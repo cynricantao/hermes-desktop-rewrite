@@ -1,0 +1,18 @@
+[package]
+name = "hermes-app"
+description = "Hermes Desktop (Rust) — native desktop client for Hermes Agent."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "hermes-desktop-rs"
+path = "src/main.rs"
+
+[dependencies]
+hermes-ui.workspace = true
+slint.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
