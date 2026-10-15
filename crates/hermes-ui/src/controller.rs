@@ -188,16 +188,22 @@ struct Controller {
 impl Controller {
     async fn run(weak: Weak<AppWindow>, mut cmds: mpsc::UnboundedReceiver<Cmd>) {
         ui(&weak, |w| w.global::<AppState>().set_connection("connecting".into()));
-        let t0 = std::time::Instant::now();
+        crate::perf::mark("controller: backend discovery start");
         let backend = match backend::discover_or_spawn(None).await {
             Ok(b) => Arc::new(b),
             Err(e) => return fail(&weak, format!("Could not start the Hermes backend: {e}")),
         };
-        tracing::info!(port = backend.endpoint.port, owned = backend.is_owned(), elapsed = ?t0.elapsed(), "backend ready");
+        tracing::info!(
+            port = backend.endpoint.port,
+            owned = backend.is_owned(),
+            "backend ready"
+        );
+        crate::perf::mark("controller: backend discovered (token fetched)");
         let (client, mut events) = match Client::connect(&backend.endpoint.ws_url()).await {
             Ok(c) => c,
             Err(e) => return fail(&weak, format!("Could not connect to the Hermes backend: {e}")),
         };
+        crate::perf::mark("controller: websocket connected");
         let mut c = Controller {
             weak: weak.clone(),
             client,
@@ -217,7 +223,9 @@ impl Controller {
             st.set_rows(ModelRc::new(VecModel::<ChatRow>::default()));
         });
         c.refresh_sessions().await;
+        crate::perf::mark("controller: session list fetched");
         c.refresh_model_label().await;
+        crate::perf::mark("controller: model label fetched");
         c.load_about().await;
         // Dev/screenshot hook: send one prompt automatically once connected.
         if let Ok(p) = std::env::var("HERMES_DESKTOP_AUTOSEND")

@@ -1,12 +1,10 @@
 //! Binary entry point: logging, tokio runtime on worker threads, Slint on the main thread.
 
-use std::time::Instant;
-
-use hermes_ui::{AppWindow, Motion, Theme};
+use hermes_ui::{AppWindow, Motion, Theme, perf};
 use slint::ComponentHandle;
 
 fn main() -> Result<(), slint::PlatformError> {
-    let t0 = Instant::now();
+    perf::init();
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -15,6 +13,7 @@ fn main() -> Result<(), slint::PlatformError> {
         .with_writer(std::io::stderr)
         .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stderr()))
         .init();
+    perf::mark("logging ready");
 
     // Two workers are plenty: one socket, one child process, a few RPCs in flight.
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -23,9 +22,10 @@ fn main() -> Result<(), slint::PlatformError> {
         .enable_all()
         .build()
         .expect("tokio runtime");
+    perf::mark("tokio runtime built");
 
     let ui = AppWindow::new()?;
-    tracing::debug!(elapsed_ms = t0.elapsed().as_secs_f64() * 1000.0, "window created");
+    perf::mark("window component created");
     // Wayland app-id / X11 WM_CLASS — must match StartupWMClass in packaging/*.desktop.
     // Needs the platform (created by AppWindow::new) and must precede the window being shown.
     slint::set_xdg_app_id("hermes-desktop-rs")?;
@@ -45,13 +45,25 @@ fn main() -> Result<(), slint::PlatformError> {
         let _ = slint::quit_event_loop();
     });
 
-    // Log time-to-first-frame once (README benchmark source).
+    // Startup phase marks from the renderer (docs/PERF.md). With
+    // HERMES_DESKTOP_EXIT_AFTER_FIRST_FRAME the process quits right after the first
+    // presented frame — used by scripts/measure-startup.sh.
+    let exit_after_first = std::env::var_os("HERMES_DESKTOP_EXIT_AFTER_FIRST_FRAME").is_some();
     let first = std::cell::Cell::new(true);
     ui.window()
-        .set_rendering_notifier(move |state, _| {
-            if matches!(state, slint::RenderingState::AfterRendering) && first.replace(false) {
-                tracing::info!(elapsed_ms = t0.elapsed().as_secs_f64() * 1000.0, "first frame");
+        .set_rendering_notifier(move |state, _| match state {
+            slint::RenderingState::RenderingSetup => perf::mark("renderer setup (GL context)"),
+            slint::RenderingState::BeforeRendering if first.get() => perf::mark("first frame: before render"),
+            slint::RenderingState::AfterRendering if first.replace(false) => {
+                perf::mark("first frame");
+                if exit_after_first {
+                    // Let the frame reach the compositor, then leave.
+                    slint::Timer::single_shot(std::time::Duration::from_millis(50), || {
+                        let _ = slint::quit_event_loop();
+                    });
+                }
             }
+            _ => {}
         })
         .ok();
 
@@ -67,8 +79,11 @@ fn main() -> Result<(), slint::PlatformError> {
     }
 
     hermes_ui::start(&ui, &rt);
-    tracing::debug!(elapsed_ms = t0.elapsed().as_secs_f64() * 1000.0, "entering event loop");
-    let r = ui.run();
+    perf::mark("controller started");
+    ui.show()?;
+    perf::mark("window shown (surface created)");
+    let r = slint::run_event_loop();
+    let _ = ui.hide();
     // Dropping the runtime drops the controller, which kills the owned backend.
     rt.shutdown_timeout(std::time::Duration::from_secs(2));
     r

@@ -38,7 +38,7 @@ entry and the icon).
 | `HERMES_DESKTOP_ISOLATED_BACKEND=1` | always spawn a private `hermes serve` |
 | `HERMES_DESKTOP_THEME=light` | system theme hint (until portal detection lands) |
 | `HERMES_DESKTOP_REDUCE_MOTION=1` | disable animation |
-| `RUST_LOG=hermes_desktop_rs=debug` | startup timing logs |
+| `RUST_LOG=startup=info` | startup phase marks (see docs/PERF.md) |
 | `HERMES_DESKTOP_AUTOSEND`, `HERMES_DESKTOP_OPEN_SETTINGS=<page>`, `HERMES_DESKTOP_TRANSCRIPT_MODE=<0-2>` | dev hooks used for scripted screenshots |
 
 ## Development
@@ -80,10 +80,11 @@ session is expected to differ (first frame, memory) but is **not measured yet**.
 | Memory (idle, window open) | RSS 188 MiB · PSS 158 MiB | `/proc/<pid>/status`, `smaps_rollup` |
 
 **Known gaps:**
-* First frame is **over the 300 ms target** in this software-GL setup; ≈350 ms of it is
-  between event-loop start and the first presented frame (EGL/llvmpipe init, font loading,
-  first layout). Not profiled yet (`perf`/`strace` aren't installed); next steps are a GPU
-  measurement and lazy-loading the serif/mono fonts.
+* First frame is **over the 300 ms target** in this headless setup. Profiled in
+  [docs/PERF.md](docs/PERF.md): ~22 ms is our code, ~290 ms is EGL driver init (a failed
+  NVIDIA vendor probe, then Mesa llvmpipe), and fonts cost a few ms. Slint's software renderer
+  presents in ~49 ms there; switching renderers is pending a decision and a real-GPU
+  measurement.
 * RSS here includes Mesa llvmpipe; re-measure under the real GPU driver.
 * The Electron Hermes Desktop wasn't running during measurement, so there is no
   side-by-side memory comparison yet.

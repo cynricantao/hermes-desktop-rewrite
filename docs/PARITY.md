@@ -27,6 +27,12 @@ Each line is one parity item: `- [ ] <feature> — <backend surface> — <source
 
 Status is updated in the same commit as the code it describes.
 
+### Rewrite progress
+
+Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
+**7 done · 7 partial · 779 not started · 0 unsupported** (of 793).
+Performance work is tracked separately in [PERF.md](PERF.md).
+
 ## Summary
 
 | Section | Items |

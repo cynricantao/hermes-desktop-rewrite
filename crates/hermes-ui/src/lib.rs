@@ -8,6 +8,7 @@
 slint::include_modules!();
 
 pub mod controller;
+pub mod perf;
 pub mod rows;
 
 pub use controller::{Cmd, start};
