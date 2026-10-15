@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Original icon for hermes-desktop-rs (CC0). Not derived from any Anthropic asset. -->
+  <rect width="256" height="256" rx="56" fill="#1a1a19"/>
+  <g fill="none" stroke="#d97757" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M84 72v112M172 72v112M84 128h88"/>
+    <path d="M60 96c-14-8-22-22-20-36M196 96c14-8 22-22 20-36"/>
+  </g>
+</svg>
