@@ -103,6 +103,39 @@ pub enum Change {
     Reset,
 }
 
+/// Tools often return a JSON envelope (`{"output": "...", "exit_code": 0, "error": null}`);
+/// show the human part. Anything else is returned unchanged.
+pub fn unwrap_tool_output(raw: &str) -> String {
+    let t = raw.trim_start();
+    if !t.starts_with('{') {
+        return raw.to_owned();
+    }
+    let Ok(Value::Object(m)) = serde_json::from_str::<Value>(t) else {
+        return raw.to_owned();
+    };
+    let mut out = String::new();
+    for key in ["output", "stdout", "content", "result"] {
+        if let Some(Value::String(s)) = m.get(key) {
+            out.push_str(s);
+            break;
+        }
+    }
+    if let Some(Value::String(e)) = m.get("error").or_else(|| m.get("stderr"))
+        && !e.is_empty()
+    {
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str(e);
+    }
+    if let Some(code) = m.get("exit_code").and_then(Value::as_i64)
+        && code != 0
+    {
+        out.push_str(&format!("\n[exit {code}]"));
+    }
+    if out.is_empty() { raw.to_owned() } else { out }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Transcript {
     pub blocks: Vec<Block>,
@@ -307,6 +340,7 @@ impl Transcript {
                                 })
                             })
                             .unwrap_or_default();
+                        c.output = unwrap_tool_output(&c.output);
                         c.inline_diff = p.get("inline_diff").and_then(Value::as_str).map(str::to_owned);
                         c.duration_s = p.get("duration_s").and_then(Value::as_f64);
                         self.status = "Thinking".into();
@@ -322,6 +356,15 @@ impl Transcript {
                 let err = p.get("error").and_then(Value::as_str).map(str::to_owned);
                 let reasoning_final = p.get("reasoning").and_then(Value::as_str).map(str::to_owned);
                 let mut change = Change::None;
+                // Reasoning already streamed into an earlier block of this turn must not be duplicated.
+                let turn_start = self
+                    .blocks
+                    .iter()
+                    .rposition(|b| matches!(b, Block::Text { role: Role::User, .. }))
+                    .unwrap_or(0);
+                let turn_has_reasoning = self.blocks[turn_start..].iter().any(
+                    |b| matches!(b, Block::Text { role: Role::Assistant, reasoning, .. } if !reasoning.is_empty()),
+                );
                 if let Some(i) = self.blocks.iter().rposition(|b| {
                     matches!(
                         b,
@@ -344,6 +387,7 @@ impl Transcript {
                             *text = t;
                         }
                         if reasoning.is_empty()
+                            && !turn_has_reasoning
                             && let Some(r) = reasoning_final
                         {
                             *reasoning = r;
@@ -505,6 +549,35 @@ mod tests {
             text, "Let me look.",
             "earlier text block is not overwritten by final text"
         );
+    }
+
+    #[test]
+    fn tool_output_unwrap() {
+        assert_eq!(
+            unwrap_tool_output(r#"{"output":"hi\nthere","exit_code":0,"error":null}"#),
+            "hi\nthere"
+        );
+        assert_eq!(
+            unwrap_tool_output(r#"{"output":"","exit_code":2,"error":"boom"}"#),
+            "boom\n[exit 2]"
+        );
+        assert_eq!(unwrap_tool_output("plain"), "plain");
+        assert_eq!(unwrap_tool_output("{bad json"), "{bad json");
+    }
+
+    #[test]
+    fn reasoning_not_duplicated_after_tools() {
+        let mut t = Transcript::new();
+        t.push_user("x");
+        t.apply(&ev("reasoning.delta", json!({"text":"plan"})));
+        t.apply(&ev("tool.start", json!({"tool_id":"a","name":"terminal"})));
+        t.apply(&ev("tool.complete", json!({"tool_id":"a"})));
+        t.apply(&ev("message.delta", json!({"text":"done"})));
+        t.apply(&ev("message.complete", json!({"text":"done","reasoning":"plan"})));
+        let Block::Text { reasoning, .. } = t.blocks.last().unwrap() else {
+            panic!()
+        };
+        assert!(reasoning.is_empty());
     }
 
     #[test]

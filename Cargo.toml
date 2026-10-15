@@ -21,6 +21,7 @@ thiserror = "2"
 slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-femtovg", "accessibility"] }
 slint-build = "1.18"
 tokio-tungstenite = "0.30"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 
 [profile.release]
