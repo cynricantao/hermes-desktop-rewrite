@@ -2452,6 +2452,132 @@ pub fn parse_value(control: &Control, raw: &str, current: Option<&Value>) -> Res
     }
 }
 
+// ── Page rows (what the UI renders) ─────────────────────────────────────────────
+
+/// One rendered row: the setting plus its resolved value. `kind` is a stable string the
+/// Slint side switches on ("toggle" … "widget"), so adding a control variant means adding a
+/// branch on both sides, never a new page.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RowData {
+    pub id: &'static str,
+    pub kind: &'static str,
+    pub label: &'static str,
+    pub description: &'static str,
+    /// Current value as text. Booleans are "true"/"false"; a list is comma-separated.
+    pub value: String,
+    /// (value, label) pairs for segmented/select; empty for a runtime-filled select.
+    pub options: Vec<(String, String)>,
+    /// Index into `options` for segmented/select, else -1.
+    pub selected: i32,
+    pub min: i32,
+    pub max: i32,
+    pub unit: &'static str,
+}
+
+/// Stable control name for the UI.
+pub fn row_kind(c: &Control) -> &'static str {
+    match c {
+        Control::Toggle => "toggle",
+        Control::Segmented(_) => "segmented",
+        Control::Select(_) => "select",
+        Control::DynSelect => "select",
+        Control::Text => "text",
+        Control::Mono => "mono",
+        Control::Number => "number",
+        Control::List => "list",
+        Control::Secret => "secret",
+        Control::Slider { .. } => "slider",
+        Control::Fallback => "fallback",
+        Control::Widget(_) => "widget",
+        Control::Action(_) => "action",
+        Control::Info => "info",
+    }
+}
+
+/// A JSON value as the single line of text the control shows. Objects have no text form
+/// (they need a structured editor) and render as "".
+pub fn value_to_string(v: &Value) -> String {
+    match v {
+        Value::Null => String::new(),
+        Value::Bool(b) => b.to_string(),
+        Value::String(s) => s.clone(),
+        Value::Number(n) => n.to_string(),
+        Value::Array(a) => a
+            .iter()
+            .map(|x| match x {
+                Value::String(s) => s.clone(),
+                other => other.to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join(", "),
+        Value::Object(_) => String::new(),
+    }
+}
+
+/// Current value of one setting, as text: config rows read the profile config, device rows
+/// read prefs and fall back to the original's default.
+pub fn row_value(s: &Setting, config: &Value, prefs: &Map<String, Value>) -> String {
+    match s.store {
+        Store::Config(key) => get(config, key).map(value_to_string).unwrap_or_default(),
+        Store::Device(key) => match prefs.get(key) {
+            Some(Value::Null) | None => crate::prefs::default_for(key).to_owned(),
+            Some(v) => value_to_string(v),
+        },
+        Store::None => String::new(),
+    }
+}
+
+/// The rows of one page, in registry order, with conditional rows dropped and values
+/// resolved. `KeyLookup` answers runtime option lists for a config key (from
+/// `/api/config/schema` / model lists); pass `|_| None` when none have been fetched.
+pub fn rows_for(
+    group_id: &str,
+    page_id: &str,
+    config: &Value,
+    prefs: &Map<String, Value>,
+    dyn_options: impl Fn(&str) -> Option<Vec<String>>,
+) -> Vec<RowData> {
+    let mut out = Vec::new();
+    for s in settings_for(group_id, page_id) {
+        if !visible(s, config) {
+            continue;
+        }
+        let value = row_value(s, config, prefs);
+        let (mut options, mut selected) = match s.control {
+            Control::Segmented(opts) | Control::Select(opts) => (
+                opts.iter()
+                    .map(|o| (o.value.to_owned(), o.label.to_owned()))
+                    .collect::<Vec<_>>(),
+                opts.iter().position(|o| o.value == value).map_or(-1, |i| i as i32),
+            ),
+            _ => (Vec::new(), -1),
+        };
+        if matches!(s.control, Control::DynSelect)
+            && let Some(list) = dyn_options(s.id)
+        {
+            selected = list.iter().position(|v| v == &value).map_or(-1, |i| i as i32);
+            options = list.into_iter().map(|v| (v.clone(), v)).collect();
+        }
+        let (min, max, unit) = match s.control {
+            Control::Slider { min, max, unit } => (min, max, unit),
+            _ => (0, 0, ""),
+        };
+        out.push(RowData {
+            id: s.id,
+            kind: row_kind(&s.control),
+            label: s.label,
+            description: s.description,
+            value,
+            options,
+            selected,
+            min,
+            max,
+            unit,
+        });
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2596,5 +2722,81 @@ mod tests {
         let c = json!({"stt": {"enabled": true}});
         assert!(voice_field_visible("stt.local.model", &c));
         assert!(voice_field_visible("tts.edge.voice", &c));
+    }
+
+    #[test]
+    fn rows_resolve_values_and_options() {
+        let cfg = json!({
+            "display": {"language": "fr"},
+            "stt": {"enabled": false, "provider": "groq"},
+        });
+        let prefs: Map<String, Value> = Map::new();
+        let rows = rows_for("appearance", "general", &cfg, &prefs, |_| None);
+        let lang = rows.iter().find(|r| r.id == "display.language").unwrap();
+        assert_eq!(lang.kind, "select");
+        assert_eq!(lang.value, "fr");
+        assert_eq!(lang.selected, 6, "French is 7th in the language list");
+        assert_eq!(lang.options[6].1, "Français");
+        // Device row with no stored value falls back to the original's default.
+        let splash = rows.iter().find(|r| r.id == "hermes.desktop.intro-splash.v1").unwrap();
+        assert_eq!(splash.kind, "toggle");
+        assert_eq!(splash.value, "true");
+        // The palette row is a page widget with no text value.
+        let pal = rows_for("appearance", "theme", &cfg, &prefs, |_| None)
+            .into_iter()
+            .find(|r| r.id == "hermes-desktop-theme-v2")
+            .unwrap();
+        assert_eq!(pal.kind, "widget");
+        assert_eq!(pal.value, "");
+    }
+
+    #[test]
+    fn rows_drop_hidden_voice_fields_and_read_prefs() {
+        let cfg = json!({"tts": {"provider": "edge"}, "stt": {"enabled": true, "provider": "groq"}});
+        let mut prefs = Map::new();
+        prefs.insert("zoom".into(), json!("125"));
+        prefs.insert("hermes.desktop.backdrop.v1".into(), json!(true));
+        let speech = rows_for("voice", "speech", &cfg, &prefs, |_| None);
+        assert!(speech.iter().any(|r| r.id == "tts.edge.voice"));
+        assert!(!speech.iter().any(|r| r.id == "tts.openai.voice"));
+        let typo = rows_for("appearance", "typography", &cfg, &prefs, |_| None);
+        let zoom = typo.iter().find(|r| r.id == "zoom").unwrap();
+        assert_eq!(zoom.value, "125");
+        assert_eq!(zoom.kind, "segmented");
+        assert_eq!(zoom.options[zoom.selected as usize].1, "125%");
+        let display = rows_for("appearance", "window-layout", &cfg, &prefs, |_| None);
+        let backdrop = display.iter().find(|r| r.id == "hermes.desktop.backdrop.v1").unwrap();
+        assert_eq!(backdrop.value, "true", "stored pref beats the default");
+    }
+
+    #[test]
+    fn dynamic_select_uses_runtime_options() {
+        let cfg = json!({"timezone": "Asia/Dubai"});
+        let prefs = Map::new();
+        let rows = rows_for("chat", "behavior", &cfg, &prefs, |key| {
+            (key == "timezone").then(|| vec!["UTC".to_owned(), "Asia/Dubai".to_owned()])
+        });
+        let tz = rows.iter().find(|r| r.id == "timezone").unwrap();
+        assert_eq!(tz.kind, "select");
+        assert_eq!(tz.options.len(), 2);
+        assert_eq!(tz.selected, 1);
+        // With no runtime list the row stays a select but shows the raw value as its text.
+        let bare = rows_for("chat", "behavior", &cfg, &prefs, |_| None);
+        let tz = bare.iter().find(|r| r.id == "timezone").unwrap();
+        assert!(tz.options.is_empty());
+        assert_eq!(tz.value, "Asia/Dubai");
+    }
+
+    #[test]
+    fn slider_rows_carry_their_range() {
+        let cfg = json!({});
+        let rows = rows_for("appearance", "chat-display", &cfg, &Map::new(), |_| None);
+        let bubble = rows
+            .iter()
+            .find(|r| r.id == "hermes.desktop.user-bubble-transparency.v1")
+            .unwrap();
+        assert_eq!(bubble.kind, "slider");
+        assert_eq!((bubble.min, bubble.max, bubble.unit), (0, 100, "%"));
+        assert_eq!(bubble.value, "0");
     }
 }
