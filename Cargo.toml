@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/hermes-core", "crates/hermes-ui", "crates/hermes-app"]
+members = ["crates/hermes-core", "crates/hermes-ui", "crates/hermes-app", "crates/hl-bench"]
 
 [workspace.package]
 version = "0.1.0"

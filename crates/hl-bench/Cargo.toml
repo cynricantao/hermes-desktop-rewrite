@@ -1,0 +1,18 @@
+[package]
+name = "hl-bench"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+syntect = ["dep:syntect"]
+ts = ["dep:tree-sitter", "dep:tree-sitter-highlight", "dep:tree-sitter-rust", "dep:tree-sitter-python", "dep:tree-sitter-javascript", "dep:tree-sitter-bash"]
+
+[dependencies]
+syntect = { version = "5.3", default-features = false, features = ["default-syntaxes", "default-themes", "regex-fancy"], optional = true }
+tree-sitter = { version = "0.25", optional = true }
+tree-sitter-highlight = { version = "0.25", optional = true }
+tree-sitter-rust = { version = "0.24", optional = true }
+tree-sitter-python = { version = "0.25", optional = true }
+tree-sitter-javascript = { version = "0.25", optional = true }
+tree-sitter-bash = { version = "0.25", optional = true }
