@@ -78,17 +78,6 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     }
 
-    // Dev/screenshot hooks (documented in README): open a screen directly.
-    if let Ok(page) = std::env::var("HERMES_DESKTOP_OPEN_SETTINGS") {
-        ui.global::<hermes_ui::SettingsState>()
-            .set_page(page.parse().unwrap_or(0));
-        ui.set_settings_open(true);
-    }
-    if let Ok(mode) = std::env::var("HERMES_DESKTOP_TRANSCRIPT_MODE") {
-        ui.global::<hermes_ui::AppState>()
-            .set_transcript_mode(mode.parse().unwrap_or(0));
-    }
-
     // Measurement hook (scripts/measure-long-transcript.sh): after N seconds, sweep the
     // transcript to the top and back once.
     if let Some(secs) = std::env::var("HERMES_DESKTOP_AUTOSCROLL")
@@ -105,6 +94,26 @@ fn main() -> Result<(), slint::PlatformError> {
 
     hermes_ui::start(&ui, &rt);
     perf::mark("controller started");
+
+    // Dev/screenshot hooks (documented in README): open a screen directly. The settings
+    // hook takes a registry page — `HERMES_DESKTOP_OPEN_SETTINGS=<group>/<page>`, e.g.
+    // `appearance/theme` — after the controller is wired, so the page loads for real.
+    if let Ok(spec) = std::env::var("HERMES_DESKTOP_OPEN_SETTINGS")
+        && !spec.trim().is_empty()
+    {
+        let (group, page) = match spec.split_once('/') {
+            Some((g, p)) => (g.to_owned(), p.to_owned()),
+            None => (spec.clone(), String::new()),
+        };
+        ui.global::<hermes_ui::SettingsState>().set_group(group.into());
+        ui.global::<hermes_ui::SettingsState>().set_page(page.into());
+        ui.set_settings_open(true);
+    }
+    if let Ok(mode) = std::env::var("HERMES_DESKTOP_TRANSCRIPT_MODE") {
+        ui.global::<hermes_ui::AppState>()
+            .set_transcript_mode(mode.parse().unwrap_or(0));
+    }
+
     ui.show()?;
     perf::mark("window shown (surface created)");
     let r = slint::run_event_loop();

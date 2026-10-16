@@ -291,7 +291,17 @@ export component AppWindow inherits Window {
     default-font-size: Theme.fs-md;
 
     in-out property <bool> sidebar-open: true;
-    in-out property <bool> settings-open: false;
+    // The settings panel is a registry-driven overlay; its visibility lives in
+    // SettingsState so the controller can drive it (dev hooks, tests) and load data
+    // exactly when it opens.
+    in-out property <bool> settings-open <=> SettingsState.open;
+    changed settings-open => {
+        if settings-open {
+            SettingsState.opened();
+        } else {
+            SettingsState.closed();
+        }
+    }
     in-out property <bool> picker-open: false;
     property <bool> empty: AppState.rows.length == 0;
     property <length> dock-h: 92px;
@@ -475,7 +485,6 @@ export component AppWindow inherits Window {
         SettingsModal {
             width: root.width;
             height: root.height;
-            open <=> root.settings-open;
         }
     }
 }
