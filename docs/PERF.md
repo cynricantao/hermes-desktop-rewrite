@@ -169,9 +169,22 @@ The GL column is llvmpipe, which renders on the CPU, so it is **not** a fair sta
 your GPU. The software column is representative, because it does the same work everywhere.
 A mid-stream screenshot under the software renderer showed the reply streaming correctly.
 
-Not measured yet: long-transcript scrolling and animation-heavy frames on the software
-renderer, and the software renderer on your real session. To measure the software renderer
-on your session (it opens and closes a window 5 times, then once more for the memory figure):
+**Software renderer on the user's real Hyprland session** (run by the user 2026-10-16, pasted
+output; release build of `c616c4a`):
+
+| Metric | Value |
+|---|---|
+| First buffer commit, `first-commit.py` ×5 | 48.7, 33.1, 32.9, 31.6, 31.6 ms → **median 32.9 ms** (min 31.6, max 48.7) |
+| Idle memory, `measure-memory.sh` | **RSS 30.1 MiB, PSS 22.3 MiB** (Pss_Anon 6.0 MiB, Pss_File 14.5 MiB, Pss_Shmem 1.8 MiB, Private_Dirty 6.0 MiB) |
+| GL/driver libraries mapped | none (software renderer, as expected) |
+
+That is well inside the 300 ms first-frame budget and lower than the femtovg/GPU figures
+above. `measure-memory.sh` printed "(no first frame seen)" because the software renderer
+has no rendering notifier. The memory sample is still taken after the settle time.
+
+Animation-heavy frames on the software renderer have not been measured yet. To repeat the
+real-session measurement (it opens and closes a window 5 times, then once more for the
+memory figure):
 
 ```sh
 cd ~/Projects/hermes\ desktop && git pull && ~/.cargo/bin/cargo build --release -p hermes-app && scripts/first-commit.py target/release/hermes-desktop-rs 5 && HERMES_MEASURE_LIVE=1 scripts/measure-memory.sh
@@ -179,3 +192,26 @@ cd ~/Projects/hermes\ desktop && git pull && ~/.cargo/bin/cargo build --release 
 
 (`measure-startup.sh` only reports a first frame for femtovg, because the software renderer
 has no rendering notifier. `first-commit.py` measures both from the Wayland protocol.)
+
+## Long conversation (600 messages), software renderer
+
+Seeded with `scripts/seed-long-session.py 600` into the private test backend (no model
+calls), opened in the app, then swept to the top and back once.
+
+**In-process** (`tests/live_backend.rs`, `HERMES_LIVE_ONLY=long`, Slint testing backend):
+600 rows loaded in 100 ms; **6 `MessageRow` instances alive at rest, at most 7 during the
+sweep** (the ListView instantiates only visible rows). RSS: 24.3 MiB before opening,
+27.0 MiB loaded, 27.1 MiB after sweep 1, 27.1 MiB after sweep 2. In the final full-suite run
+(after the other sections had run) it was 29.3, 30.7, 30.5 and 30.5 MiB.
+
+**Release binary, hidden display** (`scripts/measure-long-transcript.sh <id>`):
+
+| Window | 1440×900, scale 1 | 1440×900, scale 2 |
+|---|---:|---:|
+| idle, session loaded (4 s) | 0.0 % CPU · RSS 36.4 MiB | 0.2 % · 65.9 MiB |
+| sweep top → bottom (12 s, ~7500 px/s) | 12.0 % · 36.5 MiB | 23.9 % · 66.0 MiB |
+| idle after the sweep (5 s) | 0.2 % · 36.5 MiB | 0.2 % · 66.0 MiB |
+
+So virtualisation holds, memory stays flat, and CPU returns to ~0 when scrolling stops.
+The sweep is far faster than a human scrolls, so 12 % is an upper bound. Not measured
+on your real session: it needs a private backend port, so it can't point at your sessions.

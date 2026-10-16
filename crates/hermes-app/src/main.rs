@@ -89,6 +89,20 @@ fn main() -> Result<(), slint::PlatformError> {
             .set_transcript_mode(mode.parse().unwrap_or(0));
     }
 
+    // Measurement hook (scripts/measure-long-transcript.sh): after N seconds, sweep the
+    // transcript to the top and back once.
+    if let Some(secs) = std::env::var("HERMES_DESKTOP_AUTOSCROLL")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+    {
+        let w = ui.as_weak();
+        slint::Timer::single_shot(std::time::Duration::from_secs_f64(secs), move || {
+            if let Some(ui) = w.upgrade() {
+                ui.global::<hermes_ui::AppState>().set_autoscroll(true);
+            }
+        });
+    }
+
     hermes_ui::start(&ui, &rt);
     perf::mark("controller started");
     ui.show()?;

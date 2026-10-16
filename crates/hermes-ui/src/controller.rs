@@ -183,6 +183,10 @@ struct Controller {
     dirty: Vec<usize>,
     reset: bool,
     pending_approval: Option<String>,
+    /// Model picked on the new-chat screen before a session exists: (provider, model).
+    /// Sent with `session.create` (as the Electron app does); `config.set model` needs a
+    /// live session and answers 4001 without one.
+    draft_model: Option<(String, String)>,
 }
 
 impl Controller {
@@ -220,6 +224,7 @@ impl Controller {
             transcript: Transcript::new(),
             session: None,
             stored: None,
+            draft_model: None,
             all_sessions: vec![],
             query: String::new(),
             dirty: vec![],
@@ -236,6 +241,12 @@ impl Controller {
         c.refresh_model_label().await;
         crate::perf::mark("controller: model label fetched");
         c.load_about().await;
+        // Dev/measurement hook: open a stored session once connected.
+        if let Ok(id) = std::env::var("HERMES_DESKTOP_OPEN_SESSION")
+            && !id.trim().is_empty()
+        {
+            c.open(id.trim().to_owned()).await;
+        }
         // Dev/screenshot hook: send one prompt automatically once connected.
         if let Ok(p) = std::env::var("HERMES_DESKTOP_AUTOSEND")
             && !p.trim().is_empty()
@@ -350,6 +361,7 @@ impl Controller {
                 }
             }
             Cmd::NewChat => {
+                self.draft_model = None;
                 self.session = None;
                 self.stored = None;
                 self.transcript = Transcript::new();
@@ -377,10 +389,20 @@ impl Controller {
             }
             Cmd::RefreshModels => self.refresh_models().await,
             Cmd::SelectModel { provider, model } => {
-                let mut params = json!({"key": "model", "value": format!("{model} --provider {provider}")});
-                if let Some(sid) = &self.session {
-                    params["session_id"] = json!(sid);
-                }
+                let Some(sid) = self.session.clone() else {
+                    // New-chat screen: remember the pick; it rides on session.create.
+                    let label = short_model(&model);
+                    self.draft_model = Some((provider, model));
+                    ui(&self.weak, move |w| {
+                        w.global::<AppState>().set_model_label(label.into())
+                    });
+                    return;
+                };
+                let params = json!({
+                    "key": "model",
+                    "value": format!("{model} --provider {provider}"),
+                    "session_id": sid,
+                });
                 match self.client.request("config.set", params).await {
                     Ok(_) => self.refresh_model_label().await,
                     Err(e) => self.banner(format!("Could not switch model: {e}"), true),
@@ -425,7 +447,14 @@ impl Controller {
         }
         match self
             .client
-            .call::<SessionCreateResult>("session.create", json!({"source": "desktop"}))
+            .call::<SessionCreateResult>("session.create", {
+                let mut p = json!({"source": "desktop"});
+                if let Some((provider, model)) = self.draft_model.take() {
+                    p["model"] = json!(model);
+                    p["provider"] = json!(provider);
+                }
+                p
+            })
             .await
         {
             Ok(r) => {
@@ -574,12 +603,15 @@ impl Controller {
             "approval" => {
                 let s = |k: &str| params.get(k).and_then(Value::as_str).unwrap_or_default().to_owned();
                 self.pending_approval = Some(id);
+                let choices = approval_choices(&params);
                 let info = ApprovalInfo {
                     visible: true,
                     request_id: s("request_id").into(),
                     title: "Allow this command?".into(),
                     command: s("command").into(),
                     description: s("description").into(),
+                    allow_session: choices.iter().any(|c| c == "session"),
+                    allow_always: choices.iter().any(|c| c == "always"),
                 };
                 ui(&self.weak, move |w| w.global::<AppState>().set_approval(info));
             }
@@ -678,7 +710,10 @@ impl Controller {
                         ..Default::default()
                     });
                     for m in ids {
-                        let current = p.slug == r.provider && m == r.model;
+                        let current = match (&self.session, &self.draft_model) {
+                            (None, Some((dp, dm))) => &p.slug == dp && &m == dm,
+                            _ => p.slug == r.provider && m == r.model,
+                        };
                         items.push(ModelItem {
                             provider: p.slug.as_str().into(),
                             provider_name: p.name.as_str().into(),
@@ -726,6 +761,26 @@ fn fail(weak: &Weak<AppWindow>, msg: String) {
     });
 }
 
+/// Choices an `approval` server request offers. Mirrors `tui_gateway/server.py::
+/// _approval_request_payload`: an explicit `choices` list wins; otherwise `once`, then
+/// `session` unless smart-denied or `allow_session == false`, then `always` unless
+/// `allow_permanent == false`, then `deny`.
+pub fn approval_choices(params: &Value) -> Vec<String> {
+    if let Some(list) = params.get("choices").and_then(Value::as_array) {
+        return list.iter().filter_map(Value::as_str).map(str::to_owned).collect();
+    }
+    let flag = |k: &str| params.get(k).and_then(Value::as_bool);
+    let mut out = vec!["once".to_owned()];
+    if flag("smart_denied") != Some(true) && flag("allow_session") != Some(false) {
+        out.push("session".into());
+        if flag("allow_permanent") != Some(false) {
+            out.push("always".into());
+        }
+    }
+    out.push("deny".into());
+    out
+}
+
 /// `deepseek/deepseek-v4.1-flash` → `deepseek-v4.1-flash`.
 pub fn short_model(m: &str) -> String {
     m.rsplit('/').next().unwrap_or(m).to_owned()
@@ -752,5 +807,15 @@ mod tests {
         assert_eq!(greeting_for_hour(9), "Good morning");
         assert_eq!(greeting_for_hour(15), "Good afternoon");
         assert_eq!(greeting_for_hour(20), "Good evening");
+    }
+
+    #[test]
+    fn approval_choice_rules() {
+        let c = |v: Value| approval_choices(&v);
+        assert_eq!(c(json!({})), ["once", "session", "always", "deny"]);
+        assert_eq!(c(json!({"choices": ["once", "deny"]})), ["once", "deny"]);
+        assert_eq!(c(json!({"allow_permanent": false})), ["once", "session", "deny"]);
+        assert_eq!(c(json!({"allow_session": false})), ["once", "deny"]);
+        assert_eq!(c(json!({"smart_denied": true})), ["once", "deny"]);
     }
 }

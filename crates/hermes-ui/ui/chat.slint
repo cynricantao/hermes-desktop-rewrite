@@ -256,6 +256,10 @@ export component Transcript inherits Rectangle {
     in property <bool> running;
     in property <int> transcript-mode;
     in-out property <bool> follow: true;
+    // Dev/measurement hook (HERMES_DESKTOP_AUTOSCROLL): sweep to the top and back to the
+    // bottom once, ~7500 px/s, then clear the flag. Used by the long-transcript checks.
+    in-out property <bool> autoscroll;
+    property <int> sweep-dir: -1;
     callback copy(string);
 
     property <length> status-h: root.running ? 40px : 0px;
@@ -292,6 +296,23 @@ export component Transcript inherits Rectangle {
                 }
                 if root.running: ShimmerText { text: root.status != "" ? root.status : "Thinking"; font-size: Theme.fs-md; }
             }
+    }
+
+    Timer {
+        interval: 16ms;
+        running: root.autoscroll;
+        triggered => {
+            if root.sweep-dir < 0 {
+                list.content-y = min(0px, list.content-y + 120px);
+                if list.content-y >= 0px { root.sweep-dir = 1; }
+            } else {
+                list.content-y = max(min(0px, list.visible-height - list.content-height), list.content-y - 120px);
+                if list.content-y <= min(0px, list.visible-height - list.content-height) {
+                    root.sweep-dir = -1;
+                    root.autoscroll = false;
+                }
+            }
+        }
     }
 
     // Keep the tail in view when new content arrives and follow is on.

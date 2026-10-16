@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**11 done · 4 partial · 778 not started · 0 unsupported** (of 793).
+**13 done · 4 partial · 776 not started · 0 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -90,7 +90,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Steer a running turn — RPC session.steer — src/app/chat/session-tile-actions.ts
 - [ ] Queue a message while busy (⌘Enter) — local + RPC prompt.submit (queue drain) — src/store/composer-queue.ts
 - [ ] Send next queued message (⌘⇧K) — local — src/store/composer-queue.ts, src/lib/keybinds/actions.ts
-- [x] Interrupt / stop the active turn — RPC session.interrupt — src/app/chat/session-tile-actions.ts ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: Stop clicked mid-stream → reply stops growing (17 of 300 lines, unchanged 3 s later), running=false, no spinner, button back to Send, next prompt answered. Esc shortcut not exercised
+- [x] Interrupt / stop the active turn — RPC session.interrupt — src/app/chat/session-tile-actions.ts ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: Stop clicked mid-stream → reply stops growing (30 of 300 lines, unchanged 3 s later), running=false, no spinner, button back to Send, next prompt answered. **Esc** (global shortcut, focus in composer) verified the same way: stopped at 24 of 300 lines, unchanged 3 s later, next prompt answered
 - [ ] Redirect a running turn — RPC session.redirect — src/app/chat/session-tile-actions.ts
 - [ ] Rewind / edit-and-resend a prior user turn — RPC session.history + prompt.submit — src/app/session/hooks/use-prompt-actions/rewind.ts
 - [x] Newline without sending (⇧Enter) — local — src/lib/keybinds/actions.ts (KEYBIND_READONLY) ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: Shift+Enter → composer `hello\n`, nothing sent; Enter sends and clears; IME preedit+commit (`日本`) inserts text without sending
@@ -115,7 +115,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Screenshot attach from OS shortcut — local (Electron) + RPC image.attach_bytes — src/app/chat/composer/hooks/use-composer-screenshot.ts
 - [ ] Inline references (/file, @path) in composer — local + RPC complete.path — src/app/chat/composer/inline-refs.ts, path-refs.ts
 - [ ] URL reference chips — local — src/app/chat/composer/url-refs.ts, url-dialog.tsx
-- [x] Model pill (per-composer model switcher) — REST /api/model/set, /api/model/options — src/app/chat/composer/model-pill.tsx ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: mid-session deepseek-v4.1-flash → glm-5.3-flash via `config.set model` (session-scoped); label updates; next reply answered by the new model
+- [x] Model pill (per-composer model switcher) — REST /api/model/set, /api/model/options — src/app/chat/composer/model-pill.tsx ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: mid-session deepseek-v4.1-flash → glm-5.3-flash via `config.set model` (session-scoped); label updates; next reply answered by the new model. Re-verified 2026-10-16 (PR #3): a pick on the **new-chat screen** is kept and sent with `session.create` (`model`/`provider`, as the Electron app does), because `config.set model` answers 4001 without a live session. This was a real bug: the pick was silently ignored. Then switching back mid-session also works
 - [ ] Reasoning-effort pill — RPC config.set (agent.reasoning_effort) — src/app/chat/composer/reasoning-pill.tsx
 - [ ] Reasoning level up/down hotkeys — local — src/lib/keybinds/actions.ts
 - [ ] Composer scope selector (profile/agent routing) — local — src/app/chat/composer/scope.tsx
@@ -167,13 +167,13 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Embed consent prompt — local — src/components/assistant-ui/embeds/embed-consent.tsx, src/store/embed-consent.ts
 - [ ] SVG / listing / frame embeds — local — src/components/assistant-ui/embeds/svg-embed.tsx, listing-embed.tsx, frame-embed.tsx
 - [ ] Interrupted-reply banner + resume — local — src/app/session/hooks/use-message-stream/interrupted-reply.tsx
-- [ ] Transcript windowing / retention (perf) — local — src/app/chat/transcript-window.ts, transcript-retention.ts
+- [~] Transcript windowing / retention (perf) — local — src/app/chat/transcript-window.ts, transcript-retention.ts ⟶ windowing verified live 2026-10-16 (600-message session, `tests/live_backend.rs` long section): 6–7 `MessageRow` instances alive while sweeping all 600 rows, RSS 27.0 → 27.1 → 27.1 MiB over two full sweeps; release binary on the hidden display: idle 0 % CPU, sweep 12 % (1×) / 24 % (2×), RSS flat (docs/PERF.md). No retention cap (all rows' data stays in the model)
 - [ ] Transcript scroll restore + scroll-to-bottom — local — src/store/thread-scroll.ts, src/app/chat/scroll-to-bottom-button.tsx
 - [ ] Find in transcript (⌘F, ⌘G/⌘⇧G) — local — src/lib/find-in-page.ts, src/store/find-in-page.ts
 - [ ] Selection-to-composer context (⌘/Ctrl+L on selection) — local — src/lib/keybinds/actions.ts (view.selectionToComposer)
 - [ ] Transcript text scale — local — src/store/chat-text-scale.ts
 - [ ] Copy message / selection color handling — local — src/lib/selection-copy-colors.ts
-- [ ] Assistant-ui thread list + virtualization — local — src/components/assistant-ui/thread/list.tsx
+- [x] Assistant-ui thread list + virtualization — local — src/components/assistant-ui/thread/list.tsx ⟶ Slint `ListView` instantiates only visible rows; verified live 2026-10-16 on a 600-message session (≤7 rows alive, memory flat; see windowing item)
 - [ ] Message render error boundary — local — src/components/assistant-ui/message-render-boundary.tsx
 - [ ] Timeline index/history (jump history) — local — src/components/assistant-ui/thread/use-timeline-history.ts
 
@@ -204,9 +204,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Approvals / clarify
 
-- [x] Approval request card (dangerous command) — SRV approval — src/components/assistant-ui/tool/approval.tsx ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: `rm -r <scratch dir>` raised the card; Deny → dir kept, agent reports denial; Allow once → dir removed, agent reports success; card closes, no spinner. Needed `client.capabilities {server_requests:true}` (fixed) and `request.cancel` handling (added). "Allow for session" not exercised
+- [x] Approval request card (dangerous command) — SRV approval — src/components/assistant-ui/tool/approval.tsx ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: `rm -r <scratch dir>` raised the card; Deny → dir kept, agent reports denial; Allow once → dir removed, agent reports success; card closes, no spinner. Needed `client.capabilities {server_requests:true}` (fixed) and `request.cancel` handling (added). Card shows only the choices the backend offers (`choices` / `allow_session` / `allow_permanent`, unit-tested); screenshot docs/screenshots/rs-dark-approval-card.png
 - [ ] Approval activity feed — WS approval.* — src/components/assistant-ui/tool/approval-activity.ts
-- [~] Respond to approval (allow/deny/always) — RPC approval.respond / approval.received — src/lib/keybinds/approval-keys.ts ⟶ deny + once verified live via the SRV approval response (see card above); "always" not offered in the UI yet; keyboard shortcuts not built
+- [x] Respond to approval (allow/deny/always) — RPC approval.respond / approval.received — src/lib/keybinds/approval-keys.ts ⟶ live 2026-10-16, `tests/live_backend.rs` (14/14) vs private backend: Deny/Allow once by click; **Esc denies** and **Enter (empty composer) allows once**, same keys as approval-keys.ts; **Allow for session** → next `rm -r` in that chat runs with no card, a new chat asks again; **Always allow** → `command_allowlist` written to the private config.yaml, a new chat runs it with no card
 - [ ] Approval mode selector (manual/smart/off) — config approvals.mode (config.set) — src/app/shell/approval-mode-menu.tsx
 - [ ] Pending approvals list — RPC approval.pending — src/store/approval-mode.ts
 - [ ] Clarify questions (1–5) render + submit — SRV clarify — src/components/assistant-ui/clarify/index.tsx
