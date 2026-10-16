@@ -6,9 +6,17 @@
 //!   notifications, server→client requests, `gateway.ping` heartbeat).
 //! * [`protocol`] — serde types for the subset of the gateway contract we consume.
 //! * [`transcript`] — a pure reducer turning gateway events into a renderable transcript.
+//! * [`markdown`] — block-level splitting of assistant replies into prose / fenced code /
+//!   GFM tables, streaming-safe (a half-received table never flickers).
+//! * [`diff`] — unified-diff parsing for the diff view (line kinds, numbers, paths).
+//! * [`highlight`] — syntect-backed code highlighting on a background thread, with a
+//!   bounded content-keyed cache and per-stream checkpoint resume.
 //! * [`sessions`] — session-list grouping helpers.
 
 pub mod backend;
+pub mod diff;
+pub mod highlight;
+pub mod markdown;
 pub mod protocol;
 pub mod rpc;
 pub mod sessions;
