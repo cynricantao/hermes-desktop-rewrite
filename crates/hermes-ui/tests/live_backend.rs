@@ -1,7 +1,11 @@
 //! Live end-to-end test: the real UI (Slint testing backend, no window, no display) driven
 //! against a real Hermes backend. Covers the PARITY items that need a live run:
-//! composer keys (Enter / Shift+Enter / IME composition), Stop mid-stream, model switching
-//! mid-session, and the approval card (deny, then allow once).
+//! composer keys (Enter / Shift+Enter / IME composition), Stop mid-stream (button and Esc),
+//! model switching mid-session, the approval card (Deny / Allow once / Allow for session /
+//! Always allow, by click and by keyboard), and a long (600-message) conversation.
+//!
+//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long` runs a subset. The `long` section needs
+//! a seeded session: `HERMES_HOME=<private home> scripts/seed-long-session.py 600`.
 //!
 //! Ignored by default: it needs a running backend and spends a few cheap model calls.
 //! Run against a *private* backend with approvals enabled (never your everyday one):
@@ -12,7 +16,10 @@
 //! ```
 //!
 //! The approval part runs `rm -r` on throwaway directories under
-//! `$HERMES_LIVE_SCRATCH` (default `$TMPDIR/hermes-live-test`).
+//! `$HERMES_LIVE_SCRATCH` (default `$TMPDIR/hermes-live-test`). "Always allow" writes
+//! `command_allowlist` into the private backend's config.yaml
+//! (`$HERMES_LIVE_HOME`, default `$TMPDIR/hermes-live-home`), which
+//! `scripts/live-test-backend.sh` regenerates on every start.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -158,6 +165,109 @@ fn approval_visible(ui: &AppWindow) -> bool {
     ui.global::<AppState>().get_approval().visible
 }
 
+fn want(section: &str) -> bool {
+    std::env::var("HERMES_LIVE_ONLY")
+        .map(|v| v.split(',').any(|x| x.trim() == section))
+        .unwrap_or(true)
+}
+
+fn tmpdir() -> String {
+    std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".into())
+}
+
+/// Resident set size of this process (the test runs the real UI in-process).
+fn rss_kib() -> u64 {
+    std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|s| {
+            s.lines()
+                .find(|l| l.starts_with("VmRSS:"))
+                .and_then(|l| l.split_whitespace().nth(1))
+                .and_then(|v| v.parse().ok())
+        })
+        .unwrap_or(0)
+}
+
+/// Number of transcript rows Slint has actually instantiated (virtualisation check).
+/// Needs `SLINT_EMIT_DEBUG_INFO=1` at build time.
+fn live_message_rows(ui: &AppWindow) -> usize {
+    ElementHandle::find_by_element_type_name(ui, "MessageRow").count()
+}
+
+enum Act {
+    Click(&'static str),
+    Key(Key),
+}
+
+struct Case {
+    saw_card: bool,
+    card: hermes_ui::ApprovalInfo,
+    hidden_after: bool,
+    done: bool,
+    exists: bool,
+    reply: String,
+}
+
+/// Ask the agent to `rm -r` a fresh throwaway dir. If the approval card shows, answer it
+/// with `act` (or Deny when no card was expected), then wait for the turn to finish.
+async fn approval_case(ui: &AppWindow, dir: &str, act: Option<Act>) -> Case {
+    std::fs::create_dir_all(dir).unwrap();
+    std::fs::write(format!("{dir}/file.txt"), "throwaway").unwrap();
+    let prompt = format!(
+        "Use the terminal tool to run exactly this command and nothing else: rm -r {dir} \
+         — If the command is denied, do not try any alternative; just tell me it was denied."
+    );
+    let before = rows(ui).len();
+    by_label(ui, "Message").unwrap().set_accessible_value(prompt.as_str());
+    press(ui, Key::Return);
+    let reply_after = |ui: &AppWindow| {
+        rows(ui)
+            .iter()
+            .skip(before + 1)
+            .rev()
+            .find(|r| r.kind == 1 && !r.text.trim().is_empty())
+            .map(|r| r.text.to_string())
+    };
+    let mut c = Case {
+        saw_card: false,
+        card: Default::default(),
+        hidden_after: true,
+        done: false,
+        exists: true,
+        reply: String::new(),
+    };
+    let end = Instant::now() + Duration::from_secs(180);
+    while Instant::now() < end {
+        if approval_visible(ui) && !c.saw_card {
+            c.saw_card = true;
+            c.card = ui.global::<AppState>().get_approval();
+            sleep(300).await;
+            match &act {
+                Some(Act::Click(label)) => {
+                    if let Some(b) = by_label(ui, label) {
+                        b.single_click(PointerEventButton::Left).await;
+                    }
+                }
+                Some(Act::Key(k)) => press(ui, *k),
+                None => {
+                    if let Some(b) = by_label(ui, "Deny") {
+                        b.single_click(PointerEventButton::Left).await;
+                    }
+                }
+            }
+            c.hidden_after = wait_until(5, || !approval_visible(ui)).await;
+        }
+        if rows(ui).len() > before + 1 && !running(ui) && reply_after(ui).is_some() {
+            c.done = true;
+            break;
+        }
+        sleep(150).await;
+    }
+    c.exists = std::path::Path::new(dir).exists();
+    c.reply = reply_after(ui).unwrap_or_default().trim().chars().take(200).collect();
+    c
+}
+
 async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     let ui = ui.upgrade().expect("window");
     let st = ui.global::<AppState>();
@@ -169,7 +279,25 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
         return;
     }
 
-    // --- composer keys
+    if want("keys") {
+        keys_section(&ui, &log).await;
+    }
+    if want("stop") {
+        stop_section(&ui, &log).await;
+    }
+    if want("model") {
+        model_section(&ui, &log).await;
+    }
+    if want("approval") {
+        approval_section(&ui, &log).await;
+    }
+    if want("long") {
+        long_section(&ui, &log).await;
+    }
+}
+
+async fn keys_section(ui: &AppWindow, log: &Log) {
+    let (ui, log) = (ui.clone_strong(), log.clone());
     if let Some(input) = by_label(&ui, "Message") {
         input.single_click(PointerEventButton::Left).await;
     }
@@ -201,19 +329,25 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
             rows(&ui).len()
         ),
     );
+}
 
-    // --- Enter sends; Stop mid-stream
+async fn stop_section(ui: &AppWindow, log: &Log) {
+    let (ui, log) = (ui.clone_strong(), log.clone());
+    if let Some(input) = by_label(&ui, "Message") {
+        input.set_accessible_value("");
+    }
     let prompt = "Write the numbers from one to three hundred as English words, one per line. No tools, no preamble.";
     by_label(&ui, "Message").unwrap().set_accessible_value(prompt);
     press(&ui, Key::Return);
-    let sent = wait_until(10, || rows(&ui).first().is_some_and(|r| r.kind == 0)).await;
+    let n0 = rows(&ui).len();
+    let sent = wait_until(10, || rows(&ui).get(n0).is_some_and(|r| r.kind == 0)).await;
     record(
         &log,
         "Enter sends",
         sent && composer_text(&ui).is_empty(),
         format!(
             "first row = {:?}, composer = {:?}",
-            rows(&ui).first().map(|r| r.text.to_string()),
+            rows(&ui).get(n0).map(|r| r.text.to_string()),
             composer_text(&ui)
         ),
     );
@@ -255,7 +389,47 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
         format!("reply = {:?}", reply.trim()),
     );
 
-    // --- model switch mid-session
+    // Esc stops a running turn (global shortcut; focus is in the composer).
+    by_label(&ui, "Message").unwrap().set_accessible_value(prompt);
+    press(&ui, Key::Return);
+    let base = last_assistant(&ui);
+    let streaming = wait_until(90, || {
+        let t = last_assistant(&ui);
+        t != base && t.lines().count() >= 8
+    })
+    .await;
+    press(&ui, Key::Escape);
+    let stopped = wait_until(15, || !running(&ui)).await;
+    let n1 = last_assistant(&ui).lines().count();
+    sleep(3000).await;
+    let n2 = last_assistant(&ui).lines().count();
+    let clean = idle_clean(&ui);
+    record(
+        &log,
+        "Esc stops mid-stream",
+        streaming && stopped && n1 == n2 && n2 < 300 && clean.is_ok(),
+        format!(
+            "streaming={streaming}; running={} after Esc; lines at stop {n1}, 3 s later {n2} (of 300); {}",
+            running(&ui),
+            clean.err().unwrap_or_else(|| "no spinner, button back to Send".into())
+        ),
+    );
+    let ok = send_and_wait(&ui, "Reply with exactly the word: ok", 120).await;
+    let reply = last_assistant(&ui);
+    record(
+        &log,
+        "next prompt after Esc works",
+        ok && reply.to_lowercase().contains("ok"),
+        format!("reply = {:?}", reply.trim()),
+    );
+}
+
+async fn model_section(ui: &AppWindow, log: &Log) {
+    let (ui, log) = (ui.clone_strong(), log.clone());
+    let st = ui.global::<AppState>();
+    // Start from a fresh draft (no live session yet): the switch must still apply.
+    st.invoke_new_chat();
+    wait_until(5, || rows(&ui).is_empty()).await;
     st.invoke_refresh_models();
     wait_until(20, || st.get_models().row_count() > 0).await;
     let models: Vec<_> = st.get_models().iter().filter(|m| !m.header).collect();
@@ -277,14 +451,34 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
             let reply = last_assistant(&ui);
             record(
                 &log,
-                "model switch mid-session",
+                "model pick on a new chat (rides on session.create)",
                 switched && ok && reply.to_lowercase().contains("pong") && st.get_model_label() == short.as_str(),
                 format!(
-                    "{} → {} (label {label_before} → {}); reply after switch = {:?}",
+                    "{} → {} (label {label_before} → {}); reply after switch = {:?}; banner = {:?}",
                     c.model,
                     t.model,
                     st.get_model_label(),
-                    reply.trim()
+                    reply.trim(),
+                    st.get_banner().to_string()
+                ),
+            );
+            // Now switch back mid-session (config.set on the live session).
+            let back = c.model.rsplit('/').next().unwrap_or(&c.model).to_string();
+            st.invoke_select_model(c.provider.clone(), c.model.clone());
+            let switched = wait_until(30, || st.get_model_label() == back.as_str()).await;
+            let ok = send_and_wait(&ui, "Reply with exactly the word: pong", 120).await;
+            let reply = last_assistant(&ui);
+            record(
+                &log,
+                "model switch mid-session",
+                switched && ok && reply.to_lowercase().contains("pong") && st.get_banner().is_empty(),
+                format!(
+                    "{} → {} (label now {}); reply = {:?}; banner = {:?}",
+                    t.model,
+                    c.model,
+                    st.get_model_label(),
+                    reply.trim(),
+                    st.get_banner().to_string()
                 ),
             );
         }
@@ -295,56 +489,184 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
             format!("no target model (current {c:?}, target {t:?})"),
         ),
     }
+}
 
-    // --- approval card: deny, then allow once
-    let scratch = std::env::var("HERMES_LIVE_SCRATCH").unwrap_or_else(|_| {
-        format!(
-            "{}/hermes-live-test",
-            std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".into())
-        )
-    });
-    for (choice, label) in [("deny", "Deny"), ("once", "Allow once")] {
-        let dir = format!("{scratch}/victim-{choice}");
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(format!("{dir}/file.txt"), "throwaway").unwrap();
-        let prompt = format!(
-            "Use the terminal tool to run exactly this command and nothing else: rm -r {dir} \
-             — If the command is denied, do not try any alternative; just tell me it was denied."
-        );
-        let before = rows(&ui).len();
-        by_label(&ui, "Message").unwrap().set_accessible_value(prompt.as_str());
-        press(&ui, Key::Return);
-        let shown = wait_until(120, || approval_visible(&ui)).await;
-        let card = st.get_approval();
-        if shown && let Some(b) = by_label(&ui, label) {
-            b.single_click(PointerEventButton::Left).await;
-        }
-        let hidden = wait_until(5, || !approval_visible(&ui)).await;
-        // The turn is done when it stops running AND a new assistant reply exists after the prompt.
-        let reply_after = |ui: &AppWindow| {
-            rows(ui)
-                .iter()
-                .skip(before)
-                .rev()
-                .find(|r| r.kind == 1 && !r.text.trim().is_empty())
-                .map(|r| r.text.to_string())
-        };
-        let done = wait_until(120, || !running(&ui) && reply_after(&ui).is_some()).await;
-        let exists = std::path::Path::new(&dir).exists();
-        let reply = reply_after(&ui).unwrap_or_default();
-        let expect_exists = choice == "deny";
+async fn approval_section(ui: &AppWindow, log: &Log) {
+    let (ui, log) = (ui.clone_strong(), log.clone());
+    let st = ui.global::<AppState>();
+    let scratch = std::env::var("HERMES_LIVE_SCRATCH").unwrap_or_else(|_| format!("{}/hermes-live-test", tmpdir()));
+    let live_home = std::env::var("HERMES_LIVE_HOME").unwrap_or_else(|_| format!("{}/hermes-live-home", tmpdir()));
+    // "Always allow" persists in the private config; a second run on the same backend would
+    // never see a card. live-test-backend.sh regenerates config.yaml on every start.
+    let cfg_path = format!("{live_home}/config.yaml");
+    if std::fs::read_to_string(&cfg_path)
+        .unwrap_or_default()
+        .contains("command_allowlist")
+    {
         record(
             &log,
-            &format!("approval card: {label}"),
-            shown && hidden && done && exists == expect_exists && idle_clean(&ui).is_ok(),
+            "approval precondition",
+            false,
             format!(
-                "card shown={shown} command={:?}; hidden after click={hidden}; turn done={done}; \
-                 dir exists afterwards={exists}; agent said: {:?}",
-                card.command.to_string(),
-                reply.trim().chars().take(240).collect::<String>()
+                "{cfg_path} already has command_allowlist (from an earlier run): restart scripts/live-test-backend.sh"
+            ),
+        );
+        return;
+    }
+    // Fresh chat so earlier "session" approvals can't leak in.
+    st.invoke_new_chat();
+    wait_until(5, || rows(&ui).is_empty()).await;
+
+    // (name, act, expect dir removed). Keyboard cases come before "session", which would
+    // otherwise pre-approve the pattern for the rest of this chat.
+    let cases: [(&str, Act, bool); 4] = [
+        ("Deny (click)", Act::Click("Deny"), false),
+        ("Allow once (click)", Act::Click("Allow once"), true),
+        ("Esc denies", Act::Key(Key::Escape), false),
+        ("Enter allows once", Act::Key(Key::Return), true),
+    ];
+    for (i, (name, act, removed)) in cases.into_iter().enumerate() {
+        let dir = format!("{scratch}/victim-{i}");
+        let c = approval_case(&ui, &dir, Some(act)).await;
+        record(
+            &log,
+            &format!("approval card: {name}"),
+            c.saw_card && c.hidden_after && c.done && c.exists != removed && idle_clean(&ui).is_ok(),
+            format!(
+                "card shown={} command={:?} choices: session={} always={}; hidden={}; turn done={}; dir exists={}; agent: {:?}",
+                c.saw_card,
+                c.card.command.to_string(),
+                c.card.allow_session,
+                c.card.allow_always,
+                c.hidden_after,
+                c.done,
+                c.exists,
+                c.reply
             ),
         );
     }
+
+    // Allow for session: approves this chat's pattern, so the next rm -r runs with no card.
+    let a = approval_case(
+        &ui,
+        &format!("{scratch}/victim-session-a"),
+        Some(Act::Click("Allow for session")),
+    )
+    .await;
+    let b = approval_case(&ui, &format!("{scratch}/victim-session-b"), None).await;
+    record(
+        &log,
+        "approval card: Allow for session",
+        a.saw_card && a.card.allow_session && a.done && !a.exists && !b.saw_card && b.done && !b.exists,
+        format!(
+            "1st: card={} removed={}; 2nd in same chat: card={} removed={} agent: {:?}",
+            a.saw_card, !a.exists, b.saw_card, !b.exists, b.reply
+        ),
+    );
+    // ...and does not leak into a new chat.
+    st.invoke_new_chat();
+    wait_until(5, || rows(&ui).is_empty()).await;
+    let c = approval_case(&ui, &format!("{scratch}/victim-session-c"), Some(Act::Click("Deny"))).await;
+    record(
+        &log,
+        "Allow for session is scoped to that chat",
+        c.saw_card && c.done && c.exists,
+        format!("new chat: card={} dir kept={}", c.saw_card, c.exists),
+    );
+
+    // Always allow: persisted to the private config's command_allowlist; a new chat runs it with no card.
+    st.invoke_new_chat();
+    wait_until(5, || rows(&ui).is_empty()).await;
+    let cfg = format!("{live_home}/config.yaml");
+    let before = std::fs::read_to_string(&cfg)
+        .unwrap_or_default()
+        .contains("command_allowlist");
+    let a = approval_case(
+        &ui,
+        &format!("{scratch}/victim-always-a"),
+        Some(Act::Click("Always allow")),
+    )
+    .await;
+    let after = std::fs::read_to_string(&cfg).unwrap_or_default();
+    let persisted = after.contains("command_allowlist");
+    st.invoke_new_chat();
+    wait_until(5, || rows(&ui).is_empty()).await;
+    let b = approval_case(&ui, &format!("{scratch}/victim-always-b"), None).await;
+    record(
+        &log,
+        "approval card: Always allow",
+        a.saw_card && a.card.allow_always && a.done && !a.exists && persisted && !b.saw_card && b.done && !b.exists,
+        format!(
+            "card={} removed={}; command_allowlist in private config: before={before} after={persisted}; \
+             new chat: card={} removed={}",
+            a.saw_card, !a.exists, b.saw_card, !b.exists
+        ),
+    );
+}
+
+async fn long_section(ui: &AppWindow, log: &Log) {
+    let (ui, log) = (ui.clone_strong(), log.clone());
+    let st = ui.global::<AppState>();
+    wait_until(10, || st.get_sessions().row_count() > 0).await;
+    let id = std::env::var("HERMES_LIVE_LONG_SESSION").ok().or_else(|| {
+        st.get_sessions()
+            .iter()
+            .find(|s| s.title.contains("Question 0: explain item 0"))
+            .map(|s| s.id.to_string())
+    });
+    let Some(id) = id else {
+        record(
+            &log,
+            "long conversation",
+            false,
+            "no seeded session (run scripts/seed-long-session.py)",
+        );
+        return;
+    };
+    let rss0 = rss_kib();
+    let t0 = Instant::now();
+    st.invoke_open_session(id.as_str().into());
+    let loaded = wait_until(60, || rows(&ui).len() >= 500).await;
+    let load_ms = t0.elapsed().as_millis();
+    sleep(1000).await;
+    let n = rows(&ui).len();
+    let live_rest = live_message_rows(&ui);
+    let rss_loaded = rss_kib();
+
+    // Sweep to the top and back (Transcript.autoscroll), sampling instantiated rows.
+    st.set_autoscroll(true);
+    let mut max_live = live_rest;
+    let t1 = Instant::now();
+    while st.get_autoscroll() && t1.elapsed() < Duration::from_secs(120) {
+        max_live = max_live.max(live_message_rows(&ui));
+        sleep(100).await;
+    }
+    let sweep_s = t1.elapsed().as_secs_f32();
+    sleep(1000).await;
+    let rss_after = rss_kib();
+    // A second sweep: memory must not keep growing.
+    st.set_autoscroll(true);
+    while st.get_autoscroll() && t1.elapsed() < Duration::from_secs(240) {
+        max_live = max_live.max(live_message_rows(&ui));
+        sleep(100).await;
+    }
+    sleep(1000).await;
+    let rss_after2 = rss_kib();
+    let mib = |k: u64| k as f64 / 1024.0;
+    let grow2 = rss_after2 as i64 - rss_after as i64;
+    record(
+        &log,
+        "long conversation: virtualised, memory flat",
+        loaded && n >= 500 && max_live > 0 && max_live < 80 && grow2 < 4096,
+        format!(
+            "{n} rows loaded in {load_ms} ms; MessageRow instances at rest {live_rest}, max during sweep {max_live}; \
+             sweep {sweep_s:.1} s; RSS {:.1} → {:.1} (loaded) → {:.1} (after sweep 1) → {:.1} MiB (after sweep 2)",
+            mib(rss0),
+            mib(rss_loaded),
+            mib(rss_after),
+            mib(rss_after2)
+        ),
+    );
 }
 
 #[test]

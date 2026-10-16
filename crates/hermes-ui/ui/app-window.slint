@@ -31,6 +31,9 @@ export struct ApprovalInfo {
     title: string,
     command: string,
     description: string,
+    // Which choices the backend offered (params.choices); deny + once are always offered.
+    allow-session: bool,
+    allow-always: bool,
 }
 
 export global AppState {
@@ -53,6 +56,10 @@ export global AppState {
     in-out property <int> transcript-mode: 0;
     in-out property <ApprovalInfo> approval;
     in-out property <string> session-search;
+    // Composer draft, shared by the hero and docked composers (Enter on an empty draft
+    // answers an open approval card instead of being swallowed).
+    in-out property <string> draft;
+    in-out property <bool> autoscroll;
 
     callback send(string);
     callback stop();
@@ -257,9 +264,16 @@ component ApprovalCard inherits Rectangle {
         }
         HorizontalLayout {
             spacing: 8px;
-            alignment: end;
+            Text {
+                text: "Enter to allow once · Esc to deny";
+                color: Theme.text-4;
+                font-size: Theme.fs-xs;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
             GhostButton { text: "Deny"; clicked => { AppState.approve(AppState.approval.request-id, "deny"); } }
-            GhostButton { text: "Allow for session"; clicked => { AppState.approve(AppState.approval.request-id, "session"); } }
+            if AppState.approval.allow-always: GhostButton { text: "Always allow"; clicked => { AppState.approve(AppState.approval.request-id, "always"); } }
+            if AppState.approval.allow-session: GhostButton { text: "Allow for session"; clicked => { AppState.approve(AppState.approval.request-id, "session"); } }
             PrimaryButton { text: "Allow once"; clicked => { AppState.approve(AppState.approval.request-id, "once"); } }
         }
     }
@@ -297,8 +311,14 @@ export component AppWindow inherits Window {
             if e.text == Key.Escape {
                 if root.settings-open { root.settings-open = false; return accept; }
                 if root.picker-open { root.picker-open = false; return accept; }
-                if AppState.running { AppState.stop(); return accept; }
             }
+            // Approval card keys (same as the Electron app's approval-keys.ts): Esc denies,
+            // Enter on an empty composer allows once. Checked before Esc-to-Stop.
+            if AppState.approval.visible && !root.settings-open && !e.modifiers.shift && !e.modifiers.control && !e.modifiers.alt {
+                if e.text == Key.Escape { AppState.approve(AppState.approval.request-id, "deny"); return accept; }
+                if e.text == Key.Return && AppState.draft == "" { AppState.approve(AppState.approval.request-id, "once"); return accept; }
+            }
+            if e.text == Key.Escape && AppState.running { AppState.stop(); return accept; }
             reject
         }
 
@@ -389,6 +409,7 @@ export component AppWindow inherits Window {
                         init => { self.focus(); }
                         width: min(main.width - 64px, 672px);
                         centered: true;
+                        text <=> AppState.draft;
                         running: AppState.running;
                         model-label: AppState.model-label;
                         effort-label: AppState.effort-label;
@@ -408,6 +429,7 @@ export component AppWindow inherits Window {
                 running: AppState.running;
                 status: AppState.status;
                 transcript-mode: AppState.transcript-mode;
+                autoscroll <=> AppState.autoscroll;
             }
             if !root.empty: dock := Composer {
                 x: (parent.width - self.width) / 2;
@@ -418,6 +440,7 @@ export component AppWindow inherits Window {
                 width: min(parent.width - 48px, Theme.column-w);
                 centered: false;
                 placeholder: "Reply to Hermes…";
+                text <=> AppState.draft;
                 running: AppState.running;
                 model-label: AppState.model-label;
                 effort-label: AppState.effort-label;
@@ -429,7 +452,8 @@ export component AppWindow inherits Window {
 
             if AppState.approval.visible: ApprovalCard {
                 x: (parent.width - self.width) / 2;
-                y: parent.height - self.height - 140px;
+                // Above the docked composer and the 40 px live status line.
+                y: parent.height - self.height - root.dock-h - 8px - 48px;
                 width: min(parent.width - 48px, Theme.column-w);
             }
 
