@@ -18,7 +18,7 @@ serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2"
-slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-femtovg", "accessibility"] }
+slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-femtovg", "renderer-software", "accessibility"] }
 slint-build = "1.18"
 tokio-tungstenite = "0.30"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -30,6 +30,12 @@ lto = "fat"
 codegen-units = 1
 strip = true
 panic = "abort"
+
+# Release codegen with symbols, for stack sampling (docs/PERF.md).
+[profile.profiling]
+inherits = "release"
+strip = false
+debug = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 2

@@ -15,5 +15,12 @@ serde_json.workspace = true
 tracing.workspace = true
 chrono.workspace = true
 
+# Already in the dependency tree via slint (no new crates): drive the real UI headlessly
+# in tests/live_backend.rs. Pinned to slint's exact version because the IME events use
+# i-slint-core's internal key-event type.
+[dev-dependencies]
+i-slint-backend-testing = "=1.18.1"
+i-slint-core = "=1.18.1"
+
 [build-dependencies]
 slint-build.workspace = true

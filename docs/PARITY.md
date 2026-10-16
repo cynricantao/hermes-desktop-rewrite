@@ -27,6 +27,12 @@ Each line is one parity item: `- [ ] <feature> — <backend surface> — <source
 
 Status is updated in the same commit as the code it describes.
 
+### Rewrite progress
+
+Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
+**11 done · 4 partial · 778 not started · 0 unsupported** (of 793).
+Performance work is tracked separately in [PERF.md](PERF.md).
+
 ## Summary
 
 | Section | Items |
@@ -84,10 +90,10 @@ Status is updated in the same commit as the code it describes.
 - [ ] Steer a running turn — RPC session.steer — src/app/chat/session-tile-actions.ts
 - [ ] Queue a message while busy (⌘Enter) — local + RPC prompt.submit (queue drain) — src/store/composer-queue.ts
 - [ ] Send next queued message (⌘⇧K) — local — src/store/composer-queue.ts, src/lib/keybinds/actions.ts
-- [~] Interrupt / stop the active turn — RPC session.interrupt — src/app/chat/session-tile-actions.ts ⟶ stop button + Esc call `session.interrupt`; not yet exercised live
+- [x] Interrupt / stop the active turn — RPC session.interrupt — src/app/chat/session-tile-actions.ts ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: Stop clicked mid-stream → reply stops growing (17 of 300 lines, unchanged 3 s later), running=false, no spinner, button back to Send, next prompt answered. Esc shortcut not exercised
 - [ ] Redirect a running turn — RPC session.redirect — src/app/chat/session-tile-actions.ts
 - [ ] Rewind / edit-and-resend a prior user turn — RPC session.history + prompt.submit — src/app/session/hooks/use-prompt-actions/rewind.ts
-- [~] Newline without sending (⇧Enter) — local — src/lib/keybinds/actions.ts (KEYBIND_READONLY) ⟶ Enter sends / Shift+Enter newline implemented; no automated input test yet
+- [x] Newline without sending (⇧Enter) — local — src/lib/keybinds/actions.ts (KEYBIND_READONLY) ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: Shift+Enter → composer `hello\n`, nothing sent; Enter sends and clears; IME preedit+commit (`日本`) inserts text without sending
 - [ ] Cancel composer / dismiss (Esc) — local — src/app/chat/composer/hooks/use-composer-esc-cancel.ts
 - [ ] Rich text editor with markdown affordances — local — src/app/chat/composer/rich-editor.tsx
 - [ ] Soft focus composer (/, Shift+Enter, type-to-focus) — local — src/app/chat/composer/paste-to-focus.ts, src/lib/keybinds/composer-focus-keys.ts
@@ -109,7 +115,7 @@ Status is updated in the same commit as the code it describes.
 - [ ] Screenshot attach from OS shortcut — local (Electron) + RPC image.attach_bytes — src/app/chat/composer/hooks/use-composer-screenshot.ts
 - [ ] Inline references (/file, @path) in composer — local + RPC complete.path — src/app/chat/composer/inline-refs.ts, path-refs.ts
 - [ ] URL reference chips — local — src/app/chat/composer/url-refs.ts, url-dialog.tsx
-- [~] Model pill (per-composer model switcher) — REST /api/model/set, /api/model/options — src/app/chat/composer/model-pill.tsx ⟶ picker lists `model.options`, switch via `config.set model`; switching not exercised live
+- [x] Model pill (per-composer model switcher) — REST /api/model/set, /api/model/options — src/app/chat/composer/model-pill.tsx ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: mid-session deepseek-v4.1-flash → glm-5.3-flash via `config.set model` (session-scoped); label updates; next reply answered by the new model
 - [ ] Reasoning-effort pill — RPC config.set (agent.reasoning_effort) — src/app/chat/composer/reasoning-pill.tsx
 - [ ] Reasoning level up/down hotkeys — local — src/lib/keybinds/actions.ts
 - [ ] Composer scope selector (profile/agent routing) — local — src/app/chat/composer/scope.tsx
@@ -198,9 +204,9 @@ Status is updated in the same commit as the code it describes.
 
 ## Approvals / clarify
 
-- [~] Approval request card (dangerous command) — SRV approval — src/components/assistant-ui/tool/approval.tsx ⟶ card + once/session/deny reply to SRV approval; not yet triggered live
+- [x] Approval request card (dangerous command) — SRV approval — src/components/assistant-ui/tool/approval.tsx ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: `rm -r <scratch dir>` raised the card; Deny → dir kept, agent reports denial; Allow once → dir removed, agent reports success; card closes, no spinner. Needed `client.capabilities {server_requests:true}` (fixed) and `request.cancel` handling (added). "Allow for session" not exercised
 - [ ] Approval activity feed — WS approval.* — src/components/assistant-ui/tool/approval-activity.ts
-- [ ] Respond to approval (allow/deny/always) — RPC approval.respond / approval.received — src/lib/keybinds/approval-keys.ts
+- [~] Respond to approval (allow/deny/always) — RPC approval.respond / approval.received — src/lib/keybinds/approval-keys.ts ⟶ deny + once verified live via the SRV approval response (see card above); "always" not offered in the UI yet; keyboard shortcuts not built
 - [ ] Approval mode selector (manual/smart/off) — config approvals.mode (config.set) — src/app/shell/approval-mode-menu.tsx
 - [ ] Pending approvals list — RPC approval.pending — src/store/approval-mode.ts
 - [ ] Clarify questions (1–5) render + submit — SRV clarify — src/components/assistant-ui/clarify/index.tsx

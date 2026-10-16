@@ -386,6 +386,7 @@ export component AppWindow inherits Window {
                 HorizontalLayout {
                     alignment: center;
                     hero := Composer {
+                        init => { self.focus(); }
                         width: min(main.width - 64px, 672px);
                         centered: true;
                         running: AppState.running;
@@ -411,7 +412,8 @@ export component AppWindow inherits Window {
             if !root.empty: dock := Composer {
                 x: (parent.width - self.width) / 2;
                 y: parent.height - self.height - 8px;
-                init => { root.dock-h = self.height; }
+                // The hero composer is destroyed when the first row appears; keep typing focus.
+                init => { root.dock-h = self.height; self.focus(); }
                 changed height => { root.dock-h = self.height; }
                 width: min(parent.width - 48px, Theme.column-w);
                 centered: false;

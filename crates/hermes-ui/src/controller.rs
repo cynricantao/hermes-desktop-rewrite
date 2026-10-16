@@ -188,16 +188,31 @@ struct Controller {
 impl Controller {
     async fn run(weak: Weak<AppWindow>, mut cmds: mpsc::UnboundedReceiver<Cmd>) {
         ui(&weak, |w| w.global::<AppState>().set_connection("connecting".into()));
-        let t0 = std::time::Instant::now();
+        crate::perf::mark("controller: backend discovery start");
         let backend = match backend::discover_or_spawn(None).await {
             Ok(b) => Arc::new(b),
             Err(e) => return fail(&weak, format!("Could not start the Hermes backend: {e}")),
         };
-        tracing::info!(port = backend.endpoint.port, owned = backend.is_owned(), elapsed = ?t0.elapsed(), "backend ready");
+        tracing::info!(
+            port = backend.endpoint.port,
+            owned = backend.is_owned(),
+            "backend ready"
+        );
+        crate::perf::mark("controller: backend discovered (token fetched)");
         let (client, mut events) = match Client::connect(&backend.endpoint.ws_url()).await {
             Ok(c) => c,
             Err(e) => return fail(&weak, format!("Could not connect to the Hermes backend: {e}")),
         };
+        crate::perf::mark("controller: websocket connected");
+        // Tell the backend this client answers server→client requests (approval, …). Without
+        // it the backend treats us as an old build and withdraws every approval unseen
+        // (tui_gateway/server_requests.py). Unsupported methods are still answered with -32601.
+        if let Err(e) = client
+            .request("client.capabilities", json!({"server_requests": true}))
+            .await
+        {
+            tracing::warn!("client.capabilities failed: {e}");
+        }
         let mut c = Controller {
             weak: weak.clone(),
             client,
@@ -217,7 +232,9 @@ impl Controller {
             st.set_rows(ModelRc::new(VecModel::<ChatRow>::default()));
         });
         c.refresh_sessions().await;
+        crate::perf::mark("controller: session list fetched");
         c.refresh_model_label().await;
+        crate::perf::mark("controller: model label fetched");
         c.load_about().await;
         // Dev/screenshot hook: send one prompt automatically once connected.
         if let Ok(p) = std::env::var("HERMES_DESKTOP_AUTOSEND")
@@ -518,6 +535,18 @@ impl Controller {
             ClientEvent::Event(e) => {
                 if e.kind == "sessions.changed" {
                     self.refresh_sessions().await;
+                    return;
+                }
+                // The backend withdraws an open server request (timeout, Stop, another surface
+                // answered): tear the card down, or it would outlive the request.
+                if e.kind == "request.cancel" {
+                    let id = e.payload.get("id").and_then(Value::as_str).unwrap_or_default();
+                    if self.pending_approval.as_deref() == Some(id) {
+                        self.pending_approval = None;
+                        ui(&self.weak, |w| {
+                            w.global::<AppState>().set_approval(ApprovalInfo::default())
+                        });
+                    }
                     return;
                 }
                 // Only the open session's events touch the transcript.
