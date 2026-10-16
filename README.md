@@ -39,7 +39,7 @@ entry and the icon).
 | `HERMES_DESKTOP_THEME=light` | system theme hint (until portal detection lands) |
 | `HERMES_DESKTOP_REDUCE_MOTION=1` | disable animation |
 | `RUST_LOG=startup=info` | startup phase marks (see docs/PERF.md) |
-| `HERMES_DESKTOP_AUTOSEND`, `HERMES_DESKTOP_OPEN_SETTINGS=<page>`, `HERMES_DESKTOP_TRANSCRIPT_MODE=<0-2>` | dev hooks used for scripted screenshots |
+| `HERMES_DESKTOP_AUTOSEND`, `HERMES_DESKTOP_OPEN_SETTINGS=<group>/<page>`, `HERMES_DESKTOP_SETTINGS_SEARCH=<query>`, `HERMES_DESKTOP_TRANSCRIPT_MODE=<0-2>` | dev hooks used for scripted screenshots (`appearance/theme` opens a settings page; the search hook shows the search results state) |
 
 ## Development
 

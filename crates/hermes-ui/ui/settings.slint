@@ -105,7 +105,9 @@ component NavRow inherits Rectangle {
     callback clicked();
     height: entry.level == 1 ? 30px : 32px;
     border-radius: Theme.r-md;
-    background: entry.active ? Theme.selected : ta.has-hover ? Theme.hover : transparent;
+    // The active *page* carries the fill; an expanded group only tints, so the two never
+    // look like two selected rows.
+    background: entry.active && entry.level == 1 ? Theme.selected : (entry.active || ta.has-hover) ? Theme.hover : transparent;
     animate background { duration: Motion.fast; easing: Ease.standard; }
     accessible-role: button;
     accessible-label: entry.label;
@@ -161,6 +163,7 @@ component ScopePill inherits Rectangle {
         text: root.text;
         color: root.active ? Theme.text : Theme.text-3;
         font-size: Theme.fs-sm;
+        font-weight: root.active ? 500 : 400;
         horizontal-alignment: center;
     }
     ta := TouchArea {
@@ -589,6 +592,11 @@ component SettingsPageView inherits Rectangle {
                 x: 10px;
             }
         }
+        if SettingsState.rows.length == 0 && !SettingsState.loading: Text {
+                text: "Nothing on this page yet — its feature is still on the parity checklist.";
+                color: Theme.text-4;
+                font-size: Theme.fs-sm;
+            }
         scroll := ScrollView {
             vertical-stretch: 1;
             VerticalLayout {

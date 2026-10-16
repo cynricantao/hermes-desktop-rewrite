@@ -105,9 +105,21 @@ fn main() -> Result<(), slint::PlatformError> {
             Some((g, p)) => (g.to_owned(), p.to_owned()),
             None => (spec.clone(), String::new()),
         };
-        ui.global::<hermes_ui::SettingsState>().set_group(group.into());
-        ui.global::<hermes_ui::SettingsState>().set_page(page.into());
+        let s = ui.global::<hermes_ui::SettingsState>();
+        s.set_group(group.clone().into());
+        s.set_page(page.clone().into());
+        // The controller owns which page is loaded, so ask it to navigate before the panel
+        // opens; opening then loads the config and renders that page.
+        s.invoke_goto(group.into(), page.into());
         ui.set_settings_open(true);
+        // Screenshot hook for the search state: seed a query after the panel opens.
+        if let Ok(q) = std::env::var("HERMES_DESKTOP_SETTINGS_SEARCH")
+            && !q.trim().is_empty()
+        {
+            let s = ui.global::<hermes_ui::SettingsState>();
+            s.set_query(q.clone().into());
+            s.invoke_search(q.into());
+        }
     }
     if let Ok(mode) = std::env::var("HERMES_DESKTOP_TRANSCRIPT_MODE") {
         ui.global::<hermes_ui::AppState>()

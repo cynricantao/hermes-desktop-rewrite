@@ -568,6 +568,7 @@ impl Controller {
     /// Open the panel: load the profile roster, the scoped config and the schema, then
     /// render the current page.
     async fn settings_open(&mut self) {
+        let t0 = std::time::Instant::now();
         let Some(rest) = self.rest() else { return };
         self.set_loading(true);
         if self.profiles.is_empty() {
@@ -587,6 +588,12 @@ impl Controller {
         self.load_scoped_config().await;
         self.publish_settings();
         self.set_loading(false);
+        // Open time = keypress → the page's rows handed to the UI (docs/PERF.md).
+        tracing::info!(
+            target: "settings",
+            elapsed_ms = format_args!("{:.1}", t0.elapsed().as_secs_f64() * 1000.0),
+            "settings panel loaded"
+        );
     }
 
     /// Load (or reload) the config of the scoped profile.
@@ -1170,7 +1177,7 @@ impl Controller {
             .await
             .ok()
             .and_then(|v| v.get("value").and_then(Value::as_str).map(str::to_owned))
-            .unwrap_or_else(|| "connected".into());
+            .unwrap_or_default();
         let home = std::env::var("HERMES_HOME")
             .unwrap_or_else(|_| format!("{}/.hermes", std::env::var("HOME").unwrap_or_default()));
         ui(&self.weak, move |w| {
