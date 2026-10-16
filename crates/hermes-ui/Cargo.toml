@@ -1,0 +1,19 @@
+[package]
+name = "hermes-ui"
+description = "Slint UI for Hermes Desktop: views, theme, motion and the bridge from hermes-core events to UI models."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+hermes-core.workspace = true
+slint.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+
+[build-dependencies]
+slint-build.workspace = true

@@ -1,0 +1,92 @@
+// Design tokens. Values follow docs/DESIGN.md §5/§8/§10 (CDS token ladder, warm neutral).
+// Every animation duration goes through Motion so "reduce motion" zeroes them in one place.
+
+import "../../../assets/fonts/Inter.ttf";
+import "../../../assets/fonts/SourceSerif4.ttf";
+import "../../../assets/fonts/JetBrainsMono.ttf";
+
+export enum ThemeMode { system, light, dark }
+
+export global Theme {
+    in-out property <ThemeMode> mode: ThemeMode.system;
+    in-out property <bool> system-dark: true;
+    out property <bool> dark: mode == ThemeMode.dark || (mode == ThemeMode.system && system-dark);
+
+    // Surfaces
+    out property <color> bg:            dark ? #151515 : #fcfcfb;
+    out property <color> sidebar-bg:    dark ? #111111 : #fbfbf9;
+    out property <color> surface:       dark ? #20201f : #ffffff;
+    out property <color> surface-2:     dark ? #2c2c2a : #f0efec;
+    out property <color> raised:        dark ? #20201f : #ffffff;
+    out property <color> hover:         dark ? #ffffff0d : #0b0b0b0d;
+    out property <color> pressed:       dark ? #ffffff1a : #0b0b0b1a;
+    out property <color> selected:      dark ? #ffffff1a : #0b0b0b1a;
+    out property <color> scrim:         dark ? #00000080 : #00000066;
+
+    // Borders
+    out property <color> border:        dark ? #ffffff1a : #0b0b0b1a;
+    out property <color> border-strong: dark ? #ffffff33 : #0b0b0b33;
+
+    // Text
+    out property <color> text:          dark ? #f0efec : #0b0b0b;
+    out property <color> text-2:        dark ? #c3c2b7 : #3d3d3a;
+    out property <color> text-3:        dark ? #898781 : #73726c;
+    out property <color> text-4:        dark ? #6d6b67 : #a5a49a;
+
+    // Accent & semantic
+    out property <color> accent:        dark ? #d97757 : #d97757;
+    out property <color> accent-soft:   dark ? #d977572e : #d9775724;
+    out property <color> on-accent:     #ffffff;
+    // Interactive blue (toggles, focus, primary buttons); clay above is brand-only.
+    out property <color> interactive:   #2a78d6;
+    out property <color> toggle-on:     dark ? #2a78d6 : #2a78d6;
+    out property <color> link:          dark ? #74abe2 : #1b67b2;
+    out property <color> success:       dark ? #55bf50 : #1e9e3c;
+    out property <color> danger:        dark ? #ec7e7e : #cd2054;
+    out property <color> warning:       dark ? #fab219 : #98801f;
+    out property <color> diff-add-bg:   dark ? #32d74b33 : #1e9e3c33;
+    out property <color> diff-del-bg:   dark ? #ff2c5633 : #cd205433;
+    out property <color> diff-add-fg:   dark ? #32d74b : #1e9e3c;
+    out property <color> diff-del-fg:   dark ? #ff2c56 : #cd2054;
+    out property <color> code-bg:       dark ? #1a1a19 : #f9f9f7;
+
+    // Typography
+    in-out property <string> ui-font: "Inter";
+    out property <string> serif-font: "Source Serif 4";
+    in-out property <string> mono-font: "JetBrains Mono";
+    out property <length> fs-xs: 11px;
+    out property <length> fs-sm: 12.5px;
+    out property <length> fs-md: 14px;
+    out property <length> fs-body: 15.5px;
+    out property <length> fs-lg: 17px;
+    out property <length> fs-greet: 38px;
+
+    // Radii
+    out property <length> r-xs: 4px;   // skeleton / tiny
+    out property <length> r-sm: 6px;   // chips
+    out property <length> r-md: 8px;   // controls, rows
+    out property <length> r-lg: 12px;  // panels, modals, cards
+    out property <length> r-xl: 14px;  // composer (comfortable density)
+    out property <length> r-pill: 999px;
+
+    // Layout
+    out property <length> sidebar-w: 288px;
+    out property <length> titlebar-h: 36px;
+    out property <length> column-w: 768px;
+    out property <length> right-panel-w: 288px;
+}
+
+export global Motion {
+    in-out property <bool> reduce: false;
+    out property <duration> fast:   reduce ? 0ms : 120ms;   // --cds-dur-snap: hover / press colour
+    out property <duration> base:   reduce ? 0ms : 200ms;   // --cds-dur-base: modal in, expand, chevron
+    out property <duration> exit:   reduce ? 0ms : 150ms;   // modal out
+    out property <duration> slow:   reduce ? 0ms : 300ms;   // --cds-dur-sheet: sidebar / right panel
+}
+
+// Easings live in their own global (not re-exported to Rust: easing is not a public API type).
+export global Ease {
+    out property <easing> out:      cubic-bezier(0.165, 0.84, 0.44, 1);   // --cds-ease-out
+    out property <easing> in-out:   cubic-bezier(0.165, 0.84, 0.44, 1);   // sheets use ease-out too
+    out property <easing> standard: cubic-bezier(0.32, 0.72, 0, 1);      // --cds-ease-snap
+}

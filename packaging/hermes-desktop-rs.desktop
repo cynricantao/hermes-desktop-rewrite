@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Hermes (Rust)
+GenericName=AI agent client
+Comment=Native desktop client for Hermes Agent
+Exec=hermes-desktop-rs
+Icon=hermes-desktop-rs
+Terminal=false
+Categories=Development;Utility;
+StartupWMClass=hermes-desktop-rs
+Keywords=hermes;agent;ai;chat;
