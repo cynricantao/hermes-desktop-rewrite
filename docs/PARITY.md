@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**13 done · 4 partial · 776 not started · 0 unsupported** (of 793).
+**17 done · 4 partial · 772 not started · 0 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -226,11 +226,11 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 - [~] Session list (paged, virtualized) — REST /api/profiles/sessions — src/app/chat/sidebar/sessions-section.tsx, virtual-session-list.tsx ⟶ RPC session.list (200) grouped Today/Yesterday/7 days/Older; not paged
 - [ ] Sidebar recents feed — REST /api/profiles/sessions/sidebar — src/app/chat/sidebar/sessions-section.tsx
-- [ ] Open session / transcript hydrate — RPC session.history, REST /api/sessions/{id}/messages — src/app/session/hooks/use-session-actions/index.ts
-- [ ] New session (⌘N) — RPC session.create — src/app/session/hooks/use-session-actions/index.ts
+- [x] Open session / transcript hydrate — RPC session.history, REST /api/sessions/{id}/messages — src/app/session/hooks/use-session-actions/index.ts ⟶ live 2026-10-16, `tests/live_backend.rs` `sessions` section vs private backend (3 seeded chats): clicking a sidebar chat shows its history and only its (no rows from other chats), highlights it and sets the title; cold open 1.6 s, reopening a chat already live in the backend ~0.1 s (`session.resume` reuses it). Continuing an old chat: reply lands under its history and is still there after switching away and back. Switching away mid-stream: the other chat stays free of the stream and idle; coming back shows the finished reply. Uses `session.resume` (full history in one response), not the REST prefetch
+- [x] New session (⌘N) — RPC session.create — src/app/session/hooks/use-session-actions/index.ts ⟶ live 2026-10-16, `tests/live_backend.rs` `sessions` section vs private backend (3 seeded chats): Ctrl+N from an open chat → empty transcript, no highlight, title "New chat"; the session is created lazily on first send
 - [ ] New session in tab (⌘T) — local + RPC session.create — src/app/chat/new-session-drag.ts
 - [ ] New window (⌘⇧N) — local (Electron session-windows) — electron/session-windows.ts
-- [ ] Switch to next/prev session (⌃Tab / ⌃⇧Tab) — local — src/store/session-switcher.ts
+- [x] Switch to next/prev session (⌃Tab / ⌃⇧Tab) — local — src/store/session-switcher.ts ⟶ live 2026-10-16, `tests/live_backend.rs` `sessions` section vs private backend (3 seeded chats): walks the sidebar order (this app has no tabs, unlike the Electron recent-tab switcher), wrapping at both ends; from a new chat ⌃Tab opens the first chat, ⌃⇧Tab the last. Order logic unit-tested (`sessions::tests::cycling`)
 - [ ] Jump to session slot N (⌃1…⌃9) — local — src/lib/keybinds/actions.ts
 - [ ] Close session — RPC session.close — src/app/session/hooks/use-session-actions/index.ts
 - [ ] Delete session — RPC session.delete — src/store/session-removal.ts
@@ -590,7 +590,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Toggle voice (⌃B mac / ⌘⌥V else) — local — src/lib/keybinds/actions.ts
 - [ ] Dictation (unbound) — local — src/lib/keybinds/actions.ts
 - [ ] Reasoning up/down (unbound) — local — src/lib/keybinds/actions.ts
-- [ ] New session (⌘N) — RPC session.create — src/lib/keybinds/actions.ts
+- [x] New session (⌘N) — RPC session.create — src/lib/keybinds/actions.ts ⟶ Ctrl+N, see Sessions & sidebar
 - [ ] New tab (⌘T) — local — src/lib/keybinds/actions.ts
 - [ ] New window (⌘⇧N) — local — src/lib/keybinds/actions.ts
 - [ ] Next/prev session (⌃Tab / ⌃⇧Tab, ⌃PgDn/PgUp) — local — src/lib/keybinds/actions.ts

@@ -36,6 +36,23 @@ pub fn group_by_age(rows: &[SessionListRow], now_unix: f64) -> Vec<SessionGroup>
     groups
 }
 
+/// Index of the chat `step` places away from `current` in sidebar order, wrapping at both
+/// ends (Ctrl+Tab / Ctrl+Shift+Tab). With no open chat (or one not in the list), a forward
+/// step lands on the first chat and a backward step on the last.
+pub fn cycle_index(ids: &[String], current: Option<&str>, step: i32) -> Option<usize> {
+    if ids.is_empty() {
+        return None;
+    }
+    let n = ids.len() as i64;
+    let pos = current.and_then(|c| ids.iter().position(|id| id == c));
+    let next = match pos {
+        Some(i) => (i as i64 + step as i64).rem_euclid(n),
+        None if step >= 0 => 0,
+        None => n - 1,
+    };
+    Some(next as usize)
+}
+
 /// Title shown in the sidebar: title, else preview, else "Untitled".
 pub fn display_title(r: &SessionListRow) -> String {
     let t = r.title.trim();
@@ -77,6 +94,18 @@ mod tests {
             ["Today", "Yesterday", "Previous 7 days", "Older"]
         );
         assert_eq!(g[0].indices, vec![0, 4]);
+    }
+
+    #[test]
+    fn cycling() {
+        let ids: Vec<String> = ["a", "b", "c"].map(String::from).to_vec();
+        assert_eq!(cycle_index(&ids, Some("a"), 1), Some(1));
+        assert_eq!(cycle_index(&ids, Some("c"), 1), Some(0)); // wraps forward
+        assert_eq!(cycle_index(&ids, Some("a"), -1), Some(2)); // wraps backward
+        assert_eq!(cycle_index(&ids, None, 1), Some(0)); // new chat → first
+        assert_eq!(cycle_index(&ids, None, -1), Some(2)); // new chat → last
+        assert_eq!(cycle_index(&ids, Some("gone"), 1), Some(0));
+        assert_eq!(cycle_index(&[], Some("a"), 1), None);
     }
 
     #[test]

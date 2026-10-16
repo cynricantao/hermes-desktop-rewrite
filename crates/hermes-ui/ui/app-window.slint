@@ -71,6 +71,7 @@ export global AppState {
     callback approve(string, string);
     callback dismiss-banner();
     callback search-sessions(string);
+    callback cycle-session(int);
 }
 
 component Sidebar inherits Rectangle {
@@ -308,6 +309,9 @@ export component AppWindow inherits Window {
             if e.modifiers.control && e.text == "," { root.settings-open = true; return accept; }
             if e.modifiers.control && (e.text == "b" || e.text == "B") { root.sidebar-open = !root.sidebar-open; return accept; }
             if e.modifiers.control && (e.text == "q" || e.text == "Q") { root.quit(); return accept; }
+            // Next / previous chat in sidebar order. Some backends report Shift+Tab as Backtab.
+            if e.modifiers.control && e.text == Key.Backtab { AppState.cycle-session(-1); return accept; }
+            if e.modifiers.control && e.text == Key.Tab { AppState.cycle-session(e.modifiers.shift ? -1 : 1); return accept; }
             if e.text == Key.Escape {
                 if root.settings-open { root.settings-open = false; return accept; }
                 if root.picker-open { root.picker-open = false; return accept; }
