@@ -22,7 +22,7 @@ s = re.sub(r'(?m)^(approvals:\n  mode:) .*$', r'\1 "manual"', s)
 s = re.sub(r"(?m)^(memory:\n  provider:) .*$", r"\1 ''", s)
 open(sys.argv[2], "w").write(s)
 PY
-grep -E '^(COMMANDCODE_API_KEY)=' "$src/.env" > "$home/.env" || true
+grep -E '^(COMMANDCODE_API_KEY|OPENCODE_GO_API_KEY)=' "$src/.env" > "$home/.env" || true
 cp -p "$src/auth.json" "$home/auth.json" 2>/dev/null || true
 chmod 600 "$home/config.yaml" "$home/.env"
 echo "# private backend home: $home (approvals.mode=manual)" >&2

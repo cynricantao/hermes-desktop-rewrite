@@ -9,7 +9,7 @@ use hermes_core::backend::{self, ManagedBackend};
 use hermes_core::protocol::{
     ModelOptionsResult, SessionCreateResult, SessionListResult, SessionListRow, SessionResumeResult,
 };
-use hermes_core::sessions::{display_title, group_by_age};
+use hermes_core::sessions::{cycle_index, display_title, group_by_age};
 use hermes_core::transcript::{Change, Transcript};
 use hermes_core::{Client, ClientEvent};
 use serde_json::{Value, json};
@@ -28,10 +28,21 @@ pub enum Cmd {
     Open(String),
     Delete(String),
     Search(String),
+    /// Open the chat this many places away in sidebar order (Ctrl+Tab = 1, Ctrl+Shift+Tab = -1).
+    Cycle(i32),
     RefreshModels,
-    SelectModel { provider: String, model: String },
-    Approve { request_id: String, choice: String },
-    Setting { key: String, value: String },
+    SelectModel {
+        provider: String,
+        model: String,
+    },
+    Approve {
+        request_id: String,
+        choice: String,
+    },
+    Setting {
+        key: String,
+        value: String,
+    },
 }
 
 /// Minimum interval between UI patches while streaming (≈ one 120 Hz frame). Deltas
@@ -68,6 +79,10 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
     let t = tx.clone();
     st.on_search_sessions(move |q| {
         let _ = t.send(Cmd::Search(q.into()));
+    });
+    let t = tx.clone();
+    st.on_cycle_session(move |step| {
+        let _ = t.send(Cmd::Cycle(step));
     });
     let t = tx.clone();
     st.on_refresh_models(move || {
@@ -179,6 +194,8 @@ struct Controller {
     /// Stored id of the open chat (sidebar highlight / delete).
     stored: Option<String>,
     all_sessions: Vec<SessionListRow>,
+    /// Stored ids in the order the sidebar shows them (after search + grouping).
+    visible_ids: Vec<String>,
     query: String,
     dirty: Vec<usize>,
     reset: bool,
@@ -226,6 +243,7 @@ impl Controller {
             stored: None,
             draft_model: None,
             all_sessions: vec![],
+            visible_ids: vec![],
             query: String::new(),
             dirty: vec![],
             reset: false,
@@ -386,6 +404,12 @@ impl Controller {
             Cmd::Search(q) => {
                 self.query = q;
                 self.publish_sessions();
+            }
+            Cmd::Cycle(step) => {
+                if let Some(i) = cycle_index(&self.visible_ids, self.stored.as_deref(), step) {
+                    let id = self.visible_ids[i].clone();
+                    self.open(id).await;
+                }
             }
             Cmd::RefreshModels => self.refresh_models().await,
             Cmd::SelectModel { provider, model } => {
@@ -645,7 +669,7 @@ impl Controller {
         }
     }
 
-    fn publish_sessions(&self) {
+    fn publish_sessions(&mut self) {
         let q = self.query.to_lowercase();
         let rows: Vec<SessionListRow> = self
             .all_sessions
@@ -671,6 +695,7 @@ impl Controller {
                 });
             }
         }
+        self.visible_ids = items.iter().map(|s| s.id.to_string()).collect();
         ui(&self.weak, move |w| {
             w.global::<AppState>()
                 .set_sessions(Rc::new(VecModel::from(items)).into());

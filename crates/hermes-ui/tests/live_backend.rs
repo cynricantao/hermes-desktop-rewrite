@@ -4,8 +4,12 @@
 //! model switching mid-session, the approval card (Deny / Allow once / Allow for session /
 //! Always allow, by click and by keyboard), and a long (600-message) conversation.
 //!
-//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long` runs a subset. The `long` section needs
-//! a seeded session: `HERMES_HOME=<private home> scripts/seed-long-session.py 600`.
+//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions` runs a subset. The `long` section
+//! needs a seeded session: `HERMES_HOME=<private home> scripts/seed-long-session.py 600`. The
+//! `sessions` section (open / switch / new chat / Ctrl+Tab, continue an old chat, switch while
+//! streaming) needs three small labelled ones:
+//! `for l in SessA SessB SessC; do HERMES_HOME=<private home> scripts/seed-long-session.py 6 $l; done`.
+//! `HERMES_LIVE_NO_MODEL=1` skips its two model-call checks.
 //!
 //! Ignored by default: it needs a running backend and spends a few cheap model calls.
 //! Run against a *private* backend with approvals enabled (never your everyday one):
@@ -293,6 +297,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("long") {
         long_section(&ui, &log).await;
+    }
+    if want("sessions") {
+        sessions_section(&ui, &log).await;
     }
 }
 
@@ -665,6 +672,219 @@ async fn long_section(ui: &AppWindow, log: &Log) {
             mib(rss_loaded),
             mib(rss_after),
             mib(rss_after2)
+        ),
+    );
+}
+
+/// Text of every transcript row, joined (for "which chat is on screen" checks).
+fn transcript_text(ui: &AppWindow) -> String {
+    rows(ui)
+        .iter()
+        .map(|r| r.text.to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Stored id of the first sidebar chat whose title contains `needle`.
+fn session_id(ui: &AppWindow, needle: &str) -> Option<String> {
+    ui.global::<AppState>()
+        .get_sessions()
+        .iter()
+        .find(|s| s.title.contains(needle))
+        .map(|s| s.id.to_string())
+}
+
+/// Click a sidebar chat the way a user does (its NavItem's default action).
+fn click_session(ui: &AppWindow, needle: &str) -> bool {
+    let Some(title) = ui
+        .global::<AppState>()
+        .get_sessions()
+        .iter()
+        .find(|s| s.title.contains(needle))
+        .map(|s| s.title.to_string())
+    else {
+        return false;
+    };
+    match by_label(ui, &title) {
+        Some(e) => {
+            e.invoke_accessible_default_action();
+            true
+        }
+        None => false,
+    }
+}
+
+fn chord(ui: &AppWindow, mods: &[Key], k: impl Into<SharedString>) {
+    for m in mods {
+        key(ui, *m, true);
+    }
+    let k = k.into();
+    key(ui, k.clone(), true);
+    key(ui, k, false);
+    for m in mods.iter().rev() {
+        key(ui, *m, false);
+    }
+}
+
+/// Open `label`'s chat by clicking it; true once its history (and only its) is on screen.
+/// Opening an idle chat must show it idle. A chat whose reply is still streaming is
+/// legitimately running, so pass `expect_idle = false` when coming back to one.
+async fn open_and_check(ui: &AppWindow, log: &Log, label: &str, others: &[&str]) -> bool {
+    open_and_check_with(ui, log, label, others, true).await
+}
+
+async fn open_and_check_with(ui: &AppWindow, log: &Log, label: &str, others: &[&str], expect_idle: bool) -> bool {
+    let st = ui.global::<AppState>();
+    let want_id = session_id(ui, label).unwrap_or_default();
+    let t0 = Instant::now();
+    let clicked = click_session(ui, label);
+    let marker = format!("{label} Question 0");
+    let shown = wait_until(20, || transcript_text(ui).contains(&marker)).await;
+    let ms = t0.elapsed().as_millis();
+    sleep(300).await;
+    let text = transcript_text(ui);
+    let leaked: Vec<_> = others
+        .iter()
+        .filter(|o| text.contains(&format!("{o} Question")))
+        .collect();
+    let active = st.get_active_session().to_string();
+    let ok = clicked && shown && leaked.is_empty() && active == want_id && (!expect_idle || !running(ui));
+    record(
+        log,
+        &format!("open {label}"),
+        ok,
+        format!(
+            "clicked={clicked} history shown={shown} in {ms} ms; rows={} {:?}; other chats leaked={leaked:?}; \
+             highlighted={} title={:?}",
+            rows(ui).len(),
+            rows(ui)
+                .iter()
+                .map(|r| (r.kind, r.text.chars().take(24).collect::<String>()))
+                .collect::<Vec<_>>(),
+            active == want_id,
+            st.get_session_title()
+        ),
+    );
+    ok
+}
+
+async fn sessions_section(ui: &AppWindow, log: &Log) {
+    let (ui, log) = (ui.clone_strong(), log.clone());
+    let st = ui.global::<AppState>();
+    let labels = ["SessA", "SessB", "SessC"];
+    let seeded = wait_until(10, || labels.iter().all(|l| session_id(&ui, l).is_some())).await;
+    record(
+        &log,
+        "sessions: seeded chats listed",
+        seeded,
+        format!("{} sidebar rows", st.get_sessions().row_count()),
+    );
+    if !seeded {
+        return;
+    }
+
+    // Open, switch, switch back (the second open reuses the live session).
+    open_and_check(&ui, &log, "SessA", &["SessB", "SessC"]).await;
+    open_and_check(&ui, &log, "SessB", &["SessA", "SessC"]).await;
+    open_and_check(&ui, &log, "SessA", &["SessB", "SessC"]).await;
+
+    // Ctrl+N: back to an empty new chat.
+    chord(&ui, &[Key::Control], "n");
+    let fresh = wait_until(5, || rows(&ui).is_empty() && st.get_active_session().is_empty()).await;
+    record(
+        &log,
+        "Ctrl+N new chat",
+        fresh && st.get_session_title() == "New chat",
+        format!(
+            "rows={} active={:?} title={:?}",
+            rows(&ui).len(),
+            st.get_active_session(),
+            st.get_session_title()
+        ),
+    );
+
+    // Ctrl+Tab / Ctrl+Shift+Tab walk the sidebar order (wrapping); from a new chat Ctrl+Tab opens the first.
+    let order: Vec<String> = st.get_sessions().iter().map(|s| s.id.to_string()).collect();
+    let mut seen = vec![];
+    chord(&ui, &[Key::Control], Key::Tab);
+    wait_until(20, || st.get_active_session() == order[0] && !rows(&ui).is_empty()).await;
+    seen.push(st.get_active_session().to_string());
+    chord(&ui, &[Key::Control], Key::Tab);
+    wait_until(20, || order.len() > 1 && st.get_active_session() == order[1]).await;
+    seen.push(st.get_active_session().to_string());
+    chord(&ui, &[Key::Control, Key::Shift], Key::Tab);
+    wait_until(20, || st.get_active_session() == order[0]).await;
+    seen.push(st.get_active_session().to_string());
+    chord(&ui, &[Key::Control, Key::Shift], Key::Tab);
+    let last = order.last().cloned().unwrap_or_default();
+    wait_until(20, || st.get_active_session() == last).await;
+    seen.push(st.get_active_session().to_string());
+    let expect = [
+        order[0].clone(),
+        order.get(1).cloned().unwrap_or_default(),
+        order[0].clone(),
+        last,
+    ];
+    record(
+        &log,
+        "Ctrl+Tab / Ctrl+Shift+Tab switch chats",
+        seen == expect,
+        format!(
+            "visited positions {:?} of {}",
+            seen.iter()
+                .map(|s| order.iter().position(|o| o == s))
+                .collect::<Vec<_>>(),
+            order.len()
+        ),
+    );
+
+    if std::env::var_os("HERMES_LIVE_NO_MODEL").is_some() {
+        return;
+    }
+
+    // Continue an old chat: the reply lands under its history and survives a switch away and back.
+    open_and_check(&ui, &log, "SessB", &["SessA", "SessC"]).await;
+    let before = rows(&ui).len();
+    let answered = send_and_wait(&ui, "Reply with only the word PINEAPPLE.", 120).await;
+    let reply = last_assistant(&ui);
+    open_and_check(&ui, &log, "SessC", &["SessA", "SessB"]).await;
+    open_and_check(&ui, &log, "SessB", &["SessA", "SessC"]).await;
+    // The prompt itself contains the word: look at the assistant's reply only.
+    let kept = last_assistant(&ui).contains("PINEAPPLE");
+    record(
+        &log,
+        "continue an old chat",
+        // Rows must grow, but not necessarily by two: the backend drops an earlier unanswered
+        // turn from a reused fixture when the next one succeeds.
+        answered && reply.contains("PINEAPPLE") && kept && rows(&ui).len() > before,
+        format!(
+            "answered={answered} reply={reply:?} rows {before} → {}; still there after switching away and back={kept}",
+            rows(&ui).len()
+        ),
+    );
+
+    // Switch away while a reply streams: the other chat stays clean; coming back shows the finished reply.
+    open_and_check(&ui, &log, "SessA", &["SessB", "SessC"]).await;
+    if let Some(input) = by_label(&ui, "Message") {
+        input.set_accessible_value("Count from 1 to 80, one number per line, then write DONE.");
+    }
+    press(&ui, Key::Return);
+    let streaming = wait_until(60, || last_assistant(&ui).contains('5')).await;
+    open_and_check(&ui, &log, "SessC", &["SessA", "SessB"]).await;
+    sleep(3000).await;
+    let c_clean = !transcript_text(&ui).contains("DONE") && !transcript_text(&ui).contains("\n40\n");
+    let c_idle = !running(&ui);
+    // The reply may still be streaming when we come back, so don't require idle on open.
+    open_and_check_with(&ui, &log, "SessA", &["SessB", "SessC"], false).await;
+    let finished = wait_until(120, || !running(&ui) && last_assistant(&ui).contains("DONE")).await;
+    record(
+        &log,
+        "switch away mid-stream",
+        streaming && c_clean && c_idle && finished && idle_clean(&ui).is_ok(),
+        format!(
+            "streaming before switch={streaming}; other chat free of the stream={c_clean}, idle={c_idle}; \
+             back in the chat the reply finished with DONE={finished}; {:?}",
+            idle_clean(&ui)
         ),
     );
 }
