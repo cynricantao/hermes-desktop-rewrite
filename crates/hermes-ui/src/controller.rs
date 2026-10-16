@@ -204,6 +204,15 @@ impl Controller {
             Err(e) => return fail(&weak, format!("Could not connect to the Hermes backend: {e}")),
         };
         crate::perf::mark("controller: websocket connected");
+        // Tell the backend this client answers server→client requests (approval, …). Without
+        // it the backend treats us as an old build and withdraws every approval unseen
+        // (tui_gateway/server_requests.py). Unsupported methods are still answered with -32601.
+        if let Err(e) = client
+            .request("client.capabilities", json!({"server_requests": true}))
+            .await
+        {
+            tracing::warn!("client.capabilities failed: {e}");
+        }
         let mut c = Controller {
             weak: weak.clone(),
             client,
@@ -526,6 +535,18 @@ impl Controller {
             ClientEvent::Event(e) => {
                 if e.kind == "sessions.changed" {
                     self.refresh_sessions().await;
+                    return;
+                }
+                // The backend withdraws an open server request (timeout, Stop, another surface
+                // answered): tear the card down, or it would outlive the request.
+                if e.kind == "request.cancel" {
+                    let id = e.payload.get("id").and_then(Value::as_str).unwrap_or_default();
+                    if self.pending_approval.as_deref() == Some(id) {
+                        self.pending_approval = None;
+                        ui(&self.weak, |w| {
+                            w.global::<AppState>().set_approval(ApprovalInfo::default())
+                        });
+                    }
                     return;
                 }
                 // Only the open session's events touch the transcript.

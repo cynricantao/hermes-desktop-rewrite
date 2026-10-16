@@ -315,7 +315,8 @@ export component Composer inherits Rectangle {
     callback pick-model();
     callback pick-folder();
     callback attach();
-    forward-focus: keys;
+    // Focus lands in the text input itself (the FocusScope around it only captures Enter).
+    forward-focus: input;
 
     height: card.height + (centered ? 40px : 36px);
 

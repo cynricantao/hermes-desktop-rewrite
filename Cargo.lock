@@ -1734,6 +1734,8 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "hermes-core",
+ "i-slint-backend-testing",
+ "i-slint-core",
  "serde",
  "serde_json",
  "slint",
