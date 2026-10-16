@@ -11,7 +11,7 @@ set -euo pipefail
 sock="${HEADLESS_SOCKET:-hermes-headless-$$}"
 rt="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 weston --backend=headless --renderer="${HEADLESS_RENDERER:-pixman}" --shell=kiosk \
-  --width="${HEADLESS_W:-1440}" --height="${HEADLESS_H:-900}" \
+  --width="${HEADLESS_W:-1440}" --height="${HEADLESS_H:-900}" --scale="${HEADLESS_SCALE:-1}" \
   --socket="$sock" --idle-time=0 ${HEADLESS_DEBUG:+--debug} >/dev/null 2>&1 &
 wp=$!
 trap 'kill $wp 2>/dev/null || true' EXIT

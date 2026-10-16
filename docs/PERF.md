@@ -128,8 +128,54 @@ yet against a long conversation. That needs a seeded long session in the headles
 3. Transcript windowing (PARITY item "Transcript windowing / retention") bounds the part that
    grows with conversation size.
 
-## After
+## Your real GPU session (femtovg, run by you, 2026-10-16)
 
-No startup fix has been applied yet. The two candidate changes and their headless numbers are
-in the table above. The "after" measurement will be filled in once a renderer decision is made
-and your GPU numbers are in.
+`HERMES_MEASURE_LIVE=1 scripts/measure-startup.sh 5` on Hyprland + NVIDIA 610.57:
+
+| | Result |
+|---|---|
+| First frame | **median 122.2 ms** (120.5 / 121.5 / 122.2 / 150.3 / 162.7) |
+| Window component created | 23–29 ms |
+| Renderer setup (GL context) | 101–143 ms |
+| Memory 3 s after first frame | **PSS 79 MiB** (anon 23 MiB, file 56 MiB), RSS 111 MiB |
+
+So on real hardware femtovg already meets the 300 ms target. About 80 ms of the 122 ms is
+still NVIDIA EGL init, and most of the PSS is mapped driver code (both NVIDIA and Mesa EGL
+are loaded there too).
+
+## After: software renderer by default (decided 2026-10-16)
+
+`renderer-software` is now compiled in next to femtovg. `main.rs::select_renderer()` picks
+software first and falls back to femtovg if it can't initialise.
+`HERMES_DESKTOP_RENDERER=gl` reverses that order, and `SLINT_BACKEND` overrides both.
+Binary: 21.3 → 22.3 MB.
+
+Hidden display, same binary, `first-commit.py` 10 runs each:
+
+| Renderer | First buffer commit | PSS idle |
+|---|---:|---:|
+| software (new default) | median **49.3 ms** (46.7–54.1) | **23.9 MiB** |
+| `HERMES_DESKTOP_RENDERER=gl` | median 351.5 ms (332.5–418.8) | ~160 MiB |
+
+**CPU while a real reply streams** (`scripts/measure-stream-cpu.sh 25`, one prompt to the
+real backend, utime+stime over 25 s, % of one core):
+
+| Display | software | gl (llvmpipe here) |
+|---|---:|---:|
+| 1440×900, scale 1 | **5.8 %**, peak RSS 36.7 MiB | 87.9 %, peak RSS 208.9 MiB |
+| 1440×900, scale 2 (HiDPI) | **7.0 %**, peak RSS 66.8 MiB | 225 %, peak RSS 275.7 MiB |
+
+The GL column is llvmpipe, which renders on the CPU, so it is **not** a fair stand-in for
+your GPU. The software column is representative, because it does the same work everywhere.
+A mid-stream screenshot under the software renderer showed the reply streaming correctly.
+
+Not measured yet: long-transcript scrolling and animation-heavy frames on the software
+renderer, and the software renderer on your real session. To measure the software renderer
+on your session (it opens and closes a window 5 times, then once more for the memory figure):
+
+```sh
+cd ~/Projects/hermes\ desktop && git pull && ~/.cargo/bin/cargo build --release -p hermes-app && scripts/first-commit.py target/release/hermes-desktop-rs 5 && HERMES_MEASURE_LIVE=1 scripts/measure-memory.sh
+```
+
+(`measure-startup.sh` only reports a first frame for femtovg, because the software renderer
+has no rendering notifier. `first-commit.py` measures both from the Wayland protocol.)

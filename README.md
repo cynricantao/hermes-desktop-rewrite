@@ -65,29 +65,28 @@ Docs: [ANALYSIS](docs/ANALYSIS.md) (how the current desktop talks to the backend
 
 ## Benchmarks
 
-Measured 2026-10-16 on the dev machine (Omarchy, kernel 7.2), release profile
+Measured 2026-10-16 on the dev machine (Omarchy, kernel 7.2, NVIDIA 610.57), release profile
 (`lto = "fat"`, `codegen-units = 1`, `opt-level = 3`, `strip`, `panic = "abort"`), attached
-to an already-running host backend. **All numbers come from a headless Weston using the
-software GL path (llvmpipe)** — scripted so the user's live session wasn't touched. A GPU
-session is expected to differ (first frame, memory) but is **not measured yet**.
+to an already-running host backend. Full method and raw numbers: [docs/PERF.md](docs/PERF.md).
 
-| Metric | Result | How |
+Default renderer is Slint's **software renderer** (`HERMES_DESKTOP_RENDERER=gl` for
+femtovg/OpenGL). "Hidden display" = private headless Weston (no GPU); "your session" = the
+owner's Hyprland/NVIDIA session, run by the owner.
+
+| Metric | Result | Where / how |
 |---|---|---|
-| Binary size | 21.3 MB (stripped) | `stat target/release/hermes-desktop-rs` |
-| Process start → window created | 21 ms (runs: 21.4 / 21.5 / 21.4) | `tracing` timestamps from `main` |
-| Process start → **first frame rendered** | **361–374 ms** (runs: 371.6 / 373.7 / 360.7) | Slint `RenderingState::AfterRendering` |
-| Idle CPU (30 s, window open, no activity) | **0.0 %** (0 ticks) | `/proc/<pid>/stat` utime+stime delta |
-| Memory (idle, window open) | RSS 188 MiB · PSS 158 MiB | `/proc/<pid>/status`, `smaps_rollup` |
+| Binary size | 22.3 MB (stripped) | `stat` |
+| First frame, software (default) | **median 49 ms** (10 runs, 47–54) | hidden display, `scripts/first-commit.py` |
+| First frame, femtovg on your session | median 122 ms (5 runs, 121–163) | your session, `measure-startup.sh` |
+| First frame, femtovg on hidden display | median 352 ms (llvmpipe) | hidden display |
+| Idle CPU (20 s, window open) | **0 ticks** | hidden display, `/proc/<pid>/stat` |
+| CPU while a reply streams | **5.8 %** of one core (7.0 % at 2× scale) | hidden display, `measure-stream-cpu.sh` |
+| Memory idle, software | **PSS 24 MiB** · RSS 35 MiB | hidden display, `smaps_rollup` |
+| Memory idle, femtovg on your session | PSS 79 MiB · RSS 111 MiB | your session |
 
-**Known gaps:**
-* First frame is **over the 300 ms target** in this headless setup. Profiled in
-  [docs/PERF.md](docs/PERF.md): ~22 ms is our code, ~290 ms is EGL driver init (a failed
-  NVIDIA vendor probe, then Mesa llvmpipe), and fonts cost a few ms. Slint's software renderer
-  presents in ~49 ms there; switching renderers is pending a decision and a real-GPU
-  measurement.
-* RSS here includes Mesa llvmpipe; re-measure under the real GPU driver.
-* The Electron Hermes Desktop wasn't running during measurement, so there is no
-  side-by-side memory comparison yet.
+**Known gaps:** the software renderer hasn't been measured on your session yet, and nothing
+has been measured for long-transcript scrolling yet. The Electron Hermes Desktop wasn't
+running, so there is no side-by-side comparison yet.
 
 ## Licences
 
