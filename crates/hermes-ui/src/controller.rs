@@ -1,11 +1,13 @@
 //! Async controller: owns backend + client + transcript; talks to the UI only through
 //! `invoke_from_event_loop` (UI ← core) and an unbounded command channel (UI → core).
 
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
 use hermes_core::backend::{self, ManagedBackend};
+use hermes_core::highlight::{self, Highlighter, Item};
 use hermes_core::http::{Rest, profile_query};
 use hermes_core::prefs::Prefs;
 use hermes_core::protocol::{
@@ -19,7 +21,7 @@ use serde_json::{Value, json};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
 use tokio::sync::mpsc;
 
-use crate::rows::to_row;
+use crate::rows::{Ctx, hl_jobs, seg_block, to_row};
 use crate::{
     AppState, AppWindow, ApprovalInfo, ChatRow, ModelItem, NavEntry, ScopeChip, SearchHit, SessionItem, SettingRowUI,
     SettingsState, Theme,
@@ -46,6 +48,8 @@ pub enum Cmd {
         choice: String,
     },
     Settings(SettingsCmd),
+    /// The theme flipped: code colours are baked into rows, so rebuild them.
+    Retheme,
 }
 
 /// Settings-panel intents from the UI (see `ui/settings.slint`).
@@ -136,6 +140,10 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
             request_id: id.into(),
             choice: choice.into(),
         });
+    });
+    let t = tx.clone();
+    st.on_retheme(move || {
+        let _ = t.send(Cmd::Retheme);
     });
     let w = ui.as_weak();
     st.on_dismiss_banner(move || {
@@ -297,6 +305,13 @@ struct Controller {
     settings_hit: String,
     /// Set while a Reset click is waiting for its confirmation click.
     reset_armed: bool,
+    /// Code highlighter, started on the first code block (never before first frame).
+    hl: Option<Highlighter>,
+    hl_tx: mpsc::UnboundedSender<highlight::Done>,
+    /// Arrived highlight results by segment id (rows.rs `seg_id`).
+    hl_items: HashMap<u64, Arc<Item>>,
+    /// Content key last queued per segment id, so an unchanged block is not re-sent.
+    hl_sent: HashMap<u64, u64>,
 }
 
 impl Controller {
@@ -327,6 +342,7 @@ impl Controller {
         {
             tracing::warn!("client.capabilities failed: {e}");
         }
+        let (hl_tx, mut hl_rx) = mpsc::unbounded_channel::<highlight::Done>();
         let mut c = Controller {
             weak: weak.clone(),
             client,
@@ -350,6 +366,10 @@ impl Controller {
             settings_page: ("appearance".into(), "general".into()),
             settings_hit: String::new(),
             reset_armed: false,
+            hl: None,
+            hl_tx,
+            hl_items: HashMap::new(),
+            hl_sent: HashMap::new(),
         };
         ui(&weak, |w| {
             let st = w.global::<AppState>();
@@ -389,6 +409,11 @@ impl Controller {
                         break;
                     }
                 },
+                Some((id, item)) = hl_rx.recv() => {
+                    // Results arrive off-thread; repaint the owning row on the next frame.
+                    c.hl_items.insert(id, item);
+                    c.dirty.push(seg_block(id));
+                }
                 _ = tick.tick(), if c.reset || !c.dirty.is_empty() => c.flush(),
             }
         }
@@ -399,12 +424,23 @@ impl Controller {
         if self.reset {
             self.reset = false;
             self.dirty.clear();
+            // A reset is a new transcript (or theme): segment ids refer to other blocks now.
+            self.hl_items.clear();
+            self.hl_sent.clear();
+            for i in 0..self.transcript.blocks.len() {
+                self.queue_highlight(i);
+            }
             // Blocks are Send; Slint rows (which hold Rc models) are built on the UI thread.
             let blocks = self.transcript.blocks.clone();
+            let hl = self.hl_items.clone();
             let (running, status) = (self.transcript.running, self.transcript.status.clone());
             ui(&self.weak, move |w| {
                 let st = w.global::<AppState>();
-                let rows: Vec<ChatRow> = blocks.iter().map(to_row).collect();
+                let ctx = Ctx {
+                    dark: w.global::<Theme>().get_dark(),
+                    hl: &hl,
+                };
+                let rows: Vec<ChatRow> = blocks.iter().enumerate().map(|(i, b)| to_row(i, b, &ctx)).collect();
                 st.set_rows(ModelRc::new(VecModel::from(rows)));
                 st.set_running(running);
                 st.set_status(status.into());
@@ -414,9 +450,18 @@ impl Controller {
         let mut idx = std::mem::take(&mut self.dirty);
         idx.sort_unstable();
         idx.dedup();
+        for &i in &idx {
+            self.queue_highlight(i);
+        }
         let patch: Vec<(usize, hermes_core::transcript::Block)> = idx
             .into_iter()
             .filter_map(|i| self.transcript.blocks.get(i).map(|b| (i, b.clone())))
+            .collect();
+        let hl: HashMap<u64, Arc<Item>> = self
+            .hl_items
+            .iter()
+            .filter(|(id, _)| patch.iter().any(|(i, _)| seg_block(**id) == *i))
+            .map(|(id, it)| (*id, Arc::clone(it)))
             .collect();
         let (running, status, title) = (
             self.transcript.running,
@@ -429,8 +474,12 @@ impl Controller {
             let Some(vm) = rows.as_any().downcast_ref::<VecModel<ChatRow>>() else {
                 return;
             };
+            let ctx = Ctx {
+                dark: w.global::<Theme>().get_dark(),
+                hl: &hl,
+            };
             for (i, b) in patch {
-                let r = to_row(&b);
+                let r = to_row(i, &b, &ctx);
                 if i < vm.row_count() {
                     vm.set_row_data(i, r);
                 } else {
@@ -444,6 +493,27 @@ impl Controller {
                 st.set_session_title(t.into());
             }
         });
+    }
+
+    /// Queue highlight jobs for block `i`'s code fences whose content changed. Never
+    /// blocks: the worker parses on its own thread and answers through `hl_tx`.
+    fn queue_highlight(&mut self, i: usize) {
+        let Some(b) = self.transcript.blocks.get(i) else {
+            return;
+        };
+        for (id, text, lang) in hl_jobs(i, b) {
+            let key = highlight::block_key(&lang, &text);
+            if self.hl_sent.insert(id, key) == Some(key) {
+                continue;
+            }
+            let hl = self.hl.get_or_insert_with(|| {
+                let tx = self.hl_tx.clone();
+                Highlighter::launch(move |done| {
+                    let _ = tx.send(done);
+                })
+            });
+            hl.put(id, text, lang);
+        }
     }
 
     fn mark(&mut self, ch: Change) {
@@ -472,6 +542,7 @@ impl Controller {
     async fn handle_cmd(&mut self, cmd: Cmd) {
         match cmd {
             Cmd::Send(text) => self.send(text).await,
+            Cmd::Retheme => self.reset = true,
             Cmd::Stop => {
                 if let Some(sid) = self.session.clone() {
                     let _ = self

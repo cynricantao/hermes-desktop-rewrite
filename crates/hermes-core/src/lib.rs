@@ -8,6 +8,7 @@
 //! * [`transcript`] — a pure reducer turning gateway events into a renderable transcript.
 //! * [`markdown`] — block-level splitting of assistant replies into prose / fenced code /
 //!   GFM tables, streaming-safe (a half-received table never flickers).
+//! * [`markdown_code`] — fence classification (prose-like fences unwrap, as in the original).
 //! * [`diff`] — unified-diff parsing for the diff view (line kinds, numbers, paths).
 //! * [`highlight`] — syntect-backed code highlighting on a background thread, with a
 //!   bounded content-keyed cache and per-stream checkpoint resume.
@@ -18,6 +19,7 @@ pub mod diff;
 pub mod highlight;
 pub mod http;
 pub mod markdown;
+pub mod markdown_code;
 pub mod prefs;
 pub mod protocol;
 pub mod rpc;

@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**20 done · 36 partial · 797 not started · 1 unsupported** (of 854).
+**21 done · 38 partial · 794 not started · 1 unsupported** (of 854).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -152,10 +152,10 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] User message bubble + edit composer — local — src/components/assistant-ui/thread/user-message.tsx, user-edit-composer.tsx
 - [ ] System message rows — local — src/components/assistant-ui/thread/system-message.tsx
 - [ ] Message parts renderer (text/tool/reasoning parts) — local — src/components/assistant-ui/thread/message-parts.tsx
-- [~] Markdown text rendering — local — src/components/assistant-ui/markdown-text.tsx, src/lib/markdown-preprocess.ts ⟶ Slint StyledText (CommonMark subset): no tables, no syntax highlighting yet
-- [ ] Markdown tables — local — src/components/assistant-ui/markdown-table.tsx, src/lib/markdown-table-widths.ts
-- [ ] Code blocks with syntax highlighting (Shiki) — local — src/components/chat/shiki-block.tsx, shiki-highlighter.tsx
-- [ ] Inline code / diff rendering — local — src/components/chat/diff-lines.tsx, syntax-diff.tsx
+- [~] Markdown text rendering — local — src/components/assistant-ui/markdown-text.tsx, src/lib/markdown-preprocess.ts ⟶ prose via Slint StyledText (CommonMark subset); replies split into prose / code / table / diff segments; prose-like fences unwrap (port of isLikelyProseCodeBlock). Gaps: math, mermaid, link previews, images
+- [~] Markdown tables — local — src/components/assistant-ui/markdown-table.tsx, src/lib/markdown-table-widths.ts ⟶ GFM tables with header, alignment, hairline rules, columns sized from content and scaled to fit; verified live 2026-10-17 (tests/live_backend.rs `rich` section, 6/6) + rows.rs unit tests; screenshots docs/screenshots/transcript-rich-{dark,light}.png. Gap: no draggable column resize
+- [x] Code blocks with syntax highlighting (Shiki) — local — src/components/chat/shiki-block.tsx, shiki-highlighter.tsx ⟶ code card: syntect highlighting off-thread (DESIGN.md §7.14 colours, re-coloured on theme change), Copy code button with Copied state, 120 px cap with Expand/Collapse, horizontal scroll; verified live 2026-10-17 (tests/live_backend.rs `rich` section, 6/6) + rows.rs unit tests; screenshots docs/screenshots/transcript-rich-{dark,light}.png
+- [~] Inline code / diff rendering — local — src/components/chat/diff-lines.tsx, syntax-diff.tsx ⟶ diff fences: old/new line numbers, +/− markers, add/remove tints, hunk headers, highlighted by file language; verified live 2026-10-17 (tests/live_backend.rs `rich` section, 6/6) + rows.rs unit tests; screenshots docs/screenshots/transcript-rich-{dark,light}.png. Gap: inline `code` spans have no tinted chip (StyledText limitation)
 - [ ] ANSI-colored terminal text — local — src/components/assistant-ui/ansi-text.tsx, src/lib/ansi.ts
 - [x] Reasoning / thinking blocks (collapsible) — WS reasoning.delta, reasoning.available — src/lib/reasoning-blocks.ts, src/store/reasoning-disclosure.ts ⟶ Thought process block, Normal/Thinking/Verbose modes
 - [ ] Reasoning step rows — local — src/lib/reasoning-step.ts

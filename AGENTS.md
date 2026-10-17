@@ -39,7 +39,7 @@ Rust is installed via rustup; if `cargo` is not on `PATH`, use `~/.cargo/bin/car
 | Format | `cargo fmt --all` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Unit tests | `cargo test --workspace` |
-| Live backend test | terminal 1: `scripts/live-test-backend.sh` (runs until killed; the backend prints its port) · terminal 2: `HERMES_DESKTOP_PORT=<port> cargo test -p hermes-ui --test live_backend -- --ignored --nocapture` |
+| Live backend test | terminal 1: `scripts/live-test-backend.sh` (runs until killed; the backend prints its port) · terminal 2: `SLINT_EMIT_DEBUG_INFO=1 HERMES_DESKTOP_PORT=<port> cargo test -p hermes-ui --test live_backend -- --ignored --nocapture` (debug info is required by the element lookups; `HERMES_LIVE_ONLY=rich,keys,…` runs selected sections) |
 | First frame | `scripts/first-commit.py target/release/hermes-desktop-rs 10` (headless by default) |
 | Startup phases (femtovg only) | `scripts/measure-startup.sh 10` |
 | Memory | `scripts/measure-memory.sh` |

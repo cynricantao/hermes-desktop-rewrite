@@ -302,6 +302,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     if want("approval") {
         approval_section(&ui, &log).await;
     }
+    if want("rich") {
+        rich_section(&ui, &log).await;
+    }
     if want("long") {
         long_section(&ui, &log).await;
     }
@@ -311,6 +314,80 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     if want("settings") {
         settings_section(&ui, &log).await;
     }
+}
+
+/// The prompt the `rich` section (and the README screenshot) sends.
+const RICH_PROMPT: &str = "Reply with exactly these three parts and nothing else: \
+    (1) a ```rust fenced block with a 3-line hello-world main function, \
+    (2) a markdown table with columns Name and Count and two rows, \
+    (3) a ```diff fenced block with a @@ hunk changing `let a = 1;` to `let a = 2;`.";
+
+/// Assistant replies render as segments: code card (highlighted), GFM table, diff card.
+async fn rich_section(ui: &AppWindow, log: &Log) {
+    let (ui, log) = (ui.clone_strong(), log.clone());
+    let done = send_and_wait(&ui, RICH_PROMPT, 180).await;
+    let r = rows(&ui);
+    let Some(last) = r.iter().rev().find(|r| r.kind == 1) else {
+        record(
+            &log,
+            "rich reply rendered",
+            false,
+            format!("turn done = {done}, no assistant row"),
+        );
+        return;
+    };
+    let segs: Vec<hermes_ui::Seg> = last.segs.iter().collect();
+    let kinds: Vec<i32> = segs.iter().map(|s| s.kind).collect();
+    let code = segs.iter().find(|s| s.kind == 1);
+    let table = segs.iter().find(|s| s.kind == 3);
+    let diff = segs.iter().find(|s| s.kind == 2);
+    record(
+        &log,
+        "rich reply → code, table and diff segments",
+        done && code.is_some() && table.is_some() && diff.is_some(),
+        format!("segment kinds = {kinds:?}"),
+    );
+    if let Some(c) = code {
+        record(
+            &log,
+            "code card keeps the raw source for copy",
+            c.raw.contains("fn main") && c.lines.row_count() >= 3,
+            format!(
+                "{} lines, raw starts {:?}",
+                c.lines.row_count(),
+                c.raw.chars().take(30).collect::<String>()
+            ),
+        );
+    }
+    if let Some(t) = table {
+        record(
+            &log,
+            "table has a 2-column header and 2 body rows",
+            t.header.cells.row_count() == 2 && t.rows.row_count() == 2,
+            format!(
+                "header {} cells, {} rows",
+                t.header.cells.row_count(),
+                t.rows.row_count()
+            ),
+        );
+    }
+    if let Some(d) = diff {
+        let kinds: Vec<i32> = d.lines.iter().map(|l| l.kind).collect();
+        record(
+            &log,
+            "diff card counts +1/−1 with line kinds",
+            d.added >= 1 && d.removed >= 1 && kinds.contains(&1) && kinds.contains(&2),
+            format!("+{} −{}, line kinds = {kinds:?}", d.added, d.removed),
+        );
+    }
+    // The copy button is reachable by its accessible label.
+    let copy = ElementHandle::find_by_accessible_label(&ui, "Copy code").count();
+    record(
+        &log,
+        "code cards expose a Copy code button",
+        copy >= 2,
+        format!("{copy} Copy code buttons"),
+    );
 }
 
 async fn keys_section(ui: &AppWindow, log: &Log) {
