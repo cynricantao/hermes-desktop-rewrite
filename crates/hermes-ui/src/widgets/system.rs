@@ -45,11 +45,10 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
+use slint::ComponentHandle;
 
 use crate::widgets::{Ctx, Outcome};
-use crate::{
-    ArchiveRow, FeatureRow, KeyRow, PathRow, PluginRow, SavedConnRow, SystemState, UsageModelRow,
-};
+use crate::{ArchiveRow, FeatureRow, KeybindRow, PathRow, PluginRow, SavedConnRow, SystemState, UsageModelRow};
 
 /// Widget ids this module draws.
 pub(crate) fn owns(id: &str) -> bool {
@@ -152,7 +151,7 @@ fn thousands(n: i64) -> String {
     let digits = n.unsigned_abs().to_string();
     let mut out = String::new();
     for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i) % 3 == 0 {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(c);
@@ -287,11 +286,7 @@ fn archive_rows(list: &Value) -> Vec<ArchiveRow> {
             rows.iter()
                 .filter_map(|r| {
                     let id = r.get("id").and_then(Value::as_str)?.to_owned();
-                    let preview = r
-                        .get("preview")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_owned();
+                    let preview = r.get("preview").and_then(Value::as_str).unwrap_or_default().to_owned();
                     let title = r
                         .get("title")
                         .and_then(Value::as_str)
@@ -316,7 +311,7 @@ fn archive_rows(list: &Value) -> Vec<ArchiveRow> {
                         None => format!("{messages} messages"),
                     };
                     Some(ArchiveRow {
-                        id: id.clone(),
+                        id: id.clone().into(),
                         title: title.into(),
                         preview: preview.into(),
                         hint: hint.into(),
@@ -338,11 +333,7 @@ async fn load_gateway(ctx: &Ctx) {
     let mut error: Option<String> = None;
     let (version, released, gw_state) = match &status {
         Ok(v) => {
-            let version = v
-                .get("version")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned();
+            let version = v.get("version").and_then(Value::as_str).unwrap_or_default().to_owned();
             let released = v
                 .get("release_date")
                 .and_then(Value::as_str)
@@ -368,20 +359,15 @@ async fn load_gateway(ctx: &Ctx) {
         }
     };
     let (protocol, pid) = match &identity {
-        Ok(v) => (
-            v.get("protocolVersion")
-                .map(|p| p.to_string())
-                .unwrap_or_default(),
-            {
-                let pid = json_i64(v.get("pid"));
-                let role = v.get("role").and_then(Value::as_str).unwrap_or_default();
-                if pid > 0 {
-                    format!("{pid} ({role})")
-                } else {
-                    role.to_owned()
-                }
-            },
-        ),
+        Ok(v) => (v.get("protocolVersion").map(|p| p.to_string()).unwrap_or_default(), {
+            let pid = json_i64(v.get("pid"));
+            let role = v.get("role").and_then(Value::as_str).unwrap_or_default();
+            if pid > 0 {
+                format!("{pid} ({role})")
+            } else {
+                role.to_owned()
+            }
+        }),
         Err(e) => {
             error.get_or_insert(format!("Could not read the host identity: {e}"));
             (String::new(), String::new())
@@ -465,19 +451,24 @@ fn load_devices(ctx: &Ctx) {
 
 /// The label typed into the panel's field (`conn-label` edits land here so `conn-save`, which
 /// runs on the controller, sees the same text the user typed).
+static CONN_LABEL: OnceLock<Mutex<String>> = OnceLock::new();
+
+fn conn_label_cell() -> &'static Mutex<String> {
+    CONN_LABEL.get_or_init(|| Mutex::new(String::new()))
+}
+
 fn last_conn_label() -> String {
-    static LABEL: OnceLock<Mutex<String>> = OnceLock::new();
-    LABEL
-        .get_or_init(|| Mutex::new(String::new()))
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .clone()
+    conn_label_cell().lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+fn set_conn_label(value: &str) {
+    *conn_label_cell().lock().unwrap_or_else(|e| e.into_inner()) = value.to_owned();
 }
 
 fn load_keybinds(ctx: &Ctx) {
-    let rows: Vec<KeyRow> = KEYBINDS
+    let rows: Vec<KeybindRow> = KEYBINDS
         .iter()
-        .map(|(group, keys, label)| KeyRow {
+        .map(|(group, keys, label)| KeybindRow {
             group: (*group).into(),
             keys: (*keys).into(),
             label: (*label).into(),
@@ -500,12 +491,7 @@ async fn load_plugins(ctx: &Ctx) {
         .ok()
         .and_then(|c| c.pointer("/dashboard/hidden_plugins"))
         .and_then(Value::as_array)
-        .map(|a| {
-            a.iter()
-                .filter_map(Value::as_str)
-                .map(str::to_owned)
-                .collect()
-        })
+        .map(|a| a.iter().filter_map(Value::as_str).map(str::to_owned).collect())
         .unwrap_or_default();
     let mut rows: Vec<PluginRow> = Vec::new();
     match &list {
@@ -522,11 +508,7 @@ async fn load_plugins(ctx: &Ctx) {
                         .filter(|l| !l.trim().is_empty())
                         .unwrap_or(name)
                         .into(),
-                    description: p
-                        .get("description")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .into(),
+                    description: p.get("description").and_then(Value::as_str).unwrap_or_default().into(),
                     version: p.get("version").and_then(Value::as_str).unwrap_or_default().into(),
                     source: p.get("source").and_then(Value::as_str).unwrap_or_default().into(),
                     tab: p
@@ -567,7 +549,6 @@ async fn load_plugins(ctx: &Ctx) {
             String::new()
         }
     );
-    let _ = pq;
     state(ctx, move |s| {
         s.set_busy(false);
         s.set_plugins(slint::ModelRc::new(slint::VecModel::from(rows)));
@@ -580,9 +561,7 @@ async fn load_billing(ctx: &Ctx) {
     let pq = ctx.profile_query();
     let pp = profile_param(ctx);
     let portal = ctx.get_json(&format!("/api/portal{pq}")).await;
-    let usage = ctx
-        .get_json(&format!("/api/analytics/usage?days=30{pp}"))
-        .await;
+    let usage = ctx.get_json(&format!("/api/analytics/usage?days=30{pp}")).await;
 
     let mut error: Option<String> = None;
     let mut model_rows: Vec<UsageModelRow> = Vec::new();
@@ -625,12 +604,8 @@ async fn load_billing(ctx: &Ctx) {
                             (
                                 input + output,
                                 UsageModelRow {
-                                    model: m
-                                        .get("model")
-                                        .and_then(Value::as_str)
-                                        .unwrap_or("(unknown)")
-                                        .into(),
-                                    tokens: format!("{} tok", thousands(input + output)),
+                                    model: m.get("model").and_then(Value::as_str).unwrap_or("(unknown)").into(),
+                                    tokens: format!("{} tok", thousands(input + output)).into(),
                                     cost: m
                                         .get("estimated_cost")
                                         .and_then(Value::as_f64)
@@ -649,7 +624,7 @@ async fn load_billing(ctx: &Ctx) {
                         .collect()
                 })
                 .unwrap_or_default();
-            by_model.sort_by(|a, b| b.0.cmp(&a.0));
+            by_model.sort_by_key(|e| std::cmp::Reverse(e.0));
             model_rows = by_model.into_iter().take(5).map(|(_, r)| r).collect();
         }
         Err(e) => error = Some(format!("Could not load usage: {e}")),
@@ -664,11 +639,7 @@ async fn load_billing(ctx: &Ctx) {
                         .filter_map(|f| {
                             Some(FeatureRow {
                                 label: f.get("label").and_then(Value::as_str)?.into(),
-                                state: f
-                                    .get("state")
-                                    .and_then(Value::as_str)
-                                    .unwrap_or_default()
-                                    .into(),
+                                state: f.get("state").and_then(Value::as_str).unwrap_or_default().into(),
                             })
                         })
                         .collect()
@@ -676,13 +647,19 @@ async fn load_billing(ctx: &Ctx) {
                 .unwrap_or_default();
             (
                 v.get("logged_in").and_then(Value::as_bool).unwrap_or(false),
-                v.get("account_tier").and_then(Value::as_str).unwrap_or_default().to_owned(),
+                v.get("account_tier")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
                 match v.get("free_tier").and_then(Value::as_bool) {
                     Some(true) => "yes".to_owned(),
                     Some(false) => "no".to_owned(),
                     None => String::new(),
                 },
-                v.get("portal_url").and_then(Value::as_str).unwrap_or_default().to_owned(),
+                v.get("portal_url")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
                 v.get("subscription_url")
                     .and_then(Value::as_str)
                     .unwrap_or_default()
@@ -692,7 +669,14 @@ async fn load_billing(ctx: &Ctx) {
         }
         Err(e) => {
             error.get_or_insert(format!("Could not read the portal status: {e}"));
-            (false, String::new(), String::new(), String::new(), String::new(), Vec::new())
+            (
+                false,
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                Vec::new(),
+            )
         }
     };
     state(ctx, move |s| {
@@ -721,7 +705,10 @@ async fn load_about(ctx: &Ctx) {
     let (backend_version, released) = match &status {
         Ok(v) => (
             v.get("version").and_then(Value::as_str).unwrap_or_default().to_owned(),
-            v.get("release_date").and_then(Value::as_str).unwrap_or_default().to_owned(),
+            v.get("release_date")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned(),
         ),
         Err(e) => {
             error = Some(format!("Could not read the backend version: {e}"));
@@ -730,9 +717,15 @@ async fn load_about(ctx: &Ctx) {
     };
     let (install_method, update_state, command, available, can_apply) = match &check {
         Ok(v) => (
-            v.get("install_method").and_then(Value::as_str).unwrap_or_default().to_owned(),
+            v.get("install_method")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned(),
             v.get("message").and_then(Value::as_str).unwrap_or_default().to_owned(),
-            v.get("update_command").and_then(Value::as_str).unwrap_or_default().to_owned(),
+            v.get("update_command")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned(),
             v.get("update_available").and_then(Value::as_bool).unwrap_or(false),
             v.get("can_apply").and_then(Value::as_bool).unwrap_or(false),
         ),
@@ -801,9 +794,7 @@ fn checkout_dir(home: &str) -> String {
 
 fn removal_command() -> String {
     let home = std::env::var("HOME").unwrap_or_default();
-    format!(
-        "rm -f {home}/.local/bin/hermes-desktop-rs {home}/.local/share/applications/hermes-desktop-rs.desktop",
-    )
+    format!("rm -f {home}/.local/bin/hermes-desktop-rs {home}/.local/share/applications/hermes-desktop-rs.desktop",)
 }
 
 fn load_uninstall(ctx: &Ctx) {
@@ -839,7 +830,7 @@ pub(crate) async fn action(rest: &str, ctx: &Ctx) -> Outcome {
         }
         "gateway-restart" => restart_gateway(ctx).await,
         "conn-label" => {
-            *last_conn_label().lock().unwrap_or_else(|e| e.into_inner()) = arg.to_owned();
+            set_conn_label(arg);
             Outcome::None
         }
         "conn-save" => save_connection(ctx),
@@ -961,10 +952,7 @@ async fn delete_session(ctx: &Ctx, id: &str) -> Outcome {
         }
         Err(e) => return Outcome::Error(format!("Could not read the chat's revision: {e}")),
     }
-    let path = format!(
-        "/api/sessions/{}{query}",
-        hermes_core::backend::percent_encode(id)
-    );
+    let path = format!("/api/sessions/{}{query}", hermes_core::backend::percent_encode(id));
     match ctx.delete_json(&path).await {
         Ok(_) => {
             load_archived(ctx).await;
@@ -1006,11 +994,7 @@ async fn prune(ctx: &Ctx) -> Outcome {
                 move |s| s.set_cleanup_note(note.into())
             });
             load_archived(ctx).await;
-            if executed {
-                Outcome::Notice(note)
-            } else {
-                Outcome::None
-            }
+            if executed { Outcome::Notice(note) } else { Outcome::None }
         }
         Err(e) => {
             disarm(K_PRUNE);
@@ -1031,10 +1015,7 @@ async fn clean_empty(ctx: &Ctx) -> Outcome {
             let deleted = json_i64(v.get("deleted"));
             load_archived(ctx).await;
             state(ctx, {
-                let note = format!(
-                    "Deleted {deleted} empty chat{}",
-                    if deleted == 1 { "" } else { "s" }
-                );
+                let note = format!("Deleted {deleted} empty chat{}", if deleted == 1 { "" } else { "s" });
                 move |s| s.set_cleanup_note(note.into())
             });
             Outcome::Notice(format!(

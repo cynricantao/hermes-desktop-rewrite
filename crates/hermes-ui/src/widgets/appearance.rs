@@ -20,7 +20,7 @@ use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use serde_json::Value;
-use slint::{ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::widgets::{Ctx, Outcome};
 use crate::{AppWindow, AppearanceState, FontFamily, PaletteCard, Theme};
@@ -44,10 +44,7 @@ const FONT_LIMIT: usize = 240;
 
 /// Widget ids this module draws.
 pub(crate) fn owns(id: &str) -> bool {
-    matches!(
-        id,
-        PALETTE_KEY | CHAT_FONT_KEY | TERMINAL_FONT_KEY | "pet"
-    )
+    matches!(id, PALETTE_KEY | CHAT_FONT_KEY | TERMINAL_FONT_KEY | "pet")
 }
 
 /// Apply one stored device pref to the live window: the palette is ours, so an edit in the
@@ -108,11 +105,7 @@ async fn load_palette(ctx: &Ctx) {
             return;
         }
     };
-    let active = value
-        .get("active")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .to_owned();
+    let active = value.get("active").and_then(Value::as_str).unwrap_or("").to_owned();
     let mut cards: Vec<PaletteCard> = Vec::new();
     if let Some(themes) = value.get("themes").and_then(Value::as_array) {
         for (i, t) in themes.iter().enumerate() {
@@ -122,11 +115,7 @@ async fn load_palette(ctx: &Ctx) {
                 .and_then(Value::as_str)
                 .map(str::to_owned)
                 .unwrap_or_else(|| name.clone());
-            let description = t
-                .get("description")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .to_owned();
+            let description = t.get("description").and_then(Value::as_str).unwrap_or("").to_owned();
             cards.push(PaletteCard {
                 name: name.clone().into(),
                 label: label.into(),
@@ -139,10 +128,9 @@ async fn load_palette(ctx: &Ctx) {
         }
     }
     let rows = cards.len().div_ceil(GRID_COLS as usize).max(1) as i32;
-    let model = ModelRc::new(VecModel::from(cards));
     ctx.ui(move |w| {
         let s = w.global::<AppearanceState>();
-        s.set_palettes(model);
+        s.set_palettes(ModelRc::new(VecModel::from(cards)));
         s.set_palette_rows(rows);
         s.set_palette_error(SharedString::default());
     });
@@ -187,11 +175,7 @@ fn installed_fonts() -> &'static [String] {
     FONTS.get_or_init(|| {
         let mut families: Vec<String> = Vec::new();
         let mut seen: HashSet<String> = HashSet::new();
-        if let Ok(out) = std::process::Command::new("fc-list")
-            .arg(":")
-            .arg("family")
-            .output()
-        {
+        if let Ok(out) = std::process::Command::new("fc-list").arg(":").arg("family").output() {
             for line in String::from_utf8_lossy(&out.stdout).lines() {
                 let first = line.split(',').next().unwrap_or("").trim();
                 if first.is_empty() {
@@ -233,12 +217,13 @@ async fn load_font(ctx: &Ctx, chat: bool) {
         }
         Err(e) => error = format!("Could not read {key}: {e}"),
     }
-    let model = ModelRc::new(VecModel::from(filter_fonts("")));
+    let fonts = filter_fonts("");
     let current_s: SharedString = current.clone().into();
     let error_s: SharedString = error.into();
     ctx.ui(move |w| {
         {
             let s = w.global::<AppearanceState>();
+            let model = ModelRc::new(VecModel::from(fonts));
             if chat {
                 s.set_chat_fonts(model);
                 s.set_chat_current(current_s);
@@ -287,9 +272,10 @@ fn pick_font(terminal: bool, family: &str, ctx: &Ctx) -> Outcome {
 }
 
 fn push_font_list(ctx: &Ctx, chat: bool, list: Vec<FontFamily>) {
-    let model = ModelRc::new(VecModel::from(list));
+    let fonts = list;
     ctx.ui(move |w| {
         let s = w.global::<AppearanceState>();
+        let model = ModelRc::new(VecModel::from(fonts));
         if chat {
             s.set_chat_fonts(model);
         } else {

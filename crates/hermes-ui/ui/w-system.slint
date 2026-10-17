@@ -60,7 +60,7 @@ export struct FeatureRow {
 }
 
 /// One key binding this client actually implements.
-export struct KeyRow {
+export struct KeybindRow {
     group: string,
     keys: string,
     label: string,
@@ -122,7 +122,7 @@ export global SystemState {
     in-out property <[UsageModelRow]> usage-models: [];
 
     // Keyboard Shortcuts › Key bindings (this client's own bindings, no backend)
-    in-out property <[KeyRow]> keybinds: [];
+    in-out property <[KeybindRow]> keybinds: [];
 
     // About › Version & updates
     in-out property <string> client-version;
@@ -150,8 +150,6 @@ component MonoLine inherits TextInput {
     font-family: Theme.mono-font;
     font-size: Theme.fs-sm;
     color: Theme.text-2;
-    background: transparent;
-    border-width: 0px;
     height: 20px;
     vertical-alignment: center;
     selection-background-color: Theme.interactive;

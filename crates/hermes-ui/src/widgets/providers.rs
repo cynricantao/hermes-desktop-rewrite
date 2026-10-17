@@ -55,14 +55,11 @@
 use std::time::{Duration, Instant};
 
 use hermes_core::backend::percent_encode;
-use serde_json::{json, Value};
-use slint::{ModelRc, VecModel};
+use serde_json::{Value, json};
+use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::widgets::{Ctx, Outcome};
-use crate::{
-    EndpointRow, KeyGroup, KeyRow, LocalModelRow, OAuthRow, PoolEntry, PoolGroup, ProvidersState,
-    ToolsetRow,
-};
+use crate::{EndpointRow, KeyGroup, KeyRow, LocalModelRow, OAuthRow, PoolEntry, PoolGroup, ProvidersState, ToolsetRow};
 
 /// Widget ids this module draws.
 pub(crate) fn owns(id: &str) -> bool {
@@ -335,12 +332,7 @@ async fn poll_flow(ctx: Ctx, provider: String, session: String, interval: u64, e
             }
             other => {
                 let msg = str_of(&v, "error_message");
-                finish_flow(
-                    &ctx,
-                    &provider,
-                    Some(false),
-                )
-                .await;
+                finish_flow(&ctx, &provider, Some(false)).await;
                 set_status(
                     &ctx,
                     format!(
@@ -380,10 +372,7 @@ async fn oauth_cancel(ctx: &Ctx, arg: &str) -> Outcome {
     let (provider, session) = arg.split_once(':').unwrap_or((arg, ""));
     let mut cleared = true;
     if !session.is_empty() {
-        let path = format!(
-            "/api/providers/oauth/sessions/{}",
-            percent_encode(session)
-        );
+        let path = format!("/api/providers/oauth/sessions/{}", percent_encode(session));
         cleared = ctx.delete_json(&path).await.is_ok();
     }
     finish_flow(ctx, provider, None).await;
@@ -531,10 +520,7 @@ async fn env_del(ctx: &Ctx, key: &str) -> Outcome {
         return Outcome::Notice(format!("Removed {key}"));
     }
     let put = format!("/api/env{}", ctx.profile_query());
-    match ctx
-        .put_json(&put, &json!({ "key": key, "value": "" }))
-        .await
-    {
+    match ctx.put_json(&put, &json!({ "key": key, "value": "" })).await {
         Ok(_) => {
             refresh_env(ctx, None).await;
             Outcome::Notice(format!(
@@ -586,11 +572,7 @@ fn parse_toolsets(v: &Value) -> Vec<ToolsetRow> {
             let names: Vec<String> = t
                 .get("tools")
                 .and_then(Value::as_array)
-                .map(|a| {
-                    a.iter()
-                        .filter_map(|x| x.as_str().map(str::to_owned))
-                        .collect()
-                })
+                .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect())
                 .unwrap_or_default();
             ToolsetRow {
                 name: str_of(t, "name").into(),
@@ -617,18 +599,11 @@ async fn tools_toggle(ctx: &Ctx, arg: &str) -> Outcome {
         return Outcome::Error("No toolset to toggle".into());
     }
     let enabled = value == "true";
-    let path = format!(
-        "/api/tools/toolsets/{}{}",
-        percent_encode(name),
-        ctx.profile_query()
-    );
+    let path = format!("/api/tools/toolsets/{}{}", percent_encode(name), ctx.profile_query());
     match ctx.put_json(&path, &json!({ "enabled": enabled })).await {
         Ok(_) => {
             load_toolsets(ctx).await;
-            Outcome::Notice(format!(
-                "{name} {}",
-                if enabled { "enabled" } else { "disabled" }
-            ))
+            Outcome::Notice(format!("{name} {}", if enabled { "enabled" } else { "disabled" }))
         }
         Err(e) => {
             load_toolsets(ctx).await;
@@ -661,7 +636,7 @@ fn parse_pool(v: &Value) -> Vec<PoolGroup> {
     list.iter()
         .map(|p| {
             let provider = str_of(p, "provider");
-            let entries = p
+            let entries: Vec<PoolEntry> = p
                 .get("entries")
                 .and_then(Value::as_array)
                 .map(|a| {
@@ -763,11 +738,7 @@ fn parse_endpoints(v: &Value) -> Vec<EndpointRow> {
             let models: Vec<String> = e
                 .get("models")
                 .and_then(Value::as_array)
-                .map(|a| {
-                    a.iter()
-                        .filter_map(|x| x.as_str().map(str::to_owned))
-                        .collect()
-                })
+                .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect())
                 .unwrap_or_default();
             let hint = if models.is_empty() {
                 String::new()
@@ -834,8 +805,7 @@ async fn endpoint_save(ctx: &Ctx, fields: &[&str]) -> Outcome {
         Err(e) => {
             let msg = format!("Could not save: {e}");
             ctx.ui(move |ui| {
-                ui.global::<ProvidersState>()
-                    .set_endpoint_message(msg.into());
+                ui.global::<ProvidersState>().set_endpoint_message(msg.into());
             });
             Outcome::Error(format!("Could not save the endpoint: {e}"))
         }
@@ -853,11 +823,7 @@ async fn endpoint_validate(ctx: &Ctx, fields: &[&str]) -> Outcome {
             let ok = bool_of(&v, "ok");
             let reachable = bool_of(&v, "reachable");
             let message = str_of(&v, "message");
-            let count = v
-                .get("models")
-                .and_then(Value::as_array)
-                .map(|a| a.len())
-                .unwrap_or(0);
+            let count = v.get("models").and_then(Value::as_array).map(|a| a.len()).unwrap_or(0);
             let text = if ok {
                 format!("Reachable — {count} models")
             } else if !message.is_empty() {
@@ -869,8 +835,7 @@ async fn endpoint_validate(ctx: &Ctx, fields: &[&str]) -> Outcome {
             };
             let shown = text.clone();
             ctx.ui(move |ui| {
-                ui.global::<ProvidersState>()
-                    .set_endpoint_message(shown.into());
+                ui.global::<ProvidersState>().set_endpoint_message(shown.into());
             });
             Outcome::Notice(text)
         }
@@ -930,9 +895,7 @@ async fn load_local(ctx: &Ctx) {
                                 let id = str_of(m, "id");
                                 LocalModelRow {
                                     active: !active.is_empty() && id == active,
-                                    loaded: loaded
-                                        .and_then(|l| l.get(&id))
-                                        .is_some_and(|v| !v.is_null()),
+                                    loaded: loaded.and_then(|l| l.get(&id)).is_some_and(|v| !v.is_null()),
                                     id: id.into(),
                                     size: str_of(m, "size_label").into(),
                                 }
@@ -975,7 +938,11 @@ fn hardware_line(hw: Option<&Value>) -> String {
         }
         parts.push(v);
     }
-    if let Some(ram) = h.get("ram_available_bytes").and_then(Value::as_f64).filter(|r| *r > 0.0) {
+    if let Some(ram) = h
+        .get("ram_available_bytes")
+        .and_then(Value::as_f64)
+        .filter(|r| *r > 0.0)
+    {
         parts.push(format!("{} RAM free", gb(ram)));
     }
     parts.join(" · ")
@@ -1006,10 +973,7 @@ async fn local_server(ctx: &Ctx, action: &str) -> Outcome {
 
 async fn local_activate(ctx: &Ctx, model_id: &str) -> Outcome {
     match ctx
-        .post_json(
-            "/api/local-models/activate",
-            &json!({ "model_id": model_id }),
-        )
+        .post_json("/api/local-models/activate", &json!({ "model_id": model_id }))
         .await
     {
         Ok(_) => {
@@ -1038,6 +1002,7 @@ async fn local_eject(ctx: &Ctx, model_id: &str) -> Outcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use slint::Model as _;
 
     #[test]
     fn owns_exactly_the_provider_ids() {

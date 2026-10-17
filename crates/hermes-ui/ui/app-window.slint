@@ -5,10 +5,14 @@ import { Theme, Motion, Ease, ThemeMode } from "theme.slint";
 import { Icon, IconButton, NavItem, SectionHeader, Chip, Banner, Spinner, Toggle, Segmented, PrimaryButton, GhostButton } from "components.slint";
 import { Transcript, Composer, ChatRow, ToolRow } from "chat.slint";
 import { SettingsModal, SettingsState } from "settings.slint";
+import { AppearanceState } from "w-appearance.slint";
+import { ModelsState } from "w-models.slint";
+import { ProvidersState } from "w-providers.slint";
+import { SystemState } from "w-system.slint";
 
 import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
 
-export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState }
+export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, AppearanceState, ModelsState, ProvidersState, SystemState }
 
 export struct SessionItem {
     id: string,

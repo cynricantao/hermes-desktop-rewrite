@@ -99,8 +99,10 @@ struct Cache {
 
 static CACHE: Mutex<Option<Cache>> = Mutex::new(None);
 
-/// The cache, reset when the open profile changes.
-fn cache(scope: &str) -> MutexGuard<'static, Cache> {
+/// The cache, reset when the open profile changes. Returns the guard over the `Option` so
+/// callers use `as_ref()`/`as_mut()` and a missing entry is a loud `expect`, not a panic
+/// on a null guard.
+fn cache(scope: &str) -> MutexGuard<'static, Option<Cache>> {
     let mut guard = CACHE.lock().unwrap_or_else(|e| e.into_inner());
     let stale = guard.as_ref().is_none_or(|c| c.scope != scope);
     if stale {
@@ -129,10 +131,35 @@ fn scoped(ctx: &Ctx, path: &str) -> String {
 /// The provider/model pairs of a `/api/model/options` payload, filtered by `query`
 /// (matches a model id, or a provider name/slug which then keeps all of its models).
 struct Groups {
-    groups: Vec<ModelGroup>,
+    groups: Vec<GroupData>,
     providers: usize,
     matched: usize,
     total: usize,
+}
+
+/// A `ModelGroup` in plain (Send) form. `ModelGroup.models` is a Slint array, i.e. a
+/// `ModelRc`, which cannot cross to the UI thread — so the model is built there by
+/// [`group_model`] from this plain data.
+#[derive(Clone)]
+struct GroupData {
+    slug: String,
+    name: String,
+    authenticated: bool,
+    models: Vec<SharedString>,
+}
+
+/// Build the Slint model for a group list. Call **inside** a `ctx.ui` closure.
+fn group_model(groups: Vec<GroupData>) -> ModelRc<ModelGroup> {
+    let rows: Vec<ModelGroup> = groups
+        .into_iter()
+        .map(|g| ModelGroup {
+            slug: g.slug.into(),
+            name: g.name.into(),
+            authenticated: g.authenticated,
+            models: ModelRc::new(VecModel::from(g.models)),
+        })
+        .collect();
+    ModelRc::new(VecModel::from(rows))
 }
 
 fn build_groups(options: &Value, query: &str) -> Groups {
@@ -165,11 +192,11 @@ fn build_groups(options: &Value, query: &str) -> Groups {
         }
         out.providers += 1;
         out.matched += models.len();
-        out.groups.push(ModelGroup {
-            slug: slug.into(),
-            name: name.into(),
+        out.groups.push(GroupData {
+            slug: slug.to_owned(),
+            name: name.to_owned(),
             authenticated,
-            models: ModelRc::new(VecModel::from(models)),
+            models,
         });
     }
     out
@@ -257,13 +284,13 @@ fn push_notice(ctx: &Ctx, message: &str) {
     });
 }
 
-fn push_picker(ctx: &Ctx, target: &str, groups: Vec<ModelGroup>) {
+fn push_picker(ctx: &Ctx, target: &str, groups: Vec<GroupData>) {
     let target = target.to_owned();
     ctx.ui(move |ui| {
         let state = ui.global::<ModelsState>();
         state.set_picker_target(target.into());
         state.set_picker_search(SharedString::new());
-        state.set_picker_groups(ModelRc::new(VecModel::from(groups)));
+        state.set_picker_groups(group_model(groups));
     });
 }
 
@@ -356,9 +383,10 @@ async fn load_main(ctx: &Ctx) {
     let count = count_label(&groups, &query, "models");
     let provider = text(&options, "provider");
     let model = text(&options, "model");
+    let rows = groups.groups;
     ctx.ui(move |ui| {
         let state = ui.global::<ModelsState>();
-        state.set_main_groups(ModelRc::new(VecModel::from(groups.groups)));
+        state.set_main_groups(group_model(rows));
         state.set_main_count(count.into());
         state.set_main_provider(provider.into());
         state.set_main_model(model.into());
@@ -628,10 +656,10 @@ pub(crate) async fn action(rest: &str, ctx: &Ctx) -> Outcome {
             }
             moa_edit(ctx, "Reference model removed", move |moa, preset| {
                 with_preset(moa, preset, |p| {
-                    if let Some(list) = p.get_mut("reference_models").and_then(Value::as_array_mut) {
-                        if index < list.len() {
-                            list.remove(index);
-                        }
+                    if let Some(list) = p.get_mut("reference_models").and_then(Value::as_array_mut)
+                        && index < list.len()
+                    {
+                        list.remove(index);
                     }
                 });
             })
@@ -755,17 +783,19 @@ async fn filter(ctx: &Ctx, which: &str, query: &str) -> Outcome {
     if which == "main" {
         let count = count_label(&groups, query, "models");
         cache(&ctx.scope).as_mut().expect("cache").main_query = own;
+        let rows = groups.groups;
         ctx.ui(move |ui| {
             let state = ui.global::<ModelsState>();
-            state.set_main_groups(ModelRc::new(VecModel::from(groups.groups)));
+            state.set_main_groups(group_model(rows));
             state.set_main_count(count.into());
         });
     } else {
         cache(&ctx.scope).as_mut().expect("cache").picker_query = own.clone();
+        let rows = groups.groups;
         ctx.ui(move |ui| {
             let state = ui.global::<ModelsState>();
             state.set_picker_search(own.into());
-            state.set_picker_groups(ModelRc::new(VecModel::from(groups.groups)));
+            state.set_picker_groups(group_model(rows));
         });
     }
     Outcome::None
