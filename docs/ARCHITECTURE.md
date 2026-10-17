@@ -16,6 +16,9 @@ crates/
     protocol.rs    lenient serde types mirroring gateway-contract.openrpc.json
     transcript.rs  gateway events → transcript blocks, reporting row-level `Change`s
     sessions.rs    sidebar grouping helpers
+    api/            Typed backend client, one module per area (sessions, plugins, messaging,
+                     voice, workspace, system, extras). Pure request builders + lenient reply
+                     types; screens call these. Map: docs/BACKEND_API.md.
     capabilities.rs  Capabilities screen: REST requests + row parsers for profiles, skills,
                      toolsets, MCP servers, memory/curator and cron jobs (pure, tested)
     examples/probe.rs  live end-to-end probe against a real backend

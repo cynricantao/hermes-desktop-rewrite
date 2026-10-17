@@ -26,6 +26,44 @@ pub enum HttpError {
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Method {
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
+}
+
+impl Method {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Method::Get => "GET",
+            Method::Post => "POST",
+            Method::Put => "PUT",
+            Method::Patch => "PATCH",
+            Method::Delete => "DELETE",
+        }
+    }
+}
+
+/// One REST call: method, path (query included) and optional JSON body. Built by pure
+/// functions (unit-testable) and sent with [`Rest::call`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct Request {
+    pub method: Method,
+    pub path: String,
+    pub body: Option<Value>,
+}
+
+pub fn req(method: Method, path: impl Into<String>, body: Option<Value>) -> Request {
+    Request {
+        method,
+        path: path.into(),
+        body,
+    }
+}
+
 /// A REST handle to one backend (host, port, session token). Cheap to clone.
 #[derive(Clone)]
 pub struct Rest {
@@ -63,6 +101,11 @@ impl Rest {
 
     pub async fn post(&self, path: &str, body: &Value) -> Result<Value, HttpError> {
         self.send("POST", path, Some(body)).await
+    }
+
+    /// Send a prepared [`Request`] with the default timeout.
+    pub async fn call(&self, r: &Request) -> Result<Value, HttpError> {
+        self.send(r.method.as_str(), &r.path, r.body.as_ref()).await
     }
 
     /// Any method, with the default 10 s timeout.
