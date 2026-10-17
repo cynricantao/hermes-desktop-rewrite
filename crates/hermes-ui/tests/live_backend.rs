@@ -323,6 +323,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     if want("capabilities") {
         capabilities_section(&ui, &log).await;
     }
+    if want("widgets") {
+        settings_widgets_section(&ui, &log).await;
+    }
 }
 
 /// An independent RPC read verifies that UI selections reached the real private backend.
@@ -2135,6 +2138,584 @@ async fn capabilities_section(ui: &AppWindow, log: &Log) {
         closed,
         format!("open={}", s.get_open()),
     );
+}
+
+/// Independent REST read-backs to the private backend. The test body runs on the Slint
+/// event loop, which is not a tokio context, and `hermes_core`'s HTTP helpers use
+/// `tokio::time::timeout` internally — so the probe owns a current-thread runtime and
+/// blocks on it for each call (milliseconds, local socket).
+struct Probe {
+    rt: tokio::runtime::Runtime,
+    rest: hermes_core::http::Rest,
+}
+
+impl Probe {
+    fn new() -> Result<Self, String> {
+        let port: u16 = std::env::var("HERMES_DESKTOP_PORT")
+            .map_err(|_| "HERMES_DESKTOP_PORT not set".to_owned())?
+            .parse()
+            .map_err(|e| format!("bad HERMES_DESKTOP_PORT: {e}"))?;
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| e.to_string())?;
+        let token = rt
+            .block_on(hermes_core::backend::fetch_token("127.0.0.1", port))
+            .map_err(|e| e.to_string())?;
+        Ok(Self {
+            rt,
+            rest: hermes_core::http::Rest::new("127.0.0.1", port, token),
+        })
+    }
+
+    fn get(&self, path: &str) -> Result<serde_json::Value, String> {
+        self.rt.block_on(self.rest.get(path)).map_err(|e| e.to_string())
+    }
+
+    /// The session mutation routes answer 405 to PUT — they need PATCH.
+    fn patch(&self, path: &str, body: &serde_json::Value) -> Result<serde_json::Value, String> {
+        self.rt.block_on(self.rest.patch(path, body)).map_err(|e| e.to_string())
+    }
+}
+
+/// The four settings widget areas, end to end against the private backend. Every page whose
+/// row used to render "Not built yet" must load its real state, and each area must prove one
+/// write lands by an independent REST read-back (never the UI's own model).
+async fn settings_widgets_section(ui: &AppWindow, log: &Log) {
+    let s = ui.global::<SettingsState>();
+    let probe = match Probe::new() {
+        Ok(p) => p,
+        Err(e) => return record(log, "widgets: REST read-back setup", false, e),
+    };
+    if !wait_until(20, || s.get_open()).await {
+        chord(ui, &[Key::Control], ",");
+        let _ = wait_until(20, || s.get_open()).await;
+    }
+
+    // ── appearance/theme: the palette grid ──────────────────────────────────────
+    s.invoke_goto("appearance".into(), "theme".into());
+    let a = ui.global::<hermes_ui::AppearanceState>();
+    let palettes = wait_until(20, || a.get_palettes().row_count() > 0).await;
+    let backend_themes = probe.get("/api/dashboard/themes").ok();
+    let names: Vec<String> = backend_themes
+        .as_ref()
+        .and_then(|v| v.get("themes"))
+        .and_then(|t| t.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|t| t.get("name").and_then(|n| n.as_str()).map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default();
+    let active = backend_themes
+        .as_ref()
+        .and_then(|v| v.get("active"))
+        .and_then(|a| a.as_str())
+        .unwrap_or_default()
+        .to_owned();
+    let grid_shows = a.get_palettes().row_count();
+    record(
+        log,
+        "widgets: Appearance › Theme lists the backend palettes",
+        palettes && grid_shows == names.len() && !names.is_empty(),
+        format!(
+            "grid rows={grid_shows}, backend themes={names:?} (active {active:?}), palette-error={:?}",
+            a.get_palette_error()
+        ),
+    );
+
+    // Pick a palette that is not active and verify the backend switched.
+    if let Some(pick) = names.iter().find(|n| n.as_str() != active) {
+        s.invoke_action(format!("appearance:palette:{pick}").into());
+        let mut switched = false;
+        for _ in 0..67 {
+            let now_active = probe
+                .get("/api/dashboard/themes")
+                .ok()
+                .and_then(|v| v.get("active").and_then(|a| a.as_str()).map(str::to_owned));
+            if now_active.as_deref() == Some(pick.as_str()) {
+                switched = true;
+                break;
+            }
+            sleep(300).await;
+        }
+        // Restore the original theme so the run leaves the backend tidy.
+        s.invoke_action(format!("appearance:palette:{active}").into());
+        for _ in 0..67 {
+            let now_active = probe
+                .get("/api/dashboard/themes")
+                .ok()
+                .and_then(|v| v.get("active").and_then(|a| a.as_str()).map(str::to_owned));
+            if now_active.as_deref() == Some(active.as_str()) {
+                break;
+            }
+            sleep(300).await;
+        }
+        record(
+            log,
+            "widgets: picking a palette switches the backend theme",
+            switched,
+            format!("picked {pick:?}; GET /api/dashboard/themes active was {pick:?} (restored {active:?})"),
+        );
+    } else {
+        record(
+            log,
+            "widgets: picking a palette switches the backend theme",
+            false,
+            "no alternative theme offered",
+        );
+    }
+
+    // ── appearance/typography: installed-font pickers ───────────────────────────
+    s.invoke_goto("appearance".into(), "typography".into());
+    let fonts = wait_until(20, || {
+        a.get_chat_fonts().row_count() > 0 && a.get_terminal_fonts().row_count() > 0
+    })
+    .await;
+    let family = a
+        .get_chat_fonts()
+        .row_data(0)
+        .map(|f| f.family.to_string())
+        .unwrap_or_default();
+    record(
+        log,
+        "widgets: Appearance › Typography lists installed fonts",
+        fonts && !family.is_empty(),
+        format!(
+            "chat fonts={}, terminal fonts={}, first={family:?}, chat current={:?}, fonts-error={:?}",
+            a.get_chat_fonts().row_count(),
+            a.get_terminal_fonts().row_count(),
+            a.get_chat_current(),
+            a.get_fonts_error()
+        ),
+    );
+
+    // ── models/main: the default-model picker ───────────────────────────────────
+    let m = ui.global::<hermes_ui::ModelsState>();
+    s.invoke_goto("model".into(), "main".into());
+    let groups = wait_until(20, || m.get_main_groups().row_count() > 0).await;
+    let mut pick: Option<(String, String)> = None;
+    for g in m.get_main_groups().iter() {
+        for model in g.models.iter() {
+            let pair = (g.slug.to_string(), model.to_string());
+            if m.get_main_model() != pair.1 || m.get_main_provider() != pair.0 {
+                pick = Some(pair);
+                break;
+            }
+        }
+        if pick.is_some() {
+            break;
+        }
+    }
+    record(
+        log,
+        "widgets: Model › Main lists providers and models",
+        groups && !m.get_main_count().is_empty() && pick.is_some(),
+        format!(
+            "groups={}, count={:?}, current={} · {}, wait={:?}",
+            m.get_main_groups().row_count(),
+            m.get_main_count(),
+            m.get_main_provider(),
+            m.get_main_model(),
+            pick
+        ),
+    );
+    if let Some((provider, model)) = pick {
+        s.invoke_action(format!("models:pick:{provider}:{model}").into());
+        // The backend canonicalises some ids (e.g. `claude-fable-5.1` -> `claude-fable-5-1`),
+        // so panel and pick are compared with dots and dashes folded together.
+        let fold = |v: &str| v.replace('.', "-");
+        let want = fold(&model);
+        let ui_ok = wait_until(25, || fold(m.get_main_model().as_ref()) == want).await;
+        let mut backend_ok = false;
+        for _ in 0..67 {
+            let current_provider = probe.get("/api/model/options").ok().and_then(|v| {
+                v.get("providers").and_then(|p| p.as_array()).and_then(|list| {
+                    list.iter()
+                        .find(|p| p.get("is_current").and_then(|c| c.as_bool()).unwrap_or(false))
+                        .and_then(|p| p.get("slug").and_then(|s| s.as_str()).map(str::to_owned))
+                })
+            });
+            if current_provider.as_deref() == Some(provider.as_str()) {
+                backend_ok = true;
+                break;
+            }
+            sleep(300).await;
+        }
+        record(
+            log,
+            "widgets: Model › Main sets the default model (backed by /api/model/set)",
+            ui_ok && backend_ok,
+            format!(
+                "picked {provider} · {model}; UI shows it={ui_ok}; /api/model/options marks that provider current={backend_ok}"
+            ),
+        );
+    }
+
+    // ── model/auxiliary + moa + fallbacks ──────────────────────────────────────
+    s.invoke_goto("model".into(), "auxiliary".into());
+    let aux = wait_until(20, || m.get_aux_rows().row_count() > 0).await;
+    let aux_backend = probe
+        .get("/api/model/auxiliary")
+        .ok()
+        .and_then(|v| v.get("tasks").and_then(|t| t.as_array().map(|a| a.len())))
+        .unwrap_or(0);
+    record(
+        log,
+        "widgets: Model › Auxiliary lists every backend task",
+        aux && aux_backend > 0 && m.get_aux_rows().row_count() == aux_backend,
+        format!("rows={}, backend tasks={aux_backend}", m.get_aux_rows().row_count()),
+    );
+
+    s.invoke_goto("model".into(), "moa".into());
+    let moa = wait_until(20, || m.get_moa_loaded()).await;
+    let moa_backend = probe
+        .get("/api/model/moa")
+        .ok()
+        .and_then(|v| v.get("presets").and_then(|p| p.as_object().map(|o| o.len())))
+        .unwrap_or(0);
+    record(
+        log,
+        "widgets: Model › MoA loads presets, reference models and the aggregator",
+        moa && moa_backend > 0 && m.get_moa_presets().row_count() == moa_backend,
+        format!(
+            "loaded={moa}, presets={} (backend {moa_backend}), refs={}, aggregator={} · {}, enabled={}, error={:?}",
+            m.get_moa_presets().row_count(),
+            m.get_moa_refs().row_count(),
+            m.get_moa_aggregator_provider(),
+            m.get_moa_aggregator_model(),
+            m.get_moa_enabled(),
+            m.get_error()
+        ),
+    );
+
+    s.invoke_goto("model".into(), "fallbacks".into());
+    sleep(600).await;
+    let fb_rows = m.get_fb_rows().row_count();
+    let fb_backend = probe
+        .get("/api/config")
+        .ok()
+        .and_then(|v| v.get("fallback_providers").and_then(|f| f.as_array().map(|a| a.len())))
+        .unwrap_or(0);
+    record(
+        log,
+        "widgets: Model › Fallbacks shows the config's fallback list",
+        fb_rows == fb_backend,
+        format!(
+            "editor rows={fb_rows}, config fallback_providers={fb_backend}, error={:?}",
+            m.get_error()
+        ),
+    );
+
+    // ── providers/accounts ──────────────────────────────────────────────────────
+    let p = ui.global::<hermes_ui::ProvidersState>();
+    s.invoke_goto("providers".into(), "accounts".into());
+    let accounts = wait_until(20, || p.get_oauth_rows().row_count() > 0).await;
+    let accounts_backend = probe
+        .get("/api/providers/oauth")
+        .ok()
+        .and_then(|v| v.get("providers").and_then(|x| x.as_array().map(|a| a.len())))
+        .unwrap_or(0);
+    record(
+        log,
+        "widgets: Providers › Accounts lists every OAuth provider with its sign-in state",
+        accounts && p.get_oauth_rows().row_count() == accounts_backend && accounts_backend > 0,
+        format!(
+            "rows={} (backend {accounts_backend}), status={:?}, status-error={}",
+            p.get_oauth_rows().row_count(),
+            p.get_status(),
+            p.get_status_error()
+        ),
+    );
+
+    // ── providers/keys ──────────────────────────────────────────────────────────
+    s.invoke_goto("providers".into(), "keys".into());
+    let keys = wait_until(20, || p.get_key_groups().row_count() > 0).await;
+    let env_backend = probe
+        .get("/api/env")
+        .ok()
+        .and_then(|v| v.as_object().map(|o| o.len()))
+        .unwrap_or(0);
+    record(
+        log,
+        "widgets: Providers › Keys lists the provider credential groups",
+        keys && p.get_key_groups().row_count() > 0 && env_backend > 0,
+        format!(
+            "groups={}, backend env entries={env_backend}, status={:?}",
+            p.get_key_groups().row_count(),
+            p.get_status()
+        ),
+    );
+
+    // ── keys/tools: a real toggle write with read-back ──────────────────────────
+    s.invoke_goto("keys".into(), "tools".into());
+    let tools = wait_until(20, || p.get_toolset_rows().row_count() > 0).await;
+    let first = p.get_toolset_rows().row_data(0);
+    let toggle = first.as_ref().map(|t| (t.name.to_string(), t.enabled));
+    let mut toggled_ok = false;
+    if let Some((name, was)) = toggle.clone()
+        && !name.is_empty()
+    {
+        s.invoke_action(format!("providers:tools-toggle:{name}:{}", !was).into());
+        for _ in 0..67 {
+            let flipped = probe.get("/api/tools/toolsets").ok().and_then(|v| {
+                v.as_array().map(|list| {
+                    list.iter().any(|t| {
+                        t.get("name").and_then(|n| n.as_str()) == Some(name.as_str())
+                            && t.get("enabled").and_then(|e| e.as_bool()) == Some(!was)
+                    })
+                })
+            });
+            if flipped == Some(true) {
+                toggled_ok = true;
+                break;
+            }
+            sleep(300).await;
+        }
+        // Put it back.
+        s.invoke_action(format!("providers:tools-toggle:{name}:{was}").into());
+        for _ in 0..67 {
+            let restored = probe.get("/api/tools/toolsets").ok().and_then(|v| {
+                v.as_array().map(|list| {
+                    list.iter().any(|t| {
+                        t.get("name").and_then(|n| n.as_str()) == Some(name.as_str())
+                            && t.get("enabled").and_then(|e| e.as_bool()) == Some(was)
+                    })
+                })
+            });
+            if restored == Some(true) {
+                break;
+            }
+            sleep(300).await;
+        }
+    }
+    record(
+        log,
+        "widgets: Keys › Tools toggles a toolset (backed by /api/tools/toolsets)",
+        tools && toggled_ok,
+        format!(
+            "rows={}, toggle={toggle:?}, read-back flipped={toggled_ok}",
+            p.get_toolset_rows().row_count()
+        ),
+    );
+
+    // ── vault/credentials ───────────────────────────────────────────────────────
+    let pool_backend = probe
+        .get("/api/credentials/pool")
+        .ok()
+        .and_then(|v| v.get("providers").and_then(|x| x.as_array().map(|a| a.len())))
+        .unwrap_or(0);
+    s.invoke_goto("vault".into(), "credentials".into());
+    let pool = wait_until(20, || {
+        p.get_pool_groups().row_count() == pool_backend && pool_backend > 0
+    })
+    .await;
+    record(
+        log,
+        "widgets: Vault › Saved credentials shows the credential pool",
+        pool && p.get_pool_groups().row_count() == pool_backend,
+        format!(
+            "groups={} (backend providers {pool_backend}), status={:?}",
+            p.get_pool_groups().row_count(),
+            p.get_status()
+        ),
+    );
+
+    // ── system: about/updates ───────────────────────────────────────────────────
+    let y = ui.global::<hermes_ui::SystemState>();
+    s.invoke_goto("about".into(), "updates".into());
+    let about = wait_until(20, || !y.get_backend_version().is_empty()).await;
+    let status_version = probe
+        .get("/api/status")
+        .ok()
+        .and_then(|v| v.get("version").and_then(|x| x.as_str()).map(str::to_owned))
+        .unwrap_or_default();
+    record(
+        log,
+        "widgets: About › Version & updates reads /api/status and the update check",
+        about && y.get_backend_version() == status_version && !y.get_install_method().is_empty(),
+        format!(
+            "client={:?}, backend={:?} (api/status {status_version:?}), install={:?}, update-state={:?}, can-apply={}",
+            y.get_client_version(),
+            y.get_backend_version(),
+            y.get_install_method(),
+            y.get_update_state(),
+            y.get_can_apply()
+        ),
+    );
+
+    // ── system: sessions/archived ───────────────────────────────────────────────
+    s.invoke_goto("sessions".into(), "archived".into());
+    let sessions = wait_until(20, || !y.get_sessions_summary().is_empty()).await;
+    let empty_backend = probe
+        .get("/api/sessions/empty/count")
+        .ok()
+        .and_then(|v| v.get("count").and_then(|c| c.as_i64()))
+        .unwrap_or(-1) as i32;
+    record(
+        log,
+        "widgets: Sessions › Archive reads the archive stats and the cleanup counts",
+        sessions && y.get_empty_count() == empty_backend,
+        format!(
+            "summary={:?}, empty-count={} (backend {empty_backend}), rows={}, error={:?}",
+            y.get_sessions_summary(),
+            y.get_empty_count(),
+            y.get_archived().row_count(),
+            y.get_error()
+        ),
+    );
+
+    // ── sessions: archive by REST (fenced, the backend's own contract) and restore
+    //    through the panel — the write path the row actually offers ────────────────
+    // A previous run may have left the seeded chat archived (that is the state this check
+    // creates); unarchive it first so the round trip starts from a clean slate.
+    let first_id = |v: &serde_json::Value| -> Option<String> {
+        v.get("sessions")
+            .and_then(|s| s.as_array())
+            .and_then(|a| a.first())
+            .and_then(|s| s.get("id").and_then(|i| i.as_str()).map(str::to_owned))
+    };
+    let mut sid = probe.get("/api/sessions?limit=3").ok().and_then(|v| first_id(&v));
+    if sid.is_none() {
+        sid = probe
+            .get("/api/sessions?archived=only&order=recent&limit=3")
+            .ok()
+            .and_then(|v| first_id(&v));
+        if let Some(id) = &sid {
+            let rev = probe
+                .get(&format!("/api/sessions/{id}/mutation-snapshot"))
+                .ok()
+                .and_then(|v| v.get("runtime_revision").and_then(|r| r.as_i64()))
+                .unwrap_or(0);
+            let _ = probe.patch(
+                &format!("/api/sessions/{id}"),
+                &serde_json::json!({
+                    "archived": false,
+                    "request_id": format!("widgets-live-reset-{}", std::process::id()),
+                    "expected_revision": rev,
+                }),
+            );
+        }
+    }
+    let mut round_trip = false;
+    let mut detail = String::from("no session to archive on this backend");
+    if let Some(sid) = sid {
+        let rev = probe
+            .get(&format!("/api/sessions/{sid}/mutation-snapshot"))
+            .ok()
+            .and_then(|v| v.get("runtime_revision").and_then(|r| r.as_i64()))
+            .unwrap_or(0);
+        let archived_backend = probe
+            .patch(
+                &format!("/api/sessions/{sid}"),
+                &serde_json::json!({
+                    "archived": true,
+                    "request_id": format!("widgets-live-archive-{}", std::process::id()),
+                    "expected_revision": rev,
+                }),
+            )
+            .is_ok();
+        s.invoke_action("system:sessions-refresh".into());
+        let listed = wait_until(20, || {
+            y.get_archived()
+                .iter()
+                .any(|r| r.id == sid && r.title.to_string().contains("WIDGETS"))
+        })
+        .await;
+        s.invoke_action(format!("system:sessions-restore:{sid}").into());
+        let restored_ui = wait_until(20, || !y.get_archived().iter().any(|r| r.id == sid)).await;
+        let restored_backend = wait_until(20, || {
+            probe
+                .get("/api/sessions/stats")
+                .ok()
+                .and_then(|v| v.get("archived").and_then(|a| a.as_i64()))
+                == Some(0)
+        })
+        .await;
+        round_trip = archived_backend && listed && restored_ui && restored_backend;
+        detail = format!(
+            "{sid}: archived via REST={archived_backend}, listed in the panel={listed}, \
+             restore via panel={restored_ui}, backend archived=0 again={restored_backend}"
+        );
+    }
+    record(
+        log,
+        "widgets: Sessions › a chat archives and restores through the panel",
+        round_trip,
+        detail,
+    );
+
+    // ── system: plugins ─────────────────────────────────────────────────────────
+    s.invoke_goto("plugins".into(), "installed".into());
+    let plugins = wait_until(20, || y.get_plugins().row_count() > 0).await;
+    let plugins_backend = probe
+        .get("/api/dashboard/plugins")
+        .ok()
+        .and_then(|v| v.as_array().map(|a| a.len()))
+        .unwrap_or(0);
+    record(
+        log,
+        "widgets: Plugins › Desktop plugins lists the installed plugins",
+        plugins && y.get_plugins().row_count() == plugins_backend && plugins_backend > 0,
+        format!(
+            "rows={} (backend {plugins_backend}), note={:?}",
+            y.get_plugins().row_count(),
+            y.get_plugins_note()
+        ),
+    );
+
+    // ── system: billing + keybinds + gateway ────────────────────────────────────
+    s.invoke_goto("billing".into(), "overview".into());
+    let billing = wait_until(20, || !y.get_usage_tokens().is_empty()).await;
+    record(
+        log,
+        "widgets: Billing › Overview shows the portal state and usage totals",
+        billing && y.get_usage_days() > 0,
+        format!(
+            "tokens={:?}, cost={:?}, sessions={:?}, window={}d, models={}, portal={:?}",
+            y.get_usage_tokens(),
+            y.get_usage_cost(),
+            y.get_usage_sessions(),
+            y.get_usage_days(),
+            y.get_usage_models().row_count(),
+            y.get_portal_url()
+        ),
+    );
+
+    s.invoke_goto("keybinds".into(), "shortcuts".into());
+    let keybinds = wait_until(20, || y.get_keybinds().row_count() > 0).await;
+    record(
+        log,
+        "widgets: Keyboard Shortcuts › Key bindings lists the app's real bindings",
+        keybinds,
+        format!(
+            "rows={}, first={:?}",
+            y.get_keybinds().row_count(),
+            y.get_keybinds()
+                .row_data(0)
+                .map(|k| format!("{} · {}", k.keys, k.label))
+        ),
+    );
+
+    s.invoke_goto("gateway".into(), "connection".into());
+    let gateway = wait_until(20, || !y.get_gw_endpoint().is_empty()).await;
+    let port = std::env::var("HERMES_DESKTOP_PORT").unwrap_or_default();
+    record(
+        log,
+        "widgets: Gateways › This window shows the live backend identity",
+        gateway && y.get_gw_endpoint().to_string().contains(&port) && !y.get_gw_version().is_empty(),
+        format!(
+            "endpoint={:?} (port {port}), version={:?}, protocol={:?}, pid={:?}, state={:?}",
+            y.get_gw_endpoint(),
+            y.get_gw_version(),
+            y.get_gw_protocol(),
+            y.get_gw_pid(),
+            y.get_gw_state()
+        ),
+    );
+
+    ui.set_settings_open(false);
+    sleep(200).await;
 }
 
 #[test]

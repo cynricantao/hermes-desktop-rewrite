@@ -9,8 +9,12 @@
 
 import { ScrollView, LineEdit, Slider } from "std-widgets.slint";
 import { Theme, Motion, Ease } from "theme.slint";
-import { IconButton, Toggle, Segmented, PrimaryButton, Chip } from "components.slint";
+import { IconButton, Toggle, Segmented, PrimaryButton } from "components.slint";
 import { Icons } from "icons.slint";
+import { AppearanceWidget } from "w-appearance.slint";
+import { ModelsWidget } from "w-models.slint";
+import { ProvidersWidget } from "w-providers.slint";
+import { SystemWidget } from "w-system.slint";
 
 // ── Models the controller fills ─────────────────────────────────────────────────
 
@@ -58,6 +62,11 @@ export struct SettingRowUI {
     unit: string,
     highlight: bool,
     note: string,
+    /// A widget row: label and description on top, the panel for `area` below, full
+    /// width. `area` is "" for everything else and one of `appearance`, `models`,
+    /// `providers`, `system` otherwise (see crates/hermes-ui/src/widgets/mod.rs).
+    full: bool,
+    area: string,
 }
 
 export global SettingsState {
@@ -324,8 +333,10 @@ component RowControl inherits VerticalLayout {
         item: item;
     }
     if item.kind == "slider": SliderControl { item: item; }
-    if item.kind == "fallback": Text {
-        text: item.value == "" ? "None" : item.value;
+    // The Fallback Models row renders its list editor full-width below the label
+    // (see SettingRowView); a plain fallback row would show its value as text on the right.
+    if item.kind == "fallback" && !item.full: Text {
+        text: item.value;
         color: Theme.text-2;
         font-size: Theme.fs-sm;
         horizontal-alignment: right;
@@ -335,16 +346,6 @@ component RowControl inherits VerticalLayout {
     if item.kind == "action": PrimaryButton {
         text: item.label;
         clicked => { SettingsState.action(item.id); }
-    }
-    // Font keys render as plain text inputs today (the original lists installed fonts);
-    // the rest are page widgets that are not built yet and say so.
-    if item.kind == "widget" && (item.id == "desktop.font_family" || item.id == "terminal.font_family"): TextControl {
-        item: item;
-    }
-    if item.kind == "widget" && !(item.id == "desktop.font_family" || item.id == "terminal.font_family"): Chip {
-        interactive: false;
-        outlined: true;
-        text: item.note == "" ? "Not built yet" : item.note;
     }
     if item.kind == "info": Text {
         text: item.value;
@@ -356,30 +357,53 @@ component RowControl inherits VerticalLayout {
 component SettingRowView inherits Rectangle {
     in property <SettingRowUI> item;
     background: item.highlight ? Theme.accent-soft : transparent;
-    lay := HorizontalLayout {
+    VerticalLayout {
         padding-left: 14px;
         padding-right: 14px;
         padding-top: 11px;
         padding-bottom: 11px;
-        spacing: 28px;
-        VerticalLayout {
-            horizontal-stretch: 1;
-            spacing: 3px;
-            alignment: center;
-            Text {
-                vertical-alignment: center;
-                text: root.item.label;
-                color: Theme.text;
-                font-size: Theme.fs-md;
+        spacing: 10px;
+        HorizontalLayout {
+            spacing: 28px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 3px;
+                alignment: center;
+                Text {
+                    vertical-alignment: center;
+                    text: root.item.label;
+                    color: Theme.text;
+                    font-size: Theme.fs-md;
+                }
+                if root.item.description != "": Text {
+                    text: root.item.description;
+                    color: Theme.text-3;
+                    font-size: Theme.fs-sm;
+                    wrap: word-wrap;
+                }
             }
-            if root.item.description != "": Text {
-                text: root.item.description;
-                color: Theme.text-3;
-                font-size: Theme.fs-sm;
-                wrap: word-wrap;
+            if !root.item.full: RowControl { item: root.item; }
+        }
+        // Widget rows (and the fallback list editor) draw their panel here, full width.
+        if root.item.full: HorizontalLayout {
+            spacing: 0px;
+            if root.item.area == "appearance": AppearanceWidget {
+                id: root.item.id;
+                act(a) => { SettingsState.action(a); }
+            }
+            if root.item.area == "models": ModelsWidget {
+                id: root.item.id;
+                act(a) => { SettingsState.action(a); }
+            }
+            if root.item.area == "providers": ProvidersWidget {
+                id: root.item.id;
+                act(a) => { SettingsState.action(a); }
+            }
+            if root.item.area == "system": SystemWidget {
+                id: root.item.id;
+                act(a) => { SettingsState.action(a); }
             }
         }
-        RowControl { item: root.item; }
     }
     Rectangle {
         y: parent.height - 1px;
