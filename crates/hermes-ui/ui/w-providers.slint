@@ -7,57 +7,1144 @@
 // `ProvidersState`; this file only draws them and reports intents as
 // `act("<area>:<verb>[:<arg>]")` — settings.slint forwards those to
 // `SettingsState.action`. Rendered full-width inside the settings row for its id.
+//
+// Action ids (the part after `providers:`) this file emits:
+//   oauth-start:<id> · oauth-cancel · oauth-flow-close · oauth-disconnect:<id> · oauth-refresh
+//   env-set:<KEY>:<value> · env-del:<KEY> · env-reveal:<KEY> · env-refresh
+//   tools-toggle:<name>:<bool> · tools-refresh
+//   vault-del:<provider>:<index> · vault-refresh
+//   ce-add\n<name>\n<base-url>\n<model>\n<key> · ce-validate\n<form fields>
+//   ce-activate:<id> · ce-validate-id:<id> · ce-delete:<id> · ce-refresh
+//   lm-server:<start|stop> · lm-activate:<id> · lm-eject:<id> · lm-refresh
 
-import { Theme } from "theme.slint";
+import { ScrollView, LineEdit } from "std-widgets.slint";
+import { Theme, Motion, Ease } from "theme.slint";
+import { Icons } from "icons.slint";
+import { PrimaryButton, GhostButton, Toggle, IconButton, Chip } from "components.slint";
+
+// ── Models ──────────────────────────────────────────────────────────────────────
+
+export struct OAuthRow {
+    id: string,
+    name: string,
+    flow: string,           // "device_code" | "external"
+    logged-in: bool,
+    free-tier: bool,
+    connected: bool,        // logged in and not a free-tier identity
+    status: string,         // "Signed in" / "Not signed in" / "Free tier"
+    source-label: string,
+    token-preview: string,
+    expires: string,
+    disconnectable: bool,
+    hint: string,
+    cli-command: string,
+}
+
+export struct KeyRow {
+    key: string,
+    label: string,
+    description: string,
+    url: string,
+    is-set: bool,
+    masked: string,
+    is-password: bool,
+    revealed-value: string, // "" = hidden; set by the reveal action
+}
+
+export struct KeyGroup {
+    label: string,
+    rows: [KeyRow],
+}
+
+export struct ToolsetRow {
+    name: string,
+    label: string,
+    description: string,
+    platform: string,
+    enabled: bool,
+    available: bool,
+    configured: bool,
+    tool-count: int,
+    tools-hint: string,
+}
+
+export struct PoolEntry {
+    provider: string,
+    index: int,
+    label: string,
+    auth-type: string,
+    source: string,
+    status: string,
+    requests: int,
+    token-preview: string,
+    has-refresh: bool,
+}
+
+export struct PoolGroup {
+    provider: string,
+    entries: [PoolEntry],
+}
+
+export struct EndpointRow {
+    id: string,
+    name: string,
+    base-url: string,
+    model: string,
+    models-hint: string,
+    api-key: string,
+    is-current: bool,
+}
+
+export struct LocalModelRow {
+    id: string,
+    size: string,
+    active: bool,
+    loaded: bool,
+}
 
 export global ProvidersState {
+    /// Inline status for the widget currently loading / failing.
     in-out property <bool> busy: false;
-    in-out property <string> error;
+    in-out property <string> status;
+    in-out property <bool> status-error: false;
+
+    // Accounts.
+    in-out property <[OAuthRow]> oauth-rows: [];
+    in-out property <string> oauth-provider;   // provider id of the live flow ("" = none)
+    in-out property <string> oauth-session;    // session id of the live flow
+    in-out property <string> oauth-name;
+    in-out property <string> oauth-code;
+    in-out property <string> oauth-url;
+    in-out property <string> oauth-state;      // human status of the live flow
+
+    // Provider API keys (grouped) + general env keys (flat).
+    in-out property <[KeyGroup]> key-groups: [];
+    in-out property <[KeyRow]> env-keys: [];
+
+    // Toolsets.
+    in-out property <[ToolsetRow]> toolset-rows: [];
+
+    // Credential pool.
+    in-out property <[PoolGroup]> pool-groups: [];
+
+    // Custom endpoints.
+    in-out property <[EndpointRow]> endpoint-rows: [];
+    in-out property <string> endpoint-current;
+    in-out property <string> endpoint-message;
+    in-out property <string> form-name;
+    in-out property <string> form-base-url;
+    in-out property <string> form-model;
+    in-out property <string> form-key;
+
+    // Local models.
+    in-out property <bool> lm-runtime-installed: false;
+    in-out property <string> lm-tag;
+    in-out property <bool> lm-server-running: false;
+    in-out property <string> lm-server-url;
+    in-out property <string> lm-active-model;
+    in-out property <string> lm-models-dir;
+    in-out property <string> lm-hardware;
+    in-out property <[LocalModelRow]> lm-rows: [];
 }
+
+// ── Shared bits ─────────────────────────────────────────────────────────────────
+
+// Two-click destructive button (mirrors the panel's reset affordance): the first click
+// arms it, the second fires `confirmed`; a timeout disarms it again.
+component TwoClickButton inherits Rectangle {
+    in property <string> text;
+    in property <string> confirm-text: "Remove?";
+    callback confirmed();
+    property <bool> armed: false;
+    height: 26px;
+    width: max(58px, label.preferred-width + 20px);
+    border-radius: Theme.r-md;
+    border-width: 1px;
+    border-color: armed ? Theme.danger.with-alpha(0.55) : Theme.border-strong;
+    background: armed ? Theme.diff-del-bg : ta.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.fast; easing: Ease.standard; }
+    accessible-role: button;
+    accessible-label: armed ? confirm-text : text;
+    accessible-action-default => { if armed { armed = false; root.confirmed(); } else { armed = true; } }
+    label := Text {
+        text: root.armed ? root.confirm-text : root.text;
+        color: root.armed ? Theme.diff-del-fg : Theme.text-2;
+        font-size: Theme.fs-sm;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    timer := Timer {
+        interval: 4s;
+        running: root.armed;
+        triggered => { root.armed = false; }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            if root.armed {
+                root.armed = false;
+                root.confirmed();
+            } else {
+                root.armed = true;
+            }
+        }
+    }
+}
+
+// A quiet bordered card row: label block on the left, controls on the right.
+component Card inherits Rectangle {
+    in property <bool> tint: false;
+    border-radius: Theme.r-md;
+    border-width: 1px;
+    border-color: Theme.border;
+    background: tint ? Theme.surface-2 : transparent;
+    VerticalLayout {
+        padding: 9px;
+        padding-left: 11px;
+        spacing: 7px;
+        @children
+    }
+}
+
+component StatusPill inherits Rectangle {
+    in property <string> text;
+    in property <bool> good: false;
+    in property <bool> warn: false;
+    height: 20px;
+    width: pill.preferred-width + 14px;
+    border-radius: Theme.r-pill;
+    background: good ? Theme.diff-add-bg : warn ? Theme.diff-del-bg : Theme.surface-2;
+    pill := Text {
+        text: root.text;
+        color: root.good ? Theme.diff-add-fg : root.warn ? Theme.diff-del-fg : Theme.text-3;
+        font-size: Theme.fs-xs;
+        font-weight: 500;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component MonoLabel inherits Text {
+    font-family: Theme.mono-font;
+    font-size: Theme.fs-sm;
+    color: Theme.text;
+    vertical-alignment: center;
+}
+
+component FieldLabel inherits Text {
+    color: Theme.text-3;
+    font-size: Theme.fs-sm;
+    vertical-alignment: center;
+}
+
+component LinkButton inherits Rectangle {
+    in property <string> text;
+    callback clicked();
+    height: 20px;
+    width: lnk.preferred-width + 8px;
+    border-radius: Theme.r-xs;
+    background: ta.has-hover ? Theme.hover : transparent;
+    lnk := Text {
+        text: root.text;
+        color: Theme.link;
+        font-size: Theme.fs-sm;
+        vertical-alignment: center;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// ── providers.accounts ──────────────────────────────────────────────────────────
+
+component KeyValueRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    spacing: 8px;
+    Text {
+        text: root.label;
+        color: Theme.text-3;
+        font-size: Theme.fs-sm;
+        width: 118px;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.value;
+        color: Theme.text;
+        font-size: Theme.fs-sm;
+        horizontal-stretch: 1;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+component OAuthCard inherits Card {
+    in property <OAuthRow> row;
+    callback act(string);
+
+    HorizontalLayout {
+        spacing: 10px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 3px;
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: root.row.name;
+                    color: Theme.text;
+                    font-size: Theme.fs-md;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+                StatusPill {
+                    text: root.row.status;
+                    good: root.row.connected;
+                    warn: false;
+                }
+                if root.row.free-tier: StatusPill { text: "Free tier"; }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            if root.row.source-label != "" && root.row.logged-in: Text {
+                text: root.row.source-label
+                    + (root.row.expires != "" ? "  ·  expires " + root.row.expires : "")
+                    + (root.row.token-preview != "" ? "  ·  " + root.row.token-preview : "");
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                overflow: elide;
+            }
+            if root.row.hint != "": Text {
+                text: root.row.hint;
+                color: Theme.text-3;
+                font-size: Theme.fs-xs;
+                wrap: word-wrap;
+            }
+        }
+        VerticalLayout {
+            width: 190px;
+            spacing: 6px;
+            alignment: center;
+            if root.row.flow == "device_code" && !root.row.logged-in: PrimaryButton {
+                text: "Sign in";
+                width: 100%;
+                clicked => { root.act("providers:oauth-start:" + root.row.id); }
+            }
+            if root.row.flow == "device_code" && root.row.logged-in: HorizontalLayout {
+                spacing: 6px;
+                alignment: end;
+                if root.row.disconnectable: TwoClickButton {
+                    text: "Disconnect";
+                    confirm-text: "Confirm?";
+                    confirmed => { root.act("providers:oauth-disconnect:" + root.row.id); }
+                }
+                if !root.row.disconnectable: Text {
+                    text: "Managed elsewhere";
+                    color: Theme.text-4;
+                    font-size: Theme.fs-xs;
+                    vertical-alignment: center;
+                }
+            }
+            if root.row.flow == "external": Text {
+                text: root.row.cli-command;
+                color: Theme.text-3;
+                font-size: Theme.fs-xs;
+                font-family: Theme.mono-font;
+                overflow: elide;
+                horizontal-alignment: right;
+            }
+        }
+    }
+}
+
+component OAuthFlowCard inherits Card {
+    in property <string> provider;
+    callback act(string);
+    tint: true;
+
+    HorizontalLayout {
+        spacing: 10px;
+        Text {
+            text: "Code";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            width: 52px;
+            vertical-alignment: center;
+        }
+        code := LineEdit {
+            text: ProvidersState.oauth-code;
+            read-only: true;
+            font-family: Theme.mono-font;
+            font-size: Theme.fs-md;
+            width: 130px;
+            accessible-label: "Sign-in code";
+        }
+        Text {
+            text: "Open the link, then enter the code. Select and copy with Ctrl+C.";
+            color: Theme.text-3;
+            font-size: Theme.fs-xs;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+    }
+    HorizontalLayout {
+        spacing: 10px;
+        Text {
+            text: "Link";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            width: 52px;
+            vertical-alignment: center;
+        }
+        url := LineEdit {
+            text: ProvidersState.oauth-url;
+            read-only: true;
+            font-size: Theme.fs-sm;
+            horizontal-stretch: 1;
+            accessible-label: "Verification URL";
+        }
+    }
+    HorizontalLayout {
+        spacing: 10px;
+        Text {
+            text: ProvidersState.oauth-name + " — " + ProvidersState.oauth-state;
+            color: Theme.text-2;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        GhostButton {
+            text: "Cancel";
+            clicked => {
+                root.act("providers:oauth-cancel:" + ProvidersState.oauth-provider + ":" + ProvidersState.oauth-session);
+            }
+        }
+    }
+}
+
+component AccountsPanel inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 8px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: ProvidersState.oauth-rows.length == 1 ? "1 account provider" : ProvidersState.oauth-rows.length + " account providers";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        IconButton {
+            icon: Icons.get("refresh-cw");
+            tooltip: "Refresh accounts";
+            clicked => { root.act("providers:oauth-refresh"); }
+        }
+    }
+    if ProvidersState.oauth-provider != "": OAuthFlowCard {
+        provider: ProvidersState.oauth-provider;
+        act(a) => { root.act(a); }
+    }
+    for row[i] in ProvidersState.oauth-rows: OAuthCard {
+        row: row;
+        act(a) => { root.act(a); }
+    }
+    Text {
+        text: "Signs in through each provider's device-code flow (or lists where an external CLI keeps its credentials).";
+        color: Theme.text-4;
+        font-size: Theme.fs-xs;
+        wrap: word-wrap;
+    }
+}
+
+// ── providers.keys / keys.settings ─────────────────────────────────────────────
+
+component KeyRowItem inherits Rectangle {
+    in property <KeyRow> row;
+    callback act(string);
+    property <bool> expanded: false;
+    property <string> draft;
+    border-radius: Theme.r-sm;
+    background: hta.has-hover ? Theme.hover : transparent;
+    // Behind the content so empty areas of the row toggle the details while the buttons
+    // and inputs above it keep their own clicks.
+    hta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.expanded = !root.expanded; }
+    }
+    VerticalLayout {
+        padding-top: 7px;
+        padding-bottom: 7px;
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 6px;
+        HorizontalLayout {
+            spacing: 8px;
+            MonoLabel {
+                text: root.row.label;
+                width: 236px;
+                overflow: elide;
+            }
+            Text {
+                text: root.row.revealed-value != "" ? root.row.revealed-value : (root.row.is-set ? root.row.masked : "Not set");
+                color: root.row.is-set ? Theme.text-2 : Theme.text-4;
+                font-size: Theme.fs-sm;
+                font-family: root.row.revealed-value != "" ? Theme.mono-font : Theme.ui-font;
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            if root.row.is-set: IconButton {
+                icon: Icons.get(root.row.revealed-value != "" ? "eye-off" : "eye");
+                icon-size: 15px;
+                tooltip: root.row.revealed-value != "" ? "Hide value" : "Reveal value";
+                clicked => { root.act("providers:env-reveal:" + root.row.key); }
+            }
+            if root.row.is-set: TwoClickButton {
+                text: "Clear";
+                confirm-text: "Remove?";
+                confirmed => { root.act("providers:env-del:" + root.row.key); }
+            }
+            IconButton {
+                icon: Icons.get(root.expanded ? "chevron-down" : "chevron-right");
+                icon-size: 15px;
+                tooltip: root.expanded ? "Hide details" : "Set or replace";
+                clicked => { root.expanded = !root.expanded; }
+            }
+        }
+        if root.expanded: VerticalLayout {
+            spacing: 6px;
+            if root.row.description != "": Text {
+                text: root.row.description;
+                color: Theme.text-3;
+                font-size: Theme.fs-xs;
+                wrap: word-wrap;
+            }
+            if root.row.url != "": Text {
+                text: "Docs: " + root.row.url;
+                color: Theme.text-4;
+                font-size: Theme.fs-xs;
+                font-family: Theme.mono-font;
+                overflow: elide;
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                input := LineEdit {
+                    text <=> root.draft;
+                    placeholder-text: root.row.is-set ? "Replace value…" : "Paste value…";
+                    font-size: Theme.fs-sm;
+                    input-type: root.row.is-password ? InputType.password : InputType.text;
+                    horizontal-stretch: 1;
+                    accessible-label: root.row.label;
+                    accepted(t) => { root.act("providers:env-set:" + root.row.key + ":" + t); }
+                }
+                GhostButton {
+                    text: "Save";
+                    clicked => { root.act("providers:env-set:" + root.row.key + ":" + input.text); }
+                }
+            }
+        }
+    }
+}
+
+component KeysPanel inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 4px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: ProvidersState.key-groups.length == 1 ? "1 provider" : ProvidersState.key-groups.length + " providers";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        IconButton {
+            icon: Icons.get("refresh-cw");
+            tooltip: "Refresh keys";
+            clicked => { root.act("providers:env-refresh"); }
+        }
+    }
+    if ProvidersState.key-groups.length == 0: Text {
+        text: "No provider API keys are listed by the backend.";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    for group[g] in ProvidersState.key-groups: VerticalLayout {
+        spacing: 2px;
+        padding-top: g == 0 ? 0px : 6px;
+        Text {
+            text: group.label;
+            color: Theme.text-2;
+            font-size: Theme.fs-sm;
+            font-weight: 600;
+        }
+        for row[k] in group.rows: KeyRowItem {
+            row: row;
+            act(a) => { root.act(a); }
+        }
+    }
+}
+
+component EnvPanel inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 3px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: ProvidersState.env-keys.length == 1 ? "1 environment key" : ProvidersState.env-keys.length + " environment keys";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        IconButton {
+            icon: Icons.get("refresh-cw");
+            tooltip: "Refresh environment";
+            clicked => { root.act("providers:env-refresh"); }
+        }
+    }
+    if ProvidersState.env-keys.length == 0: Text {
+        text: "No server or tool environment keys are listed by the backend.";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    for row[i] in ProvidersState.env-keys: KeyRowItem {
+        row: row;
+        act(a) => { root.act(a); }
+    }
+}
+
+// ── keys.tools ─────────────────────────────────────────────────────────────────
+
+component ToolsetRowItem inherits Card {
+    in property <ToolsetRow> row;
+    callback act(string);
+    property <bool> expanded: false;
+
+    HorizontalLayout {
+        spacing: 10px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 3px;
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: root.row.label;
+                    color: Theme.text;
+                    font-size: Theme.fs-md;
+                    vertical-alignment: center;
+                }
+                Chip { text: root.row.platform; interactive: false; outlined: true; }
+                if !root.row.available: Chip { text: "Unavailable"; interactive: false; }
+                if root.row.available && !root.row.configured: Chip { text: "Needs setup"; interactive: false; }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            if root.row.description != "": Text {
+                text: root.row.description;
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                wrap: word-wrap;
+            }
+            if root.expanded && root.row.tools-hint != "": Text {
+                text: root.row.tool-count + (root.row.tool-count == 1 ? " tool: " : " tools: ") + root.row.tools-hint;
+                color: Theme.text-4;
+                font-size: Theme.fs-xs;
+                wrap: word-wrap;
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: center;
+            LinkButton {
+                text: root.expanded ? "hide tools" : root.row.tool-count + " tools";
+                clicked => { root.expanded = !root.expanded; }
+            }
+            Toggle {
+                checked: root.row.enabled;
+                accessible-label: root.row.label;
+                toggled(v) => { root.act("providers:tools-toggle:" + root.row.name + ":" + (v ? "true" : "false")); }
+            }
+        }
+    }
+}
+
+component ToolsPanel inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 6px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: ProvidersState.toolset-rows.length + " toolsets";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        IconButton {
+            icon: Icons.get("refresh-cw");
+            tooltip: "Refresh toolsets";
+            clicked => { root.act("providers:tools-refresh"); }
+        }
+    }
+    for row[i] in ProvidersState.toolset-rows: ToolsetRowItem {
+        row: row;
+        act(a) => { root.act(a); }
+    }
+    Text {
+        text: "A toolset's switch enables or disables its tools for the CLI platform. “Unavailable” means the platform cannot run it; “Needs setup” means a credential or binary is missing.";
+        color: Theme.text-4;
+        font-size: Theme.fs-xs;
+        wrap: word-wrap;
+    }
+}
+
+// ── vault.credentials ──────────────────────────────────────────────────────────
+
+component PoolEntryRow inherits Rectangle {
+    in property <PoolEntry> row;
+    callback act(string);
+    height: 30px;
+    HorizontalLayout {
+        spacing: 10px;
+        Text {
+            text: "#" + root.row.index;
+            color: Theme.text-4;
+            font-size: Theme.fs-sm;
+            width: 26px;
+            vertical-alignment: center;
+        }
+        Text {
+            text: root.row.label;
+            color: Theme.text;
+            font-size: Theme.fs-sm;
+            width: 210px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        Chip { text: root.row.auth-type; interactive: false; outlined: true; }
+        Text {
+            text: root.row.source;
+            color: Theme.text-3;
+            font-size: Theme.fs-xs;
+            font-family: Theme.mono-font;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        Text {
+            text: root.row.status != "" ? root.row.status : "—";
+            color: root.row.status == "ok" ? Theme.diff-add-fg : Theme.text-3;
+            font-size: Theme.fs-xs;
+            width: 30px;
+            vertical-alignment: center;
+        }
+        Text {
+            text: root.row.requests + " req";
+            color: Theme.text-3;
+            font-size: Theme.fs-xs;
+            width: 56px;
+            vertical-alignment: center;
+        }
+        Text {
+            text: root.row.token-preview;
+            color: Theme.text-4;
+            font-size: Theme.fs-xs;
+            font-family: Theme.mono-font;
+            width: 96px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        if root.row.has-refresh: Chip { text: "refresh"; interactive: false; outlined: true; }
+        TwoClickButton {
+            text: "Remove";
+            confirm-text: "Remove?";
+            confirmed => { root.act("providers:vault-del:" + root.row.provider + ":" + root.row.index); }
+        }
+    }
+}
+
+component PoolPanel inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 8px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: "The credential pool the agent rotates through, per provider.";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        IconButton {
+            icon: Icons.get("refresh-cw");
+            tooltip: "Refresh pool";
+            clicked => { root.act("providers:vault-refresh"); }
+        }
+    }
+    if ProvidersState.pool-groups.length == 0: Text {
+        text: "No pooled credentials. Sign in on the Accounts page, or save an API key on the API keys page.";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    for group[g] in ProvidersState.pool-groups: VerticalLayout {
+        spacing: 2px;
+        padding-top: g == 0 ? 0px : 8px;
+        Text {
+            text: group.provider;
+            color: Theme.text-2;
+            font-size: Theme.fs-sm;
+            font-weight: 600;
+        }
+        for entry[e] in group.entries: PoolEntryRow {
+            row: entry;
+            act(a) => { root.act(a); }
+        }
+    }
+}
+
+// ── providers.custom ───────────────────────────────────────────────────────────
+
+component EndpointRowItem inherits Card {
+    in property <EndpointRow> row;
+    callback act(string);
+    HorizontalLayout {
+        spacing: 10px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 3px;
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: root.row.name;
+                    color: Theme.text;
+                    font-size: Theme.fs-md;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+                if root.row.is-current: StatusPill { text: "Current"; good: true; }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            Text {
+                text: root.row.base-url;
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                font-family: Theme.mono-font;
+                overflow: elide;
+            }
+            Text {
+                text: (root.row.model != "" ? "model " + root.row.model : "no default model")
+                    + (root.row.models-hint != "" ? "  ·  " + root.row.models-hint : "")
+                    + (root.row.api-key != "" ? "  ·  key " + root.row.api-key : "");
+                color: Theme.text-4;
+                font-size: Theme.fs-xs;
+                overflow: elide;
+            }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: center;
+            if !root.row.is-current: GhostButton {
+                text: "Activate";
+                clicked => { root.act("providers:ce-activate:" + root.row.id); }
+            }
+            TwoClickButton {
+                text: "Delete";
+                confirm-text: "Delete?";
+                confirmed => { root.act("providers:ce-delete:" + root.row.id); }
+            }
+        }
+    }
+}
+
+component EndpointsPanel inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 8px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: ProvidersState.endpoint-current;
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+        IconButton {
+            icon: Icons.get("refresh-cw");
+            tooltip: "Refresh endpoints";
+            clicked => { root.act("providers:ce-refresh"); }
+        }
+    }
+    if ProvidersState.endpoint-rows.length == 0: Text {
+        text: "No custom endpoints yet. Add any OpenAI-compatible base URL below.";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    for row[i] in ProvidersState.endpoint-rows: EndpointRowItem {
+        row: row;
+        act(a) => { root.act(a); }
+    }
+    Card {
+        tint: true;
+        Text {
+            text: "Add an endpoint";
+            color: Theme.text-2;
+            font-size: Theme.fs-sm;
+            font-weight: 600;
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            FieldLabel { text: "Name"; width: 74px; }
+            name-in := LineEdit {
+                text <=> ProvidersState.form-name;
+                placeholder-text: "e.g. vLLM box";
+                font-size: Theme.fs-sm;
+                horizontal-stretch: 1;
+                accessible-label: "Endpoint name";
+            }
+            FieldLabel { text: "Base URL"; width: 62px; }
+            base-in := LineEdit {
+                text <=> ProvidersState.form-base-url;
+                placeholder-text: "https://host/v1";
+                font-size: Theme.fs-sm;
+                horizontal-stretch: 2;
+                accessible-label: "Endpoint base URL";
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            FieldLabel { text: "Model"; width: 74px; }
+            model-in := LineEdit {
+                text <=> ProvidersState.form-model;
+                placeholder-text: "default model id";
+                font-size: Theme.fs-sm;
+                horizontal-stretch: 1;
+                accessible-label: "Endpoint model";
+            }
+            FieldLabel { text: "API key"; width: 62px; }
+            key-in := LineEdit {
+                text <=> ProvidersState.form-key;
+                placeholder-text: "optional";
+                input-type: InputType.password;
+                font-size: Theme.fs-sm;
+                horizontal-stretch: 2;
+                accessible-label: "Endpoint API key";
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: ProvidersState.endpoint-message;
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                wrap: word-wrap;
+            }
+            GhostButton {
+                text: "Validate";
+                clicked => {
+                    root.act("providers:ce-validate\n" + name-in.text + "\n" + base-in.text + "\n" + model-in.text + "\n" + key-in.text);
+                }
+            }
+            PrimaryButton {
+                text: "Add endpoint";
+                clicked => {
+                    root.act("providers:ce-add\n" + name-in.text + "\n" + base-in.text + "\n" + model-in.text + "\n" + key-in.text);
+                }
+            }
+        }
+    }
+}
+
+// ── providers.local ────────────────────────────────────────────────────────────
+
+component LocalModelRowItem inherits Rectangle {
+    in property <LocalModelRow> row;
+    callback act(string);
+    height: 30px;
+    HorizontalLayout {
+        spacing: 10px;
+        Text {
+            text: root.row.id;
+            color: Theme.text;
+            font-size: Theme.fs-sm;
+            font-family: Theme.mono-font;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        Text {
+            text: root.row.size;
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            width: 70px;
+            vertical-alignment: center;
+        }
+        if root.row.active: StatusPill { text: "Default"; good: true; }
+        if root.row.loaded: StatusPill { text: "Loaded"; good: true; }
+        HorizontalLayout {
+            spacing: 6px;
+            width: 168px;
+            alignment: end;
+            if !root.row.active: GhostButton {
+                text: "Activate";
+                clicked => { root.act("providers:lm-activate:" + root.row.id); }
+            }
+            if root.row.loaded: GhostButton {
+                text: "Eject";
+                clicked => { root.act("providers:lm-eject:" + root.row.id); }
+            }
+        }
+    }
+}
+
+component LocalPanel inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 8px;
+
+    Card {
+        HorizontalLayout {
+            spacing: 10px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 3px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: "Local engine";
+                        color: Theme.text;
+                        font-size: Theme.fs-md;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                    StatusPill {
+                        text: ProvidersState.lm-server-running ? "Server running" : "Server stopped";
+                        good: ProvidersState.lm-server-running;
+                        warn: false;
+                    }
+                    if ProvidersState.lm-runtime-installed: StatusPill {
+                        text: "runtime " + ProvidersState.lm-tag;
+                        good: true;
+                    }
+                    if !ProvidersState.lm-runtime-installed: StatusPill {
+                        text: "no runtime";
+                        warn: true;
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                }
+                KeyValueRow {
+                    label: "Default model";
+                    value: ProvidersState.lm-active-model != "" ? ProvidersState.lm-active-model : "—";
+                }
+                KeyValueRow {
+                    label: "Server URL";
+                    value: ProvidersState.lm-server-url != "" ? ProvidersState.lm-server-url : "—";
+                }
+                KeyValueRow { label: "Models dir"; value: ProvidersState.lm-models-dir; }
+                if ProvidersState.lm-hardware != "": KeyValueRow {
+                    label: "Hardware";
+                    value: ProvidersState.lm-hardware;
+                }
+            }
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                IconButton {
+                    icon: Icons.get("refresh-cw");
+                    tooltip: "Refresh status";
+                    clicked => { root.act("providers:lm-refresh"); }
+                }
+                if !ProvidersState.lm-server-running: PrimaryButton {
+                    text: "Start server";
+                    clicked => { root.act("providers:lm-server:start"); }
+                }
+                if ProvidersState.lm-server-running: TwoClickButton {
+                    text: "Stop server";
+                    confirm-text: "Stop?";
+                    confirmed => { root.act("providers:lm-server:stop"); }
+                }
+            }
+        }
+    }
+    Text {
+        text: ProvidersState.lm-rows.length == 1 ? "1 downloaded model" : ProvidersState.lm-rows.length + " downloaded models";
+        color: Theme.text-3;
+        font-size: Theme.fs-sm;
+    }
+    for row[i] in ProvidersState.lm-rows: LocalModelRowItem {
+        row: row;
+        act(a) => { root.act(a); }
+    }
+    Text {
+        text: "Model downloads and runtime installation are not wired up in this build yet — only status, start/stop, activate and eject.";
+        color: Theme.text-4;
+        font-size: Theme.fs-xs;
+        wrap: word-wrap;
+    }
+}
+
+// ── vault.sources ──────────────────────────────────────────────────────────────
+
+component SourcesPanel inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 8px;
+
+    Card {
+        Text {
+            text: "Password-manager sources";
+            color: Theme.text;
+            font-size: Theme.fs-md;
+            font-weight: 600;
+        }
+        Text {
+            text: "The desktop app's password-manager sources (1Password, Bitwarden) and browser-vault unlock are served by the agent's gateway RPC (`vault.sources`, `vault.unlock`). This client speaks the REST API only, which exposes no vault-source route, so there is nothing to list here yet.";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            wrap: word-wrap;
+        }
+        Text {
+            text: "What this client does show: the agent's credential pool — the accounts and API keys it authenticates with — on Settings › Vault › Saved credentials.";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// ── Widget ─────────────────────────────────────────────────────────────────────
 
 export component ProvidersWidget inherits VerticalLayout {
     in property <string> id;
     callback act(string);
     spacing: 8px;
+    horizontal-stretch: 1;
 
-    if id == "providers.accounts": Text {
-        text: "Sign-in state loads from the backend…";
-        color: Theme.text-4;
+    if ProvidersState.status != "": Text {
+        text: ProvidersState.status;
+        color: ProvidersState.status-error ? Theme.diff-del-fg : Theme.text-3;
         font-size: Theme.fs-sm;
+        wrap: word-wrap;
     }
-    if id == "providers.keys": Text {
-        text: "Provider keys…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
-    }
-    if id == "providers.custom": Text {
-        text: "Custom endpoints…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
-    }
-    if id == "providers.local": Text {
-        text: "Local models…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
-    }
-    if id == "keys.tools": Text {
-        text: "Toolsets…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
-    }
-    if id == "keys.settings": Text {
-        text: "Environment keys…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
-    }
-    if id == "vault.credentials": Text {
-        text: "Saved credentials…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
-    }
-    if id == "vault.sources": Text {
-        text: "Password managers…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
-    }
+    if id == "providers.accounts": AccountsPanel { id: id; act(a) => { root.act(a); } }
+    if id == "providers.keys": KeysPanel { id: id; act(a) => { root.act(a); } }
+    if id == "keys.settings": EnvPanel { id: id; act(a) => { root.act(a); } }
+    if id == "keys.tools": ToolsPanel { id: id; act(a) => { root.act(a); } }
+    if id == "vault.credentials": PoolPanel { id: id; act(a) => { root.act(a); } }
+    if id == "providers.custom": EndpointsPanel { id: id; act(a) => { root.act(a); } }
+    if id == "providers.local": LocalPanel { id: id; act(a) => { root.act(a); } }
+    if id == "vault.sources": SourcesPanel { id: id; act(a) => { root.act(a); } }
 }
