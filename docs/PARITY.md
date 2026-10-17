@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**42 done · 134 partial · 616 not started · 1 unsupported** (of 793).
+**42 done · 152 partial · 598 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -305,7 +305,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Fallback models — REST /api/model/options + config fallback_providers — src/app/settings/fallback-models-field.tsx
 - [ ] Recommended default per provider — REST /api/model/recommended-default — src/app/settings/model-settings.tsx
 - [ ] Provider accounts view (OAuth sign-in) — REST /api/providers/oauth/* — src/app/settings/providers-settings.tsx
-- [ ] Provider API keys view — REST /api/env, /api/env/reveal — src/app/settings/keys-settings.tsx, env-credentials.tsx
+- [~] Provider API keys view — REST /api/env, /api/env/reveal — src/app/settings/keys-settings.tsx, env-credentials.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Custom endpoints (OpenAI/Anthropic-compatible) — REST /api/providers/custom-endpoints — src/app/settings/custom-endpoints-settings.tsx
 - [ ] Validate provider/endpoint — REST /api/providers/validate, /api/providers/custom-endpoints/validate — src/app/settings/helpers.ts
 - [ ] Favorite models — local — src/store/favorite-models.ts
@@ -831,10 +831,10 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Cloud connection (sign-in, org/agent picker) — local + REST — src/app/settings/gateway-settings.tsx
 - [ ] Keychain encryption of secrets — local (Electron secret-storage-policy) — src/app/settings/settings-manifest.ts (gateway.keychainEncryption)
 - [ ] Connections registry — local — src/app/settings/connections-registry.tsx
-- [ ] Diagnostics (share logs) — RPC diagnostics.share_nous + REST /api/ops/debug-share — src/app/settings/settings-manifest.ts (gateway.diagnostics)
-- [ ] Gateway restart — REST /api/gateway/restart — src/lib/shared-gateway-restart.ts
-- [ ] Managed updates — local + REST /api/hermes/update — src/app/settings/managed-updates-section.tsx
-- [ ] Doctor / security audit / backup — REST /api/ops/doctor|security-audit|backup — src/api/system.ts
+- [~] Diagnostics (share logs) — RPC diagnostics.share_nous + REST /api/ops/debug-share — src/app/settings/settings-manifest.ts (gateway.diagnostics) ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
+- [~] Gateway restart — REST /api/gateway/restart — src/lib/shared-gateway-restart.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
+- [~] Managed updates — local + REST /api/hermes/update — src/app/settings/managed-updates-section.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
+- [~] Doctor / security audit / backup — REST /api/ops/doctor|security-audit|backup — src/api/system.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Open logs — local (Electron) — src/app/settings/gateway-settings.tsx
 - [ ] Environment override (HERMES_*) — local — src/app/settings/env-credentials.tsx
 
@@ -873,7 +873,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 ## Settings — Providers & Keys page
 
 - [ ] Provider accounts (OAuth) — REST /api/providers/oauth/* — src/app/settings/providers-settings.tsx
-- [ ] API keys (env vars) — REST /api/env, /api/env/reveal — src/app/settings/keys-settings.tsx
+- [~] API keys (env vars) — REST /api/env, /api/env/reveal — src/app/settings/keys-settings.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Custom endpoints — REST /api/providers/custom-endpoints — src/app/settings/custom-endpoints-settings.tsx
 - [ ] Local models — REST /api/local-models/* — src/app/settings/local-models-settings.tsx
 - [ ] Tool keys (per-provider tool credentials) — local — src/app/settings/keys-settings.tsx (view 'tools')
@@ -896,7 +896,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Settings — About page
 
-- [ ] App updates (check/download) — REST /api/hermes/update + Electron updater — src/app/settings/about-settings.tsx
+- [~] App updates (check/download) — REST /api/hermes/update + Electron updater — src/app/settings/about-settings.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Update channel — local — src/app/settings/update-channel-row.tsx, src/store/updates-channel.ts
 - [ ] Version label + distribution — local — src/lib/version-label.ts, distribution-label.ts
 - [ ] Uninstall Hermes — local (Electron desktop-uninstall) — src/app/settings/uninstall-section.tsx
@@ -937,7 +937,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Windows MSIX/AppInstaller update — local (Electron) (platform) — electron/appinstaller-checker.ts
 - [ ] Source-checkout update handoff — local (Electron) (platform) — electron/updater/checkout.ts
 - [ ] Update gate / marker — local (Electron) (platform) — electron/update-gate.ts, electron/update-marker.ts
-- [ ] Update check (backend) — REST /api/hermes/update/check — src/store/updates.ts
+- [~] Update check (backend) — REST /api/hermes/update/check — src/store/updates.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Managed (gateway) updates — local + REST — src/store/managed-updates.ts
 - [ ] Updates overlay UI — local — src/app/updates-overlay.tsx
 - [ ] Update channel select — local — src/app/settings/update-channel-row.tsx
@@ -949,7 +949,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Window controls (custom titlebar) — local (Electron) — src/app/shell/titlebar-controls.tsx, electron/window-controls.ts
 - [ ] Titlebar app actions (left/right) — local — src/app/shell/titlebar.ts
 - [ ] Statusbar (custom status items) — local — src/app/shell/statusbar-controls.tsx, hooks/use-statusbar-items.tsx
-- [ ] System resources statusbar (CPU/RAM/battery) — local (Electron system.battery) — src/app/shell/system-resources-statusbar.tsx
+- [~] System resources statusbar (CPU/RAM/battery) — local (Electron system.battery) — src/app/shell/system-resources-statusbar.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Tray icon + menu — local (Electron) (platform) — electron/tray-host.ts
 - [ ] Minimize to tray — local (Electron) (platform) — electron/minimize-to-tray.ts
 - [ ] HUD mode shell (chrome-free floating chat) — local (Electron HUD) — src/app/hud/hud-shell.tsx
@@ -986,7 +986,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Free-tier sign-in — RPC free_tier.claim_nudge — src/store/free-tier-sign-in.ts
 - [ ] Free-tier challenge — WS free_tier.challenge + RPC free_tier.challenge_result — src/store/free-tier-challenge.ts
 - [ ] Model confirmation step — REST /api/model/set, /api/providers/validate — src/store/onboarding.ts
-- [ ] Setup runtime check — RPC setup.runtime_check, setup.status — src/plugins/hermes-bots/create-dialog.tsx
+- [~] Setup runtime check — RPC setup.runtime_check, setup.status — src/plugins/hermes-bots/create-dialog.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Billing gate (credit exhausted block) — local — src/store/billing-block.ts
 - [ ] Billing state + plans — RPC billing.state, subscription.* — src/app/settings/billing/use-billing-state.ts
 - [ ] Cloud team change — local — src/app/settings/cloud-team-change.ts
@@ -1023,25 +1023,25 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Delete webhook — REST /api/webhooks/{name} (DELETE) — src/app/webhooks/index.tsx ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
 - [ ] Webhook enabled toggle — REST /api/webhooks/{name}/enabled — src/api/messaging.ts
 - [~] Session import (foreign agent sessions) — RPC session.foreign.list|preview|import — src/app/session-import/index.tsx, src/app/session-import/api.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
-- [ ] Subagents list — RPC subagent.list — src/store/subagents.ts
-- [ ] Subagent tail — RPC subagent.tail — src/store/subagents.ts
-- [ ] Subagent steer/interrupt — RPC subagent.steer, subagent.interrupt — src/store/subagents.ts
-- [ ] Subagent spawn tree save/load/list — RPC spawn_tree.save|load|list — src/store/subagents.ts
-- [ ] Delegation status/pause — RPC delegation.status, delegation.pause — src/store/background-delegation.ts
+- [~] Subagents list — RPC subagent.list — src/store/subagents.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
+- [~] Subagent tail — RPC subagent.tail — src/store/subagents.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
+- [~] Subagent steer/interrupt — RPC subagent.steer, subagent.interrupt — src/store/subagents.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
+- [~] Subagent spawn tree save/load/list — RPC spawn_tree.save|load|list — src/store/subagents.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
+- [~] Delegation status/pause — RPC delegation.status, delegation.pause — src/store/background-delegation.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [~] Background prompt (BTW) — RPC prompt.background, prompt.btw; WS btw.complete — src/app/session/hooks/use-prompt-actions/slash.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [~] Agents page (roster) — local + RPC session.active_list — src/app/agents/index.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Learning graph — REST /api/learning/graph — src/api/skills.ts
 - [ ] Learning node detail/edit/delete — REST /api/learning/node + RPC learning.* — src/api/skills.ts
 - [ ] Learning frames — RPC learning.frames — src/app/learning/archive-skill-confirm-dialog.tsx
-- [ ] Insights — RPC insights.get — src/hermes.ts
+- [~] Insights — RPC insights.get — src/hermes.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Starmap (session/learning map + timeline) — local — src/app/starmap/star-map.tsx, src/app/starmap/timeline.tsx
 - [ ] Starmap share code + controls — local — src/app/starmap/share-code.ts, src/app/starmap/share-controls.tsx
 - [~] Command center (command dispatch console) — RPC command.dispatch, command.resolve — src/app/command-center/index.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
-- [ ] Command center maintenance (doctor/audit/backup) — REST /api/ops/* — src/app/command-center/maintenance.tsx
+- [~] Command center maintenance (doctor/audit/backup) — REST /api/ops/* — src/app/command-center/maintenance.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Desktop telemetry (feature use/daily) — RPC shared_metrics.* — src/store/desktop-metrics.ts
 - [ ] Startup latency reporting — RPC shared_metrics.startup_latency — src/app/gateway/report-startup-latency.ts
 - [ ] Friction/dislike reporting — RPC shared_metrics.desktop_friction|desktop_dislike — src/store/shared-metrics.ts
-- [ ] Diagnostics share (Nous) — RPC diagnostics.share_nous — src/store/send-diagnostics.ts
+- [~] Diagnostics share (Nous) — RPC diagnostics.share_nous — src/store/send-diagnostics.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] i18n backend language packs — RPC i18n.languages, i18n.catalog — src/i18n/backend-packs.ts
 - [ ] Slash command catalog (desktop) — local registry — src/lib/desktop-slash-commands.ts, src/lib/desktop-slash-registry.json
 - [ ] Electron preload bridge (native API surface) — local (Electron) — electron/preload.ts
