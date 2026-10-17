@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily update check for Hermes Desktop (Rust)
+Documentation=file://%h/.local/share/hermes-desktop-rs/src/docs/UPDATING.md
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

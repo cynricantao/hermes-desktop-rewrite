@@ -30,6 +30,9 @@ cargo run -p hermes-app --release          # binary: target/release/hermes-deskt
 Arch / Omarchy package: `cd packaging && makepkg -si` (installs the binary, a `.desktop`
 entry and the icon).
 
+Per-user install that keeps itself up to date (after every successful `hermes update`, and
+daily): `scripts/install-user.sh` — see [docs/UPDATING.md](docs/UPDATING.md).
+
 ### Environment
 
 | Variable | Effect |

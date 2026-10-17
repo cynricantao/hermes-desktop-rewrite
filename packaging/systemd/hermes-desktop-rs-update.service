@@ -1,0 +1,11 @@
+[Unit]
+Description=Update Hermes Desktop (Rust) from its main branch
+Documentation=file://%h/.local/share/hermes-desktop-rs/src/docs/UPDATING.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/lib/hermes-desktop-rs/hermes-desktop-rs-update
+Nice=19
+IOSchedulingClass=idle
+TimeoutStartSec=2h
