@@ -7,36 +7,528 @@
 // `act("<area>:<verb>[:<arg>]")` — settings.slint forwards those to
 // `SettingsState.action`. Rendered full-width inside the settings row for its id.
 
-import { Theme } from "theme.slint";
+import { ScrollView, LineEdit } from "std-widgets.slint";
+import { Theme, Motion, Ease } from "theme.slint";
+import { PrimaryButton, GhostButton, Chip, Toggle, Segmented, IconButton, Spinner } from "components.slint";
+import { Icons } from "icons.slint";
+
+// ── Data the controller pushes ──────────────────────────────────────────────────
+
+/// One provider and its (already filtered) model ids — the grouped model lists.
+export struct ModelGroup {
+    slug: string,
+    name: string,
+    authenticated: bool,
+    models: [string],
+}
+
+/// One auxiliary task row and its pinned route.
+export struct AuxRow {
+    task: string,
+    label: string,
+    hint: string,
+    provider: string,
+    model: string,
+    /// Route line: "Auto · use main model" or "provider · model".
+    route: string,
+    is-auto: bool,
+    inherit: string,
+}
+
+/// One Mixture-of-Agents reference model.
+export struct MoaRef {
+    provider: string,
+    model: string,
+    enabled: bool,
+}
+
+/// One `fallback_providers` entry.
+export struct FbRow {
+    provider: string,
+    model: string,
+}
 
 export global ModelsState {
     in-out property <bool> busy: false;
     in-out property <string> error;
+    in-out property <string> notice;
+
+    // Default model (`model.main`).
+    in-out property <string> main-provider;
+    in-out property <string> main-model;
+    in-out property <string> main-count;
+    in-out property <string> main-search;
+    in-out property <[ModelGroup]> main-groups: [];
+
+    /// The one inline picker any "change" control opens (only one is open at a time).
+    in-out property <string> picker-target;
+    in-out property <string> picker-search;
+    in-out property <[ModelGroup]> picker-groups: [];
+
+    // Auxiliary models.
+    in-out property <[AuxRow]> aux-rows: [];
+
+    // Mixture of Agents.
+    in-out property <bool> moa-loaded: false;
+    in-out property <bool> moa-enabled: false;
+    in-out property <[MoaRef]> moa-refs: [];
+    in-out property <string> moa-aggregator-provider;
+    in-out property <string> moa-aggregator-model;
+    in-out property <[string]> moa-fanout-options: [];
+    in-out property <int> moa-fanout: 0;
+    in-out property <[string]> moa-policy-options: ["Loud", "Silent"];
+    in-out property <int> moa-policy: 0;
+    in-out property <[string]> moa-presets: [];
+    in-out property <string> moa-preset;
+    in-out property <string> moa-default-preset;
+
+    // Fallback models.
+    in-out property <[FbRow]> fb-rows: [];
+}
+
+// ── Shared pieces ───────────────────────────────────────────────────────────────
+
+/// Provider-grouped, scrollable list of models. A row emits
+/// `<prefix>:<provider-slug>:<model>`; the current provider/model is marked.
+component GroupedList inherits ScrollView {
+    in property <[ModelGroup]> groups: [];
+    in property <string> current-provider;
+    in property <string> current-model;
+    in property <string> prefix;
+    callback act(string);
+    height: 232px;
+    VerticalLayout {
+        padding: 2px;
+        spacing: 1px;
+        for g in root.groups: VerticalLayout {
+            spacing: 1px;
+            Text {
+                text: g.name + (g.authenticated ? "" : "  ·  not signed in");
+                height: 24px;
+                vertical-alignment: center;
+                font-size: Theme.fs-xs;
+                color: Theme.text-3;
+            }
+            for m in g.models: Rectangle {
+                height: 28px;
+                border-radius: Theme.r-sm;
+                background: (g.slug == root.current-provider && m == root.current-model)
+                    ? Theme.selected
+                    : ta.has-hover ? Theme.hover : transparent;
+                animate background { duration: Motion.fast; }
+                accessible-role: button;
+                accessible-label: g.name + " " + m;
+                accessible-action-default => { root.act(root.prefix + ":" + g.slug + ":" + m); }
+                HorizontalLayout {
+                    alignment: center;
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    spacing: 8px;
+                    if g.slug == root.current-provider && m == root.current-model: Image {
+                        source: Icons.get("check");
+                        width: 12px;
+                        height: 12px;
+                        colorize: Theme.accent;
+                    }
+                    Text {
+                        text: m;
+                        font-size: Theme.fs-sm;
+                        color: Theme.text-2;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                    }
+                }
+                ta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.act(root.prefix + ":" + g.slug + ":" + m); }
+                }
+            }
+        }
+    }
+}
+
+/// The inline "change model" picker: a search box over the provider-grouped list.
+/// `clear-label` non-empty adds a button that puts the slot back to "auto".
+component Picker inherits VerticalLayout {
+    in property <string> target;
+    in property <string> title;
+    in property <string> current-provider;
+    in property <string> current-model;
+    in property <string> clear-label;
+    callback act(string);
+    spacing: 6px;
+    Rectangle {
+        border-radius: Theme.r-md;
+        border-width: 1px;
+        border-color: Theme.border;
+        background: Theme.surface-2;
+        VerticalLayout {
+            padding: 8px;
+            spacing: 6px;
+            HorizontalLayout {
+                alignment: center;
+                spacing: 8px;
+                Text {
+                    text: root.title;
+                    font-size: Theme.fs-sm;
+                    color: Theme.text-2;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                }
+                if root.clear-label != "": GhostButton {
+                    text: root.clear-label;
+                    clicked => { root.act("models:clear:" + root.target); }
+                }
+            }
+            LineEdit {
+                placeholder-text: "Search models";
+                text <=> ModelsState.picker-search;
+                edited(t) => { root.act("models:pfilter:" + t); }
+                accepted(t) => { root.act("models:pfilter:" + t); }
+            }
+            GroupedList {
+                groups: ModelsState.picker-groups;
+                current-provider: root.current-provider;
+                current-model: root.current-model;
+                prefix: "models:choose:" + root.target;
+                act(a) => { root.act(a); }
+            }
+        }
+    }
+}
+
+// ── Panels ─────────────────────────────────────────────────────────────────────
+
+/// `model.main` — the default model.
+component MainPanel inherits VerticalLayout {
+    callback act(string);
+    spacing: 8px;
+    HorizontalLayout {
+        alignment: center;
+        spacing: 10px;
+        Text {
+            text: ModelsState.main-count;
+            font-size: Theme.fs-sm;
+            color: Theme.text-3;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        Spinner {
+            width: 14px;
+            height: 14px;
+            visible: ModelsState.busy;
+        }
+        Text {
+            text: ModelsState.main-provider == "" ? "" : ModelsState.main-provider + " · " + ModelsState.main-model;
+            font-size: Theme.fs-sm;
+            color: Theme.text-2;
+            vertical-alignment: center;
+        }
+    }
+    LineEdit {
+        placeholder-text: "Search models";
+        text <=> ModelsState.main-search;
+        edited(t) => { root.act("models:mfilter:" + t); }
+        accepted(t) => { root.act("models:mfilter:" + t); }
+    }
+    Rectangle {
+        border-radius: Theme.r-md;
+        border-width: 1px;
+        border-color: Theme.border;
+        background: Theme.surface;
+        GroupedList {
+            groups: ModelsState.main-groups;
+            current-provider: ModelsState.main-provider;
+            current-model: ModelsState.main-model;
+            prefix: "models:pick";
+            act(a) => { root.act(a); }
+        }
+    }
+}
+
+/// `model.auxiliary` — one row per side task.
+component AuxPanel inherits VerticalLayout {
+    callback act(string);
+    spacing: 4px;
+    if ModelsState.aux-rows.length == 0: Text {
+        text: "Loading auxiliary tasks…";
+        font-size: Theme.fs-sm;
+        color: Theme.text-4;
+    }
+    for r in ModelsState.aux-rows: VerticalLayout {
+        spacing: 4px;
+        HorizontalLayout {
+            alignment: center;
+            spacing: 12px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 1px;
+                Text { text: r.label; font-size: Theme.fs-sm; color: Theme.text; }
+                if r.hint != "": Text { text: r.hint; font-size: Theme.fs-xs; color: Theme.text-4; }
+            }
+            Chip {
+                text: r.route;
+                has-chevron: true;
+                outlined: r.is-auto;
+                clicked => { root.act("models:open:aux." + r.task); }
+            }
+        }
+        if ModelsState.picker-target == "aux." + r.task: Picker {
+            target: "aux." + r.task;
+            title: "Model for " + r.label;
+            current-provider: r.provider;
+            current-model: r.model;
+            clear-label: r.is-auto ? "" : "Automatic";
+            act(a) => { root.act(a); }
+        }
+    }
+}
+
+/// `model.moa` — Mixture of Agents for the selected preset.
+component MoaPanel inherits VerticalLayout {
+    callback act(string);
+    spacing: 12px;
+    HorizontalLayout {
+        alignment: center;
+        spacing: 10px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 1px;
+            Text { text: "Enabled"; font-size: Theme.fs-sm; color: Theme.text; }
+            Text {
+                text: "Reference models answer in parallel and the aggregator combines their answers.";
+                font-size: Theme.fs-xs;
+                color: Theme.text-4;
+                wrap: word-wrap;
+            }
+        }
+        Toggle {
+            checked: ModelsState.moa-enabled;
+            toggled(v) => { root.act("models:moa-enabled:" + (v ? "1" : "0")); }
+        }
+    }
+    if ModelsState.moa-presets.length > 0: VerticalLayout {
+        spacing: 6px;
+        Text { text: "Preset"; font-size: Theme.fs-xs; color: Theme.text-3; }
+        HorizontalLayout {
+            spacing: 6px;
+            for p in ModelsState.moa-presets: Chip {
+                text: p;
+                secondary: p == ModelsState.moa-default-preset ? "default" : "";
+                outlined: p != ModelsState.moa-preset;
+                clicked => { root.act("models:moa-preset:" + p); }
+            }
+        }
+        Text {
+            text: "Editing “" + ModelsState.moa-preset + "” · the “default” preset is what new sessions use.";
+            font-size: Theme.fs-xs;
+            color: Theme.text-4;
+        }
+    }
+    VerticalLayout {
+        spacing: 6px;
+        Text { text: "Reference models"; font-size: Theme.fs-xs; color: Theme.text-3; }
+        for slot[i] in ModelsState.moa-refs: HorizontalLayout {
+            alignment: center;
+            spacing: 8px;
+            height: 30px;
+            Toggle {
+                checked: slot.enabled;
+                toggled(v) => { root.act("models:moa-ref-enabled:" + i + ":" + (v ? "1" : "0")); }
+            }
+            Text {
+                text: slot.provider + " · " + slot.model;
+                font-size: Theme.fs-sm;
+                color: slot.enabled ? Theme.text-2 : Theme.text-4;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                overflow: elide;
+            }
+            IconButton {
+                icon: Icons.get("x");
+                tooltip: "Remove reference model";
+                clicked => { root.act("models:moa-ref-remove:" + i); }
+            }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            GhostButton {
+                text: "Add reference model";
+                clicked => { root.act("models:open:moa.ref"); }
+            }
+        }
+        if ModelsState.picker-target == "moa.ref": Picker {
+            target: "moa.ref";
+            title: "Add a reference model";
+            current-provider: "";
+            current-model: "";
+            clear-label: "";
+            act(a) => { root.act(a); }
+        }
+    }
+    HorizontalLayout {
+        alignment: center;
+        spacing: 12px;
+        Text {
+            text: "Aggregator";
+            font-size: Theme.fs-sm;
+            color: Theme.text;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        Chip {
+            text: ModelsState.moa-aggregator-provider == ""
+                ? "Choose a model"
+                : ModelsState.moa-aggregator-provider + " · " + ModelsState.moa-aggregator-model;
+            has-chevron: true;
+            clicked => { root.act("models:open:moa.agg"); }
+        }
+    }
+    if ModelsState.picker-target == "moa.agg": Picker {
+        target: "moa.agg";
+        title: "Aggregator model";
+        current-provider: ModelsState.moa-aggregator-provider;
+        current-model: ModelsState.moa-aggregator-model;
+        clear-label: "";
+        act(a) => { root.act(a); }
+    }
+    VerticalLayout {
+        spacing: 6px;
+        Text { text: "Fan-out"; font-size: Theme.fs-xs; color: Theme.text-3; }
+        Segmented {
+            width: min(360px, max(160px, ModelsState.moa-fanout-options.length * 92px));
+            options: ModelsState.moa-fanout-options;
+            selected: ModelsState.moa-fanout;
+            changed(i) => { root.act("models:moa-fanout:" + i); }
+        }
+        Text {
+            text: "How often the reference models are consulted.";
+            font-size: Theme.fs-xs;
+            color: Theme.text-4;
+        }
+    }
+    VerticalLayout {
+        spacing: 6px;
+        Text { text: "If a reference model fails"; font-size: Theme.fs-xs; color: Theme.text-3; }
+        Segmented {
+            width: min(360px, max(160px, ModelsState.moa-policy-options.length * 92px));
+            options: ModelsState.moa-policy-options;
+            selected: ModelsState.moa-policy;
+            changed(i) => { root.act("models:moa-policy:" + i); }
+        }
+        Text {
+            text: "Loud says so in the answer; silent carries on with the models that answered.";
+            font-size: Theme.fs-xs;
+            color: Theme.text-4;
+        }
+    }
+}
+
+/// `fallback_providers` — the ordered fallback chain.
+component FallbackPanel inherits VerticalLayout {
+    callback act(string);
+    spacing: 6px;
+    if ModelsState.fb-rows.length == 0: Text {
+        text: "No fallbacks: they are tried in order if the default model fails.";
+        font-size: Theme.fs-sm;
+        color: Theme.text-4;
+        wrap: word-wrap;
+    }
+    for row[i] in ModelsState.fb-rows: VerticalLayout {
+        spacing: 4px;
+        HorizontalLayout {
+            alignment: center;
+            spacing: 8px;
+            Text {
+                text: "\{i + 1}";
+                width: 16px;
+                horizontal-alignment: center;
+                font-size: Theme.fs-xs;
+                color: Theme.text-4;
+                vertical-alignment: center;
+            }
+            Chip {
+                text: row.provider == "" ? "Choose a model" : row.provider + " · " + row.model;
+                has-chevron: true;
+                clicked => { root.act("models:open:fb." + i); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            IconButton {
+                icon: Icons.get("arrow-up");
+                tooltip: "Move up";
+                visible: i > 0;
+                clicked => { root.act("models:fbup:" + i); }
+            }
+            IconButton {
+                icon: Icons.get("arrow-down");
+                tooltip: "Move down";
+                visible: i + 1 < ModelsState.fb-rows.length;
+                clicked => { root.act("models:fbdown:" + i); }
+            }
+            IconButton {
+                icon: Icons.get("x");
+                tooltip: "Remove";
+                clicked => { root.act("models:fbremove:" + i); }
+            }
+        }
+        if ModelsState.picker-target == "fb." + i: Picker {
+            target: "fb." + i;
+            title: "Fallback " + (i + 1);
+            current-provider: row.provider;
+            current-model: row.model;
+            clear-label: "";
+            act(a) => { root.act(a); }
+        }
+    }
+    HorizontalLayout {
+        spacing: 6px;
+        GhostButton {
+            text: "Add fallback";
+            clicked => { root.act("models:open:fb.new"); }
+        }
+    }
+    if ModelsState.picker-target == "fb.new": Picker {
+        target: "fb.new";
+        title: "Add a fallback model";
+        current-provider: "";
+        current-model: "";
+        clear-label: "";
+        act(a) => { root.act(a); }
+    }
 }
 
 export component ModelsWidget inherits VerticalLayout {
     in property <string> id;
     callback act(string);
+    horizontal-stretch: 1;
     spacing: 8px;
 
-    if id == "model.main": Text {
-        text: "Models load from the backend…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
+    if ModelsState.error != "": Rectangle {
+        border-radius: Theme.r-md;
+        border-width: 1px;
+        border-color: Theme.danger.with-alpha(0.45);
+        background: Theme.danger.with-alpha(0.10);
+        height: err-text.preferred-height + 16px;
+        err-text := Text {
+            x: 10px;
+            y: 8px;
+            width: parent.width - 20px;
+            text: ModelsState.error;
+            color: Theme.text-2;
+            font-size: Theme.fs-sm;
+            wrap: word-wrap;
+        }
     }
-    if id == "model.auxiliary": Text {
-        text: "Auxiliary models…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
+    if ModelsState.notice != "": Text {
+        text: ModelsState.notice;
+        color: Theme.text-3;
+        font-size: Theme.fs-xs;
     }
-    if id == "model.moa": Text {
-        text: "Mixture of Agents…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
-    }
-    if id == "fallback_providers": Text {
-        text: "Fallback models…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
-    }
+
+    if id == "model.main": MainPanel { act(a) => { root.act(a); } }
+    if id == "model.auxiliary": AuxPanel { act(a) => { root.act(a); } }
+    if id == "model.moa": MoaPanel { act(a) => { root.act(a); } }
+    if id == "fallback_providers": FallbackPanel { act(a) => { root.act(a); } }
 }
