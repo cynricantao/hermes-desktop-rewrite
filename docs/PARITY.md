@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**43 done · 203 partial · 546 not started · 1 unsupported** (of 793).
+**43 done · 215 partial · 534 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -631,7 +631,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Create profile (unbound) — local — src/lib/keybinds/actions.ts
 - [ ] HUD snap to pointer (⌘⇧G, HUD-only) — local — src/lib/keybinds/actions.ts (KEYBIND_READONLY)
 - [ ] Terminal copy/paste (platform chords) — local — src/lib/keybinds/actions.ts (KEYBIND_READONLY)
-- [ ] Rebind / clear / reset keys + conflict detection — local — src/store/keybinds.ts
+- [~] Rebind / clear / reset keys + conflict detection — local — src/store/keybinds.ts ⟶ registry in `hermes-core::keybinds` (92 actions with Linux defaults, parse/format/match, overrides, conflicts; 27 unit tests); no shortcuts screen or dispatch yet
 - [ ] Per-plugin contributed keybinds — local — src/lib/keybinds/plugin-actions.ts
 - [ ] Keybind deep-link capture mode — local — src/store/keybinds.ts
 
@@ -840,20 +840,20 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Settings — Keybinds page
 
-- [ ] Shortcuts list + capture/rebind — local — src/app/settings/keybind-settings.tsx
+- [~] Shortcuts list + capture/rebind — local — src/app/settings/keybind-settings.tsx ⟶ registry in `hermes-core::keybinds` (92 actions with Linux defaults, parse/format/match, overrides, conflicts; 27 unit tests); no shortcuts screen or dispatch yet
 - [ ] HUD modifier gesture — local (Electron hud-modifier) — src/app/settings/hud-modifier-settings.tsx
 - [ ] Screenshot shortcut — local (Electron screenshot) — src/app/settings/screenshot-settings.tsx
 
 ## Settings — Notifications page
 
-- [ ] Enable all notifications — local — src/app/settings/notifications-settings.tsx
-- [ ] Approval notifications — local — src/store/native-notifications.ts
-- [ ] Input notifications — local — src/store/native-notifications.ts
-- [ ] Turn-done notifications — local — src/store/native-notifications.ts
-- [ ] Turn-error notifications — local — src/store/native-notifications.ts
-- [ ] Background-done notifications — local — src/store/native-notifications.ts
-- [ ] Credits notifications — local — src/store/native-notifications.ts
-- [ ] Plugin notifications — local — src/store/native-notifications.ts
+- [~] Enable all notifications — local — src/app/settings/notifications-settings.tsx ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
+- [~] Approval notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
+- [~] Input notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
+- [~] Turn-done notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
+- [~] Turn-error notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
+- [~] Background-done notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
+- [~] Credits notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
+- [~] Plugin notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
 - [ ] Completion sound — local — src/store/completion-sound.ts
 
 ## Settings — Sessions page
@@ -919,10 +919,10 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Notifications
 
-- [ ] In-app toast notifications — local — src/store/notifications.ts
+- [~] In-app toast notifications — local — src/store/notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
 - [ ] Butterbar (top banner notices) — local — src/store/butterbar.ts, src/app/shell/butterbar.tsx
 - [ ] Terms/consent butterbar — local — src/app/shell/terms-butterbar.tsx
-- [ ] Native OS notifications — local (Electron notification-ipc) — src/store/native-notifications.ts
+- [~] Native OS notifications — local (Electron notification-ipc) — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
 - [ ] Notification click actions — local (Electron notification-actions) — electron/notification-actions.ts
 - [ ] Notification registry (native) — local (Electron) — electron/notification-registry.ts
 - [ ] Agent notices (in-chat notice rows) — WS notice — src/store/agent-notices.ts
