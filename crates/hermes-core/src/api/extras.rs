@@ -729,6 +729,66 @@ pub async fn grant_computer_use_permissions(rest: &Rest, profile: &str) -> Resul
     send_as(rest, &grant_computer_use_permissions_request(profile)).await
 }
 
+// ── Browser (CDP) control ─────────────────────────────────────────────────────
+
+/// `browser.manage` reply. `messages` only accompanies a `connect` that had progress to
+/// report; `browser_use` is only set by `status` / `use`.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct BrowserManaged {
+    pub connected: bool,
+    pub url: Option<String>,
+    pub browser_use: bool,
+    pub messages: Vec<String>,
+}
+
+/// `browser.manage`: one method for the whole browser card. `action` is
+/// `status` | `use` | `connect` | `disconnect`; `enabled` is the `use` argument, `url` the
+/// optional CDP endpoint for `connect` (empty = the backend's `http://127.0.0.1:9222`).
+pub fn browser_manage_call(action: &str, enabled: Option<bool>, url: &str, session_id: &str, profile: &str) -> Call {
+    let mut params = json!({ "action": action });
+    if let Some(v) = enabled {
+        params["enabled"] = json!(v);
+    }
+    put_str(&mut params, "url", url);
+    put_str(&mut params, "session_id", session_id);
+    put_str(&mut params, "profile", profile);
+    call_of("browser.manage", params)
+}
+
+/// `browser.manage {action: "status"}`: the current CDP override and browser-use mode.
+/// Read-only (`_resolve_browser_cdp_url` reads env/config).
+pub async fn browser_status(client: &Client, profile: &str) -> Result<BrowserManaged, ApiError> {
+    call_as(client, &browser_manage_call("status", None, "", "", profile)).await
+}
+
+/// `browser.manage {action: "use"}`: switch the backend's browser-use CLI mode.
+///
+/// **Writes backend state** (a process-wide mode flag); builder + unit test only.
+pub async fn browser_use(client: &Client, enabled: bool, profile: &str) -> Result<BrowserManaged, ApiError> {
+    call_as(client, &browser_manage_call("use", Some(enabled), "", "", profile)).await
+}
+
+/// `browser.manage {action: "connect"}`: point the backend at a CDP endpoint (reaps and
+/// relaunches browser supervisors).
+///
+/// **Spawns processes / writes backend state**; builder + unit test only.
+pub async fn browser_connect(
+    client: &Client,
+    url: &str,
+    session_id: &str,
+    profile: &str,
+) -> Result<BrowserManaged, ApiError> {
+    call_as(client, &browser_manage_call("connect", None, url, session_id, profile)).await
+}
+
+/// `browser.manage {action: "disconnect"}`: drop the CDP override and reap the supervisors.
+///
+/// **Spawns processes / writes backend state**; builder + unit test only.
+pub async fn browser_disconnect(client: &Client, profile: &str) -> Result<BrowserManaged, ApiError> {
+    call_as(client, &browser_manage_call("disconnect", None, "", "", profile)).await
+}
+
 // ── MCP: REST catalog + whole-map replace ─────────────────────────────────────
 
 /// One env var a catalog entry declares (never the value).
@@ -2154,6 +2214,45 @@ mod tests {
                 .unwrap()
                 .name,
             "1password"
+        );
+    }
+
+    #[test]
+    fn browser_manage_builders_and_decode() {
+        assert_eq!(
+            browser_manage_call("status", None, "", "", "").params,
+            json!({ "action": "status" })
+        );
+        assert_eq!(
+            browser_manage_call("use", Some(false), "", "", "swe").params,
+            json!({ "action": "use", "enabled": false, "profile": "swe" })
+        );
+        assert_eq!(
+            browser_manage_call("connect", None, "ws://127.0.0.1:9222/devtools/browser/x", "s1", "").params,
+            json!({ "action": "connect", "url": "ws://127.0.0.1:9222/devtools/browser/x",
+                    "session_id": "s1" })
+        );
+        assert_eq!(
+            browser_manage_call("disconnect", None, "", "", "").params,
+            json!({ "action": "disconnect" })
+        );
+
+        let b: BrowserManaged = crate::api::decode(json!({
+            "connected": true, "url": "http://127.0.0.1:9222", "browser_use": false
+        }))
+        .unwrap();
+        assert!(b.connected);
+        assert!(b.messages.is_empty());
+        let c: BrowserManaged = crate::api::decode(json!({
+            "connected": true, "url": "http://127.0.0.1:9222",
+            "messages": ["Adopted 127.0.0.1:9222."], "extra": 1
+        }))
+        .unwrap();
+        assert_eq!(c.messages.len(), 1);
+        assert!(!c.browser_use);
+        assert_eq!(
+            crate::api::decode::<BrowserManaged>(json!({})).unwrap(),
+            BrowserManaged::default()
         );
     }
 }

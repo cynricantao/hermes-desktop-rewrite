@@ -1711,6 +1711,32 @@ pub async fn prompt_btw(client: &Client, session_id: &str, profile: &str, text: 
     call_as(client, &prompt_btw_call(session_id, profile, text)).await
 }
 
+/// `preview.restart`: hand the preview pane's failure to a hidden side agent that diagnoses
+/// the URL and — deliberately — leaves a restarted dev server running under its task id.
+pub fn preview_restart_call(session_id: &str, url: &str, cwd: &str, context: &str, profile: &str) -> Call {
+    let mut p = json!({"session_id": session_id, "url": url});
+    if !cwd.is_empty() {
+        p["cwd"] = json!(cwd);
+    }
+    if !context.is_empty() {
+        p["context"] = json!(context);
+    }
+    call_of("preview.restart", profiled(p, profile))
+}
+
+/// Restart the preview dev server. **Spawns a side agent / spends model calls** — builder +
+/// unit test only.
+pub async fn preview_restart(
+    client: &Client,
+    session_id: &str,
+    url: &str,
+    cwd: &str,
+    context: &str,
+    profile: &str,
+) -> Result<TaskId, ApiError> {
+    call_as(client, &preview_restart_call(session_id, url, cwd, context, profile)).await
+}
+
 #[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
 #[serde(default)]
 pub struct MessageReaction {
@@ -1765,6 +1791,129 @@ pub async fn message_react(
         &message_react_call(session_id, profile, row_id, newest_role, emoji, author),
     )
     .await
+}
+
+// ── RPC: one-shot LLM and image generation ───────────────────────────────────
+
+/// `llm.oneshot`: aux-model text (titles, project ideas).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct LlmOneshot {
+    pub text: String,
+}
+
+/// The optional `llm.oneshot` knobs (backend defaults: `task: "title_generation"`,
+/// `max_tokens: 1024`, `temperature: 0.3`).
+#[derive(Debug, Clone, Default)]
+pub struct LlmOneshotOptions<'a> {
+    /// The template's substitution object.
+    pub variables: Option<&'a Value>,
+    pub task: &'a str,
+    pub max_tokens: Option<u32>,
+    pub temperature: Option<f32>,
+}
+
+/// `llm.oneshot`: a stateless one-shot. A live `session_id` lends its model, else the `options`
+/// task backend runs it. At least a template or `instructions`/`input` is required.
+///
+/// **Spends model calls.**
+pub fn llm_oneshot_call(
+    session_id: &str,
+    template: &str,
+    instructions: &str,
+    input: &str,
+    options: &LlmOneshotOptions,
+    profile: &str,
+) -> Call {
+    let mut p = json!({});
+    if !session_id.is_empty() {
+        p["session_id"] = json!(session_id);
+    }
+    if !template.is_empty() {
+        p["template"] = json!(template);
+    }
+    if !instructions.is_empty() {
+        p["instructions"] = json!(instructions);
+    }
+    if !input.is_empty() {
+        p["input"] = json!(input);
+    }
+    if let Some(v) = options.variables {
+        p["variables"] = v.clone();
+    }
+    if !options.task.is_empty() {
+        p["task"] = json!(options.task);
+    }
+    if let Some(v) = options.max_tokens {
+        p["max_tokens"] = json!(v);
+    }
+    if let Some(v) = options.temperature {
+        p["temperature"] = json!(v);
+    }
+    call_of("llm.oneshot", profiled(p, profile))
+}
+
+/// Run a one-shot aux generation. **Spends model calls.**
+pub async fn llm_oneshot(
+    client: &Client,
+    session_id: &str,
+    template: &str,
+    instructions: &str,
+    input: &str,
+    options: &LlmOneshotOptions<'_>,
+    profile: &str,
+) -> Result<LlmOneshot, ApiError> {
+    call_as(
+        client,
+        &llm_oneshot_call(session_id, template, instructions, input, options, profile),
+    )
+    .await
+}
+
+/// `image.generate` reply; `image_data` (a `data:` URL) is omitted when the download failed —
+/// fall back to `image` (the backend's URL/path).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct ImageGenerated {
+    /// Provider availability; `probe: true` answers this alone.
+    pub available: bool,
+    pub success: bool,
+    pub image: String,
+    pub image_data: Option<String>,
+    pub error: Option<String>,
+}
+
+/// `image.generate`: `prompt` (required unless `probe`), `aspect_ratio`
+/// (`landscape` | `square` | `portrait`, `square` default) and `max_bytes` (cap on the data
+/// URL; backend default 8 MB, max 16 MB). `probe: true` answers availability only.
+///
+/// **Spends model calls / uses the network** — calls the image provider (a `probe` does not).
+pub fn image_generate_call(prompt: &str, aspect_ratio: &str, probe: bool, max_bytes: Option<u64>) -> Call {
+    let mut p = json!({});
+    if !prompt.is_empty() {
+        p["prompt"] = json!(prompt);
+    }
+    if !aspect_ratio.is_empty() {
+        p["aspect_ratio"] = json!(aspect_ratio);
+    }
+    if probe {
+        p["probe"] = json!(true);
+    }
+    if let Some(v) = max_bytes {
+        p["max_bytes"] = json!(v);
+    }
+    call_of("image.generate", p)
+}
+
+/// Generate one image. **Spends model calls / uses the network.**
+pub async fn image_generate(
+    client: &Client,
+    prompt: &str,
+    aspect_ratio: &str,
+    probe: bool,
+    max_bytes: Option<u64>,
+) -> Result<ImageGenerated, ApiError> {
+    call_as(client, &image_generate_call(prompt, aspect_ratio, probe, max_bytes)).await
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -2328,5 +2477,60 @@ mod tests {
 
         let close: SessionClosed = decode(json!({"closed": true, "messages": ["turn stopped"]})).unwrap();
         assert!(close.closed);
+
+        let pr = preview_restart_call("s1", "http://localhost:3000", "/w", "TypeError: x", "");
+        assert_eq!(pr.method, "preview.restart");
+        assert_eq!(
+            pr.params,
+            json!({"session_id": "s1", "url": "http://localhost:3000", "cwd": "/w",
+                   "context": "TypeError: x"})
+        );
+        assert_eq!(
+            preview_restart_call("s1", "http://localhost:3000", "", "", "swe").params,
+            json!({"session_id": "s1", "url": "http://localhost:3000", "profile": "swe"})
+        );
+
+        assert_eq!(
+            llm_oneshot_call("", "", "Summarize.", "text", &LlmOneshotOptions::default(), "").params,
+            json!({ "instructions": "Summarize.", "input": "text" })
+        );
+        assert_eq!(
+            llm_oneshot_call(
+                "s1",
+                "tpl",
+                "",
+                "",
+                &LlmOneshotOptions {
+                    variables: Some(&json!({"n": "1"})),
+                    task: "title_generation",
+                    max_tokens: Some(64),
+                    // Exact in f32 -> f64 (0.2 would round-trip as 0.20000000298023224).
+                    temperature: Some(0.25),
+                },
+                "swe"
+            )
+            .params,
+            json!({"session_id": "s1", "template": "tpl", "variables": {"n": "1"},
+                   "task": "title_generation", "max_tokens": 64, "temperature": 0.25,
+                   "profile": "swe"})
+        );
+        let one: LlmOneshot = decode(json!({"text": "Hello"})).unwrap();
+        assert_eq!(one.text, "Hello");
+        assert_eq!(decode::<LlmOneshot>(json!({})).unwrap(), LlmOneshot::default());
+
+        assert_eq!(
+            image_generate_call("a cat", "square", false, None).params,
+            json!({ "prompt": "a cat", "aspect_ratio": "square" })
+        );
+        assert_eq!(
+            image_generate_call("", "", true, Some(1000)).params,
+            json!({ "probe": true, "max_bytes": 1000 })
+        );
+        let ig: ImageGenerated = decode(json!({
+            "available": true, "success": true, "image": "/tmp/a.png"
+        }))
+        .unwrap();
+        assert!(ig.success && ig.image_data.is_none());
+        assert_eq!(decode::<ImageGenerated>(json!({})).unwrap(), ImageGenerated::default());
     }
 }

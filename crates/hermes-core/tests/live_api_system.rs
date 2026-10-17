@@ -250,6 +250,24 @@ async fn system_area_live() {
         Err(e) => checks.check("wake.status", false, e.to_string()),
     }
 
+    // ── RPC: onboarding state (read-only probe; start/skip are builder-only) ──
+
+    match sys::onboarding_state(&client, false).await {
+        Ok(s) => checks.check(
+            "onboarding.state",
+            s.run_id.is_none() || s.session_id.is_some(),
+            format!(
+                "run={} eligible={} session_id={:?} run_id={:?}",
+                s.run, s.eligible, s.session_id, s.run_id
+            ),
+        ),
+        Err(e) => checks.check("onboarding.state", false, e.to_string()),
+    }
+    checks.ok(
+        "onboarding.state (assume_fresh)",
+        &sys::onboarding_state(&client, true).await,
+    );
+
     // ── RPC: session-scoped calls without a session (expected 4001) ───────────
 
     expect_session_error(

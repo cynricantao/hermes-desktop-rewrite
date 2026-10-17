@@ -1047,6 +1047,43 @@ pub async fn connectors_operation_wake(
     call_as(client, &connectors_operation_wake_call(owner, op_id, profile)).await
 }
 
+/// `connection.respond` reply: `settled` is true once the operation has nothing left open.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct ConnectionResponded {
+    pub status: String,
+    pub settled: bool,
+}
+
+/// `connection.respond`: the card's per-target outcomes. `answer` is a `ConnectionAnswer`
+/// object — `{targets: [{name, status: "approved" | "skipped", detail?, env?}], settled_by?,
+/// said?}` (`tui_gateway/contracts/connectors_operation.py`).
+///
+/// **Writes connection state** — settles the addressed operation's targets. Answered for a
+/// session owner (the session's open operation) or an account owner (the Connectors page).
+pub fn connection_respond_call(owner: &ConnectorOwner, op_id: &str, answer: &Value, profile: &str) -> Call {
+    call_of(
+        "connection.respond",
+        params(&[
+            ("owner", owner.to_json()),
+            ("op_id", json!(op_id)),
+            ("result", answer.clone()),
+            ("profile", profile_param(profile)),
+        ]),
+    )
+}
+
+/// Answer an open connection operation's card. **Writes connection state.**
+pub async fn connection_respond(
+    client: &Client,
+    owner: &ConnectorOwner,
+    op_id: &str,
+    answer: &Value,
+    profile: &str,
+) -> Result<ConnectionResponded, ApiError> {
+    call_as(client, &connection_respond_call(owner, op_id, answer, profile)).await
+}
+
 // ── Reloads ─────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
@@ -1600,6 +1637,24 @@ mod tests {
 
         let w: ConnectorWakeResult = decode(json!({"status": "ok"})).unwrap();
         assert_eq!(w.status, "ok");
+
+        let answer = json!({"targets": [{"name": "notion", "status": "approved"}]});
+        assert_eq!(
+            connection_respond_call(&owner, "op-1", &answer, "").params,
+            json!({"owner": {"type": "account"}, "op_id": "op-1", "result": answer})
+        );
+        assert_eq!(
+            connection_respond_call(&owner, "op-1", &json!({}), "swe").params,
+            json!({"owner": {"type": "account"}, "op_id": "op-1", "result": {},
+                   "profile": "swe"})
+        );
+        let r: ConnectionResponded = decode(json!({"status": "ok", "settled": true})).unwrap();
+        assert_eq!(r.status, "ok");
+        assert!(r.settled);
+        assert_eq!(
+            decode::<ConnectionResponded>(json!({})).unwrap(),
+            ConnectionResponded::default()
+        );
 
         assert_eq!(
             decode::<ConnectionOperationStatus>(json!({})).unwrap(),

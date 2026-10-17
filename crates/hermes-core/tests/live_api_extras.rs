@@ -165,5 +165,22 @@ async fn extras_rest_and_rpc() {
         // source rows are backend-owned; decoding is the assertion.
     }
 
+    // ── Browser (CDP) control — `status` is a local read; the other actions write
+    //    backend state / spawn supervisors and stay builder-only ──
+    let browser = browser_status(&client, "").await;
+    if checks.ok("browser.manage status", &browser) {
+        let b = browser.unwrap();
+        // The handler pairs `connected` with a non-empty url (`bool(_resolve_browser_cdp_url())`);
+        // no CDP override answers `url: ""`.
+        checks.check(
+            "browser status shape",
+            b.connected == b.url.as_deref().is_some_and(|u| !u.is_empty()),
+            format!(
+                "connected={} url={:?} browser_use={}",
+                b.connected, b.url, b.browser_use
+            ),
+        );
+    }
+
     checks.finish();
 }

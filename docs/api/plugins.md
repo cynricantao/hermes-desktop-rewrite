@@ -32,6 +32,7 @@ Live coverage is in `crates/hermes-core/tests/live_api_plugins.rs` (safe reads o
 | Connectors — policy set | `connectors_policy_set_call` / `connectors_policy_set` | RPC `connectors.policy.set` `{change, expected_revision}` | **Network** write; `ConnectorPolicyChange::Tools{v..}` / `::Connector{v..}`; stale revision → `policy_conflict`. |
 | Connectors — op status | `connectors_operation_status_call` / `connectors_operation_status` | RPC `connectors.operation.status` `{owner, op_id}` | **Network**; unknown op → 4004 `unknown_operation`. |
 | Connectors — op wake | `connectors_operation_wake_call` / `connectors_operation_wake` | RPC `connectors.operation.wake` `{owner, op_id}` | **Network**; unknown op → 4004. |
+| Connectors — respond | `connection_respond_call` / `connection_respond` | RPC `connection.respond` `{owner, op_id, result}` | The card's per-target answer (`result: {targets:[{name, status, detail?, env?}], settled_by?, said?}`); reply `{status:"ok", settled}`. **Writes connection state** — ran live only on the no-op path (bogus op → 4004, same as the sibling op RPCs). |
 | Env reload | `reload_env_call` / `reload_env` | RPC `reload.env` `{session_id?}` | Re-reads the backend's own `.env` from disk; returns `{updated}`. |
 | MCP reload | `reload_mcp_call` / `reload_mcp` | RPC `reload.mcp` `{session_id?, confirm?, always?, rev?}` | **Spawns processes** (stdio MCP servers reconnect) and invalidates prompt caches; without `confirm` answers `confirm_required`. |
 
@@ -66,6 +67,7 @@ test backend on port 37273: **21 checks, 0 failed** (`test live_plugins_and_conn
 | `connectors_connect_call` | **Network** — opens an OAuth/authorization operation and a browser leg. |
 | `connectors_accounts_remove_call`, `connectors_accounts_rename_call` | **Network** + would act on a real hosted account (none exists for the test member; removing/renaming is destructive). |
 | `connectors_policy_set_call` | **Network** write to the member policy. |
+| `connection_respond_call` | **Writes connection state** (settles a live operation's targets); only the unknown-op error path (4004) runs live. |
 | `reload_mcp_call` | **Spawns processes** — MCP servers are torn down and rediscovered. |
 | `plugin_rest_request` / `plugin_rest` (generic) | Covered indirectly: the kanban board check goes through the same namespace builder. Other plugin sub-routes are plugin-specific and not typed here. |
 

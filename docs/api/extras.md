@@ -61,6 +61,8 @@ is `#[serde(default)]` so older/newer backends never fail to decode.
 |---|---|---|---|
 | Status | `computer_use_status` | `GET /api/tools/computer-use/status[?profile=]` | `platform`, `ready`, `can_grant`, per-permission `checks` |
 | Grant permissions | `grant_computer_use_permissions` | `POST /api/tools/computer-use/permissions/grant[?profile=]` | **Spawns a process**; macOS only (400 elsewhere) |
+| Browser status | `browser_status` / `browser_manage_call` | RPC `browser.manage {action:"status"[, profile]}` | CDP override + `browser_use` CLI mode; `url` is `""` (not null) when no override. Read-only. Ran live (`connected=false url="" browser_use=true`). |
+| Browser use / connect / disconnect | `browser_use` / `browser_connect` / `browser_disconnect` | RPC `browser.manage {action:"use"\|"connect"\|"disconnect", url?, enabled?, session_id?, profile}` | **Writes backend state / spawns browser supervisors** (connect reaps + relaunches; disconnect drops the override). Builder-only. |
 
 ## MCP
 
@@ -115,6 +117,8 @@ is `#[serde(default)]` so older/newer backends never fail to decode.
   network calls or config writes; only the category-less `toolset_config` read was run.
 - `toolset_save_env` (credentials), `toolset_post_setup` (spawns installers).
 - `grant_computer_use_permissions` — spawns a process, macOS only.
+- `browser_use`, `browser_connect`, `browser_disconnect` — write backend state and/or reap and
+  relaunch browser supervisors; only `browser.manage status` ran live.
 - `mcp_catalog_install`, `mcp_servers_replace` — spawns/network and destructive whole-map write.
 - `mcp_servers_set_api_key` (secret), `mcp_servers_test` (connects, spawns),
   `mcp_servers_oauth_start` / `poll` / `cancel` / `callback` (network + live OAuth session).
@@ -140,6 +144,6 @@ is `#[serde(default)]` so older/newer backends never fail to decode.
 - Unit tests: `cargo test -p hermes-core --lib api::extras` — 23 passed (12 in `extras`, the
   rest in the parallel `extras::admin` submodule). Full `cargo test -p hermes-core`: 99 passed,
   0 failed.
-- Live test (private backend on port 37273):
-  `HERMES_DESKTOP_PORT=37273 cargo test -p hermes-core --test live_api_extras -- --ignored --nocapture`
-  — **31 checks, 0 failed**.
+- Live test (private backend, port 37273 at the time; re-run on port 36763):
+  `HERMES_DESKTOP_PORT=36763 cargo test -p hermes-core --test live_api_extras -- --ignored --nocapture`
+  — **33 checks, 0 failed** (adds `browser.manage status` + `browser status shape`).

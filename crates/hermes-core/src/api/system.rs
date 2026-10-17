@@ -1351,6 +1351,283 @@ pub async fn wake_status(
     call_as(client, &wake_status_call(surface, client_capture, profile)).await
 }
 
+/// `wake.start`: the arm result. `reason` is `unavailable` | `disabled` |
+/// `disabled_for_surface` | `owned` when `started` is false.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct WakeStart {
+    pub started: bool,
+    pub reason: Option<String>,
+    /// Why the surface cannot arm (`unavailable`), from the requirements probe.
+    pub hint: Option<String>,
+    /// `local` | `client` — `client` means the desktop feeds PCM through [`wake_feed_call`].
+    pub capture: Option<String>,
+    pub phrase: Option<String>,
+    pub provider: Option<String>,
+    pub owner_surface: Option<String>,
+    /// True when this explicit gesture wrote `wake_word.enabled: true`.
+    pub enabled_persisted: Option<bool>,
+    pub sample_rate: Option<i64>,
+    pub frame_length: Option<i64>,
+}
+
+/// `wake.start`: arm the wake-word listener for `surface` (`"tui"` | `"gui"`, empty = the
+/// backend's `auto`). `persist: true` — an explicit gesture — also flips `wake_word.enabled`
+/// on; auto-arm callers leave it off. `client_capture` asks for the client-PCM path
+/// (`capture: "client"`), fed later with [`wake_feed_call`].
+///
+/// **Spawns/records** — opens the microphone on the backend host; builder + unit test only.
+pub fn wake_start_call(
+    surface: &str,
+    persist: bool,
+    session_id: &str,
+    client_capture: Option<bool>,
+    profile: &str,
+) -> Call {
+    let mut p = json!({ "profile": profile_param(profile) });
+    if !surface.is_empty() {
+        p["surface"] = json!(surface);
+    }
+    if persist {
+        p["persist"] = json!(true);
+    }
+    if !session_id.is_empty() {
+        p["session_id"] = json!(session_id);
+    }
+    if let Some(v) = client_capture {
+        p["client_capture"] = json!(v);
+    }
+    call_of("wake.start", p)
+}
+
+/// Arm the wake-word listener. **Spawns/records the microphone** on the backend host.
+pub async fn wake_start(
+    client: &Client,
+    surface: &str,
+    persist: bool,
+    session_id: &str,
+    client_capture: Option<bool>,
+    profile: &str,
+) -> Result<WakeStart, ApiError> {
+    call_as(
+        client,
+        &wake_start_call(surface, persist, session_id, client_capture, profile),
+    )
+    .await
+}
+
+/// `wake.stop`: stopping this surface's listener; `persist: true` also clears the config flag.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct WakeStop {
+    pub stopped: bool,
+    /// `null` when the caller owned the listener; `"not_owner"` otherwise.
+    pub reason: Option<String>,
+    /// True when this call wrote `wake_word.enabled: false`.
+    pub disabled_persisted: bool,
+}
+
+/// `wake.stop`: stop this surface's listener; `persist: true` (an explicit gesture) also
+/// writes `wake_word.enabled: false`.
+///
+/// **Releases the microphone** on the backend host; builder + unit test only.
+pub fn wake_stop_call(persist: bool, profile: &str) -> Call {
+    let mut p = json!({ "profile": profile_param(profile) });
+    if persist {
+        p["persist"] = json!(true);
+    }
+    call_of("wake.stop", p)
+}
+
+/// Stop the wake-word listener. **Releases the backend host's microphone.**
+pub async fn wake_stop(client: &Client, persist: bool, profile: &str) -> Result<WakeStop, ApiError> {
+    call_as(client, &wake_stop_call(persist, profile)).await
+}
+
+/// `wake.pause`: releasing the mic (e.g. while the desktop's browser captures audio).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct WakePause {
+    pub paused: bool,
+    /// `null` when the caller owned the listener; `"not_owner"` otherwise.
+    pub reason: Option<String>,
+}
+
+/// `wake.pause`: release the mic. **Releases the backend host's microphone.**
+pub fn wake_pause_call(profile: &str) -> Call {
+    call_of("wake.pause", json!({ "profile": profile_param(profile) }))
+}
+
+/// Pause the wake-word detector.
+pub async fn wake_pause(client: &Client, profile: &str) -> Result<WakePause, ApiError> {
+    call_as(client, &wake_pause_call(profile)).await
+}
+
+/// `wake.resume`: reclaiming the mic after a pause; a no-op if the listener is not armed.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct WakeResume {
+    pub resumed: bool,
+    /// `null` when the caller owned the listener; `"not_owner"` otherwise.
+    pub reason: Option<String>,
+}
+
+/// `wake.resume`: reclaim the mic after [`wake_pause`].
+pub fn wake_resume_call(profile: &str) -> Call {
+    call_of("wake.resume", json!({ "profile": profile_param(profile) }))
+}
+
+/// Resume the wake-word detector.
+pub async fn wake_resume(client: &Client, profile: &str) -> Result<WakeResume, ApiError> {
+    call_as(client, &wake_resume_call(profile)).await
+}
+
+/// `wake.feed`: pushing client-captured PCM into the armed detector (`reason: "empty"` for an
+/// empty frame).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct WakeFeed {
+    pub fed: bool,
+    /// `null` when the caller owned the listener; `"not_owner"` / `"empty"` otherwise.
+    pub reason: Option<String>,
+}
+
+/// `wake.feed`: push client-captured PCM (base64 int16 mono LE, 16 kHz only) into the armed
+/// detector — mic-less remote backends run openWakeWord this way. `sample_rate` is optional;
+/// the backend accepts `0` or `16000`.
+///
+/// **Records the microphone** on the calling surface; builder + unit test only.
+pub fn wake_feed_call(pcm_b64: &str, sample_rate: Option<i64>, profile: &str) -> Call {
+    let mut p = json!({ "profile": profile_param(profile), "pcm": pcm_b64 });
+    if let Some(v) = sample_rate {
+        p["sample_rate"] = json!(v);
+    }
+    call_of("wake.feed", p)
+}
+
+/// Push a client-captured PCM frame. **Feeds the backend host's detector.**
+pub async fn wake_feed(
+    client: &Client,
+    pcm_b64: &str,
+    sample_rate: Option<i64>,
+    profile: &str,
+) -> Result<WakeFeed, ApiError> {
+    call_as(client, &wake_feed_call(pcm_b64, sample_rate, profile)).await
+}
+
+// ── Onboarding ───────────────────────────────────────────────────────────────
+
+/// `onboarding.state`: whether the first-run flow should show, and the run it would resume.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct OnboardingState {
+    /// The guided run should start (fresh install, or nothing finished yet).
+    pub run: bool,
+    /// This install is eligible for the guided run.
+    pub eligible: bool,
+    /// The live run's session, when one is open.
+    pub session_id: Option<String>,
+    pub run_id: Option<String>,
+}
+
+/// `onboarding.state`: `assume_fresh` answers as a first install (the dialog's preview).
+/// Read-only; `_run_state` only reads the onboarding store. Its strict param model
+/// (`OnboardingStateParams`) takes `assume_fresh` only — a `profile` is rejected with 4000.
+pub fn onboarding_state_call(assume_fresh: bool) -> Call {
+    let mut p = json!({});
+    if assume_fresh {
+        p["assume_fresh"] = json!(true);
+    }
+    call_of("onboarding.state", p)
+}
+
+/// Read whether the first-run chat should show. Read-only.
+pub async fn onboarding_state(client: &Client, assume_fresh: bool) -> Result<OnboardingState, ApiError> {
+    call_as(client, &onboarding_state_call(assume_fresh)).await
+}
+
+/// `onboarding.start` reply: the chat that was opened (or handed back).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct OnboardingStarted {
+    pub session_id: String,
+    pub stored_session_id: String,
+    /// True when an already-stored run was resumed instead of a new chat created.
+    pub resumed: bool,
+    pub run_id: String,
+}
+
+/// `onboarding.start`: open (or resume) the first-run chat. `fresh_launch` discards runs a
+/// killed app left behind; `rerun` starts over on the configured model. `facts_source` is
+/// `local` | `remote`. The handler submits the opening prompt through `prompt.submit`. Its
+/// strict param model takes no `profile` (the run is the default profile's).
+///
+/// **Spends model calls** — builder + unit test only.
+pub fn onboarding_start_call(
+    fresh_launch: bool,
+    rerun: bool,
+    assume_fresh: bool,
+    locale: &str,
+    facts_source: &str,
+) -> Call {
+    let mut p = json!({});
+    if fresh_launch {
+        p["fresh_launch"] = json!(true);
+    }
+    if rerun {
+        p["rerun"] = json!(true);
+    }
+    if assume_fresh {
+        p["assume_fresh"] = json!(true);
+    }
+    if !locale.is_empty() {
+        p["locale"] = json!(locale);
+    }
+    if !facts_source.is_empty() {
+        p["facts_source"] = json!(facts_source);
+    }
+    call_of("onboarding.start", p)
+}
+
+/// Start (or resume) the first-run chat. **Spends model calls.**
+pub async fn onboarding_start(
+    client: &Client,
+    fresh_launch: bool,
+    rerun: bool,
+    assume_fresh: bool,
+    locale: &str,
+    facts_source: &str,
+) -> Result<OnboardingStarted, ApiError> {
+    call_as(
+        client,
+        &onboarding_start_call(fresh_launch, rerun, assume_fresh, locale, facts_source),
+    )
+    .await
+}
+
+/// `onboarding.skip` reply.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct OnboardingSkipped {
+    /// True when the whole guided tour was skipped (`skipped_all`), not just one step.
+    pub skipped: bool,
+}
+
+/// `onboarding.skip`: advance the live run's onboarding step to `skipped` and cancel its setup
+/// card. Needs the run's live session and writes its stored record, so it is builder + unit
+/// test only.
+pub fn onboarding_skip_call(session_id: &str, profile: &str) -> Call {
+    call_of(
+        "onboarding.skip",
+        json!({ "profile": profile_param(profile), "session_id": session_id }),
+    )
+}
+
+/// Skip the live run's onboarding step. **Writes the run record.**
+pub async fn onboarding_skip(client: &Client, session_id: &str, profile: &str) -> Result<OnboardingSkipped, ApiError> {
+    call_as(client, &onboarding_skip_call(session_id, profile)).await
+}
+
 // ── Diagnostics & CLI ────────────────────────────────────────────────────────
 
 /// `diagnostics.share_nous`: upload result.
@@ -1655,6 +1932,45 @@ mod tests {
             wake_status_call(Some("desktop"), Some(true), "").params,
             json!({ "profile": null, "surface": "desktop", "client_capture": true })
         );
+        assert_eq!(
+            wake_start_call("gui", false, "", None, "").params,
+            json!({ "profile": null, "surface": "gui" })
+        );
+        assert_eq!(
+            wake_start_call("gui", true, "s1", Some(true), "swe").params,
+            json!({ "profile": "swe", "surface": "gui", "persist": true, "session_id": "s1",
+                    "client_capture": true })
+        );
+        assert_eq!(wake_stop_call(false, "").params, json!({ "profile": null }));
+        assert_eq!(
+            wake_stop_call(true, "swe").params,
+            json!({ "profile": "swe", "persist": true })
+        );
+        assert_eq!(wake_pause_call("").params, json!({ "profile": null }));
+        assert_eq!(wake_resume_call("swe").params, json!({ "profile": "swe" }));
+        assert_eq!(
+            wake_feed_call("AAA=", None, "").params,
+            json!({ "profile": null, "pcm": "AAA=" })
+        );
+        assert_eq!(
+            wake_feed_call("AAA=", Some(16000), "").params,
+            json!({ "profile": null, "pcm": "AAA=", "sample_rate": 16000 })
+        );
+
+        assert_eq!(onboarding_state_call(false).params, json!({}));
+        assert_eq!(onboarding_state_call(true).params, json!({ "assume_fresh": true }));
+        assert_eq!(
+            onboarding_start_call(true, false, false, "de", "local").params,
+            json!({ "fresh_launch": true, "locale": "de", "facts_source": "local" })
+        );
+        assert_eq!(
+            onboarding_start_call(false, true, true, "", "").params,
+            json!({ "rerun": true, "assume_fresh": true })
+        );
+        assert_eq!(
+            onboarding_skip_call("s1", "").params,
+            json!({ "profile": null, "session_id": "s1" })
+        );
 
         assert_eq!(diagnostics_share_nous_call(None, None, None).params, json!({}));
         let extra = BTreeMap::from([("app.log".to_string(), "hello".to_string())]);
@@ -1735,6 +2051,14 @@ mod tests {
             HandoffFailed,
             WakeInputDevice,
             WakeStatus,
+            WakeStart,
+            WakeStop,
+            WakePause,
+            WakeResume,
+            WakeFeed,
+            OnboardingState,
+            OnboardingStarted,
+            OnboardingSkipped,
             DiagnosticsShare,
             CliExec,
         );
@@ -2094,5 +2418,41 @@ mod tests {
         .unwrap();
         assert_eq!(ce.code, 0);
         assert!(!ce.blocked);
+
+        let ws: WakeStart = decode(json!({
+            "started": false, "reason": "unavailable", "hint": "no input device",
+            "capture": "client", "phrase": "hey hermes", "provider": "openwakeword",
+            "owner_surface": "gui", "enabled_persisted": false,
+            "sample_rate": 16000, "frame_length": 1280
+        }))
+        .unwrap();
+        assert_eq!(ws.reason.as_deref(), Some("unavailable"));
+        assert_eq!(ws.capture.as_deref(), Some("client"));
+        let wstop: WakeStop = decode(json!({
+            "stopped": true, "reason": null, "disabled_persisted": false
+        }))
+        .unwrap();
+        assert!(wstop.stopped);
+        let wpause: WakePause = decode(json!({"paused": false, "reason": "not_owner"})).unwrap();
+        assert_eq!(wpause.reason.as_deref(), Some("not_owner"));
+        let wresume: WakeResume = decode(json!({"resumed": true, "reason": null})).unwrap();
+        assert!(wresume.resumed);
+        let wfeed: WakeFeed = decode(json!({"fed": false, "reason": "empty"})).unwrap();
+        assert_eq!(wfeed.reason.as_deref(), Some("empty"));
+
+        let os: OnboardingState = decode(json!({
+            "run": true, "eligible": true, "session_id": "s1", "run_id": "r1"
+        }))
+        .unwrap();
+        assert!(os.run && os.eligible);
+        assert_eq!(os.session_id.as_deref(), Some("s1"));
+        let ostarted: OnboardingStarted = decode(json!({
+            "session_id": "s1", "stored_session_id": "st1", "resumed": false, "run_id": "r1"
+        }))
+        .unwrap();
+        assert_eq!(ostarted.stored_session_id, "st1");
+        assert!(!ostarted.resumed);
+        let oskip: OnboardingSkipped = decode(json!({"skipped": false})).unwrap();
+        assert!(!oskip.skipped);
     }
 }
