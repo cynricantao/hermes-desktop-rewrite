@@ -1600,11 +1600,56 @@ async fn settings_section(ui: &AppWindow, log: &Log) {
     sleep(200).await;
 }
 
+/// Rows of the open page whose control is missing from the accessibility tree or shows a
+/// different value there than the row model holds. Every row is instantiated (plain `for`
+/// in a ScrollView, no virtualisation), so an absent control means it was not built.
+/// Each control kind is matched on what it exposes: text inputs their value, toggles their
+/// checked state, selects their current label, segmented controls their selected tab.
+fn unrendered_controls(ui: &AppWindow, rows: &[hermes_ui::SettingRowUI]) -> Vec<String> {
+    let labelled = |label: &str| ElementHandle::find_by_accessible_label(ui, label).collect::<Vec<_>>();
+    let selected_label = |r: &hermes_ui::SettingRowUI| {
+        usize::try_from(r.selected)
+            .ok()
+            .and_then(|i| r.option_labels.row_data(i))
+            .map(|l| l.to_string())
+    };
+    rows.iter()
+        .filter(|r| {
+            let found = match r.kind.as_str() {
+                "text" | "mono" | "number" | "list" => labelled(&r.label)
+                    .iter()
+                    .any(|e| e.accessible_value().as_deref() == Some(r.value.as_str())),
+                "toggle" => labelled(&r.label)
+                    .iter()
+                    .any(|e| e.accessible_checked() == Some(r.value == "true")),
+                "select" if r.option_labels.row_count() > 0 => {
+                    let current = selected_label(r).unwrap_or_else(|| r.value.to_string());
+                    labelled(&r.label)
+                        .iter()
+                        .any(|e| e.accessible_value().as_deref() == Some(current.as_str()))
+                }
+                "select" => labelled(&r.label)
+                    .iter()
+                    .any(|e| e.accessible_value().as_deref() == Some(r.value.as_str())),
+                "segmented" => selected_label(r)
+                    .is_some_and(|l| labelled(&l).iter().any(|e| e.accessible_item_selected() == Some(true))),
+                "slider" => !labelled(&r.label).is_empty(),
+                // Secret, widget, action and info rows are outside these six pages.
+                _ => false,
+            };
+            !found
+        })
+        .map(|r| format!("{} ({})", r.id, r.kind))
+        .collect()
+}
+
 /// The plain registry pages (Workspace, Safety, Browser, Memory & Context, Voice, Advanced),
-/// against the default profile of the private backend. For every page: the panel shows
-/// exactly the registry rows visible for the loaded config, and each config row shows the
-/// backend's value. Then one row per group is edited through the panel, read back over REST
-/// (never the UI's own model) and put back.
+/// against the default profile of the private backend. For every page, with the panel open
+/// and no search query: the page model holds exactly the registry rows visible for the
+/// loaded config, each config row holds the backend's value, and each row's control is in
+/// the accessibility tree showing that value. Then one row per group is edited through the
+/// panel, read back over REST (never the UI's own model), and put back, and the put-back is
+/// confirmed over REST too. A row with no restorable baseline is never written.
 async fn settings_pages_section(ui: &AppWindow, log: &Log) {
     use hermes_core::settings::{self, Store};
 
@@ -1615,8 +1660,17 @@ async fn settings_pages_section(ui: &AppWindow, log: &Log) {
     };
     if !s.get_open() {
         chord(ui, &[Key::Control], ",");
-        let _ = wait_until(20, || s.get_open()).await;
     }
+    if !wait_until(20, || s.get_open()).await {
+        return record(
+            log,
+            "settings pages: Ctrl+, opens the panel",
+            false,
+            "panel stayed closed",
+        );
+    }
+    // A leftover query shows search hits instead of the page.
+    s.invoke_search("".into());
     s.invoke_scope("default".into());
     sleep(600).await;
     let config = match probe.get("/api/config") {
@@ -1632,10 +1686,15 @@ async fn settings_pages_section(ui: &AppWindow, log: &Log) {
                 .collect();
             s.invoke_goto(group.into(), page.id.into());
             let shown = wait_until(10, || {
-                s.get_page().as_str() == page.id && settings_rows(ui).len() == expected.len()
+                s.get_open()
+                    && s.get_query().is_empty()
+                    && s.get_group().as_str() == group
+                    && s.get_page().as_str() == page.id
+                    && settings_rows(ui).len() == expected.len()
             })
             .await;
             let rows = settings_rows(ui);
+            let unrendered = unrendered_controls(ui, &rows);
             let ids: Vec<String> = rows.iter().map(|r| r.id.to_string()).collect();
             let want_ids: Vec<&str> = expected.iter().map(|r| r.id).collect();
             let mismatched: Vec<String> = expected
@@ -1650,9 +1709,10 @@ async fn settings_pages_section(ui: &AppWindow, log: &Log) {
             record(
                 log,
                 &format!("settings pages: {group} › {} renders its registry rows", page.id),
-                shown && ids == want_ids && mismatched.is_empty(),
+                shown && ids == want_ids && mismatched.is_empty() && unrendered.is_empty(),
                 format!(
-                    "{} rows {ids:?} (expected {}); value mismatches {mismatched:?}",
+                    "{} rows {ids:?} (expected {}); value mismatches {mismatched:?}; \
+                     controls missing from the accessibility tree {unrendered:?}",
                     ids.len(),
                     want_ids.len()
                 ),
@@ -1678,26 +1738,45 @@ async fn settings_pages_section(ui: &AppWindow, log: &Log) {
     ];
     for (group, page, key, a, b) in writes {
         s.invoke_goto(group.into(), page.into());
+        let name = format!("settings pages: {group} › {page} saves {key} (REST read-back)");
+        let backend_value = || {
+            probe
+                .get("/api/config")
+                .ok()
+                .and_then(|c| settings::get(&c, key).map(settings::value_to_string))
+        };
         let _ = wait_until(10, || row_value(ui, key).is_some()).await;
         let before = row_value(ui, key).unwrap_or_default();
+        // An absent key cannot be put back through the panel (it would leave a value
+        // behind), so the row is not written at all.
+        if before.is_empty() || backend_value().as_deref() != Some(before.as_str()) {
+            record(
+                log,
+                &name,
+                false,
+                format!(
+                    "no restorable baseline: panel {before:?}, backend {:?}; not written",
+                    backend_value()
+                ),
+            );
+            continue;
+        }
         let new = if before == a { b } else { a };
         s.invoke_edit(key.into(), new.into());
         let shown = wait_until(10, || row_value(ui, key).as_deref() == Some(new)).await;
         sleep(300).await;
-        let stored = probe
-            .get("/api/config")
-            .ok()
-            .and_then(|c| settings::get(&c, key).map(settings::value_to_string));
-        let mut restored = before.is_empty();
-        if !before.is_empty() {
-            s.invoke_edit(key.into(), before.clone().into());
-            restored = wait_until(10, || row_value(ui, key).as_deref() == Some(before.as_str())).await;
-        }
+        let stored = backend_value();
+        s.invoke_edit(key.into(), before.clone().into());
+        let _ = wait_until(10, || row_value(ui, key).as_deref() == Some(before.as_str())).await;
+        sleep(300).await;
+        let restored = backend_value();
         record(
             log,
-            &format!("settings pages: {group} › {page} saves {key} (REST read-back)"),
-            shown && stored.as_deref() == Some(new) && restored,
-            format!("{before:?} → {new:?}: panel={shown}, backend config={stored:?}, put back={restored}"),
+            &name,
+            shown && stored.as_deref() == Some(new) && restored.as_deref() == Some(before.as_str()),
+            format!(
+                "{before:?} → {new:?}: panel={shown}, backend config={stored:?}, backend after put-back={restored:?}"
+            ),
         );
     }
 
