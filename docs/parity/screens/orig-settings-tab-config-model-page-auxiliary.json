@@ -1,0 +1,1116 @@
+{
+ "hash": "#/settings?tab=config:model&page=auxiliary",
+ "title": "Hermes",
+ "w": 1440,
+ "h": 900,
+ "texts": [
+  "Sessions",
+  "Bots",
+  "New session",
+  "Ctrl",
+  "N",
+  "Capabilities",
+  "Messaging",
+  "Artifacts",
+  "Scheduled jobs",
+  "No sessions yet",
+  "New project",
+  "Backend",
+  "ready",
+  "Smart",
+  "Model",
+  "Main model",
+  "Fallback models",
+  "Auxiliary models",
+  "Mixture of Agents",
+  "Chat",
+  "Appearance",
+  "Workspace",
+  "Safety",
+  "Browser",
+  "Passwords & Logins",
+  "Memory & Context",
+  "Voice",
+  "Advanced",
+  "Notifications",
+  "Billing",
+  "Providers",
+  "Gateways",
+  "Keyboard Shortcuts",
+  "Tools & Keys",
+  "Plugins",
+  "About",
+  "Settings",
+  "Reset all to main",
+  "Helper tasks run on the main model by default. Assign a dedicated model to any task to override.",
+  "Vision",
+  "Image analysis",
+  "auto · use main model",
+  "Set to main",
+  "Change",
+  "Compression",
+  "Context compaction",
+  "Skills hub",
+  "Skill search",
+  "Approval",
+  "Smart auto-approve",
+  "MCP",
+  "MCP tool routing",
+  "Title gen",
+  "Session titles",
+  "Review",
+  "/review reviewer subagent",
+  "Voice chat",
+  "Spoken voice-mode replies",
+  "·",
+  "Reasoning Off",
+  "Triage specifier",
+  "Kanban spec fleshing",
+  "Kanban decomposer",
+  "Task decomposition",
+  "Profile describer",
+  "Auto profile descriptions",
+  "Curator",
+  "Skill-usage review",
+  "Search",
+  "K"
+ ],
+ "controls": [
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "SESSIONS",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    0,
+    34,
+    74,
+    28
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "BOTS",
+   "slot": "pane-tab",
+   "box": [
+    74,
+    34,
+    48,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New session Ctrl N",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    68,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Capabilities",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    97,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Messaging",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    126,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Artifacts",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    155,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Scheduled jobs",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    184,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New project",
+   "slot": "button",
+   "box": [
+    79,
+    550,
+    101,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "default",
+   "type": "button",
+   "state": "pressed",
+   "box": [
+    12,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New profile",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    154,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Import profile…",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    176,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage profiles…",
+   "type": "button",
+   "box": [
+    198,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage gateways…",
+   "type": "button",
+   "box": [
+    224,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "NEW SESSION",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    260,
+    0,
+    107,
+    34
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Close",
+   "type": "button",
+   "box": [
+    343,
+    0,
+    24,
+    34
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New session tab",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    367,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    4,
+    880,
+    28,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Backend ready",
+   "type": "button",
+   "slot": "dropdown-menu-trigger",
+   "box": [
+    34,
+    880,
+    102,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Smart",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1377,
+    880,
+    59,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Close settings",
+   "slot": "button",
+   "box": [
+    1355,
+    57,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Model",
+   "type": "button",
+   "box": [
+    59,
+    59,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Collapse: Model",
+   "type": "button",
+   "slot": "button",
+   "state": "expanded",
+   "box": [
+    221,
+    61,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Main model",
+   "type": "button",
+   "box": [
+    79,
+    89,
+    168,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Fallback models",
+   "type": "button",
+   "box": [
+    79,
+    119,
+    168,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Auxiliary models",
+   "type": "button",
+   "box": [
+    79,
+    149,
+    168,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Mixture of Agents",
+   "type": "button",
+   "box": [
+    79,
+    179,
+    168,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Chat",
+   "type": "button",
+   "box": [
+    59,
+    209,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Chat",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    211,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Appearance",
+   "type": "button",
+   "box": [
+    59,
+    239,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Appearance",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    241,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Workspace",
+   "type": "button",
+   "box": [
+    59,
+    269,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Workspace",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    271,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Safety",
+   "type": "button",
+   "box": [
+    59,
+    299,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Safety",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    301,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Browser",
+   "type": "button",
+   "box": [
+    59,
+    329,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Browser",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    331,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Passwords & Logins",
+   "type": "button",
+   "box": [
+    59,
+    359,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Passwords & Logins",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    361,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Memory & Context",
+   "type": "button",
+   "box": [
+    59,
+    389,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Memory & Context",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    391,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Voice",
+   "type": "button",
+   "box": [
+    59,
+    419,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Voice",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    421,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Advanced",
+   "type": "button",
+   "box": [
+    59,
+    449,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Advanced",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    451,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Notifications",
+   "type": "button",
+   "box": [
+    59,
+    479,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Notifications",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    481,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Billing",
+   "type": "button",
+   "box": [
+    59,
+    509,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Billing",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    511,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Providers",
+   "type": "button",
+   "box": [
+    59,
+    549,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Providers",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    551,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Gateways",
+   "type": "button",
+   "box": [
+    59,
+    579,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Gateways",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    581,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Keyboard Shortcuts",
+   "type": "button",
+   "box": [
+    59,
+    609,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Keyboard Shortcuts",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    611,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Tools & Keys",
+   "type": "button",
+   "box": [
+    59,
+    639,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Tools & Keys",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    641,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Sessions",
+   "type": "button",
+   "box": [
+    59,
+    669,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Sessions",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    671,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Plugins",
+   "type": "button",
+   "box": [
+    59,
+    709,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "About",
+   "type": "button",
+   "box": [
+    59,
+    749,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: About",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    751,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    59,
+    815,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    87,
+    815,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    115,
+    815,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Model",
+   "slot": "button",
+   "box": [
+    382,
+    71,
+    33,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Reset all to main",
+   "slot": "button",
+   "box": [
+    1230,
+    99,
+    95,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    177,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    177,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    246,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    246,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    315,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    315,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    383,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    383,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    452,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    452,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    520,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    520,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    589,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    589,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    658,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    658,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    726,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    726,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    795,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    795,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    863,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    863,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Set to main",
+   "slot": "button",
+   "box": [
+    1195,
+    932,
+    81,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Change",
+   "slot": "button",
+   "box": [
+    1281,
+    932,
+    44,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Search Ctrl K",
+   "type": "button",
+   "box": [
+    654,
+    36,
+    132,
+    24
+   ]
+  }
+ ]
+}

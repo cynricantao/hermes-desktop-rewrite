@@ -1,0 +1,1745 @@
+{
+ "hash": "#/settings?tab=keys",
+ "title": "Hermes",
+ "w": 1440,
+ "h": 900,
+ "texts": [
+  "Sessions",
+  "Bots",
+  "New session",
+  "Ctrl",
+  "N",
+  "Capabilities",
+  "Messaging",
+  "Artifacts",
+  "Scheduled jobs",
+  "No sessions yet",
+  "New project",
+  "Backend",
+  "ready",
+  "Smart",
+  "Model",
+  "Chat",
+  "Appearance",
+  "Workspace",
+  "Safety",
+  "Browser",
+  "Passwords & Logins",
+  "Memory & Context",
+  "Voice",
+  "Advanced",
+  "Notifications",
+  "Billing",
+  "Providers",
+  "Gateways",
+  "Keyboard Shortcuts",
+  "Tools & Keys",
+  "Tools",
+  "Settings",
+  "Plugins",
+  "About",
+  "AGENT BROWSER ENGINE",
+  "BRAVE SEARCH",
+  "BROWSER USE",
+  "BROWSERBASE",
+  "BROWSERBASE PROJECT ID",
+  "BRV",
+  "CAMOFOX",
+  "CAMOFOX URL",
+  "CONNECTOR GATEWAY URL",
+  "ELEVENLABS",
+  "EXA",
+  "FAL",
+  "FIRECRAWL",
+  "FIRECRAWL API URL",
+  "FIRECRAWL BROWSER TTL",
+  "FIRECRAWL GATEWAY URL",
+  "GITHUB",
+  "HINDSIGHT",
+  "HINDSIGHT API URL",
+  "HONCHO",
+  "HONCHO BASE URL",
+  "KEENABLE",
+  "KREA",
+  "MEM0",
+  "MISTRAL",
+  "OPENVIKING",
+  "OPENVIKING ENDPOINT",
+  "PARALLEL",
+  "PERPLEXITY",
+  "PORCUPINE ACCESS",
+  "RETAINDB",
+  "RETAINDB BASE URL",
+  "SEARXNG URL",
+  "SUPERMEMORY",
+  "TAVILY",
+  "TOOL GATEWAY DOMAIN",
+  "TOOL GATEWAY SCHEME",
+  "TOOL GATEWAY URL",
+  "TOOL GATEWAY USER",
+  "VOICE TOOLS OPENAI",
+  "Search",
+  "K"
+ ],
+ "controls": [
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "SESSIONS",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    0,
+    34,
+    74,
+    28
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "BOTS",
+   "slot": "pane-tab",
+   "box": [
+    74,
+    34,
+    48,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New session Ctrl N",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    68,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Capabilities",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    97,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Messaging",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    126,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Artifacts",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    155,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Scheduled jobs",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    184,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New project",
+   "slot": "button",
+   "box": [
+    79,
+    550,
+    101,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "default",
+   "type": "button",
+   "state": "pressed",
+   "box": [
+    12,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New profile",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    154,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Import profile…",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    176,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage profiles…",
+   "type": "button",
+   "box": [
+    198,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage gateways…",
+   "type": "button",
+   "box": [
+    224,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "NEW SESSION",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    260,
+    0,
+    107,
+    34
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Close",
+   "type": "button",
+   "box": [
+    343,
+    0,
+    24,
+    34
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New session tab",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    367,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    4,
+    880,
+    28,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Backend ready",
+   "type": "button",
+   "slot": "dropdown-menu-trigger",
+   "box": [
+    34,
+    880,
+    102,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Smart",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1377,
+    880,
+    59,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Close settings",
+   "slot": "button",
+   "box": [
+    1355,
+    57,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Model",
+   "type": "button",
+   "box": [
+    59,
+    59,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Model",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    61,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Chat",
+   "type": "button",
+   "box": [
+    59,
+    89,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Chat",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    91,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Appearance",
+   "type": "button",
+   "box": [
+    59,
+    119,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Appearance",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    121,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Workspace",
+   "type": "button",
+   "box": [
+    59,
+    149,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Workspace",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    151,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Safety",
+   "type": "button",
+   "box": [
+    59,
+    179,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Safety",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    181,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Browser",
+   "type": "button",
+   "box": [
+    59,
+    209,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Browser",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    211,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Passwords & Logins",
+   "type": "button",
+   "box": [
+    59,
+    239,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Passwords & Logins",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    241,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Memory & Context",
+   "type": "button",
+   "box": [
+    59,
+    269,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Memory & Context",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    271,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Voice",
+   "type": "button",
+   "box": [
+    59,
+    299,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Voice",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    301,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Advanced",
+   "type": "button",
+   "box": [
+    59,
+    329,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Advanced",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    331,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Notifications",
+   "type": "button",
+   "box": [
+    59,
+    359,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Notifications",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    361,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Billing",
+   "type": "button",
+   "box": [
+    59,
+    389,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Billing",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    391,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Providers",
+   "type": "button",
+   "box": [
+    59,
+    429,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Providers",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    431,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Gateways",
+   "type": "button",
+   "box": [
+    59,
+    459,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Gateways",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    461,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Keyboard Shortcuts",
+   "type": "button",
+   "box": [
+    59,
+    489,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Keyboard Shortcuts",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    491,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Tools & Keys",
+   "type": "button",
+   "box": [
+    59,
+    519,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Collapse: Tools & Keys",
+   "type": "button",
+   "slot": "button",
+   "state": "expanded",
+   "box": [
+    221,
+    521,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Tools",
+   "type": "button",
+   "box": [
+    79,
+    549,
+    168,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Settings",
+   "type": "button",
+   "box": [
+    79,
+    579,
+    168,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Sessions",
+   "type": "button",
+   "box": [
+    59,
+    609,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Sessions",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    611,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Plugins",
+   "type": "button",
+   "box": [
+    59,
+    649,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "About",
+   "type": "button",
+   "box": [
+    59,
+    689,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: About",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    691,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    59,
+    815,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    87,
+    815,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    115,
+    815,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Tools & Keys",
+   "slot": "button",
+   "box": [
+    382,
+    71,
+    69,
+    16
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "AGENT BROWSER ENGINE",
+   "box": [
+    315,
+    99,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Optional",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    111,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "BRAVE SEARCH",
+   "box": [
+    315,
+    163,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste BRAVE SEARCH key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    175,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "BROWSER USE",
+   "box": [
+    315,
+    227,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste BROWSER USE key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    239,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "BROWSERBASE",
+   "box": [
+    315,
+    291,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste BROWSERBASE key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    303,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "BROWSERBASE PROJECT ID",
+   "box": [
+    315,
+    355,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Optional",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    367,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "BRV",
+   "box": [
+    315,
+    419,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste BRV key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    431,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "CAMOFOX",
+   "box": [
+    315,
+    483,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste CAMOFOX key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    495,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "CAMOFOX URL",
+   "box": [
+    315,
+    547,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "https://…",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    559,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "CONNECTOR GATEWAY URL",
+   "box": [
+    315,
+    611,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "https://…",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    623,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "ELEVENLABS",
+   "box": [
+    315,
+    675,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste ELEVENLABS key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    687,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "EXA",
+   "box": [
+    315,
+    739,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste EXA key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    751,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "FAL",
+   "box": [
+    315,
+    803,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste FAL key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    815,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "FIRECRAWL",
+   "box": [
+    315,
+    867,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste FIRECRAWL key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    879,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "FIRECRAWL API URL",
+   "box": [
+    315,
+    931,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "https://…",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    943,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "FIRECRAWL BROWSER TTL",
+   "box": [
+    315,
+    995,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Optional",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    1007,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "FIRECRAWL GATEWAY URL",
+   "box": [
+    315,
+    1059,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "https://…",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    1071,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "GITHUB",
+   "box": [
+    315,
+    1123,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste GITHUB key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    1135,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "HINDSIGHT",
+   "box": [
+    315,
+    1187,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste HINDSIGHT key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    1199,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "HINDSIGHT API URL",
+   "box": [
+    315,
+    1251,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "https://…",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    1263,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "HONCHO",
+   "box": [
+    315,
+    1315,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste HONCHO key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    1327,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "HONCHO BASE URL",
+   "box": [
+    315,
+    1379,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "https://…",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    1391,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "KEENABLE",
+   "box": [
+    315,
+    1443,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste KEENABLE key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    1455,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "KREA",
+   "box": [
+    315,
+    1507,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste KREA key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    1519,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "MEM0",
+   "box": [
+    315,
+    1571,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste MEM0 key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    1583,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "MISTRAL",
+   "box": [
+    315,
+    1635,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste MISTRAL key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    1647,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "OPENVIKING",
+   "box": [
+    315,
+    1699,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste OPENVIKING key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    1711,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "OPENVIKING ENDPOINT",
+   "box": [
+    315,
+    1763,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Optional",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    1775,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "PARALLEL",
+   "box": [
+    315,
+    1827,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste PARALLEL key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    1839,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "PERPLEXITY",
+   "box": [
+    315,
+    1891,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste PERPLEXITY key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    1903,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "PORCUPINE ACCESS",
+   "box": [
+    315,
+    1955,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste PORCUPINE ACCESS key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    1967,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "RETAINDB",
+   "box": [
+    315,
+    2019,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste RETAINDB key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    2031,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "RETAINDB BASE URL",
+   "box": [
+    315,
+    2083,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "https://…",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    2095,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "SEARXNG URL",
+   "box": [
+    315,
+    2147,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "https://…",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    2159,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "SUPERMEMORY",
+   "box": [
+    315,
+    2211,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste SUPERMEMORY key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    2223,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "TAVILY",
+   "box": [
+    315,
+    2275,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste TAVILY key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    2287,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "TOOL GATEWAY DOMAIN",
+   "box": [
+    315,
+    2339,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Optional",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    2351,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "TOOL GATEWAY SCHEME",
+   "box": [
+    315,
+    2403,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Optional",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    2415,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "TOOL GATEWAY URL",
+   "box": [
+    315,
+    2467,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "https://…",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    961,
+    2479,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "TOOL GATEWAY USER",
+   "box": [
+    315,
+    2531,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste TOOL GATEWAY USER key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    2543,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "button",
+   "text": "VOICE TOOLS OPENAI",
+   "box": [
+    315,
+    2595,
+    1011,
+    56
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste VOICE TOOLS OPENAI key",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    961,
+    2607,
+    344,
+    32
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Search Ctrl K",
+   "type": "button",
+   "box": [
+    654,
+    36,
+    132,
+    24
+   ]
+  }
+ ]
+}

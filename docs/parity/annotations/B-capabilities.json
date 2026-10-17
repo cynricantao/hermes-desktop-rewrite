@@ -1,0 +1,1600 @@
+{
+ "MODL-001": {
+  "behavior": "Settings → Model → Main model: pick 'Provider' + 'Model', click Apply → POST /api/model/set; toast 'Main model updated' with 'New sessions will use <model>.' Note under it: 'Applies to new sessions. Use the model picker in the composer to hot-swap the active chat.' Load error: 'Could not load models' + Retry.",
+  "states": "loading ('Loading model configuration...'), Apply enabled/disabled until provider+model chosen, applying ('Applying...'), error toast 'Failed to save model defaults', stale-backend banner 'This backend is running old code after an update. Restart it to load the new code.'",
+  "test": "In the Rust app open Settings → Model → Main model, pick a provider/model, Apply, and confirm the private test backend reports the new model (and the next session uses it).",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:481-486 (group 'model' page 'main', keys model/provider/default/reasoning)",
+  "unsure": "Whether the Rust settings page calls /api/model/set (a widget/action id) or only writes config model; exact request shape not traced."
+ },
+ "MODL-002": {
+  "behavior": "Settings → Model → Main model → 'Context length' override writes config key model_context_length (tokens, 0 = auto). Description: 'Overrides the detected context window of the MAIN chat model only (tokens). Leave at 0 to use the selected model's detected value.'",
+  "states": "default (0/auto), numeric value, autosave 'Settings failed to load'/'Autosave failed' error banner",
+  "test": "Set model_context_length to 4096 in the Rust settings UI, reopen the page and confirm the backend config shows 4096 (and 0 restores auto).",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:881-890 (cfg key model_context_length)",
+  "unsure": "Whether the Rust row is a Number control and its bounds; description text I quoted is from settings.rs, not the React file."
+ },
+ "MODL-003": {
+  "behavior": "Settings → Model → Auxiliary models: one row per task (Vision, Compression, Skills hub, Approval, MCP, Title gen, Review, Voice chat, plus triage_specifier/kanban_decomposer/profile_describer/curator), showing 'auto · use main model' until pinned. 'Change' opens provider/model/reasoning selects; 'Set to main' and 'Reset all to main' clear pins.",
+  "states": "loading, auto/inherited ('auto · use main model', 'inherits <task>'), editing, applying, error toast",
+  "test": "Pin Vision to a model via the private backend (/api/model/auxiliary), reopen the page and confirm the row shows the pinned model and 'Reset all to main' restores auto.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:489-503 (group 'model' page 'auxiliary'), settings.rs:1218 (auxiliary.compression.timeout)",
+  "unsure": "Exact REST verb/shape for /api/model/auxiliary and whether the Rust build renders one row per task or a single list."
+ },
+ "MODL-004": {
+  "behavior": "Settings → Model → Mixture of Agents: pick Preset, set 'Aggregator' ('acting model · billed for the run') and reference models; 'Add preset' creates a named preset that appears as a model under the MoA provider. Copy: 'References only advise once per user turn by default.'",
+  "states": "loading, preset selected, adding preset (placeholder 'new preset'), reference enabled/disabled ('Enable/Disable reference N'), saving, error",
+  "test": "Create a MoA preset named 'demo' with one reference in the Rust UI and confirm /api/model/moa returns it; delete it and confirm it is gone.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:506-510 (group 'model' page 'moa', keyword 'aggregator')",
+  "unsure": "Whether the Rust MoA page is a real editor or a read-only widget; exact REST paths for presets."
+ },
+ "MODL-005": {
+  "behavior": "Settings → Model → Fallback models: 'Add fallback' appends a {provider, model} row tried in order when the main model fails; empty state 'No fallback models — the default model is used unless it fails.' Writes top-level config fallback_providers; half-filled rows are not persisted.",
+  "states": "empty (copy above), one or more rows, row remove, incomplete-row kept locally, error 'Hermes did not save that model change.'",
+  "test": "Add one fallback pair in the Rust UI, confirm config.yaml fallback_providers contains exactly {provider, model} with no extra keys, then remove it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:890-900 (cfg key fallback_providers)",
+  "unsure": "Whether the Rust repo has a structured editor or a raw text/list control for fallback_providers."
+ },
+ "MODL-006": {
+  "behavior": "Per-provider recommended default is fetched from /api/model/recommended-default and pre-selects the Model field for that provider in the main-model picker; changing provider refreshes the highlighted default.",
+  "states": "loading, recommended model prefilled, provider without recommendation (blank Model)",
+  "test": "Select each provider in the Rust main-model page and check the default model matches what GET /api/model/recommended-default returns for the private backend.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust rewrite calls /api/model/recommended-default at all — no grep hit found; the file src/app/settings/model-settings.tsx was only skimmed for this row."
+ },
+ "MODL-007": {
+  "behavior": "Settings → Providers → Accounts: 'Connect an account' starts the provider OAuth flow in-app ('Hermes runs the browser sign-in for you, right here in the app.'); a connected provider shows 'Connected' + 'Disconnect'; Disconnect asks 'Remove <provider>?' and some providers run their removal in the terminal ('Disconnect (runs the removal command in the terminal)').",
+  "states": "loading ('Loading providers...'), not connected ('Connect an account'), connecting, connected, disconnect confirm dialog, removed toast 'Account removed' / '<provider> was removed.', failure 'Could not remove <provider>'",
+  "test": "Against the private backend start a provider OAuth connect, complete it in the browser, confirm the row flips to 'Connected', then Disconnect and confirm the row returns to 'Connect an account'.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2113-2118 (widget providers/accounts 'Accounts')",
+  "unsure": "Which provider accounts the private backend offers and whether the Rust widget is implemented beyond the nav entry."
+ },
+ "MODL-008": {
+  "behavior": "Settings → Providers → API keys (also Tools & Keys → Settings): lists env credentials per provider; 'Set'/'Replace' opens a key field with Reveal/Hide ('Reveal value' / 'Hide value') and Clear; empty state 'Nothing configured in this category yet.'; load error 'API keys failed to load'.",
+  "states": "loading ('Loading API keys and credentials...'), unset, set, revealed, saving ('Saving'), save error 'Could not save credential.'",
+  "test": "Set a dummy value for one provider key in the Rust UI against the private backend, reveal it, clear it, and confirm /api/env reflects each step.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2119-2124 (widget providers/keys 'API keys'), settings.rs:2148 (widget keys/tools)",
+  "unsure": "Whether 'Reveal' issues GET /api/env/reveal in the Rust build (no call site found)."
+ },
+ "MODL-009": {
+  "behavior": "Settings → Providers → Custom Endpoints: 'New endpoint' opens 'Add Endpoint' with fields Name, 'Provider ID', 'Endpoint URL', 'Default Model', 'Context', 'API Key' ('Leave blank to keep current key'), 'Use for new chats', 'Discover models'; 'Save'/'Test'; empty state 'No custom endpoints' / 'Add an OpenAI-compatible endpoint below.'",
+  "states": "empty, list with rows, 'Active' badge, 'API key set' badge, edit dialog, saving, 'Save failed', 'Could not load custom endpoints', delete confirm 'Delete <name>?'",
+  "test": "Add an endpoint pointing at a local stub in the Rust UI, save, Test it ('Endpoint is reachable.'), then delete it and confirm the empty state returns.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2125-2131 (widget providers/custom-endpoints 'Custom Endpoints')",
+  "unsure": "Whether the Rust build implements the endpoint editor or only the settings nav entry."
+ },
+ "MODL-010": {
+  "behavior": "Click 'Test' in a custom-endpoint dialog (or test a provider) → POST /api/providers/custom-endpoints/validate (or /api/providers/validate); success toast 'Endpoint is reachable.' / 'Endpoint is reachable (<transport> route served).' / 'Found N models.'; failure 'Endpoint validation failed.' and field toast 'Validation failed'.",
+  "states": "idle, testing (button busy), success toast, failure toast, unknown-provider/no-key error",
+  "test": "Point a custom endpoint at a dead port and press Test in the Rust app: expect the failure toast; point it at a live stub: expect 'Endpoint is reachable.'",
+  "rust_evidence": "",
+  "unsure": "No Rust call site for the validate endpoints found; whether the Rust UI has a Test button at all is unverified."
+ },
+ "MODL-011": {
+  "behavior": "Model menu/model picker rows can be starred: 'Add to favorites' (⇧ Click) and 'Remove from favorites'; a 'Favorites' group is pinned at the top of the model list. Stored locally (never on the backend).",
+  "states": "no favorites, favorite on (star filled), favorite off, group shown only when non-empty",
+  "test": "Shift-click a model in the Rust model picker to favorite it, relaunch, and confirm it still appears under 'Favorites'.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has no model picker yet (only a settings main-model page), so favorite models are unverifiable there."
+ },
+ "MODL-012": {
+  "behavior": "Model visibility overlay ('Models'): search models, hide/show rows per provider, 'Add provider…', 'Add custom model', 'Remove custom model', 'Reset to defaults' which confirms 'Reset model visibility to defaults?' then clears all hide choices ('Custom models you added are kept and shown.').",
+  "states": "loading, provider with no auth ('No authenticated providers.'), filtered ('Search models'), custom model added, reset confirm dialog",
+  "test": "Hide one model in the Rust overlay, confirm it disappears from the picker, then Reset to defaults and confirm it returns.",
+  "rust_evidence": "",
+  "unsure": "No model-visibility surface found in the Rust repo; the overlay may not be implemented."
+ },
+ "MODL-013": {
+  "behavior": "Press ⌘⇧M (composer.modelPicker, default 'mod+shift+m') → the model picker opens on the composer under the pointer: 'Switch model', search 'Filter providers and models...', current model marked 'current:', 'No models found.' when filtering, 'Add provider' row; selecting applies the model to the session.",
+  "states": "closed, open, filtering, empty result ('No models found.'), loading ('Could not load models'), local downloads section ('Local'), no-auth ('No authenticated providers.')",
+  "test": "In the Rust app press the model-picker hotkey and confirm a dropdown opens with the private backend's model list and that Enter applies a model.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:124-132, 516 (Cmd::RefreshModels / Cmd::SelectModel) and crates/hermes-ui/ui/app-window.slint:50 (model-label)",
+  "unsure": "The Rust app has a model label + refresh, but no ⌘⇧M overlay keybind was found in app-window.slint."
+ },
+ "MODL-014": {
+  "behavior": "Per-model reasoning/fast/service-tier presets are remembered locally (key 'hermes.desktop.model-presets') and re-applied to a session whenever that model is selected, so switching models restores the levels you last used for each.",
+  "states": "no preset stored for a model, preset stored, re-applied on model select",
+  "test": "Set reasoning effort on model A, switch to B, back to A, and confirm A's stored effort is re-applied in the Rust app.",
+  "rust_evidence": "",
+  "unsure": "No per-model preset store found in the Rust repo; the Rust app's reasoning/server-tier features are unverified."
+ },
+ "MODL-015": {
+  "behavior": "Model price display is off by default; when enabled the picker shows per-model 'Input/Output price per million tokens' and a 'was' price for discounted models. Local-only preference (key hermes.desktop.model-pricing.v1).",
+  "states": "pricing off (default), pricing on with per-row price, price missing for a model",
+  "test": "Toggle pricing on in the Rust model picker and confirm prices appear on rows that the private backend reports prices for.",
+  "rust_evidence": "",
+  "unsure": "No pricing code in the Rust repo; whether the test backend even reports prices is unverified."
+ },
+ "MODL-016": {
+  "behavior": "Model picker → 'Add custom model…' opens a field ('Type a model id, e.g. openai/gpt-5'); the id is added to the local custom-model list and surfaced as an option. 'Remove custom model' deletes it. Custom models ride along with /api/model/options.",
+  "states": "dialog closed, typing, invalid/empty id (add disabled), added, removed",
+  "test": "Add custom model 'foo/bar' in the Rust picker, confirm it lists and can be selected, then remove it.",
+  "rust_evidence": "",
+  "unsure": "No custom-model store found in the Rust repo."
+ },
+ "MODL-017": {
+  "behavior": "Selecting a model inside a profile or the Bots editor can raise a guarded switch: dialog 'Model Selection Warning' with 'Confirm only if you accept this trade-off.' and 'Confirm'; declining shows 'Model change cancelled — you declined the data-training tier warning.'",
+  "states": "no warning, warning dialog, confirmed, declined, save failure 'Hermes did not save that model change.'",
+  "test": "Pick a data-training-tier model through profiles.configure against the private backend and confirm the warning appears, then decline and confirm the model is unchanged.",
+  "rust_evidence": "",
+  "unsure": "Which model tiers trigger the warning, and whether the Rust app has any equivalent confirmation."
+ },
+ "MODL-018": {
+  "behavior": "Titlebar model menu: search models, per-row 'Fast'/'free' badges, price tooltip 'Input <in>/Mtok · Output <out>/Mtok', 'Favorites', 'Edit models…', 'Refresh models', 'Use Settings default', and a 'Run locally · free, private' row with 'Set up'. Picking applies to the next message ('<model> applies from your next message' when deferred).",
+  "states": "closed, open, searching ('No models found'), usage-limited rows ('Limited', 'Limited until <time>', 'resets <time>'), sign-in needed ('Sign in again'), local-setup row",
+  "test": "Open the titlebar model menu in the Rust app, pick a model, and confirm the label updates and the next turn runs on it against the private backend.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:50 (model-label), crates/hermes-ui/src/controller.rs:1119 (refresh_model_label)",
+  "unsure": "The Rust app shows a model label but no titlebar menu panel was found; the 'Limited'/usage rows depend on backend support."
+ },
+ "MODL-019": {
+  "behavior": "The model catalog menu groups models by provider under 'Options', shows per-model 'Thinking'/'Fast'/'Ultrafast' and 'Effort' choices (Minimal…Ultra) with '<level> sends <level> on this route', and 'No options for this model' for models without options. Writes go to the session's model options; failures show 'Model option update failed' / 'Fast mode update failed'.",
+  "states": "no options ('No options for this model'), options open, level selected, update failed toast, disabled while applying",
+  "test": "Open the model catalog menu for a model with options in the Rust app, set Effort to High, and confirm the session reports that effort against the private backend.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:384 (Segmented options Normal/Thinking/Verbose)",
+  "unsure": "The Rust segmented control is a transcript-detail switch, not model options; the modelOptions menu itself was not found."
+ },
+ "MODL-020": {
+  "behavior": "RPC model.disconnect removes a model/provider binding for the session/account; UI clears the model label and returns to the picker default, surfacing an error toast if the backend refuses.",
+  "states": "idle, disconnecting, disconnected (label back to default/none), error",
+  "test": "Call model.disconnect against the private test backend from the Rust app and confirm the model label falls back and the backend no longer reports the binding.",
+  "rust_evidence": "",
+  "unsure": "Where src/hermes.ts exposes model.disconnect and what payload it takes was not read; behavior is inferred from the row's surface only."
+ },
+ "MODL-021": {
+  "behavior": "While a model switch is in flight the session shows a waiting line ('provider wait') in place of the model label; it clears when the switch resolves and is scoped per session id.",
+  "states": "no wait, waiting text shown per session, cleared on resolve",
+  "test": "Trigger a slow model switch against the private backend and confirm the Rust chat shows a waiting indicator until the new model answers.",
+  "rust_evidence": "",
+  "unsure": "No provider-wait equivalent in the Rust repo; the exact waiting string is set by other code, not the store."
+ },
+ "MODL-022": {
+  "behavior": "Switching models mid-turn runs a guarded handshake: the gateway may answer confirm_required with a confirm_message, in which case the app shows a confirm dialog and only resends with confirm_expensive_model: true when accepted; declining leaves the model unchanged.",
+  "states": "plain switch, confirm dialog for expensive model, declined, deferred (applies from next message), failure toast",
+  "test": "Switch to an expensive model mid-turn against the private backend and confirm the warning dialog appears; decline and verify the model did not change.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust app performs config.set model at all mid-session (it does send model on session.create) and thus whether the guard is reachable."
+ },
+ "MODL-023": {
+  "behavior": "Settings → Providers → Local Models (feature-gated): 'Local runtime' section shows hardware ('This machine', '<label> GPU memory', '<label> RAM'), 'Models' with 'Recommended', 'Download · <size>', 'Downloaded', 'Use'/'Default'; runtime offers 'Install runtime' when missing. Copy: 'Models you download run entirely on this machine — no account, nothing leaves your computer.'",
+  "states": "feature flag off (no surface), hardware check ('Checking your hardware…'), runtime missing, installing ('Installing runtime…'), installed ('Ready · <backend>'), download running/paused, active model ('Default', 'In memory'), failure toasts",
+  "test": "With the private backend, open Local Models in the Rust app and confirm the hardware card and model list render from /api/local-models/*; downloading a real model is out of scope for CI.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2133-2137 (widget providers/local-models 'Local Models')",
+  "unsure": "Whether the Rust flag gate exists (no local-models feature flag found) — downloading huge models is also impractical to test."
+ },
+ "MODL-024": {
+  "behavior": "'Run a model on this machine' quickstart card: 'Set up for me' runs the one-click path (engine → model → default) with stages 'Engine', 'Model', 'Finish'; 'Let me choose' opens the model list. Done toast: '<model> is set up — new chats run on this machine.'",
+  "states": "runtime+model missing, setup running per stage ('Starting…'), success toast, failure 'Local model setup failed', already-ready variant copy",
+  "test": "Run the quickstart against a private backend where the runtime is already installed and confirm the stages advance and the default model flips.",
+  "rust_evidence": "",
+  "unsure": "Quickstart requires a real llama.cpp install/download; the Rust repo has no equals, so only the REST contract is checkable."
+ },
+ "MODL-025": {
+  "behavior": "'Install the local runtime' card → 'Install runtime' POSTs /api/local-models/runtime/install ('Installing runtime…'), then reports 'llama.cpp runtime installed' / 'Build <tag>, <backend> backend.' with 'Update engine' when a newer build exists ('Engine update available').",
+  "states": "not installed, installing, installed up-to-date ('Engine up to date'), update available, 'Runtime install failed'",
+  "test": "Against the private backend, trigger the runtime install endpoint from the Rust app and confirm the card flips to installed (a real few-hundred-MB download may be stubbed).",
+  "rust_evidence": "",
+  "unsure": "Unverifiable without a real runtime download; no Rust code for it."
+ },
+ "MODL-026": {
+  "behavior": "Downloading a model shows progress '<done> of <total>', speed, '~<eta> left', and 'Pause'/'Resume' buttons wired to /api/local-models/download and the job endpoints; 'Paused' is shown while suspended; done toast '<model> is ready.'",
+  "states": "queued, downloading, paused ('Paused'), resuming, complete ('Downloaded' + toast), failed ('Download of <model> failed', 'Couldn't pause/resume the download of <model>')",
+  "test": "Start and pause a small model download against the private backend and confirm the progress row and paused state round-trip through the job API.",
+  "rust_evidence": "",
+  "unsure": "Requires a real network download; the Rust repo has no download UI."
+ },
+ "MODL-027": {
+  "behavior": "'Use' on a downloaded model POSTs /api/local-models/activate and marks it 'Default' ('New chats use this model — it loads when you send your first message'); 'eject' frees GPU memory ('Model unloaded — GPU memory freed.'). 'Turn off'/'Turn on' stops/starts the local server.",
+  "states": "inactive, activating ('Starting…'), active ('Default', 'Loads on your first message'), loaded ('In memory'), ejected, server stopped/running, failure toasts",
+  "test": "Activate a downloaded model against the private backend and confirm 'Default' moves and /api/local-models reports it active; then eject.",
+  "rust_evidence": "",
+  "unsure": "Needs a real local model present; not testable in the current Rust build."
+ },
+ "MODL-028": {
+  "behavior": "'Find more models' browses Hugging Face: 'Search models by name or author…' → results with 'downloads'/'likes', 'requires Hugging Face sign-in' badge, 'Download {name}' rows and 'Add model file' for a local GGUF sideload ('Choose a GGUF model file'). Copy warns models are 'sized to your machine automatically, but not tested by us.'",
+  "states": "idle hint, searching ('Searching Hugging Face'), empty ('No compatible model files found.'), gated result, downloading, sideload dialog, 'Already downloaded.'",
+  "test": "Search a known repo name against the private backend and confirm the file list renders; sideload a local GGUF path and confirm it is added to the library.",
+  "rust_evidence": "",
+  "unsure": "The Rust repo has no browse UI; requires live Hugging Face access, so only a stubbed backend check is realistic."
+ },
+ "MODL-029": {
+  "behavior": "A feature flag gates every local-models surface: on by default on macOS/Windows/Linux x64+arm64, otherwise the app must be launched with --local; without the flag no local-models UI is shown even when local models are configured.",
+  "states": "flag on (surfaces visible), flag off / unsupported platform (no surface), launched with --local (forced on)",
+  "test": "Launch the Rust app without the flag equivalent and confirm no Local Models entry exists; then with it and confirm the entry appears.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has a Local Models settings nav entry with no gate, so either always-on or the gate is missing — could not confirm which is intended."
+ },
+ "MODL-030": {
+  "behavior": "Settings → Advanced → Agent limits / Tool access: 'Service Tier' select (Normal/Fast/Auto/Cold), 'Max Turns' (agent.max_turns) and 'API Max Retries' (agent.api_max_retries) numeric fields autosave to config; invalid values keep the previous setting.",
+  "states": "default values, edited and saved, autosave failure banner 'Autosave failed', page load failure 'Settings failed to load'",
+  "test": "Edit service tier to Fast and max turns to 12 in the Rust settings UI and confirm the private backend config reflects both keys.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1798-1822 (cfg agent.max_turns, agent.api_max_retries, agent.service_tier)",
+  "unsure": "Whether the React 'agent.*' labels match settings.rs labels exactly (settings.rs may relabel them)."
+ },
+ "PROF-001": {
+  "behavior": "Open Profiles ('Profiles', count '<n> profiles') → list from profiles.list//api/profiles with search 'Search profiles...'; empty 'No profiles yet.'; selecting shows detail, else 'Select a profile to view its details.'; header actions 'New profile', 'Import profile…', 'Export profile…', 'Refresh profiles'.",
+  "states": "loading ('Loading profiles...'), empty, list, selected detail, search no-match, error 'Failed to load profiles', refreshing",
+  "test": "Open Profiles in the Rust app against the private backend and confirm every profile the backend reports is listed with its skill count and model.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:130-138 + controller.rs:1263-1280 (build_scopes/parse_profiles read the profile list for the settings 'Applies to' pills)",
+  "unsure": "There is no Profiles page in the Rust repo — only the settings scope pills; the page itself is unbuilt."
+ },
+ "PROF-002": {
+  "behavior": "Click 'New profile' → dialog 'Create profile' with 'Name' (hint 'Lowercase letters, digits, hyphens, and underscores. Must start with a letter or digit.'), 'Clone from' ('None (blank)', 'Clone from default'), and 'Create profile'; invalid input shows 'Invalid name. <hint>' or 'Name is required.'; success toast 'Profile created'.",
+  "states": "dialog closed, typing, invalid name, name required, creating ('Creating...'), created, failure 'Failed to create profile'",
+  "test": "Create profile 'qa-test' in the Rust app and confirm the private backend's profiles list contains it with the cloned config.",
+  "rust_evidence": "",
+  "unsure": "No create-profile UI in the Rust repo; the exact REST payload (clone source field name) was not traced."
+ },
+ "PROF-003": {
+  "behavior": "Profile menu → 'Rename…' opens 'Rename profile' with 'New name'; copy warns renaming updates the profile directory and wrapper scripts. Confirm → PATCH /api/profiles/{name}; success 'Profile renamed', failure 'Failed to rename profile'.",
+  "states": "menu open, dialog open, invalid name, renaming ('Renaming...'), renamed, failed",
+  "test": "Rename a throwaway profile in the Rust app against the private backend and confirm the new name appears (and the old one is gone).",
+  "rust_evidence": "",
+  "unsure": "Whether the PATCH body is {name} or {new_name}; not traced in src/api/profiles.ts."
+ },
+ "PROF-004": {
+  "behavior": "Profile menu → delete opens 'Delete profile?' with 'This will delete <name> and remove its <dir> directory. This cannot be undone.' and a 'Deleting...' state; success toast 'Profile deleted', failure 'Failed to delete profile'.",
+  "states": "dialog open, deleting, deleted, failed, cancel",
+  "test": "Delete a throwaway profile in the Rust app and confirm it disappears from the backend's profiles list.",
+  "rust_evidence": "",
+  "unsure": "Only delete the test backend's own throwaway profile; real profiles must not be touched."
+ },
+ "PROF-005": {
+  "behavior": "RPC profiles.describe returns a profile's config used by the Bots editor; RPC profiles.configure writes it back (e.g. {name:'writer', disabled_skills:[...]}), applied to that profile only.",
+  "states": "loading, described, saved, error",
+  "test": "Call profiles.describe then profiles.configure for a throwaway profile against the private backend and confirm the changed field round-trips.",
+  "rust_evidence": "",
+  "unsure": "Source file src/plugins/hermes-bots/data.ts was not read in full; the exact configure payload shape beyond the disabled_skills example is unverified."
+ },
+ "PROF-006": {
+  "behavior": "Profile detail → 'Edit SOUL.md…' opens the persona editor: loads GET /api/profiles/{name}/soul ('Loading SOUL.md...'), empty shows 'Empty SOUL.md — start writing the persona...'; 'Save SOUL.md' PUTs it; success 'SOUL.md saved'; missing file shows 'No SOUL.md file exists for this profile yet.'",
+  "states": "loading, empty ('Empty SOUL.md — start writing the persona...'), dirty ('Unsaved changes'), saving ('Saving...'), saved, error 'Failed to load/save SOUL.md'",
+  "test": "Edit and save SOUL.md for a throwaway profile in the Rust app, then confirm the file content via GET /api/profiles/{name}/soul.",
+  "rust_evidence": "",
+  "unsure": "No SOUL.md editor in the Rust repo."
+ },
+ "PROF-007": {
+  "behavior": "Chat avatars: for a relayed/bot sender the renderer calls profiles.list, matches the sender to a profile with has_avatar, then profiles.get_asset {asset:'avatar'} and renders the base64 data URL in a 16px rounded image; falls back to the bot glyph when missing or on older gateways.",
+  "states": "no avatar (glyph fallback), avatar loaded, cache hit (module-level map), legacy gateway (RPC error → glyph)",
+  "test": "Against the private backend with a profile that has an avatar set, send a relayed message and confirm the avatar renders next to the sender name.",
+  "rust_evidence": "",
+  "unsure": "src/components/assistant-ui/thread/user-message.tsx avatar path is React-specific; the Rust repo has no avatar rendering."
+ },
+ "PROF-008": {
+  "behavior": "'Export profile…' opens a save dialog and POSTs /api/profiles/{name}/export ('Profile exported'); 'Import profile…' picks an archive and POSTs /api/profiles/import as a NEW profile ('Profile imported'); failures show 'Failed to export profile' / 'Failed to import profile'.",
+  "states": "idle, exporting, exported toast, importing, imported toast, failed export/import",
+  "test": "Export a throwaway profile to a temp path and re-import it in the Rust app, then confirm two profiles exist for that config.",
+  "rust_evidence": "",
+  "unsure": "Whether import reuses the name or requires a new one; not traced."
+ },
+ "PROF-009": {
+  "behavior": "Switch profile: ⌘D (profile.default, 'mod+d') returns to the default profile; ⌘1…⌘9 select named profiles 1-9 and ⌘⌥1…⌘⌥9 profiles 10-18 ('Switch to <name>'); switching reconnects the session store to that profile. Failure toast 'Could not connect to <name>'.",
+  "states": "default selected, named profile selected, connection switching, unreachable gateway ('<gateway> · unreachable'), switch failed",
+  "test": "Press ⌘D in the Rust app and confirm the active profile returns to default and the session list reloads from it.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:1263-1280 (profile scopes) and crates/hermes-core/src/backend.rs (per-profile backends)",
+  "unsure": "No profile-switch hotkeys were found in the Rust UI (app-window.slint only binds Ctrl+N/B/Q)."
+ },
+ "PROF-010": {
+  "behavior": "⌘⇧] (profile.next) and ⌘⇧[ (profile.prev) step to the next/previous profile in the rail's order, wrapping around; the session list reloads for the newly active profile.",
+  "states": "normal step, wrap at the ends, single profile (no-op), switch failure toast",
+  "test": "With 2+ profiles on the private backend press the next/prev profile chords in the Rust app and confirm the active profile changes each time.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has no profile rail/order, so these chords have nothing to act on."
+ },
+ "PROF-011": {
+  "behavior": "⌘⇧0 (profile.toggleAll) switches between 'Show all profiles' and showing only the active one; the rail header copy is 'All profiles' when everything is shown.",
+  "states": "all profiles shown, single profile shown, no-op with one profile",
+  "test": "Toggle ⌘⇧0 in the Rust app and confirm the sidebar switches between one profile and all profiles.",
+  "rust_evidence": "",
+  "unsure": "No equivalent toggle in the Rust UI."
+ },
+ "PROF-012": {
+  "behavior": "profile.create ships unbound (defaults: []) — creating a profile is mouse/keyboard-panel only ('New profile' in the Profiles page); if a user binds a combo in the panel, that combo opens the create dialog.",
+  "states": "unbound (panel shows unassigned), user-bound, dialog open",
+  "test": "In the Rust keybinds list confirm a 'Create profile' action exists with no default chord and that binding one opens the dialog.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has no keybinds panel."
+ },
+ "PROF-013": {
+  "behavior": "The sidebar profile rail / dropdown switcher lists profiles with status dots and counts ('<n> unread sessions', '<n> sessions running', '1 session needs your answer'); clicking one switches profile, 'New profile' creates, 'Manage profiles…' opens the Profiles page.",
+  "states": "rail collapsed/expanded ('Profile rail'), profile active/inactive, unread/working/needs-input badges, loading",
+  "test": "Click a profile in the Rust app's rail and confirm the session list and header switch to that profile on the private backend.",
+  "rust_evidence": "",
+  "unsure": "No profile rail in the Rust UI; behavior taken from profile-switcher.tsx + profiles.* i18n."
+ },
+ "PROF-014": {
+  "behavior": "Settings header shows 'Applies to' with one pill per profile plus the connection pills; the active pill decides which profile's config the page reads and writes, and pages mark profile scope with 'Changes on this page apply to the \"<profile>\" profile.'",
+  "states": "single profile (one pill), multiple profiles, per-profile page vs device-level page (no pills), scope switched",
+  "test": "Switch the 'Applies to' pill in the Rust settings modal and confirm the page rows reload from the selected profile's config.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:63-88 (ScopeChip/per-profile) and crates/hermes-ui/ui/settings.slint:533-552 (ScopePills), controller.rs:631 (SettingsCmd::Scope)",
+  "unsure": "Whether every Rust page honours profile scope the way the React pages do (per_profile is per-page in settings.rs)."
+ },
+ "PROF-015": {
+  "behavior": "Profile menu → 'Connect to a remote host…' opens 'Connect <profile> to a remote host' with 'Remote address' + 'Access token'; the profile then shows badge 'Runs on <host>'; confirm copy warns commands and files then run on that host. 'Remove remote connection' reverts to local ('<profile> now runs on this computer').",
+  "states": "local, dialog open, invalid URL ('Enter a full address starting with http:// or https://'), connecting, connected ('Runs on <host>'), auth failed ('Remote host rejected the saved token'), removed",
+  "test": "Point a throwaway profile at a second private backend and confirm sessions for it open against that host, then remove the override.",
+  "rust_evidence": "",
+  "unsure": "No per-profile remote override in the Rust repo; also needs a second reachable test backend to verify."
+ },
+ "PROF-016": {
+  "behavior": "Right-click (context menu) on a profile in the sidebar opens 'ProfileLaunchMenuItems' with launch destinations for that profile/connection (e.g. open in new window / on another gateway); choosing one opens a session on that profile and connection.",
+  "states": "menu closed, menu open, target unreachable, launched",
+  "test": "Right-click a profile row in the Rust app and confirm the launch items appear and one opens a session for that profile.",
+  "rust_evidence": "",
+  "unsure": "profile-launch-menu.tsx exports only the menu items component; the exact item labels come from the caller and were not traced."
+ },
+ "PROF-017": {
+  "behavior": "Export/import a profile as a portable bundle: the CLI tar.gz (config, skills, SOUL.md, cron; credentials excluded) plus a desktop-only desktop.json carrying skin/mode, user themes, profile rail color and the layout tree; importing applies it so the receiving profile looks identical.",
+  "states": "exporting, exported, importing, imported, failed import/export, archive without desktop.json (CLI-made)",
+  "test": "Export a throwaway profile, import it back in the Rust app, and confirm theme/layout (desktop.json) is applied to the new profile.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has neither export/import nor a theme/layout overlay, so parity here is contract-only."
+ },
+ "PROF-018": {
+  "behavior": "Profile detail → 'Copy setup' fetches GET /api/profiles/{name}/setup-command and copies the shell command to the clipboard, with a 'Copying...' state and toast 'Setup command copied'; failure 'Failed to copy setup command'.",
+  "states": "idle, copying, copied, failure",
+  "test": "Press Copy setup for a throwaway profile in the Rust app and confirm the clipboard holds exactly the backend's setup-command string.",
+  "rust_evidence": "",
+  "unsure": "No such action in the Rust repo."
+ },
+ "PROF-019": {
+  "behavior": "Profiles are cached and prewarmed after load so switching profiles is instant and status counts (unread/working) are available without a round-trip; a stale/failed prewarm silently falls back to a live fetch.",
+  "states": "cold, prewarming, warm, prewarm failed (falls back to fetch)",
+  "test": "Switch profiles twice in the Rust app and confirm the second switch does not show a loading placeholder against the private backend.",
+  "rust_evidence": "",
+  "unsure": "src/store/profile-cache.ts is empty/nonexistent per the row's source; use-profile-prewarm.ts was not found, so the mechanism could not be confirmed."
+ },
+ "PROF-020": {
+  "behavior": "Profile menu → 'Set as default' marks that profile as the startup default ('<name> is now the default', badge 'Default profile'); copy: 'Used when Hermes opens and for new chats. Existing sessions stay in their profiles.' Failure 'Could not set the default profile'.",
+  "states": "default marked, switching default, saved toast, failure",
+  "test": "Set a throwaway profile as default in the Rust app, relaunch, and confirm it opens on that profile.",
+  "rust_evidence": "",
+  "unsure": "Whether the default-profile preference lives in desktop prefs or the backend; not traced."
+ },
+ "PROF-021": {
+  "behavior": "Profile actions → 'Color…' sets a per-profile accent (swatches plus 'Auto'); the color follows the profile everywhere it appears (rail dot, scoped pills). 'Set color <hex>' is the swatch's accessible label.",
+  "states": "auto (theme-derived), explicit color, picker open, saved",
+  "test": "Set a profile color to a known hex in the Rust app, relaunch, and confirm the rail dot keeps that color.",
+  "rust_evidence": "",
+  "unsure": "Whether color is stored per profile locally or in the profile's desktop.json; not traced."
+ },
+ "PROF-022": {
+  "behavior": "Opening a Browser pane while browser.use_real_profile is off shows the one-time consent prompt 'Stay signed in to your sites' with bullets ('Cookies and logins are copied into a managed snapshot.', 'Your live browser profile is never opened directly.', 'Nothing leaves this computer.') and buttons 'Use my profile' / 'Not now' / \"Don't show again\".",
+  "states": "prompt shown (first pane only), 'Not now' (muted for the run), \"Don't show again\" (persisted), already allowed (no prompt), setting already on (no prompt)",
+  "test": "Open a Browser pane with the flag off against the private backend and confirm the prompt appears exactly once, then enable via 'Use my profile'.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has no browser pane yet, so the consent flow cannot exist."
+ },
+ "SKIL-001": {
+  "behavior": "Capabilities → 'Skills' tab (meta = skill count): list from /api/skills with search 'Search skills...', category chips 'All', sort 'Most used'/'A–Z', bulk 'Enable all'/'Disable all'/'Disable unused'; rows show provenance and 'used N×'. Empty: 'No skills found' / 'Try a broader search or different category.'",
+  "states": "loading ('Loading capabilities...'), list, search no-match ('Nothing matches \"<query>\".'), load error 'Skills failed to load' + 'Refresh skills', bulk applied ('Updated N items for new sessions.' / 'Nothing to change.')",
+  "test": "Open Capabilities → Skills in the Rust app against the private backend and confirm every skill from GET /api/skills is listed with its category and enabled state.",
+  "rust_evidence": "",
+  "unsure": "No Capabilities page in the Rust repo at all (only settings), so the tab, list and search are unbuilt."
+ },
+ "SKIL-002": {
+  "behavior": "Select a skill in the Skills tab → detail pane shows its description, provenance pill and file list; 'Edit' opens the SKILL.md, 'Archive' hides it ('Skill archived' / 'Restorable via hermes curator restore.'); a skill with no description shows 'No description.'",
+  "states": "no selection, selected, loading, description missing ('No description.'), editing, archived toast, failure",
+  "test": "Select a skill in the Rust app's Skills tab and confirm the detail pane renders the same description text that GET /api/skills/content returns.",
+  "rust_evidence": "",
+  "unsure": "Whether the detail pane renders SKILL.md (frontmatter viewer) or only the description; skill-detail.tsx was skimmed."
+ },
+ "SKIL-003": {
+  "behavior": "Toggle a skill's switch → POST /api/skills/toggle; toast 'Skill enabled'/'Skill disabled' with '<name> applies to new sessions.'; a failed call shows 'Failed to update <name>' and reverts the switch.",
+  "states": "enabled, disabled, toggling (row busy), success toast, error toast, optimistic-revert",
+  "test": "Toggle a skill off in the Rust app and confirm GET /api/skills reports enabled=false for that skill on the private backend.",
+  "rust_evidence": "",
+  "unsure": "The toggle endpoint's body/verb (POST {name, enabled}) was not read from src/app/capabilities/skills/skills-data.ts."
+ },
+ "SKIL-004": {
+  "behavior": "Skills tab bottom picker 'Available to install'/'Skills Hub' shows hub entries with an 'Official' pill; 'Browse the full hub' expands it and 'Hide the hub browser' collapses it; while connecting it shows 'Connecting to skill hubs...' and 'Connected hubs:'.",
+  "states": "collapsed, expanded, connecting, connected, empty ('No matching skills found in the hub.'), hub load failure 'Skill hub failed to load'",
+  "test": "Open the embedded hub picker in the Rust app and confirm the official index entries list against the private backend's hub endpoints.",
+  "rust_evidence": "",
+  "unsure": "Which hub sources the private test backend proxies (official index vs GitHub) was not verified."
+ },
+ "SKIL-005": {
+  "behavior": "In the hub picker type a query and press 'Search' → searches /api/skills/hub/search; results show 'N results in Nms'; no hits shows 'No matching skills found in the hub.'; partial timeouts show 'Timed out: <sources>'; failure 'Hub search failed'.",
+  "states": "idle ('Search the skill hub'), searching ('Searching...'), results with count+ms, empty, partial timeout, error",
+  "test": "Search a term that exists in the private hub and confirm result count matches the API response; search gibberish and confirm the empty message.",
+  "rust_evidence": "",
+  "unsure": "Whether the 15s-ish search timeout in the Rust client is honoured; not traced."
+ },
+ "SKIL-006": {
+  "behavior": "Click 'Preview' on a hub result → renders the skill's SKILL.md contents; a skill without one shows 'This skill has no SKILL.md preview.'; failure 'Skill preview failed'.",
+  "states": "no preview, loading, preview rendered, no SKILL.md, error",
+  "test": "Preview an official hub skill in the Rust app and confirm the rendered markdown matches GET /api/skills/hub/preview.",
+  "rust_evidence": "",
+  "unsure": "Whether the preview supports the hub's file browser tabs ('Files') or only SKILL.md; not traced."
+ },
+ "SKIL-007": {
+  "behavior": "Click 'Scan' on a hub skill → POST /api/skills/hub/scan, showing 'Scanning...' then a verdict pill 'Safe'/'Caution'/'Dangerous', a finding count ('N findings' / 'No security findings.') and a policy line 'Install allowed'/'Review before installing'/'Install blocked by policy'; failure 'Security scan failed'.",
+  "states": "unscanned, scanning, safe, caution, dangerous, blocked-by-policy, error",
+  "test": "Scan a known-risky fixture skill on the private backend and confirm the verdict and finding count match the API response.",
+  "rust_evidence": "",
+  "unsure": "Whether the private test backend ships any skill that produces a caution/dangerous verdict, so the non-safe states may be unreachable."
+ },
+ "SKIL-008": {
+  "behavior": "'Install' on a hub result POSTs /api/skills/hub/install ('Installing...' → 'Installed'); 'Uninstall' removes it; 'Update installed' updates all ('Updating...'). A blocked install shows \"Couldn't install <name>\" with the flagged-item copy and 'View scan'; failures log to 'Action log'.",
+  "states": "not installed, installing ('Installing...'), installed, uninstalling, updating, blocked dialog, error ('Skill action failed')",
+  "test": "Install a small hub skill into a throwaway profile in the Rust app and confirm GET /api/skills lists it, then uninstall it.",
+  "rust_evidence": "",
+  "unsure": "Whether install targets the profile scope or the global skills dir on the test backend."
+ },
+ "SKIL-009": {
+  "behavior": "Each skill row shows where it came from: 'Learned' (agent-created), 'Built-in' (bundled) or 'Hub' (installed from a hub), derived from the skill's provenance metadata.",
+  "states": "learned, built-in, hub, unknown/absent provenance (no pill)",
+  "test": "Create a skill via the agent, install another from the hub, and confirm the Rust app labels each with the matching provenance pill.",
+  "rust_evidence": "",
+  "unsure": "skill-provenance.ts's exact rule set (whether it falls back on path prefixes) was not read in full."
+ },
+ "SKIL-010": {
+  "behavior": "SKILL.md frontmatter is parsed client-side for name/description/metadata; when the file has no frontmatter or no description the UI shows 'No description.' rather than a blank row, and a malformed block is ignored rather than crashing the list.",
+  "states": "valid frontmatter, missing description, no frontmatter, malformed YAML",
+  "test": "Point a fixture skill with a malformed frontmatter block at the Rust app and confirm the list still renders and shows 'No description.'",
+  "rust_evidence": "crates/hermes-core/src/markdown.rs (frontmatter-aware markdown parsing helpers)",
+  "unsure": "Whether the Rust markdown module actually parses skill frontmatter or only renders it; not confirmed."
+ },
+ "SKIL-011": {
+  "behavior": "Opening a skill install deeplink shows 'Install \"<name>\"?' with 'This skill will be available in new sessions. Only install sources you trust.', a read-only 'Source' and 'Install to: This computer'; confirming shows 'Installing…' then '\"<name>\" installed'; a changed destination shows 'The destination changed. Close this dialog and open the install link again.'",
+  "states": "dialog open, installing, installed, destination changed, dismissed",
+  "test": "Fire a hermes:// skill-install deeplink at the Rust app with a fixture source and confirm the confirm dialog and install land in the test profile.",
+  "rust_evidence": "",
+  "unsure": "The deeplink scheme/handler in the Rust app was not found; whether any deeplink routing exists is unverified."
+ },
+ "SKIL-012": {
+  "behavior": "RPC skills.manage (action=search|install|create|update|delete) lets an agent/plugin manage skills from inside the app (the embedded Skills Hub in Bot Mode uses search+install); after a change the UI shows 'Skill updated' and refreshes the list.",
+  "states": "idle, searching, installing, created/updated/deleted, error",
+  "test": "Call skills.manage action=create with a throwaway skill in the Rust app and confirm the new skill appears in the Skills list and on disk in the test profile.",
+  "rust_evidence": "",
+  "unsure": "The exact action vocabulary of skills.manage (create vs write) was not read from its type definitions."
+ },
+ "SKIL-013": {
+  "behavior": "Click 'Refresh skills' (also the app-wide refresh hotkey) re-reads skills and toolsets and invalidates slash completions; while running the label is 'Refreshing skills'; failure shows 'Skills failed to load' / 'Toolsets failed to refresh'.",
+  "states": "idle, refreshing, refreshed, failure banner with Retry",
+  "test": "Add a skill file on the private backend, press refresh in the Rust app, and confirm the new skill appears without a restart.",
+  "rust_evidence": "",
+  "unsure": "Whether RPC skills.reload is used at all (the UI mostly invalidates REST queries); not confirmed."
+ },
+ "SKIL-014": {
+  "behavior": "Typing a skill's name (whole word, not inside a slash command) in the composer offers a 'Use skill: <name>' pill; clicking it prefixes the draft with '/<name>'. The pill is suppressed once the session has already used that skill (skill_view/skill_manage seen) or when the name matches the workspace folder.",
+  "states": "no match, pill offered, pill clicked (draft prefixed), suppressed (already in context / homonym / too short name)",
+  "test": "Type an installed skill's name in the Rust composer and confirm the suggestion appears and click-inserts '/<skill>'.",
+  "rust_evidence": "",
+  "unsure": "No suggestion-provider system in the Rust composer was found."
+ },
+ "SKIL-015": {
+  "behavior": "Settings → Maintenance shows a 'Skill curator' card from GET /api/curator: state 'Active'/'Paused'/'Disabled', last run 'Last run <when>' or 'Never ran', with copy 'Background review that archives stale agent-created skills'.",
+  "states": "active, paused, disabled, never ran, loading, error",
+  "test": "Open the curator card in the Rust app against the private backend and confirm the state string matches GET /api/curator.",
+  "rust_evidence": "",
+  "unsure": "Whether /api/curator exists on the private test backend (it may be CLI-only)."
+ },
+ "SKIL-016": {
+  "behavior": "'Pause'/'Resume' on the curator card POSTs /api/curator/paused and 'Run now' POSTs /api/curator/run; the action reports '<name> started — tailing log...' with 'Action log' access, and 'Running...' while it works.",
+  "states": "running, paused, resumed, run started, failure '<name> failed to start'",
+  "test": "Pause the curator in the Rust app, confirm GET /api/curator reports paused, then Resume and confirm it is active again.",
+  "rust_evidence": "",
+  "unsure": "Whether the private test backend exposes the curator endpoints at all."
+ },
+ "TSET-001": {
+  "behavior": "Capabilities → 'Tools' tab lists every toolset from /api/tools/toolsets with search 'Search tools...', an enabled count ('<enabled>/<total> toolsets enabled'), bulk 'Enable all'/'Disable all'/'Disable unused', and category chips ('All'); empty state 'No toolsets found' / 'Try a broader search query.'",
+  "states": "loading, list with enabled pills, search no-match, empty, load error 'Tool configuration failed to load', refreshing",
+  "test": "Open Capabilities → Tools in the Rust app and confirm the toolset list and enabled counts match GET /api/tools/toolsets.",
+  "rust_evidence": "",
+  "unsure": "No Capabilities/Tools page in the Rust repo; only the settings 'Tool access' page with the raw toolsets key exists."
+ },
+ "TSET-002": {
+  "behavior": "Select a toolset → detail pane shows its description, a 'Configure <label>' button, key state ('Configured' / 'Needs keys') and, for vision tools, 'Vision uses your auxiliary model configuration — the image-capable model is picked there, not per-provider here.' with a link 'Choose vision model in Settings → Models'; missing text shows 'No description.'",
+  "states": "no selection, selected, description missing, needs keys, configured, vision hint shown",
+  "test": "Select the vision toolset in the Rust app and confirm the description and auxiliary-model hint render from GET /api/tools/toolsets/{name}.",
+  "rust_evidence": "",
+  "unsure": "Layout of the detail pane (tabs vs sections) was not traced; only the description found."
+ },
+ "TSET-003": {
+  "behavior": "Toggle a toolset's switch ('Turn <label> toolset on'/'off') → POST /api/tools/toolsets/{name}; toast 'Toolset enabled'/'Toolset disabled' with '<name> applies to new sessions.'; failure 'Failed to update <name>' and the switch reverts.",
+  "states": "enabled, disabled, toggling, success toast, error toast, bulk change ('Updated N items for new sessions.')",
+  "test": "Disable a toolset in the Rust app and confirm the private backend's tool list no longer includes its tools in a new session.",
+  "rust_evidence": "",
+  "unsure": "Whether the toggle is optimistic in the Rust build; not implemented yet."
+ },
+ "TSET-004": {
+  "behavior": "'Configure <label>' opens the toolset config panel from /api/tools/toolsets/{name}/config: credential fields with 'Set'/'Not set', 'Save changes', and a remove confirm 'Remove <key> from .env?'; a toolset with no options shows 'This toolset has no provider options — enable it and it works with your current setup.'",
+  "states": "loading ('Loading configuration'), ready, 'Needs sign-in', 'Setup required', saving, 'Failed to save <key>', removed ('<key> removed.')",
+  "test": "Set a dummy credential for a toolset in the Rust app and confirm GET /api/tools/toolsets/{name}/config reports it set.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust settings page for tool access opens this panel; only the toolsets config key row was found."
+ },
+ "TSET-005": {
+  "behavior": "Inside a toolset's config, provider rows show state 'Ready'/'Needs sign-in'/'Setup required', an 'Active' badge ('This is your active backend') and a 'Use this backend' action → POST /api/tools/toolsets/{name}/provider; success '<provider> is now active.' For web toolsets, 'Use for Search'/'Use for Extract' set the per-capability backend.",
+  "states": "no providers ('No providers are available for this toolset right now.'), provider list, active, selecting, selected toast, 'Failed to select <provider>'",
+  "test": "Switch a toolset's provider in the Rust app and confirm GET /api/tools/toolsets/{name}/config reports the new active provider.",
+  "rust_evidence": "",
+  "unsure": "Whether the web-search capability selection (Search/Extract) is part of the same endpoint; not traced."
+ },
+ "TSET-006": {
+  "behavior": "Per-backend model list from /api/tools/toolsets/{name}/models shows a count ('N models'), marks the current one 'In use'/'default', and only allows changes on the active backend ('Select this backend first to change its model.'); choosing one shows 'Model selected' / '<model> applies to new sessions.'",
+  "states": "loading ('Loading model catalog...'), list, in-use row, inactive-backend hint, selecting, failure 'Failed to select <model>'",
+  "test": "Pick a different model for one backend in the Rust app and confirm the backend reports it as the toolset's model.",
+  "rust_evidence": "",
+  "unsure": "Whether model catalogs for toolsets exist on the private test backend (some backends have no models)."
+ },
+ "TSET-007": {
+  "behavior": "A backend that needs a one-time install shows 'Run setup'/'Re-run setup' with the hint 'This backend needs a one-time install (<step>). Runs on this machine — may take a few minutes.'; running shows 'Installing…'/'Starting…', success 'Setup complete' → '<step> installed.', errors 'Setup finished with errors' with 'Open logs'.",
+  "states": "not installed ('Run setup'), running, installed ('Installed' + 'Re-run setup'), complete toast, error with logs, 'Failed to run <step> setup'",
+  "test": "Run post-setup for a backend that needs it against the private backend and confirm the state flips to Installed and the log tail appears.",
+  "rust_evidence": "",
+  "unsure": "Which backends need post-setup on the test backend (may be none), so the flow may be unexercisable."
+ },
+ "TSET-008": {
+  "behavior": "Toolset rows carry a usage badge ('used N×') computed from a 365-day analytics scan (GET usage analytics), cached 10 minutes per profile scope and refreshed when the page refresh hotkey is used.",
+  "states": "no data yet, badges with counts, cached, refreshed, analytics unavailable (no badges)",
+  "test": "Run a tool in a session, then open Capabilities → Tools in the Rust app and confirm the toolset's usage badge increments.",
+  "rust_evidence": "",
+  "unsure": "Whether GET /api/usage analytics with a 365-day window is cheap enough on the test backend; not measured."
+ },
+ "TSET-009": {
+  "behavior": "RPC tools.list returns the agent's currently available tools for a profile; the renderer uses it to show the real tool set (used by tool catalogs and the Tools & Keys settings page).",
+  "states": "loading, list, empty, error",
+  "test": "Call tools.list against the private backend from the Rust app and confirm it returns the same tool names the agent reports in a session.",
+  "rust_evidence": "",
+  "unsure": "src/hermes.ts is only a 133-line barrel here, so the exact tools.list payload/params were not located."
+ },
+ "TSET-010": {
+  "behavior": "RPC tools.configure enables/disables individual agent tools (or whole groups) for the active profile; the UI reflects the new tool set after the call and surfaces an error toast when the backend refuses.",
+  "states": "idle, configuring, applied, error",
+  "test": "Disable one tool via tools.configure and confirm a new session's prompt no longer advertises that tool on the private backend.",
+  "rust_evidence": "",
+  "unsure": "The exact payload shape of tools.configure could not be read (no call site found in the checked files)."
+ },
+ "TSET-011": {
+  "behavior": "RPC tools.show returns a single tool's schema (name, description, JSON parameter schema) for inspection in the UI.",
+  "states": "loading, schema shown, unknown tool (error)",
+  "test": "Call tools.show for a known tool against the private backend and confirm the returned schema matches what the model receives.",
+  "rust_evidence": "",
+  "unsure": "No call site for tools.show was found, so its parameter name (tool vs name) is unverified."
+ },
+ "TSET-012": {
+  "behavior": "Settings → Advanced → Tool access writes the config key toolsets (the enabled toolset id list). Clearing every entry warns: 'Remove all enabled toolsets? This disables memory, terminal, web search, delegation, and most other tools until you re-enable them.'",
+  "states": "default set, edited, empty (with wipe confirm), autosave failure",
+  "test": "Change the enabled toolset list in the Rust settings UI and confirm config.yaml's toolsets key matches on the private backend.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1688-1695 (cfg key 'toolsets', label 'Enabled Toolsets', Control::List)",
+  "unsure": "Whether the Rust List control can remove the last entry and shows an equivalent wipe warning."
+ },
+ "TSET-013": {
+  "behavior": "Settings → Advanced → Terminal backend ('Execution backend') lists Local plus docker/singularity/modal/daytona/ssh from /api/tools/terminal/backends with 'Ready'/'Needs setup'/'Unavailable'/'In use'; selecting one POSTs /api/tools/terminal/backend → 'Terminal commands now run via <backend>. Applies to new sessions.' Selecting an unready backend asks 'Select <backend> anyway?'.",
+  "states": "loading ('Checking execution backends…'), ready, needs setup (confirm dialog), unavailable ('Terminal commands are unavailable'), selecting, 'Use Local' fallback, error 'Failed to select <backend>'",
+  "test": "Switch the execution backend to Local and back on the private backend and confirm the active backend reported by /api/tools/terminal/backends follows.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1698-1702 (cfg key terminal.backend, label 'Execution Backend')",
+  "unsure": "Whether the Rust row is a plain select rather than the status-aware panel (readiness/in-use badges unverified)."
+ },
+ "TSET-014": {
+  "behavior": "Settings → Tools → Computer use shows GET /api/tools/computer-use/status with permission rows 'Accessibility' and 'Screen Recording' (each 'Granted'/'Not granted'/'Unknown') and 'Driver health'; a grant action calls /api/tools/computer-use/permissions/grant (on macOS 'macOS will show a permission dialog attributed to CuaDriver. Approve it, then return here.').",
+  "states": "loading, permissions granted/not granted/unknown, granting, driver healthy/unhealthy, non-macOS ('Drives your desktop via the X11/XWayland accessibility stack — no permission prompt.'), error 'Could not request permissions'",
+  "test": "Open the computer-use panel in the Rust app and confirm the permission rows mirror /api/tools/computer-use/status on the private backend (grant is OS-specific and must not be exercised blindly).",
+  "rust_evidence": "",
+  "unsure": "Whether the private test backend reports computer-use status at all, and whether granting is safe to trigger headlessly (it is not)."
+ },
+ "TSET-015": {
+  "behavior": "Toggle 'Use My Real Browser Profile' writes config browser.use_real_profile: on shows 'Real-profile browsing on' ('New sessions will browse with a snapshot of your default browser profile.'), off shows 'Real-profile browsing off' ('The profile snapshot will be deleted; new sessions use a clean browser.').",
+  "states": "off, on, saving, on toast, off toast, 'Could not save the real-profile setting', consent prompt variant",
+  "test": "Toggle the setting in the Rust app and confirm config.yaml's browser.use_real_profile flips on the private backend.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1086-1092 (cfg key browser.use_real_profile)",
+  "unsure": "Whether the Rust row is a plain toggle without the consent-prompt copy."
+ },
+ "TSET-016": {
+  "behavior": "Settings → Advanced → Tool access writes config agent.tool_use_enforcement (a text policy controlling how strictly the agent must call tools instead of describing them).",
+  "states": "default, edited value, autosave failure",
+  "test": "Set agent.tool_use_enforcement to a non-default value in the Rust settings UI and confirm config.yaml matches on the private backend.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1832-1838 (cfg key agent.tool_use_enforcement, label 'Tool-Use Enforcement')",
+  "unsure": "The accepted values of the key (free text vs enum) are not validated in either app."
+ },
+ "TSET-017": {
+  "behavior": "Settings → Safety writes config command_allowlist — the list of shell command patterns that never require approval; adding/removing entries autosaves to config.",
+  "states": "empty list, entries present, edited, autosave failure",
+  "test": "Add a command pattern in the Rust settings UI and confirm config.yaml's command_allowlist contains it on the private backend.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1052 (cfg key command_allowlist)",
+  "unsure": "Whether the Rust control is a List widget or a comma string."
+ },
+ "TSET-018": {
+  "behavior": "Settings → Advanced → Output limits writes tool_output.max_bytes, tool_output.max_lines and tool_output.max_line_length — the caps applied when tool output is fed back to the model.",
+  "states": "default values, edited, autosave failure",
+  "test": "Change tool_output.max_lines in the Rust settings UI and confirm the backend config reflects it, then run a verbose command and see the truncation respect the new cap.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1764-1790 (cfg keys tool_output.max_bytes / max_lines / max_line_length)",
+  "unsure": "Which of the three keys the Rust page renders and whether values are validated as positive integers."
+ },
+ "TSET-019": {
+  "behavior": "Settings → Safety → Checkpoints writes config checkpoints.enabled ('Create rollback snapshots before file edits.') and checkpoints.max_snapshots ('Checkpoint Limit'); the snapshot store is what /rollback lists.",
+  "states": "enabled, disabled, limit edited, autosave failure",
+  "test": "Toggle checkpointing in the Rust settings UI and confirm a file edit in a new session produces a snapshot that /rollback lists.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1078-1084 (cfg keys checkpoints / checkpoints.enabled) and settings.rs:1791 (checkpoints.max_snapshots)",
+  "unsure": "Whether checkpoints are actually produced by the private backend's file editing tools in a test run."
+ },
+ "TSET-020": {
+  "behavior": "RPC rollback.list returns filesystem checkpoints for the session, rollback.diff shows one checkpoint's changes and rollback.restore restores a chosen one (restores keep the user's hand-edits unless --all is used, per the /rollback command copy).",
+  "states": "no checkpoints (empty), list, diff shown, restore run, restore failure",
+  "test": "Edit a file in a session on the private backend, rollback.list to see the snapshot, then rollback.restore and confirm the file content reverts.",
+  "rust_evidence": "",
+  "unsure": "Whether the private test backend enables checkpoints by default, so the list may be empty in a fresh test run."
+ },
+ "MCP-001": {
+  "behavior": "Capabilities → Connectors/MCP lists configured servers ('All servers') from /api/mcp/servers with per-server status pills ('Connecting…', 'Needs authentication', 'Error', 'Off'), a capability summary ('N tools, M prompts, R resources enabled') and a disabled marker 'disabled'; loading text 'Loading MCP servers...'.",
+  "states": "loading, server ok, needs-auth, error, off/disabled, probing, empty list, catalog loading ('Loading MCP catalog...')",
+  "test": "Open the MCP list in the Rust app and confirm every server in the private backend's mcp.json appears with a status that matches mcp.servers.test.",
+  "rust_evidence": "",
+  "unsure": "No MCP servers surface in the Rust repo; also the private test backend's mcp.json content is unknown."
+ },
+ "MCP-002": {
+  "behavior": "'Add your own' opens 'Connect to a custom MCP' — paste a command/snippet ('Paste a command or a snippet', placeholder 'npx -y @modelcontextprotocol/server-filesystem /path/to/dir') which prefills Name/Type (STDIO or Streamable HTTP)/Command/Args/Env/CWD or URL/Headers/Auth; 'Save' writes one mcp.json entry ('one new entry in mcp.json on this device').",
+  "states": "dialog open, paste parsed, paste unmatched ('Nothing here reads as a server. Fill the fields below instead.'), name taken ('That name is already used.'), saving, 'That server was not saved.'",
+  "test": "Add a throwaway stdio server (a harmless echo command) in the Rust app and confirm it appears in the test backend's mcp.json, then remove it.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust app can write mcp.json at all; also the paste parser lives in use-mcp-draft.ts, not read."
+ },
+ "MCP-003": {
+  "behavior": "Editing an existing server opens the same editor prefilled from the stored entry; saving updates that entry in mcp.json and reports 'MCP server saved' → '<name> applies after MCP reload.', with 'Save failed' on error and 'Invalid MCP JSON' for malformed server JSON.",
+  "states": "editor prefilled, dirty, saving, saved toast, invalid JSON, save failed",
+  "test": "Change a throwaway server's args in the Rust editor and confirm the stored mcp.json entry changes while other keys stay untouched.",
+  "rust_evidence": "",
+  "unsure": "Whether the editor preserves unknown keys; the React side does (see fallback-models note) but mcp-editor.tsx was skimmed."
+ },
+ "MCP-004": {
+  "behavior": "'Remove' on a server asks 'Remove <name>?' — 'The entry leaves mcp.json on this computer. Nothing else is deleted.' Confirming calls mcp.servers.remove and drops the row; failure shows 'Remove failed'.",
+  "states": "confirm dialog, removing, removed, 'Remove failed'",
+  "test": "Remove a throwaway server in the Rust app and confirm the entry is gone from the test backend's mcp.json.",
+  "rust_evidence": "",
+  "unsure": "Whether removal also reloads MCP automatically or waits for the reload action."
+ },
+ "MCP-005": {
+  "behavior": "The server switch toggles its enabled flag (POST /api/mcp/servers/{name}/enabled); a disabled server shows the 'disabled' label and its tools are not offered to the agent.",
+  "states": "enabled, disabled ('disabled'), toggling, write failure",
+  "test": "Disable a server in the Rust app and confirm a new session's tool list (mcp.servers.list) omits its tools.",
+  "rust_evidence": "",
+  "unsure": "Whether the toggle is on the card or only inside the editor."
+ },
+ "MCP-006": {
+  "behavior": "'Test connection' (and the automatic probe) calls /api/mcp/servers/{name}/test or mcp.servers.test and paints the status pill: ok, 'Needs authentication', 'Error', 'Connecting…' while probing; a successful probe reports '<server>: N tools'.",
+  "states": "idle/unknown, probing, ok with tool count, needs-auth, error, off",
+  "test": "Press Test on a working fixture server in the Rust app and confirm the tool count matches what the server exposes.",
+  "rust_evidence": "",
+  "unsure": "Whether a fixture MCP server exists for the private test backend; without one only the error path is testable."
+ },
+ "MCP-007": {
+  "behavior": "MCP health is polled (status 'probing' then ok/needs-auth/error/off per server) and cached; the UI shows the last known state plus 'MCP server saved' → '<name> applies after MCP reload.' after edits.",
+  "states": "probing, ok, needs-auth, error, off, stale/unknown, reload pending",
+  "test": "Stop a fixture MCP server under the test backend and confirm the Rust UI flips that row to Error within one poll.",
+  "rust_evidence": "",
+  "unsure": "Polling interval and cache TTL for health in the React app were not measured."
+ },
+ "MCP-008": {
+  "behavior": "For servers that need OAuth the row shows 'Authenticate' (or 'Reconnect'); starting it opens the browser sign-in (mcp.servers.oauth.start) and polls status; on success the row shows 'Authenticated' → '<server>: N tools'. Cancel/Stop waiting aborts the flow.",
+  "states": "needs-auth, starting, waiting for browser, authenticated with tool count, failed, cancelled ('Stop waiting')",
+  "test": "Start OAuth for a fixture server, complete it in the browser, and confirm the Rust row flips to 'Authenticated' with a tool count.",
+  "rust_evidence": "",
+  "unsure": "Requires an OAuth-capable MCP fixture and a browser; the private test backend may not provide one."
+ },
+ "MCP-009": {
+  "behavior": "RPC mcp.servers.set_api_key stores an API key for an MCP server that authenticates with a bearer token, after which the server's status stops reporting 'Needs authentication'.",
+  "states": "no key, key set, saving, status needs-auth → ok, error",
+  "test": "Set a dummy API key for a fixture server in the Rust app and confirm the status pill stops showing 'Needs authentication'.",
+  "rust_evidence": "",
+  "unsure": "Whether the private test backend exposes mcp.servers.set_api_key (it may be desktop-only glue)."
+ },
+ "MCP-010": {
+  "behavior": "The MCP catalog (Nous-approved list) is fetched via mcp.catalog //api/mcp/catalog; the list marks entries 'In the Hermes catalog' with a 'Managed' / 'MCP · Catalog' / 'MCP · Custom' kind badge and an 'Open logs' action; catalog load shows 'Loading MCP catalog...'.",
+  "states": "loading, catalog entries with kind badges, catalog unavailable, entry already installed",
+  "test": "Open the catalog list in the Rust app and confirm the entry names and kinds match GET /api/mcp/catalog.",
+  "rust_evidence": "",
+  "unsure": "Whether the private test backend serves a catalog at all (it may be an online-only feature)."
+ },
+ "MCP-011": {
+  "behavior": "Installing a catalog entry POSTs /api/mcp/catalog/install; required env fields must be filled first ('Fill in the required values before installing.'), and a failure shows 'Failed to install <name>'; on success the server appears in the list with the catalog kind badge.",
+  "states": "install form, required values missing, installing, installed (badge 'MCP · Catalog'), failed ('Failed to install <name>')",
+  "test": "Install a catalog entry that needs no secrets in the Rust app and confirm it lands in the test backend's mcp.json with the catalog provenance.",
+  "rust_evidence": "",
+  "unsure": "Whether catalog install needs network access the test environment has."
+ },
+ "MCP-012": {
+  "behavior": "After any mcp.json change the server is only live after a reload: the UI offers a reload action (RPC reload.mcp) and reports 'MCP reload failed' on error; with approvals.mcp_reload_confirm on, the reload asks for confirmation first.",
+  "states": "no pending change, pending reload, confirming (when config approvals.mcp_reload_confirm is on), reloaded, 'MCP reload failed'",
+  "test": "Add a server, reload MCP, and confirm the new server's status resolves without restarting the app against the private backend.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust app can trigger reload.mcp (it would need the active gateway socket); no call found."
+ },
+ "MCP-013": {
+  "behavior": "Opening a server's logs shows the tailed log lines (stdio sections filtered to that server; 500 lines from the 'mcp' log file, or 300 lines from 'agent' searched for the server name), polled every 2 s; a log with no output yet shows 'No output yet.'",
+  "states": "loading/no output yet, lines streaming (poll every 2 s), filtered to one server, error",
+  "test": "Start a fixture server that logs to stderr and confirm the Rust log pane shows its lines within a few seconds.",
+  "rust_evidence": "",
+  "unsure": "The getLogs endpoint's parameter names (file/lines/search) come from src/hermes.ts, which was not read in detail."
+ },
+ "MCP-014": {
+  "behavior": "Each server's tool list can be filtered on/off (per-tool switches and 'Turn every tool on or off'), and only enabled tools are offered; the counts shown come from the filter ('N tools on', 'N tools off', 'N of M on').",
+  "states": "all on, some on ('N of M on'), all off, tool row toggling, stale tool list ('Sign in to read the latest tool list.')",
+  "test": "Disable one tool of a fixture server in the Rust app and confirm a new session's MCP tool list omits exactly that tool.",
+  "rust_evidence": "",
+  "unsure": "Where the filter is persisted (config vs local) is decided by src/lib/mcp-tool-filter.ts, which was not read in full."
+ },
+ "MCP-015": {
+  "behavior": "An mcp:// install link opens 'Add MCP server?' showing the exact config ('it comes from the link, not from Hermes') plus a stdio warning ('This server runs a local process on your machine with the command shown below. Only continue if you trust its source.'), an editable Name and 'Add server'; bad links show 'MCP install link rejected'.",
+  "states": "dialog open, name invalid, name conflict, stdio warning, added, rejected with reason (bad base64 / no url-or-command / non-http URL / >32KB)",
+  "test": "Fire a fixture mcp:// link at the Rust app and confirm the dialog shows the config verbatim and that Add writes the same entry.",
+  "rust_evidence": "",
+  "unsure": "No deeplink handling in the Rust app was found."
+ },
+ "MCP-016": {
+  "behavior": "Server cards show the provider's brand mark and a cost estimate: '~N tok/call' from the probed tool list and 'N uses/30d' from usage analytics (10-minute cache), plus a 'tokens per call' label in the detail.",
+  "states": "no estimate yet, estimate shown, usage unavailable (no badge), unknown brand (generic icon)",
+  "test": "Open a fixture server's card in the Rust app and confirm the token estimate is shown once the probe returns tools.",
+  "rust_evidence": "",
+  "unsure": "The estimate's formula (mcp-cost.ts) was not read, so the exact number cannot be asserted."
+ },
+ "MCP-017": {
+  "behavior": "Typing an MCP server's name in the composer offers a suggestion pill that references it, matching the skill/github/cron providers; the pill is suppressed for servers already in context or disabled.",
+  "states": "no match, pill offered for an enabled server, suppressed (disabled server, already used)",
+  "test": "Type a server's name in the Rust composer and confirm a suggestion appears and inserts a reference to that server.",
+  "rust_evidence": "",
+  "unsure": "src/store/suggestion-providers/mcp.ts was not read; the exact pill text/insert behavior is inferred from the sibling skill provider."
+ },
+ "MCP-018": {
+  "behavior": "With config approvals.mcp_reload_confirm enabled, reloading MCP asks for confirmation before the live reload is applied; with it off the reload runs immediately.",
+  "states": "confirm off (immediate), confirm on (dialog), confirmed, cancelled, reload failure",
+  "test": "Flip approvals.mcp_reload_confirm in the Rust settings UI and confirm the value round-trips to config.yaml on the private backend.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:751 ('approvals.mcp_reload_confirm' appears in the safety-page key list)",
+  "unsure": "Whether the Rust page renders this key with a label; it was only seen in a key list."
+ },
+ "PLUG-001": {
+  "behavior": "Capabilities → 'Plugins' tab lists installed plugins from /api/plugins + plugins.list with kind badges ('Agent', 'Desktop', 'Agent + Desktop'), a 'portable' badge and per-half switches ('Desktop' / 'Agent in <profile>'); empty states 'No plugins yet.' and 'No agent plugins installed for this profile.'",
+  "states": "loading, installed agent+desktop, desktop-only, agent-only, disabled half, 'copying…' (desktop half pending), 'unavailable (remote backend)', error 'Could not load agent plugins'",
+  "test": "Open Capabilities → Plugins in the Rust app and confirm the installed plugins and their per-half state match GET /api/plugins on the private backend.",
+  "rust_evidence": "",
+  "unsure": "No Capabilities/Plugins page in the Rust repo; only the settings 'Desktop plugins' list widget exists."
+ },
+ "PLUG-002": {
+  "behavior": "'Plugin catalog' section: 'Browse' opens an embedded docs catalog (hermes-agent.nousresearch.com/docs/plugins?embed=picker) and 'Hide the catalog browser' closes it; a catalog name is resolved through RPC plugins.catalog.lookup, and deeplinks with an unknown name report '\"<name>\" is not in the Hermes plugin catalog. Nothing was installed.'",
+  "states": "collapsed, open (iframe loading), lookup ok, lookup unknown, catalog unavailable ('Could not load the Hermes plugin catalog. Check your connection and open the link again.')",
+  "test": "Open the catalog browser in the Rust app and confirm it loads the catalog page; a deeplink for a real catalog name resolves through plugins.catalog.lookup on the private backend.",
+  "rust_evidence": "",
+  "unsure": "Whether an embedded web view is even available in the Rust/Slint client (no web view found)."
+ },
+ "PLUG-003": {
+  "behavior": "Clicking '+ Add to this Agent' on a catalog entry (or confirming a catalog deeplink) installs the plugin at its reviewed pinned commit into the selected profile; provenance then reads 'Installed from the Hermes catalog at pin <sha>.' and an already-installed entry says '<name> is already installed in this profile.'",
+  "states": "not installed, installing, installed (+ pin provenance), already installed, pinned ('pinned @ <sha>', 'Update to <sha>'), update consent dialog, 'Could not update <name>'",
+  "test": "Install a bundled/catalog plugin into a throwaway profile in the Rust app and confirm the profile's plugins list (RPC plugins.list) shows it at the pinned sha.",
+  "rust_evidence": "",
+  "unsure": "Needs a catalog entry whose install does not require network git access; the test backend's catalog availability is unverified."
+ },
+ "PLUG-004": {
+  "behavior": "Per-half enable/disable switches report '<name> agent tools enabled for <profile>' / 'disabled for <profile>' (failure 'Could not toggle the <name> agent tools; the Desktop panel was left unchanged'); 'Uninstall' confirms 'Uninstall <name>?' — 'This deletes the plugin's files from the <profile> profile...' then '<name> uninstalled. Restart the gateway to unload it.'",
+  "states": "enabled, disabled, toggling, toggle failure, uninstall confirm dialog, uninstalling, uninstalled (gateway restart needed), legacy backend ('This backend predates key-addressed plugin toggles — update Hermes to manage it here.')",
+  "test": "Disable a plugin's agent half for a throwaway profile in the Rust app and confirm RPC plugins.list reports it off, then re-enable.",
+  "rust_evidence": "",
+  "unsure": "Whether the backend half of the toggle is key-addressed (legacy gate) on the private test backend."
+ },
+ "PLUG-005": {
+  "behavior": "A plugin package is classified into deskop/agent/both halves: the row shows 'Agent + Desktop', 'Agent' or 'Desktop' with 'this app, same for every profile' for the desktop half and 'Agent in <profile>' for the agent half; a package on disk but not copied shows 'copying…' or 'unavailable (remote backend)' with an explanatory tip.",
+  "states": "both halves, agent only, desktop only, desktop half pending, desktop half on a remote backend, portable",
+  "test": "Compare the half badges shown in the Rust app with the plugin package metadata returned by the backend for a bundled plugin (e.g. kanban).",
+  "rust_evidence": "",
+  "unsure": "plugin-packages.ts was only skimmed; the exact classification rules (manifest fields) are unverified."
+ },
+ "PLUG-006": {
+  "behavior": "Settings → Plugins page lists one page per installed plugin that ships settings ('Options that installed plugins add. Each plugin gets its own page, and some add sub-pages under it.'), with a page count ('1 page'/'N pages') and 'Manage plugins'; no plugin with settings shows 'No plugin has settings yet.'",
+  "states": "no plugin pages ('No plugin has settings yet.'), pages listed, plugin page open, missing page ('That plugin has no settings page. It may be disabled or uninstalled.')",
+  "test": "With a plugin that declares settings installed in the test profile, confirm the Rust settings nav gains that plugin's page and it renders its fields.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:330-336 (group 'plugins' page 'installed') and settings.rs:2062 (widget plugins/installed)",
+  "unsure": "Contributed settings pages are dynamic; the Rust settings schema is static, so plugin pages likely cannot be added yet."
+ },
+ "PLUG-007": {
+  "behavior": "A plugin's declarative config form (its config_schema) renders one control per field with 'Save settings' → '<name> settings saved.'; missing required values block the save ('Required'); secrets render as '•••••••• (set)' and are stored in the profile's .env, not config.yaml.",
+  "states": "loading, clean, dirty, saving, saved, required missing, secret set, save failed ('Could not save <name> settings')",
+  "test": "Save one non-secret field of a plugin's settings form in the Rust app and confirm the value round-trips to the test profile's config.",
+  "rust_evidence": "",
+  "unsure": "No dynamic form renderer in the Rust settings UI (its schema is compile-time), so this is very likely unbuilt."
+ },
+ "PLUG-008": {
+  "behavior": "The install modal offers install targets — 'Install here' for the agent half in the current profile and a Desktop target — with tips explaining when one half is not installable ('The desktop half is loaded in this app, but the agent half is not installed in <profile>. Install it there.') and a Git install path when the package was copied in by hand.",
+  "states": "open, target checkboxes, install running, installed, not installable (no origin), error",
+  "test": "Open the install modal for a bundled plugin in the Rust app and confirm the target choices match what the backend reports about that package.",
+  "rust_evidence": "",
+  "unsure": "plugin-install-modal.tsx was not read; the exact target labels are inferred from plugins i18n."
+ },
+ "PLUG-009": {
+  "behavior": "When the agent asks to install a plugin ('plugin-install-request'), the app shows a confirm dialog naming the plugin and its source; confirming runs the same install path as the manual modal, declining leaves the profile unchanged.",
+  "states": "no request, request pending, confirming, installing, installed, declined",
+  "test": "Trigger a plugin install request against the private backend and confirm the Rust app shows the dialog and installs on confirm.",
+  "rust_evidence": "",
+  "unsure": "src/store/plugin-install-request.ts was not read; the dialog copy comes from the SDK path."
+ },
+ "PLUG-010": {
+  "behavior": "Plugins contribute UI through a registry whose areas are routes, panes, status bar, keybinds, appearance and context menu; a disabled plugin's contributed surface shows 'Plugin \"<id>\" disabled' with 'Re-enable it in Capabilities → Plugins to bring the pane back.' and a missing pane renders 'missing pane: <paneId>'.",
+  "states": "contribution registered, plugin disabled (placeholder), pane missing, area invalidated/re-rendered",
+  "test": "Disable the shipped kanban plugin in the Rust app and confirm its nav row/pane disappears and the disabled notice appears.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has no plugin contribution system; whether any plugin surface exists at all is unverified."
+ },
+ "PLUG-011": {
+  "behavior": "A plugin can register whole pages under the routes area; each contributed route appears in the app's route table and renders the plugin's page component at its path.",
+  "states": "route registered, plugin disabled (route removed), route collision with a built-in, page render error",
+  "test": "With a bundled plugin that ships a route (e.g. kanban) enabled, navigate to its route in the Rust app and confirm the page renders.",
+  "rust_evidence": "",
+  "unsure": "ROUTES_AREA registration shape was not read; no equivalent in the Rust app."
+ },
+ "PLUG-012": {
+  "behavior": "A plugin can contribute sidebar nav rows (SIDEBAR_NAV_AREA); contributed rows render under the plugin's grouping in the sidebar and disappear when the plugin is disabled or uninstalled.",
+  "states": "row shown, plugin disabled (row hidden), row active/highlighted",
+  "test": "Enable the kanban plugin and confirm its sidebar row appears in the Rust app; disable and confirm it disappears.",
+  "rust_evidence": "",
+  "unsure": "No contributed-nav support in the Rust sidebar."
+ },
+ "PLUG-013": {
+  "behavior": "A plugin can contribute a header widget for a profile group in the sidebar (SIDEBAR_PROFILE_GROUP_HEADER_AREA), rendered above that group's session rows.",
+  "states": "header shown, no profiles (area empty), plugin disabled (removed)",
+  "test": "With a plugin that contributes a profile-group header enabled, confirm it renders above that profile's group in the Rust sidebar.",
+  "rust_evidence": "",
+  "unsure": "No equivalent area or profile-group headers in the Rust sidebar."
+ },
+ "PLUG-014": {
+  "behavior": "Plugin SDK host bridge gives plugin code host.request (backend RPC), host state subscriptions (config/session/appearance), UI helpers (dialogs/toasts) and action dispatch (ctx.runAction limited to view/navigation actions).",
+  "states": "request ok, request error, state update pushed, action allowed, action refused (not in PLUGIN_APP_ACTIONS)",
+  "test": "Load the bundled hello-runtime plugin and confirm its host call round-trips (request/state) against the private backend.",
+  "rust_evidence": "",
+  "unsure": "src/sdk/index.ts was not read in full; the exact host API surface is unverified."
+ },
+ "PLUG-015": {
+  "behavior": "Four plugins ship bundled — hello-runtime, hermes-bots, kanban and radio — and appear in the installed list as loadable packages ('bundled' kind) with their panes/routes working out of the box.",
+  "states": "bundled plugin present, disabled, runtime loaded ('runtime' kind), on-disk copy ('on disk')",
+  "test": "Confirm all four bundled plugins appear in the Rust app's plugin list with the 'bundled' kind and that at least one surface (kanban) renders.",
+  "rust_evidence": "",
+  "unsure": "No plugin loading in the Rust app."
+ },
+ "PLUG-016": {
+  "behavior": "Capabilities → Connectors ('Connectors', search 'Search N apps') supports segments 'All'/'Available'/'Connected'/'Turned off', a 'Category' filter ('All categories', 'Uncategorised'), group headers with notes ('Broken connections first.', 'Sign-ins are kept.') and card kinds ('Managed', 'MCP · Catalog', 'MCP · Custom', 'MCP · Plugin <name>').",
+  "states": "loading ('Reading the catalog and the servers on this computer'), empty ('No apps here yet. Add a server on this computer to get started.'), no match ('No matching apps'), connected group, available, off, hosted unreachable ('Could not reach the hosted apps.')",
+  "test": "Open Connectors in the Rust app and confirm the catalog list, segments and group counts match the backend's connector catalog.",
+  "rust_evidence": "",
+  "unsure": "Connectors need live hosted-catalog access; the private test backend may only serve local servers."
+ },
+ "PLUG-017": {
+  "behavior": "Clicking 'Connect'/'Authenticate' on a connector card starts the OAuth flow (connectors.connect) and the card shows 'Connecting'/'Connecting…'; success turns it 'Connected' with 'N tools', failure 'Could not connect' and expired tokens show 'Access expired' with 'Reconnect'.",
+  "states": "available, connecting, connected (with tool count), needs-auth, access expired, could not connect, off by organisation ('Off by your organisation')",
+  "test": "Connect a fixture connector in the Rust app, complete the browser sign-in, and confirm the card flips to Connected on the private backend.",
+  "rust_evidence": "",
+  "unsure": "Hosted connector OAuth needs a real Nous account/browser; not testable headlessly."
+ },
+ "PLUG-018": {
+  "behavior": "The 'Accounts' section lists signed-in accounts ('N accounts', '<n> retired') with per-account status ('Access expired', 'Waiting for sign-in', 'Replaced by a reconnect', 'Access revoked', 'Inactive'); 'Add another account' connects a second; 'Rename' and 'Remove' with confirm 'Remove the <name> <app> account?' — 'Hermes stops acting as this account.'",
+  "states": "no accounts, one account, several accounts, retired rows, rename dialog (alias rule: 'Lowercase letters, numbers and dashes, up to 32.'), remove confirm",
+  "test": "Add a second account for a fixture connector and confirm both appear with distinct aliases and that removing one leaves the other connected.",
+  "rust_evidence": "",
+  "unsure": "Requires multiple real sign-ins; unverifiable in a headless test run."
+ },
+ "PLUG-019": {
+  "behavior": "The 'Tools' panel for a connector shows 'What Hermes may do with <name>', a facet summary (Read/Write/Destructive/Unknown effect), quick rules 'Read only'/'Turn off destructive'/'Everything on', per-tool switches, and 'Save changes'/'Discard'; loading says 'Reading the tool list' and an unavailable list shows 'Tool list unavailable.'",
+  "states": "loading, summary, all tools, filtered (search 'Search N tools'), deprecated hidden/shown, dirty ('N tools off, M back on'), saving ('Saving...'), saved, no match ('No tool matches these filters.')",
+  "test": "Turn off one destructive tool for a fixture connector, Save, and confirm the backend's tool list reflects it for a new session.",
+  "rust_evidence": "",
+  "unsure": "The connector tool-rule API (connectors.tools) requires a connected account, so the write path may be untestable headlessly."
+ },
+ "PLUG-020": {
+  "behavior": "Tool rules are loaded and written through connectors.policy.get|set; a concurrent change is detected and shows 'Someone changed this rule while you were editing.' with 'Reload their version' / 'Save over their version', and a failed save shows 'Those tool rules were not saved.'",
+  "states": "clean, dirty, saving, saved, conflict dialog, save failed, offline/not installed ('Install it on this device to see the tools it brings.')",
+  "test": "Edit a tool rule, have the backend change the same rule, then save and confirm the conflict dialog appears with both resolution choices.",
+  "rust_evidence": "",
+  "unsure": "The conflict detection payload (revision/etag) was not read; use-tools-editor.ts was only skimmed."
+ },
+ "PLUG-021": {
+  "behavior": "Hosted (managed) connectors expose an extra dialog for account-level actions — 'Disconnect <name>?' ('Hermes stops acting as this account. You can connect again at any time.') and 'Where <name> runs' showing 'Managed' vs local with 'Both are on, so Hermes sees every <name> tool twice.' and 'Turn off the local server'.",
+  "states": "hosted available, hosted and local both on (duplicate-tools warning), disconnect confirm, disconnect refused ('Nous could not remove this sign-in right now...'), no account to disconnect",
+  "test": "With a hosted fixture connector, open the dialog and confirm the ways section and disconnect copy render.",
+  "rust_evidence": "",
+  "unsure": "Hosted actions need a signed-in Nous account; not verifiable against the private test backend."
+ },
+ "PLUG-022": {
+  "behavior": "A locally runnable connector card offers 'Turn <name> on'/'Turn <name> off' (and 'Also runs on this device' when a hosted twin exists); toggling the local server changes its state pill between 'On', 'Connecting…', 'Off', 'Error' and 'Needs authentication'.",
+  "states": "on, on-unused ('On, unused'), connecting, off, error, needs-auth, server state unknown ('State unknown')",
+  "test": "Turn a local fixture server on in the Rust app and confirm its state resolves to On and its tools appear.",
+  "rust_evidence": "",
+  "unsure": "Whether the private test backend can run any local connector server."
+ },
+ "PLUG-023": {
+  "behavior": "Connector deeplinks (e.g. hermes://connector/…) open the Connectors page with that connector's dialog focused; an unknown or malformed target falls back to the Connectors list instead of erroring.",
+  "states": "valid deeplink (dialog focused), unknown connector (list shown), not signed in (list shown)",
+  "test": "Fire a fixture connector deeplink at the Rust app and confirm the Connectors tab opens with that app's dialog.",
+  "rust_evidence": "",
+  "unsure": "No deeplink routing in the Rust app; the deep-link.ts scheme was not read."
+ },
+ "PLUG-024": {
+  "behavior": "Typing a connector's name in the composer offers a suggestion that references it (from the connector catalog, RPC connectors.list), suppressed when the connector is not connected.",
+  "states": "no match, suggestion offered, suppressed (not connected / already in use)",
+  "test": "With a connected fixture connector type its name in the Rust composer and confirm the suggestion appears.",
+  "rust_evidence": "",
+  "unsure": "src/store/connector-catalog.ts does not exist under that path (source ref is stale); behavior inferred from the sibling suggestion providers."
+ },
+ "MEM-001": {
+  "behavior": "Settings → Memory & Context → 'Persistent memory' shows memory status from /api/memory: 'Memory data' — 'Built-in memory files injected into every session' — with 'Active provider: <name>', 'Agent memory (MEMORY.md)' and 'User profile (USER.md)' rows showing each file's size (or 'empty').",
+  "states": "loading, provider built-in, files present with byte sizes, 'empty', provider name shown, load failure",
+  "test": "Open the memory page in the Rust app and confirm each file's byte size matches what GET /api/memory reports on the private backend.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:230-239 (group 'memory' pages 'persistent'/'context')",
+  "unsure": "Whether the Rust settings page renders file sizes (it may only show the toggles) — the page rows were not listed in detail."
+ },
+ "MEM-002": {
+  "behavior": "'Reset memory' / 'Reset profile' / 'Reset both' posts /api/memory/reset after confirming 'Delete <target>? This cannot be undone.'; success reports 'Deleted <files>.' and the sizes refresh; failure shows 'Memory reset failed'.",
+  "states": "idle, confirm dialog per target, resetting, done ('Deleted <files>.'), reset failed",
+  "test": "Reset the test profile's memory files in the Rust app and confirm GET /api/memory then reports them empty (never run this against a real profile).",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust settings page exposes a reset action for memory files; no such button was found."
+ },
+ "MEM-003": {
+  "behavior": "Memory provider discovery loads /api/memory/providers/{provider}/config, which returns the provider's fields (each with key, kind, value, group and whether it is a secret) used to render 'Active provider: <name>' and the provider's configuration form.",
+  "states": "loading, provider with fields, provider with no fields, provider unavailable, error",
+  "test": "Select each memory provider available on the private backend and confirm the Rust page renders the same field set the config endpoint returns.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1149-1157 (cfg key memory.provider, with a note that its options come from a separate source)",
+  "unsure": "Which memory providers the private test backend actually exposes; the Rust page may only offer the built-in provider."
+ },
+ "MEM-004": {
+  "behavior": "Under the provider dropdown a 'Connect' link appears only for OAuth-capable providers; it calls /api/memory/providers/{p}/oauth/start then polls /oauth/status every 1.5 s up to 120 s. Errors: 'Could not start the connection.', 'Timed out — try again.', 'Connection failed.'; a stored credential shows a connected badge.",
+  "states": "capability unknown (nothing rendered), not capable (404 → nothing), not connected (Connect link), pending (spinner), connected (badge), error (self-clearing after 6 s)",
+  "test": "With an OAuth-capable memory provider on the private backend, click Connect in the Rust app, finish the browser sign-in, and confirm the badge appears.",
+  "rust_evidence": "",
+  "unsure": "Requires an OAuth-capable memory provider + browser; likely unavailable on the private test backend."
+ },
+ "MEM-005": {
+  "behavior": "The provider config modal edits the fields from /api/memory/providers/{p}/config, grouped in declared order, with secrets blanked on load and blank values falling back to the resolved host or built-in default; saving reports '<label> saved' / 'Memory provider configuration updated.'",
+  "states": "closed, open with grouped fields, secret field blank, blank-means-default hint, saving, saved, save error",
+  "test": "Change one non-secret memory provider field in the Rust app and confirm GET /api/memory/providers/{p}/config returns the new value.",
+  "rust_evidence": "",
+  "unsure": "No memory provider config UI in the Rust repo."
+ },
+ "MEM-006": {
+  "behavior": "Settings → Memory & Context → Persistent memory writes config memory.memory_enabled ('Persistent Memory' — 'Save durable memories that can help future sessions.'); turning it off stops new memory writes but keeps existing MEMORY.md content.",
+  "states": "enabled, disabled, saving, autosave failure",
+  "test": "Disable persistent memory in the Rust settings UI and confirm config.yaml's memory.memory_enabled is false on the private backend.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1113-1121 (cfg key memory.memory_enabled)",
+  "unsure": "Whether the Rust label matches ('Persistent Memory') and whether the description text is shown."
+ },
+ "MEM-007": {
+  "behavior": "Settings → Memory & Context writes config memory.user_profile_enabled ('User Profile' — 'Maintain a compact profile of user preferences.'); when off the USER.md profile is no longer injected or updated.",
+  "states": "enabled, disabled, saving, autosave failure",
+  "test": "Toggle the user-profile setting in the Rust UI and confirm memory.user_profile_enabled flips in the backend config.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1122-1128 (cfg key memory.user_profile_enabled)",
+  "unsure": "Whether the Rust page groups it with the persistent-memory toggle."
+ },
+ "MEM-008": {
+  "behavior": "Numeric limits memory.memory_char_limit and memory.user_char_limit cap how many characters of MEMORY.md and USER.md are injected into each session; raised/lowered values autosave and take effect for new sessions.",
+  "states": "default limits, custom values, invalid (below 1) rejected by numeric parsing, autosave failure",
+  "test": "Set memory.memory_char_limit to a small value in the Rust UI, run a session, and confirm the injected memory block is truncated to the cap.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1131-1146 (cfg keys memory.memory_char_limit, memory.user_char_limit)",
+  "unsure": "Whether the Rust numeric control enforces a minimum."
+ },
+ "MEM-009": {
+  "behavior": "The 'Memory provider' select writes config memory.provider (built-in by default); its options are supplied by the backend's provider list rather than a static enum, and switching provider changes where memory is read/written for new sessions.",
+  "states": "built-in selected, external provider selected, options loading, provider unavailable, autosave failure",
+  "test": "Switch the memory provider in the Rust UI and confirm config.yaml's memory.provider matches, and that a new session reports that provider.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1149-1157 (cfg key memory.provider; note that options are not a static list)",
+  "unsure": "How the Rust Select is populated when the key's options are dynamic — the schema-driven page may show a free-text row instead."
+ },
+ "MEM-010": {
+  "behavior": "Settings → Memory & Context → Context & compression writes config context.engine ('Context Engine' — 'Strategy for managing long conversations near the context limit.') with options compressor / default / custom.",
+  "states": "compressor, default, custom, saving, autosave failure",
+  "test": "Switch the context engine to compressor in the Rust UI and confirm config.yaml's context.engine matches on the private backend.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1158-1166 (cfg key context.engine)",
+  "unsure": "Whether the Rust Select carries the same three options."
+ },
+ "MEM-011": {
+  "behavior": "Auto-compression settings write config compression.enabled (master switch), compression.threshold (percentage of context that triggers compaction), compression.target_ratio, compression.protect_last_n and compression.codex_gpt55_autoraise; changing them applies to new sessions.",
+  "states": "enabled, disabled (threshold greyed), edited values, invalid percentage, autosave failure",
+  "test": "Lower compression.threshold in the Rust UI, run a long session on the private backend, and confirm compaction fires earlier.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1171-1215 (cfg keys compression.enabled / threshold / target_ratio / protect_last_n / codex_gpt55_autoraise)",
+  "unsure": "Whether every one of those keys is rendered by the Rust page (the page's rows were not enumerated)."
+ },
+ "MEM-012": {
+  "behavior": "auxiliary.compression.timeout is the number of seconds to wait for the auxiliary compression model per call (default 120); raising it helps slow local models and is shown with that hint.",
+  "states": "default (120), raised value, invalid value, autosave failure",
+  "test": "Set auxiliary.compression.timeout to 300 in the Rust UI and confirm config.yaml reflects it on the private backend.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1216-1222 (cfg key auxiliary.compression.timeout)",
+  "unsure": "Whether the Rust row shows the 'default 120' hint."
+ },
+ "MEM-013": {
+  "behavior": "Settings → Chat → Behavior writes config display.show_reasoning, which controls whether thinking/reasoning blocks are shown in the transcript; when off the reasoning rows are hidden from the thread.",
+  "states": "on (reasoning blocks visible), off (hidden), saving, autosave failure",
+  "test": "Toggle display.show_reasoning off in the Rust UI, send a prompt that reasons, and confirm no reasoning block renders in the transcript.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:935-943 (cfg key display.show_reasoning)",
+  "unsure": "Whether the Rust transcript renders reasoning blocks at all today (the toggle may be wired to nothing)."
+ },
+ "MEM-014": {
+  "behavior": "The memory settings surface reports provider health/troubleshooting state: when the configured provider is unreachable or unconfigured the page shows that status instead of file sizes, and the provider dropdown plus its config form are the recovery path.",
+  "states": "provider ok, provider unconfigured, provider error/unreachable, loading",
+  "test": "Point memory.provider at an unavailable provider in the test config and confirm the Rust memory page shows an error state rather than stale sizes.",
+  "rust_evidence": "",
+  "unsure": "The row's source is a glob (src/app/settings/memory/*); I could not identify a single troubleshooting-status component, so this behavior is only partially confirmed."
+ },
+ "MSG-001": {
+  "behavior": "Open 'Messaging' → list of platforms from /api/messaging/platforms with a status filter ('All', 'Errors', 'Connected', 'Inactive', 'Needs attention') and search 'Search messaging...'; each row shows its state ('Connected', 'Connecting', 'Disabled', 'Error', 'Messaging gateway stopped', 'Needs setup', 'Restart needed', 'Retrying', 'Startup failed').",
+  "states": "loading ('Loading messaging platforms...'), load error 'Messaging platforms failed to load', connected, needs setup, restart needed, gateway stopped ('Start the gateway from the status bar to connect.'), disabled",
+  "test": "Open Messaging in the Rust app and confirm every platform from GET /api/messaging/platforms is listed with the same state string.",
+  "rust_evidence": "",
+  "unsure": "No Messaging page in the Rust repo; also the private test backend likely has no platform configured, so only the needs-setup state is reachable."
+ },
+ "MSG-002": {
+  "behavior": "Select a platform → its credential form grouped 'Required' / 'Recommended' / 'Advanced (N)' with placeholders and help text per env key, 'Replace current value' to overwrite a saved secret, 'Clear <key>' to remove one, list rows with 'Add another'; 'Save changes' shows 'Saving...' then 'Saved'.",
+  "states": "loading, unsaved changes ('Unsaved changes'), saving, saved ('Applied to the running gateway.' or 'New credentials take effect after a gateway restart.'), key cleared ('<key> cleared'), failures 'Failed to save <name>' / 'Failed to clear <key>'",
+  "test": "Save a dummy credential for a platform on the private backend and confirm GET /api/messaging/platforms reports it set; then clear it.",
+  "rust_evidence": "",
+  "unsure": "Whether saving without every required field is blocked client-side; not traced in messaging/index.tsx."
+ },
+ "MSG-003": {
+  "behavior": "A 'Test' action on a platform POSTs /api/messaging/platforms/{id}/test and reports success/failure for that platform's credentials without saving them permanently.",
+  "states": "idle, testing, ok, failure toast",
+  "test": "Run Test for a platform with known-bad credentials and confirm the Rust app surfaces the failure from the test endpoint.",
+  "rust_evidence": "",
+  "unsure": "The Test button's exact placement/label in messaging/index.tsx was not located; only the API call is confirmed."
+ },
+ "MSG-004": {
+  "behavior": "Telegram setup: 'Choose how to connect your Telegram bot' → 'Quick setup' (recommended) 'Create with QR' shows a QR ('Scan with the Telegram app on your phone, or open the link on this computer.', 'Waiting for Telegram…', 'Expires in <remaining>'), then 'Bot created' + 'Owner detected' + 'Allowed users'; 'Save and restart' → 'Telegram saved; gateway restarting…'.",
+  "states": "choice dialog, QR waiting, expiry ('Expired'), bot created, owner detected, replacing existing credentials warning, numeric-only validation ('Allowed Telegram user IDs must be numeric.'), save, restart failed ('Telegram saved; gateway restart failed<detail>')",
+  "test": "Start the QR flow in the Rust app against the private backend and confirm the QR/onboarding URL appears; completing it needs a real Telegram account, so only the pending/expired states are testable.",
+  "rust_evidence": "",
+  "unsure": "Completing Telegram pairing needs a real account and phone; the flow can only be verified up to the pending state."
+ },
+ "MSG-005": {
+  "behavior": "The Messaging page shows pairing from /api/pairing: 'Pending requests (N)' rows with the requester and how long they have waited ('just now' / 'Nm ago'), and 'Approved users (N)'; the tab label is 'N pending pairing requests' for screen readers.",
+  "states": "no pending, pending rows, approved rows, loading, load failure",
+  "test": "With a pending pairing request injected on the private backend, confirm the Rust page lists it under 'Pending requests (1)'.",
+  "rust_evidence": "",
+  "unsure": "Generating a real pending pairing request requires an inbound message from a messaging platform; the test backend may not be able to produce one."
+ },
+ "MSG-006": {
+  "behavior": "'Approve' on a pending request POSTs /api/pairing/approve (button shows 'Approving...'), the row moves to approved and a toast says '<name> approved' with 'They are recognized automatically on their next message.'; failure 'Failed to approve <name>'; repeated failures show 'Too many failed approvals — this platform is locked out. Try again later.'",
+  "states": "pending, approving, approved (row moves), failure toast, locked out",
+  "test": "Approve a stubbed pending request in the Rust app and confirm the private backend lists the user under approved.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust app has any pairing UI at all (nothing found)."
+ },
+ "MSG-007": {
+  "behavior": "'Revoke' on an approved user opens a confirm ('Revoke access' — '<name> will lose access and stop being recognized on their next message.') and on confirm POSTs /api/pairing/revoke ('Revoking...'), then toasts '<name> revoked'; failure 'Failed to revoke <name>'.",
+  "states": "confirm dialog, revoking, revoked (row removed), failure",
+  "test": "Revoke an approved user in the Rust app and confirm the private backend's /api/pairing no longer lists them.",
+  "rust_evidence": "",
+  "unsure": "Requires an approved user to exist on the test backend first."
+ },
+ "MSG-008": {
+  "behavior": "Allowlist fields on each platform render a list of user IDs with 'Add another', per-row 'Remove' and the placeholder 'Enter an ID'; entries are validated per platform (e.g. Telegram IDs must be numeric) and saved with the rest of the form.",
+  "states": "empty list, entries present, invalid entry, added, removed, saving",
+  "test": "Add one allowed user id for a platform in the Rust app, save, and confirm the stored env value contains exactly that id.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust side parses/validates ids per platform like the React component."
+ },
+ "MSG-009": {
+  "behavior": "RPC bot_relay.* carries the bot message relay: the outbox (queued outbound messages), reply routing back into a bot's session, and the roster of bots/groups — the hermes-bots plugin renders these as chat rows.",
+  "states": "relay connected, outbox pending, reply delivered, roster empty, relay unavailable",
+  "test": "With the hermes-bots plugin active on the private backend, send a bot message and confirm the relayed row appears in the Rust chat with its sender label.",
+  "rust_evidence": "",
+  "unsure": "The bot_relay method set and its payloads were not enumerated; source is a directory glob (src/plugins/hermes-bots/*)."
+ },
+ "MSG-010": {
+  "behavior": "WS notifications platforms.changed and pairing.changed invalidate the messaging and pairing views so the platform list and pending/approved users update live without a manual refresh.",
+  "states": "no event, platform changed (list refetch), pairing changed (pairing refetch), transient fetch error",
+  "test": "Change a platform's state on the private backend while the Rust Messaging page is open and confirm the row updates without a reload.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust client subscribes to these notifications (no messaging code found)."
+ },
+ "MSG-011": {
+  "behavior": "Bot and group chats are filtered by a chat scope (which bot/group conversations appear in the session list), persisted locally and applied to the sidebar's session grouping.",
+  "states": "all scope, single bot/group scope, scope with no matches, persisted across launches",
+  "test": "Switch the bot chat scope in the Rust app and confirm only sessions belonging to that bot/group remain listed.",
+  "rust_evidence": "",
+  "unsure": "src/store/bot-chat-scope.ts does not exist at that path (the row's source looks stale/moved), so the exact scope model is unverified."
+ },
+ "MSG-012": {
+  "behavior": "Group chats are orchestrated through RPC groups.*: groups.capabilities gates the feature, groups.create opens a room, groups.state returns members/state, groups.send posts a turn, and groups.attachment.upload/download move files in and out; the UI only offers the group surface when the capabilities gate passes.",
+  "states": "unsupported driver/version (no group UI), supported, creating, active room, attachment uploading/downloading, send failed",
+  "test": "Check groups.capabilities against the private backend and confirm the Rust app only offers group chats when the method reports a capable driver.",
+  "rust_evidence": "",
+  "unsure": "Group orchestration needs an external group driver; the feature almost certainly degrades to unsupported on the test backend."
+ },
+ "CRON-001": {
+  "behavior": "Open 'Scheduled jobs' → the jobs list from /api/cron/jobs with count ('N jobs'), search 'Search cron jobs...', per-job state pills ('enabled', 'scheduled', 'running', 'paused', 'disabled', 'last run failed', 'completed') and timing lines 'Last:', 'Next:' (or 'Overdue since:'), 'No runs yet'.",
+  "states": "loading ('Loading cron jobs...'), empty ('No scheduled jobs yet' + 'Schedule a prompt to run on a cron expression.'), list, search no-match ('No matches'), last run failed, overdue, load error 'Failed to load cron jobs'",
+  "test": "Open Scheduled jobs in the Rust app and confirm the jobs, their state pills and next-run times match GET /api/cron/jobs on the private backend.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:130 (sidebar nav 'Scheduled')",
+  "unsure": "The Rust sidebar has a 'Scheduled' nav item but no cron page/route was found."
+ },
+ "CRON-002": {
+  "behavior": "'New cron' opens 'New cron job' with Name, Prompt, optional Script, Frequency (Daily/Weekdays/Weekly/Monthly/Hourly/Every 15 minutes/Custom), 'Deliver to' and Model; 'Create cron' POSTs /api/cron/jobs, 'Save changes' updates it (RPC cron.manage).",
+  "states": "dialog open, validation errors ('Prompt is required.', 'Prompt and schedule are required.', 'Schedule is required.'), script-only hint, saving, 'Cron created' / 'Cron updated', 'Failed to save cron job'",
+  "test": "Create a job ('*/5 * * * *', prompt 'ping', deliver to This desktop) in the Rust app and confirm GET /api/cron/jobs returns it, then delete it.",
+  "rust_evidence": "",
+  "unsure": "No cron UI in the Rust repo; also whether the test backend persists jobs between runs is unverified."
+ },
+ "CRON-003": {
+  "behavior": "Delete a job: confirm dialog 'Delete cron job?' — 'This will remove <name> permanently. It will stop firing immediately.' — then DELETE /api/cron/jobs/{id} ('Deleting...'), toast 'Cron deleted'; failure 'Failed to delete cron job'.",
+  "states": "confirm dialog, deleting, deleted, failure, cancel",
+  "test": "Delete a throwaway job in the Rust app and confirm it disappears from GET /api/cron/jobs.",
+  "rust_evidence": "",
+  "unsure": "None beyond the feature not being implemented in the Rust app."
+ },
+ "CRON-004": {
+  "behavior": "'Pause cron' / 'Resume cron' POST the pause/resume endpoint for the job and flip its state pill ('paused' ↔ 'scheduled'); toasts 'Cron paused' / 'Cron resumed'; failure 'Failed to update cron job'.",
+  "states": "enabled, paused, resuming, toast, failure",
+  "test": "Pause a job in the Rust app and confirm GET /api/cron/jobs reports it paused (and that it does not fire).",
+  "rust_evidence": "",
+  "unsure": "Whether pause is a POST to /{id}/pause or a flag via PUT; the row lists both, source not read."
+ },
+ "CRON-005": {
+  "behavior": "'Trigger now' runs the job immediately and refreshes the list from the backend; feedback is 'Cron triggered' (or 'Queued run' while the run's session is not yet materialized); failure 'Failed to trigger cron job'.",
+  "states": "idle, triggering, triggered toast, queued run, failure toast, one-shot job deleted after running",
+  "test": "Trigger a throwaway job in the Rust app and confirm a run appears in its runs history and (if it delivers locally) a session is created.",
+  "rust_evidence": "",
+  "unsure": "Whether the private test backend can actually execute the prompt (it would need a model); 'Queued run' may be the only observable state."
+ },
+ "CRON-006": {
+  "behavior": "'Run history' / 'Show runs' expands a job's runs (GET /api/cron/jobs/{id}/runs) with each run's start time and outcome ('last run failed' with 'Last run failed:'), or 'No runs yet' when the job has never fired.",
+  "states": "collapsed ('Show runs'), expanded ('Hide runs'), no runs, runs with success/failure, running",
+  "test": "After triggering a job, expand Run history in the Rust app and confirm the run row matches GET /api/cron/jobs/{id}/runs.",
+  "rust_evidence": "",
+  "unsure": "The runs payload shape (status field names) was not read from job-state.ts."
+ },
+ "CRON-007": {
+  "behavior": "The job editor's 'Deliver to' select is populated from /api/cron/delivery-targets with labels 'This desktop', 'Telegram', 'Discord', 'Slack', 'Email'; a platform without a home channel shows 'set a home channel first'.",
+  "states": "targets loaded, desktop only (no messaging configured), target missing home channel, load failure",
+  "test": "Open the deliver select in the Rust app and confirm the options match GET /api/cron/delivery-targets on the private backend.",
+  "rust_evidence": "",
+  "unsure": "Whether the private test backend returns only the local target (no messaging platforms configured)."
+ },
+ "CRON-008": {
+  "behavior": "The 'Blueprints' tab lists ready-made automations ('Ready-made automations') from /api/cron/blueprints; each card opens a dialog with the blueprint's slots (enum/weekdays/time/text) and 'Schedule it'; empty state 'No blueprints available' — 'No automation blueprints are available on this backend.'",
+  "states": "loading ('Loading blueprints...'), list, empty, load failure 'Failed to load blueprints', dialog open",
+  "test": "Open the Blueprints tab in the Rust app and confirm the blueprint names match GET /api/cron/blueprints.",
+  "rust_evidence": "",
+  "unsure": "Whether the private test backend ships any blueprints (the empty state may be all that is reachable)."
+ },
+ "CRON-009": {
+  "behavior": "'Schedule it' instantiates a blueprint (/api/cron/blueprints/instantiate, button shows 'Scheduling...'), seeding the deliver slot to 'This desktop' and validating each slot (field errors shown inline with the leading status code stripped); success toast 'Blueprint scheduled'.",
+  "states": "dialog open, invalid slot (inline error), scheduling, scheduled, failure",
+  "test": "Instantiate a blueprint in the Rust app and confirm a matching job appears in GET /api/cron/jobs with the seeded schedule.",
+  "rust_evidence": "",
+  "unsure": "Whether any blueprint exists on the test backend to instantiate."
+ },
+ "CRON-010": {
+  "behavior": "The sidebar has a 'Cron jobs' section listing the active jobs with their next run and state, so due/overdue jobs are visible without opening the Scheduled jobs page.",
+  "states": "no jobs (section hidden or empty), jobs listed, running job, overdue job",
+  "test": "With a job present, confirm the Rust sidebar's Scheduled section lists it with the same next-run time as the full page.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:130 (NavItem 'Scheduled')",
+  "unsure": "The React sidebar section lists jobs inline; the Rust nav item is a static nav row, so per-job rows are unbuilt."
+ },
+ "CRON-011": {
+  "behavior": "Clicking a job's run (or its run session) opens that run's conversation in a chat tab so the user can read the output and reply, instead of only seeing the status.",
+  "states": "no run session yet (row not clickable), run session exists (opens tab), run session deleted (error)",
+  "test": "Trigger a job, then click its run in the Rust app and confirm a chat tab opens with that run's transcript.",
+  "rust_evidence": "",
+  "unsure": "open-cron-run.ts was not read; the exact affordance (run row vs a button) is unverified."
+ },
+ "CRON-012": {
+  "behavior": "The WS notification cron.changed invalidates the cron list so jobs/pauses/triggers made elsewhere (CLI, another window, the scheduler itself) show up live without pressing refresh.",
+  "states": "no event, jobs changed (refetch), jobs list loading, stale scope guard (older request superseded)",
+  "test": "Add a job via the private backend's CLI while the Rust Scheduled page is open and confirm it appears without a manual refresh.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust client subscribes to cron.changed (no cron code found)."
+ },
+ "ART-001": {
+  "behavior": "Open 'Artifacts' → the artifact library from session outputs with tabs 'All' / 'Images' / 'Files' / 'Links' (each with a count), search 'Search artifacts...', a refresh button ('Refresh artifacts', spinning while 'Indexing recent session artifacts') and pagination ('<start>-<end> of <total>'); columns are 'Link title'/'URL', 'Name'/'Path', 'Session'.",
+  "states": "loading, populated with per-kind counts, empty ('No artifacts found' — 'Generated images and file outputs will appear here as sessions produce them.'), refreshing, search no-match, load error 'Artifacts failed to load', open failed ('Open failed')",
+  "test": "Open Artifacts in the Rust app and confirm the counts and rows match what the private backend's sessions produced (create one image/file output first).",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:129 (sidebar NavItem 'Artifacts')",
+  "unsure": "The Rust app has an Artifacts nav item but no artifacts page/store was found; artifact indexing may need a session that actually produces artifacts."
+ },
+ "ART-002": {
+  "behavior": "Artifact detection scans assistant messages for substantial code blocks, HTML pages and SVG graphics and attaches an artifact card to the message: kind badge 'Code' / 'Interactive page' / 'Graphic', a 'Generating… N lines' state while the block is still streaming, 'N versions' and 'Open'.",
+  "states": "no artifact, streaming ('Generating… N lines'), complete with version count, multiple versions, open",
+  "test": "Ask the private backend's agent for an HTML/SVG snippet and confirm the Rust transcript shows an artifact card with the right kind badge.",
+  "rust_evidence": "",
+  "unsure": "artifact-detect.ts thresholds (min lines/size) were not read, so which blocks qualify is unverified."
+ },
+ "ART-003": {
+  "behavior": "Artifacts are kept in a local registry with versions; opening one shows 'v<current> of <total>' with 'Older version'/'Newer version' navigation, 'Latest', and 'Copy content' / 'Download' / 'Open in browser'; an artifact missing from the registry shows 'Artifact unavailable' — 'This artifact is no longer in the local registry.'",
+  "states": "single version, multiple versions (navigation), latest, older, missing, copy/download",
+  "test": "Produce a regeneration of one artifact, then step versions in the Rust preview and confirm the content matches each version in the store.",
+  "rust_evidence": "",
+  "unsure": "Where versions are persisted (local storage vs session store) was not read."
+ },
+ "ART-004": {
+  "behavior": "The right-rail 'Preview' pane hosts an in-app browser/file viewer; loading shows 'Loading preview' and a failure shows 'Preview unavailable'; the pane can be closed ('Close preview pane') or pinned ('Pin to workspace').",
+  "states": "closed, loading, loaded, unavailable, pinned/unpinned",
+  "test": "Open a local HTML file in the Rust preview pane against the private backend and confirm it renders and that closing the pane removes the tab.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has no preview pane (no web view) — this is the biggest structural gap in the ART/PANE area."
+ },
+ "ART-005": {
+  "behavior": "Preview pages render in a guest Chromium webview owned by the Electron shell (not the renderer), with an offscreen variant used while the pane is hidden or transitioning so state survives tab switches.",
+  "states": "guest alive, offscreen (pane hidden), reloaded, crashed ('Preview app failed to boot')",
+  "test": "Not testable in the Rust client; in the Electron app, hide and reshow the preview and confirm page state survives.",
+  "rust_evidence": "",
+  "unsure": "Rows marked '(platform)' depend on Electron webview internals; a native client would need an embedded browser engine, which the Rust rewrite does not have."
+ },
+ "ART-006": {
+  "behavior": "The preview browser bar has 'Back', 'Forward', 'Reload page', an 'Address' field (placeholder 'Enter address') with history autocomplete; an empty page shows 'Type an address above to browse, or ask Hermes to open a page.', and links in chat carry the hint '⌘/Ctrl-click for preview pane'.",
+  "states": "blank page, loaded URL, editing address, navigation blocked (non-http), back/forward disabled at ends",
+  "test": "Type a local test URL in the Rust preview bar and confirm the page loads and Back returns to the previous URL.",
+  "rust_evidence": "",
+  "unsure": "No preview browser bar in the Rust app."
+ },
+ "ART-007": {
+  "behavior": "The preview console lists page console output ('Preview Console', 'N console messages'), supports selecting entries ('N selected'), copy ('Copy all to clipboard'), clear and sending entries to chat ('Send to chat' → 'N log entries added to composer'); empty state 'No console messages yet.'",
+  "states": "hidden, shown, empty, entries, selection, copied, sent ('Sent to chat'), copy failed",
+  "test": "With a page that logs on load, open the Rust preview console and confirm the entries appear and 'Send to chat' inserts them into the composer.",
+  "rust_evidence": "",
+  "unsure": "Console capture requires the guest webview's devtools protocol; unavailable in the Rust client."
+ },
+ "ART-008": {
+  "behavior": "'Annotate' enters annotation mode on the preview page ('Stop annotating' leaves it); hovering elements shows numbered pins and clicking opens a comment box ('Comment <n>', 'Add a comment...'), then 'Add N comments' sends them to the agent. Previewing is required ('Open a page in the in-app browser first.').",
+  "states": "off, annotating, hovered element, comment box open, saving comment ('Save'/'Cancel comment'), sent, error ('Could not start annotation mode')",
+  "test": "In the Electron app, enter annotation mode on a local page, add one comment, and confirm the annotation reaches the agent as a SRV preview.act request; the Rust client cannot do this.",
+  "rust_evidence": "",
+  "unsure": "Annotation depends on the Electron preview bridge and the SRV preview.act server->client request; no Rust equivalent."
+ },
+ "ART-009": {
+  "behavior": "The preview act bridge (SRV preview.act) lets the agent click, type and scroll inside the preview page on the user's behalf, returning the resulting page state; the desktop answers the server->client request against the live webview.",
+  "states": "idle, act request pending, act applied, request failed/timeout, no preview open (error)",
+  "test": "Ask the agent to click a button in a local preview page and confirm the action happens and the agent receives the updated state (Electron app only).",
+  "rust_evidence": "",
+  "unsure": "src/lib/preview-act/* does not exist at that path (source ref stale/exact path unverified), so the act vocabulary is not enumerated."
+ },
+ "ART-010": {
+  "behavior": "The preview reader (SRV preview.read) returns the visible page's text to the agent; each preview tab registers a reader function (registerPreviewPageReader) so the right tab answers, and the reader is unregistered when the tab closes.",
+  "states": "reader registered, read request served, no reader (error), tab closed (unregistered)",
+  "test": "With a text-heavy page open locally, confirm a preview.read request returns that page's text (Electron app only).",
+  "rust_evidence": "",
+  "unsure": "preview-reader.ts registers readers per tab; the wire shape of the read reply was not traced."
+ },
+ "ART-011": {
+  "behavior": "When the preview shows a failing dev server the UI offers 'Ask Hermes to restart the server' → 'Hermes is looking for a preview server to restart (<taskId>)', then 'Preview server restarted' / 'Reloading the preview now.'; failures show 'Preview restart failed' / 'Server restart failed: <message>'.",
+  "states": "idle, looking for the server, restarting ('Hermes is restarting...'), restarted, failed, still working ('no restart result has arrived yet')",
+  "test": "Kill a local dev server behind the preview and confirm the Rust/Electron preview offers and completes the restart flow.",
+  "rust_evidence": "",
+  "unsure": "The preview.restart RPC requires a live preview target and a manageable server process; not available in the Rust client."
+ },
+ "ART-012": {
+  "behavior": "The preview file viewer renders a file with mode switches 'SOURCE' / 'PREVIEW' / 'DIFF' ('Click to select · shift-click to extend · drag to composer' on source lines); binary and large files show 'This looks like a binary file' / 'This file is large' with 'Preview anyway' and 'Showing first 512 KB.' for truncation; a missing file shows 'File no longer exists'.",
+  "states": "source, rendered preview, diff, unknown size, binary warning, large warning, truncated, missing file, editing ('Editing', 'Unsaved changes'), save failed, disk changed ('File changed on disk' → 'Overwrite' / 'Discard & reload')",
+  "test": "Preview a local text file in the Rust app, switch to DIFF after editing it on disk, and confirm both the source and the diff render.",
+  "rust_evidence": "crates/hermes-core/src/diff.rs and crates/hermes-core/src/highlight.rs (diff/highlight parsing for file views)",
+  "unsure": "The Rust core has diff/highlight helpers, but no preview pane was found to host them."
+ },
+ "ART-013": {
+  "behavior": "A script preview target runs a project script and streams its output into the preview pane, so a dev server or build script started from the UI shows its log where the preview lives.",
+  "states": "not started, starting, streaming, exited, failed to start",
+  "test": "Start a trivial script target in the Electron app and confirm its output streams into the pane; the Rust client has no script runner.",
+  "rust_evidence": "",
+  "unsure": "preview-script-runner.ts was not read; the exact trigger (button vs auto) is unverified."
+ },
+ "ART-014": {
+  "behavior": "'Pop out' moves the preview into its own window and 'Pop in' returns it to the right rail, keeping the same page state across the move via the popout bridge.",
+  "states": "docked, popped out, popping in, bridge lost (reload)",
+  "test": "Pop the preview out and back in the Electron app and confirm the page state survives; the Rust client has no multi-window preview.",
+  "rust_evidence": "",
+  "unsure": "Requires Electron multi-window plumbing; '(platform)' row, not expected in the Rust rewrite."
+ },
+ "ART-015": {
+  "behavior": "'Open in external' (and 'Open in browser') hands the current preview URL to the OS default browser via the Electron shell, so the user can leave the in-app browser.",
+  "states": "available, opening ('Opening...'), failed ('Could not open in browser')",
+  "test": "Use Open in external in the Electron app and confirm the OS browser opens the URL; the Rust client would need its own openExternal equivalent (not found).",
+  "rust_evidence": "",
+  "unsure": "src/store/preview-open-browser.ts was not found at that path."
+ },
+ "ART-016": {
+  "behavior": "Multiple preview targets can be open at once as tabs scoped to a workspace; 'Pin to workspace' / 'Unpin from workspace' decide whether the tab follows the workspace, and closing a tab drops its target.",
+  "states": "no targets, one target, several tabs, active tab, pinned, unpinned, closed",
+  "test": "Open two local pages as preview tabs in the Electron app, switch between them, and confirm each keeps its own URL/scroll; not available in the Rust client.",
+  "rust_evidence": "",
+  "unsure": "preview-tabs-scope.ts was not found at the stated path."
+ },
+ "ART-017": {
+  "behavior": "While a preview is open the shell watches the underlying files; when one changes the page reloads and the pane reports 'File changed, reloading preview: <url>' (or '<count> file changes, reloading preview: <url>'), and a failed watch reports 'Could not watch preview file: <message>'.",
+  "states": "no watcher, watching, single change (reload), batch changes (reload), watch failed, workspace changed ('Workspace changed, reloading preview')",
+  "test": "Edit a file behind an open preview in the Electron app and confirm the pane reloads and shows the change message.",
+  "rust_evidence": "",
+  "unsure": "electron/preview-file-watch.ts is Electron-main code; a native client would need its own watcher (none found)."
+ },
+ "ART-018": {
+  "behavior": "Before opening a preview the app checks reachability of the target: a dead server shows 'Server not found' / 'Preview failed to load' with 'Try again', and a loopback address on a remote backend explains 'This address points at the machine running your agent, not this one. ...'",
+  "states": "reachable (opens), unreachable ('Server not found'), load failed with Try again, remote loopback warning",
+  "test": "Point the preview at a closed local port and confirm the Rust/Electron pane shows 'Server not found' with a retry, then at a live port and confirm it loads.",
+  "rust_evidence": "",
+  "unsure": "src/lib/preview-reach.ts was not read; the exact probe (fetch vs socket) is unverified."
+ },
+ "ART-019": {
+  "behavior": "The Electron main process can capture the preview page as an image (preview capture), used when the agent needs to see the rendered result; capture failure reports an error to the caller rather than returning a blank image.",
+  "states": "idle, capturing, captured image returned, capture failed",
+  "test": "Not applicable to the headless Rust app; in the Electron app a capture of a local page should return a non-blank image.",
+  "rust_evidence": "",
+  "unsure": "electron/preview-capture.ts depends on the guest webview; unavailable in the Rust client."
+ },
+ "PANE-001": {
+  "behavior": "⌘J (view.toggleRightSidebar, 'mod+j') shows/hides the right sidebar; its panels are Terminal, Files, Review and Logs, exposed with aria labels 'Right sidebar' and 'Right sidebar panels'; the file-browser slot also follows the config setting shown as 'Show the file browser beside the chat'.",
+  "states": "hidden, shown, panel switching, zone collapsed, per-zone tab strip hidden",
+  "test": "Press ⌘J in the Rust app and confirm the right sidebar appears/disappears and that its panels can be switched.",
+  "rust_evidence": "",
+  "unsure": "No right sidebar exists in the Rust UI (app-window.slint has only the left sidebar), so the toggle has nothing to drive."
+ },
+ "PANE-002": {
+  "behavior": "The 'File system' panel shows the workspace folder as a lazy tree (dirs expand on click, files open in preview), with 'Open folder', 'Refresh tree', 'Collapse all folders', a gitignored-visibility toggle and 'No folder selected' when the workspace has no cwd.",
+  "states": "no project ('No project' — 'Open a project to browse its files and review changes.'), loading ('Loading file tree'), tree, folder expanding (placeholder 'Loading…'), empty folder ('Empty' — 'This folder is empty.'), unreadable ('Could not read this folder (<error>).'), tree error ('The file tree hit an error rendering this folder.')",
+  "test": "Open a project in the Rust app and expand its tree, confirming the file list matches the folder on disk.",
+  "rust_evidence": "",
+  "unsure": "The React tree reads folders through Electron fs-ipc, not a backend RPC; the Rust app has no file tree."
+ },
+ "PANE-003": {
+  "behavior": "The tree remembers per-workspace preferences: whether gitignored files are shown ('Show gitignored files' / 'Hide gitignored files') and which folders are collapsed, reapplied on next open.",
+  "states": "ignored hidden (default), ignored shown, all collapsed, preferences persisted per workspace",
+  "test": "Toggle ignored-file visibility in the Rust app and confirm gitignored entries appear/disappear and that the choice survives a reload.",
+  "rust_evidence": "",
+  "unsure": "files/prefs.ts was not read; the storage key and scope are unverified."
+ },
+ "PANE-004": {
+  "behavior": "Right-click a file in the tree for actions: open, reveal in the OS file manager, copy path, rename (inline input, Enter/Esc) and delete (confirm dialog).",
+  "states": "menu closed, menu open, renaming, deleting (confirm), action failed, read-only file",
+  "test": "Copy a file's path from the Rust tree context menu and confirm the clipboard holds the absolute path.",
+  "rust_evidence": "",
+  "unsure": "file-actions.tsx reveals in the OS file manager via Electron; the Rust equivalent was not found."
+ },
+ "PANE-005": {
+  "behavior": "Dragging a file from the tree onto the chat or terminal starts a drag with the file's path as the payload, so it can be attached as context or pasted as a path.",
+  "states": "idle, dragging (dragover highlight), dropped on composer, dropped on terminal, drag cancelled",
+  "test": "Drag a file from the tree into the Rust composer and confirm the draft gains a reference to that path.",
+  "rust_evidence": "",
+  "unsure": "files/dnd-manager.ts was not read; the drop targets and payload format are unverified."
+ },
+ "PANE-006": {
+  "behavior": "With a remote backend the file picker browses folders on that machine: 'Choose remote folder' — 'Browse folders on the connected backend.' — with 'Select folder', 'New folder' (name validation 'Enter a single folder name, without slashes.') and 'Create folder'.",
+  "states": "loading, browsing, folder selected, creating folder, invalid name, create failed ('Could not create the folder (<error>).')",
+  "test": "Open the remote folder picker for a remote backend in the Rust app and confirm it lists that host's directories.",
+  "rust_evidence": "",
+  "unsure": "Requires a remote backend plus the picker UI; neither exists in the Rust app."
+ },
+ "PANE-007": {
+  "behavior": "The files pane's tree is sourced from the workspace's project directory — the RPC/ipc layer lists one directory level at a time and caches it, invalidating on workspace change.",
+  "states": "no workspace, listing, cached, cache cleared (workspace switch), list error (error placeholder row)",
+  "test": "Switch workspaces in the Rust app and confirm the tree reloads for the new directory.",
+  "rust_evidence": "",
+  "unsure": "The implementing code (use-project-tree.ts) calls a local fs-ipc readProjectDir, not RPC projects.tree as the row's surface claims — one of the two is stale."
+ },
+ "PANE-008": {
+  "behavior": "The 'Review' panel shows the workspace's source-control state (changed files, diffs) for the current repository; with nothing changed it shows 'No diffs', and it offers 'Refresh tree'.",
+  "states": "no project ('No project open'), loading, no changes ('No diffs'), changes listed, refresh, error",
+  "test": "Edit a file in the Rust app's workspace and confirm the Review panel lists it as changed with a diff.",
+  "rust_evidence": "crates/hermes-core/src/diff.rs (diff parsing used by the transcript's diff rows)",
+  "unsure": "The review panel's data source (/api/git/*) was not located in src/api; the Rust app has no review panel."
+ },
+ "PANE-009": {
+  "behavior": "The review panel lists changed files as a tree with per-file status (added/modified/deleted/renamed) and lets the user open a file's diff.",
+  "states": "grouped by folder, file selected, diff open, statuses (added/modified/deleted/renamed/untracked)",
+  "test": "Confirm each changed file in the test repo appears with the same status letter in the Rust review tree as git reports.",
+  "rust_evidence": "",
+  "unsure": "No review file tree in the Rust app."
+ },
+ "PANE-010": {
+  "behavior": "A churn bar above the review list visualises additions vs deletions for the working tree, with the aggregate counts shown next to it.",
+  "states": "no changes, additions only, deletions only, mixed, very large change (clamped bar)",
+  "test": "Compare the churn bar's added/removed counts with `git diff --stat` for the test repo.",
+  "rust_evidence": "",
+  "unsure": "No churn bar in the Rust app; the exact counting rule (lines vs files) was not read."
+ },
+ "PANE-011": {
+  "behavior": "A scope row switches the review between staged, unstaged and pull-request scopes, re-scanning the repository for the chosen scope.",
+  "states": "staged, unstaged, PR scope, empty scope, scan running",
+  "test": "Stage a change, switch the scope row in the Rust app, and confirm the file moves between the staged and unstaged lists.",
+  "rust_evidence": "",
+  "unsure": "scope-row.tsx was not read; whether the PR scope needs GitHub auth is unverified."
+ },
+ "PANE-012": {
+  "behavior": "The ship bar offers the commit/push actions for the current scope (message field plus commit, and push when a remote exists), reporting success or the underlying git error.",
+  "states": "clean, dirty (commit enabled), committing, committed, pushing, pushed, git error, detached HEAD/no remote (disabled)",
+  "test": "Commit one file in a throwaway test repo from the Rust app and confirm `git log` shows the commit.",
+  "rust_evidence": "",
+  "unsure": "ship-bar.tsx uses Electron git-ipc; the Rust app has no git write path."
+ },
+ "PANE-013": {
+  "behavior": "A WS review.summary notification carries the agent-produced summary of the pending changes and is rendered at the top of the review panel as a short prose abstract.",
+  "states": "no summary, summary present, summary stale (code changed after it), summary dismissed",
+  "test": "Ask the agent to review the working tree and confirm the summary appears in the Rust review panel.",
+  "rust_evidence": "",
+  "unsure": "The notification's payload shape was not read from src/store/review.ts."
+ },
+ "PANE-014": {
+  "behavior": "The review panel lists open pull requests for the workspace (GET /api/profiles/sessions/pull-requests) with their title, number and state so the user can jump from a change to its PR.",
+  "states": "no PRs, PR list, state badges (open/merged/closed/draft), load failure",
+  "test": "With a repo that has a PR, confirm the Rust review panel lists the same PR number/title as the endpoint returns.",
+  "rust_evidence": "",
+  "unsure": "Requires GitHub credentials on the test backend; likely unavailable."
+ },
+ "PANE-015": {
+  "behavior": "A GitHub auth probe (GET /api/git/gh-auth, ?refresh=true to re-probe) determines whether pull-request features are usable and gates the PR suggestions in the composer.",
+  "states": "authenticated, not authenticated (features hidden), probing, probe failed",
+  "test": "Run the probe against the private backend and confirm the Rust UI shows PR features only when the endpoint reports authenticated.",
+  "rust_evidence": "",
+  "unsure": "The endpoint's response shape was not read."
+ },
+ "PANE-016": {
+  "behavior": "The 'Terminal' panel hosts a persistent PTY rooted at the workspace cwd; a command that is not attached to an interactive terminal renders as read-only output ('Read-only output' — 'To answer prompts, stop the background command and run it in a new terminal.') with an 'Open new terminal' action.",
+  "states": "not started, running, exited, read-only output (background command), 'Hide terminal', shell error",
+  "test": "Open a terminal in the Rust app, run `pwd`, and confirm the output appears and the shell keeps state (e.g. a later `echo $((1+1))` still works in the same session).",
+  "rust_evidence": "",
+  "unsure": "The Rust app has no terminal pane; the PTY lives in Electron main (terminal-ipc) with no native equivalent found."
+ },
+ "PANE-017": {
+  "behavior": "Terminals are stacked in a vertical rail (aria 'Terminals') with a 'New terminal' button and per-terminal close; the rail menu offers 'Close others', 'Close all' and 'Hide terminal'.",
+  "states": "one terminal, several terminals, active tab, closing, close others, close all, hidden",
+  "test": "Open three terminals in the Rust app, close one via the rail, and confirm the other two keep their scrollback and cwd.",
+  "rust_evidence": "",
+  "unsure": "No terminal rail in the Rust app."
+ },
+ "PANE-018": {
+  "behavior": "A new terminal spawns a fresh shell in the workspace directory (independent of any previous PTY), and becomes the active tab in the rail.",
+  "states": "spawning, ready, spawn failed (error row), cwd missing (fallback home)",
+  "test": "Press the new-terminal chord in the Rust app from a project folder and confirm the new shell starts in that folder.",
+  "rust_evidence": "",
+  "unsure": "terminals.ts was not read; the queued-start behavior when the backend is busy is unverified."
+ },
+ "PANE-019": {
+  "behavior": "Terminal clipboard: ⌘C/⌘V on macOS, Ctrl+Shift+C/V elsewhere; plain Ctrl+C also copies when text is selected, and with no selection it stays a SIGINT.",
+  "states": "no selection (Ctrl+C = interrupt), selection (copy), paste, clipboard denied",
+  "test": "Select text in the Rust terminal, press Ctrl+Shift+C, and confirm the clipboard holds exactly that selection while the running process is not interrupted.",
+  "rust_evidence": "",
+  "unsure": "No terminal in the Rust app; the Ctrl+C-vs-copy rule needs a real selection API."
+ },
+ "PANE-020": {
+  "behavior": "URLs printed in terminal output are detected as links; ⌘/Ctrl-click opens them in the in-app preview or the external browser rather than typing into the shell.",
+  "states": "no links, link hover (underline), ctrl-click opens, plain click does nothing, unsafe scheme ignored",
+  "test": "Print a URL in the Rust terminal and Ctrl-click it, confirming the preview/external browser opens instead of the shell receiving input.",
+  "rust_evidence": "",
+  "unsure": "terminal/links.ts was not read; the allowed schemes are unverified."
+ },
+ "PANE-021": {
+  "behavior": "When the agent runs a command through the terminal tool the pane streams it live: RPC terminal.resize matches the pane width to the PTY and WS agent.terminal.output delivers the output chunks the pane renders as they arrive.",
+  "states": "streaming, command finished, resized (PTY reflow), agent command in a read-only view, stream interrupted",
+  "test": "Ask the agent to run a multi-line command and confirm the Rust pane streams the output while the turn is still running.",
+  "rust_evidence": "crates/hermes-core/src/rpc.rs (gateway RPC + notification plumbing) — no terminal-specific code found",
+  "unsure": "Whether the private test backend emits agent.terminal.output for an ordinary terminal tool call."
+ },
+ "PANE-022": {
+  "behavior": "Settings → Appearance/Workspace → terminal font: config terminal.font_family chooses an installed font for Desktop terminals (blank = bundled JetBrains Mono), applied to every open terminal.",
+  "states": "default (bundled JetBrains Mono), custom font applied, font unavailable (falls back), autosave failure",
+  "test": "Set terminal.font_family to an installed font in the Rust settings UI and confirm config.yaml stores it and a terminal renders with it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:637-641 (cfg key terminal.font_family)",
+  "unsure": "Whether the Rust app has a terminal to apply the font to (no terminal pane found)."
+ },
+ "PANE-023": {
+  "behavior": "When the selected execution backend is not ready the terminal pane shows a warning instead of a prompt, explaining 'Hermes can't run shell commands right now: <backend> isn't ready. Switch to Local, or finish setting up <backend> and try again.' with 'Use Local' and 'Open terminal settings' actions.",
+  "states": "backend ready, backend unready (warning), switched to Local ('Terminal commands now run locally. Applies to new sessions.'), open settings",
+  "test": "Set an unready backend in the test config and confirm the Rust terminal pane shows the warning and that 'Use Local' restores a working terminal.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1698-1702 (cfg terminal.backend)",
+  "unsure": "No terminal pane in the Rust app to host the warning; and the warning state needs an unready backend on the test config."
+ },
+ "PANE-024": {
+  "behavior": "Terminal hotkeys: Ctrl+` (view.showTerminal) reveals the terminal, opening one if none exist; Ctrl+Shift+` (view.newTerminal) spawns a new one; Ctrl+Shift+Down/Up (next/prevTerminal) walk the rail; Ctrl+Shift+W (closeTerminal) closes the active one.",
+  "states": "no terminals (toggle opens one), several terminals (next/prev wraps), last terminal closed (pane hides), hotkey while a terminal is focused",
+  "test": "Press Ctrl+` in the Rust app and confirm a terminal appears; press it again and confirm the pane hides without killing the shell.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:318-321 (Ctrl+N, Ctrl+B, Ctrl+Q only — no terminal chords found)",
+  "unsure": "The Rust app has none of these chords nor a terminal pane."
+ },
+ "PANE-025": {
+  "behavior": "⌘G (view.toggleReview, 'mod+g') shows/hides the review pane; the files pane has view.showFiles, which ships unbound so it can only be opened by binding a key in the shortcuts panel.",
+  "states": "review hidden, review shown, files shown via custom binding, unbound (no default chord)",
+  "test": "Press ⌘G in the Rust app and confirm the review pane toggles, then bind a chord for 'Show files' and confirm it opens the files pane.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has neither pane, so both actions are unreachable."
+ },
+ "PANE-026": {
+  "behavior": "The agent can read what is currently visible in the terminal: the desktop answers the SRV terminal.read request with the pane's visible buffer (not the whole scrollback) so the model sees what the user sees.",
+  "states": "terminal open with output (read served), empty terminal (empty read), no terminal (error), output still streaming",
+  "test": "Run a command in the Rust terminal and ask the agent to read the terminal, confirming it reports the visible lines rather than the full buffer.",
+  "rust_evidence": "",
+  "unsure": "The row's source is a session-hooks glob; the exact request/response shape of terminal.read was not located, and the Rust app has no terminal to read."
+ },
+ "_new_items": [
+  {
+   "section": "Skills",
+   "feature": "Capabilities page shell: tab row with live per-tab counts, shared search header and refresh hotkey",
+   "surface": "local (route ?tab=)",
+   "source": "src/app/capabilities/index.tsx",
+   "behavior": "Open Capabilities → four tabs 'Skills' / 'Tools' / 'Connectors' / 'Plugins', each showing a live count that keeps updating for the tabs you are not on; the header search filters the active tab (search is hidden on Connectors and Plugins, which own their own search) and offers rotating hints built from your own data ('Try …'); the refresh hotkey re-reads skills, toolsets and the official hub index and fails to 'Skills failed to load' with a Retry."
+  },
+  {
+   "section": "Skills",
+   "feature": "Capabilities scope selector (profile / gateway pills above every tab)",
+   "surface": "local",
+   "source": "src/app/capabilities/scope-selector.tsx",
+   "behavior": "Every Capabilities tab carries a scope selector: picking a profile scope pins all reads/writes on that tab (skills, toolsets, connectors, plugins) to that profile, and picking a registered gateway scope routes them to that backend; the selector is hidden for single-profile installs and replaced by a pinned note for plugin-embedded views."
+  },
+  {
+   "section": "Models & providers",
+   "feature": "Stale auxiliary-model warning banner",
+   "surface": "local",
+   "source": "src/app/settings/model-settings.tsx",
+   "behavior": "After the main model changes, Model → Main shows a warning '<N> auxiliary tasks (<names>) still run on <other providers>, not your main model.' with 'Reset all to main' and \"Don't show again\"; dismissing it is remembered per profile so it does not return for the same pairing."
+  },
+  {
+   "section": "Plugins / connectors",
+   "feature": "Kanban board plugin (boards, cards, assignment to profiles, completion notify)",
+   "surface": "local + board HTTP API",
+   "source": "src/plugins/kanban/board.tsx",
+   "behavior": "The bundled kanban plugin adds a board route: boards switchable from a board switcher, tasks as cards that can be created/edited/deleted, moved between columns, commented on, reassigned to a profile ('reassign'), estimated, exported/imported as an archive, and completion notifications posted back to chat."
+  },
+  {
+   "section": "Plugins / connectors",
+   "feature": "Bots roster / Bot Mode (bots page, avatar picker, per-bot advanced skills)",
+   "surface": "RPC profiles.describe / profiles.configure",
+   "source": "src/plugins/hermes-bots/plugin.tsx",
+   "behavior": "The bundled hermes-bots plugin registers its own sidebar group, routes and panes: a roster of bots with avatars, create/edit dialogs, per-bot advanced settings (disabled skills, model, groups menu) and group-chat workspaces, plus a profile-group header contribution that opens the bots screen."
+  },
+  {
+   "section": "Plugins / connectors",
+   "feature": "Install a plugin from Git (repo URL plus Desktop/Agent targets)",
+   "surface": "local + RPC plugins.manage",
+   "source": "src/app/settings/plugin-install-modal.tsx",
+   "behavior": "The install modal takes a Git repo URL and target halves (Desktop target copies the desktop half onto this machine, Agent target installs into the selected profile); a package copied in by hand with no catalog entry or git remote cannot be agent-installed from here and says so."
+  },
+  {
+   "section": "Plugins / connectors",
+   "feature": "Bundled demo/utility plugins (hello-runtime, radio)",
+   "surface": "local",
+   "source": "src/plugins/hello-runtime/plugin.runtime.js, src/plugins/radio/plugin.js",
+   "behavior": "hello-runtime is a minimal bundled plugin proving the runtime host bridge (a contributed page that round-trips host requests), and radio is a bundled audio/stream surface; both appear in the installed plugin list as 'bundled' with their own switch."
+  },
+  {
+   "section": "Plugins / connectors",
+   "feature": "Connectors-page 'Add your own' custom MCP form with paste parsing",
+   "surface": "REST /api/mcp/servers",
+   "source": "src/app/capabilities/connectors/add-server-form.tsx",
+   "behavior": "'Add your own' in Connectors opens 'Connect to a custom MCP'; pasting a command snippet fills Name/Type/Command/Args/Env/CWD or URL/Headers/Auth, an unparseable paste says 'Nothing here reads as a server. Fill the fields below instead.', and Save writes exactly one new mcp.json entry after warning about local process commands."
+  },
+  {
+   "section": "Memory",
+   "feature": "Memory Graph overlay (starmap of skills and memories)",
+   "surface": "local",
+   "source": "src/app/starmap/index.tsx",
+   "behavior": "Opening the Memory Graph (status bar or /journey) shows an interactive map titled 'Memory Graph' ('<nodes> skills across <clusters> categories') with filters 'All'/'Used', a 'Refresh' action, node context menus, a playback hotkey, and a share box that copies/loads only the layout (never memory or skill text)."
+  },
+  {
+   "section": "Profiles",
+   "feature": "Open a profile in a new window",
+   "surface": "local",
+   "source": "src/app/profiles/index.tsx",
+   "behavior": "A profile's action menu offers 'Open in new window', which opens a second app window already switched to that profile so two profiles can be worked side by side."
+  },
+  {
+   "section": "Profiles",
+   "feature": "Name this agent (display name for the default profile)",
+   "surface": "REST /api/profiles/{name}",
+   "source": "src/app/profiles/index.tsx",
+   "behavior": "The profile editor offers 'Name this agent' with a 'Display name' field; the copy layer says 'Sets a display name shown across the app. The internal profile ID stays \"default\".' and the name is then used wherever the profile is shown."
+  },
+  {
+   "section": "Right panel (files / review / terminal)",
+   "feature": "Logs panel in the right sidebar",
+   "surface": "local (gateway logs)",
+   "source": "src/app/right-sidebar/index.tsx",
+   "behavior": "The right sidebar exposes a 'Logs' panel alongside Terminal/Files/Review; it streams the gateway/backend log tail and is the destination of the various 'Open logs' actions across settings and messaging."
+  },
+  {
+   "section": "Right panel (files / review / terminal)",
+   "feature": "'Add to chat' from a pane (terminal output / preview selection into the composer)",
+   "surface": "local",
+   "source": "src/app/right-sidebar/terminal/instance.tsx",
+   "behavior": "The terminal pane offers 'Add to chat', which puts the selected output into the composer as context instead of the user retyping it; the preview pane has the same affordance for previewed lines."
+  },
+  {
+   "section": "Scheduled / cron",
+   "feature": "Per-job model override in the cron editor",
+   "surface": "REST /api/cron/jobs",
+   "source": "src/app/cron/index.tsx",
+   "behavior": "The cron editor's Model select defaults to 'Default (global model)' and can pin a specific model for that job, so a scheduled job runs on the chosen model regardless of the global setting."
+  },
+  {
+   "section": "Scheduled / cron",
+   "feature": "Cron job row overflow (edit / run again / delete) and script-only badge",
+   "surface": "local",
+   "source": "src/app/cron/index.tsx",
+   "behavior": "Each job row has 'Edit job', 'Run again' and delete actions plus a 'script' badge for script-only jobs ('Script-only job (no AI prompt). Job id: …'); job rows also show 'Manage' and the runs toggle 'Show runs'/'Hide runs'."
+  }
+ ]
+}

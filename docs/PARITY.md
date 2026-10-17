@@ -30,59 +30,59 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**20 done · 36 partial · 736 not started · 1 unsupported** (of 793).
+**20 done · 36 partial · 797 not started · 1 unsupported** (of 854).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
 
 | Section | Items |
 |---|---:|
-| Chat & composer | 50 |
-| Transcript rendering | 37 |
-| Tools / terminal rows | 22 |
-| Approvals / clarify | 17 |
-| Sessions & sidebar | 43 |
-| Projects / workspaces | 25 |
-| Models & providers | 30 |
-| Profiles | 22 |
-| Skills | 16 |
+| Chat & composer | 59 |
+| Transcript rendering | 43 |
+| Tools / terminal rows | 25 |
+| Approvals / clarify | 20 |
+| Sessions & sidebar | 46 |
+| Projects / workspaces | 28 |
+| Models & providers | 31 |
+| Profiles | 24 |
+| Skills | 18 |
 | Tools / toolsets | 20 |
 | MCP | 18 |
-| Plugins / connectors | 24 |
-| Memory | 14 |
+| Plugins / connectors | 28 |
+| Memory | 15 |
 | Messaging gateways | 12 |
-| Scheduled / cron | 12 |
+| Scheduled / cron | 14 |
 | Artifacts / preview | 19 |
-| Right panel (files / review / terminal) | 26 |
+| Right panel (files / review / terminal) | 28 |
 | Voice | 26 |
-| Command palette & shortcuts | 61 |
-| Settings (shell) | 4 |
+| Command palette & shortcuts | 64 |
+| Settings (shell) | 5 |
 | Settings — Model page | 7 |
 | Settings — Chat page | 5 |
-| Settings — Appearance page | 33 |
+| Settings — Appearance page | 34 |
 | Settings — Workspace page | 9 |
 | Settings — Safety page | 8 |
 | Settings — Browser page | 3 |
 | Settings — Memory & Context page | 12 |
-| Settings — Voice page | 18 |
-| Settings — Advanced page | 20 |
+| Settings — Voice page | 19 |
+| Settings — Advanced page | 21 |
 | Settings — Gateway / Connections page | 13 |
 | Settings — Keybinds page | 3 |
-| Settings — Notifications page | 9 |
-| Settings — Sessions page | 3 |
+| Settings — Notifications page | 10 |
+| Settings — Sessions page | 4 |
 | Settings — Vault page | 5 |
 | Settings — Providers & Keys page | 6 |
 | Settings — Plugins page | 3 |
 | Settings — Billing page | 6 |
 | Settings — About page | 5 |
-| Appearance / themes | 12 |
-| Notifications | 11 |
-| Updates | 9 |
-| Window / tray / HUD / pet | 27 |
+| Appearance / themes | 13 |
+| Notifications | 13 |
+| Updates | 10 |
+| Window / tray / HUD / pet | 33 |
 | Onboarding / auth / billing | 17 |
 | Remote connections | 20 |
-| Extras: webhooks, imports, subagents, learning, telemetry | 31 |
-| **Total** | **793** |
+| Extras: webhooks, imports, subagents, learning, telemetry | 32 |
+| **Total** | **854** |
 
 ## Chat & composer
 
@@ -136,6 +136,15 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Preview-status row in composer — local — src/app/chat/composer/status-stack/preview-row.tsx
 - [ ] Status drawer (expandable status stack) — local — src/app/chat/composer/status-stack/drawer.tsx
 - [ ] Agent-actions / session menu in composer — local — src/store/composer-actions.ts
+- [ ] Composer placeholder rotation (new session vs follow-up) — local — src/i18n/en.ts (composer.newSessionPlaceholders), src/app/chat/composer/index.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Composer queue panel — local — src/app/chat/composer/queue-panel.tsx, queue-slot.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Prompt snippets menu — local — src/app/chat/composer/context-menu.tsx (composer.promptSnippets) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Composer context menu — local — src/app/chat/composer/context-menu.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Completion drawer / command palette inside the composer — local — src/app/chat/composer/completion-drawer.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Voice menu / voice engine rows — local — src/app/chat/composer/voice-menu.tsx, voice-engine-rows.tsx, voice-fan.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Wake-word indicator — local — src/i18n/en.ts (composer.wakeWord*) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Composer busy-submit gate — local — src/app/chat/composer/busy-submit-state.ts ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Discard lost prompt — local — src/app/chat/composer/discard-lost-prompt.ts ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Transcript rendering
 
@@ -176,6 +185,12 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [x] Assistant-ui thread list + virtualization — local — src/components/assistant-ui/thread/list.tsx ⟶ Slint `ListView` instantiates only visible rows; verified live 2026-10-16 on a 600-message session (≤7 rows alive, memory flat; see windowing item)
 - [ ] Message render error boundary — local — src/components/assistant-ui/message-render-boundary.tsx
 - [ ] Timeline index/history (jump history) — local — src/components/assistant-ui/thread/use-timeline-history.ts
+- [ ] Read aloud from a message — local + RPC voice.tts — src/components/assistant-ui/thread/assistant-message.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Message action menu (More actions) — local — src/components/assistant-ui/thread/assistant-message.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Checkpoint restore controls — local — src/i18n/en.ts (assistant.thread.restore*) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Show earlier messages / backfill — local — src/components/assistant-ui/thread/list.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Response loading / processing states — local — src/i18n/en.ts (assistant.thread.loadingResponse, processingPrompt, loadingLocalModel) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Image / video / audio transcript media — local — src/components/assistant-ui/markdown-text.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Tools / terminal rows
 
@@ -201,6 +216,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Run ticker (elapsed time) — local — src/components/assistant-ui/tool/run-ticker.tsx
 - [x] Tool disclosure/expandable blocks — local — src/components/chat/disclosure-row.tsx, expandable-block.tsx ⟶ ToolGroup in chat.slint
 - [ ] JSON document editor for tool args — local — src/components/chat/json-document-editor.tsx
+- [ ] Tool feed chrome (group header, counts) — local — src/components/assistant-ui/tool/fallback.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Tool output copy actions — local — src/i18n/en.ts (assistant.tool.copy*) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Tool timing and 'this turn took' footer — local — src/i18n/en.ts (assistant.thread.turnDuration) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Approvals / clarify
 
@@ -221,6 +239,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Connection request (remote OAuth/pairing) — SRV connection.request, RPC connection.respond — src/store/connection-request.ts
 - [ ] Free-tier challenge prompt — WS free_tier.challenge — src/store/free-tier-challenge.ts
 - [ ] Clarify lock (single-flight) — RPC clarify.lock — src/store/clarify.ts
+- [ ] Approval 'Always allow' rule editor — RPC approvals.* — src/i18n/en.ts (assistant.approval.always*) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Approval jump / pending count affordance — local — src/components/assistant-ui/tool/approval.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Clarify multi-question progress — local — src/components/assistant-ui/clarify/core/question-block.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Sessions & sidebar
 
@@ -267,6 +288,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Session unread aggregation across connections — RPC session.active_list — src/store/session-unread-remote.ts
 - [ ] Resume-exhausted overlay — local — src/app/chat/resume-exhausted-overlay.tsx
 - [ ] Session sidebar focus hotkey — local — src/store/session-sidebar-focus.ts
+- [ ] Session row context menu — local — src/app/chat/sidebar/session-actions-menu.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Corrupt session-database recovery — local — src/i18n/en.ts (sidebar.storageCorrupt*) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Sidebar header actions (new session in project, mark all read, search aria) — local — src/i18n/en.ts (sidebar.newSessionIn, markAllRead) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Projects / workspaces
 
@@ -295,6 +319,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Project filter in sidebar — local — src/app/chat/sidebar/project-filter.ts
 - [ ] Workspace page header (page-owned controls) — local — src/app/contrib/workspace-page-header.tsx
 - [ ] Sidebar workspace nav (Agents/Capabilities/Messaging/Artifacts/Cron) — local routes — src/app/routes.ts
+- [ ] Project idea (IDEA.md) editor — local — src/i18n/en.ts (projects.idea*) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Kanban task worktree folding — local — src/app/chat/sidebar/projects/workspace-groups.ts (kanbanWorktreeDir) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Worktree lane management — local — src/i18n/en.ts (projects.removeWorktree, projects.copyPath, projects.reveal) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Models & providers
 
@@ -328,6 +355,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Local model search + sideload (HF) — REST /api/local-models/search, /sideload — src/app/settings/local-models-browse.tsx
 - [ ] Local models feature flag — local — src/store/local-models-flag.ts
 - [ ] Service tier / API retries / max turns — config agent.* — src/app/settings/constants.ts
+- [ ] Stale auxiliary-model warning banner — local — src/app/settings/model-settings.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Profiles
 
@@ -353,6 +381,8 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Default profile preference — local — src/store/default-profile.ts
 - [ ] Profile color / short label / order — local — src/lib/profile-color.ts, profile-order.ts
 - [ ] Real-profile consent (agent memory of user) — local — src/store/real-profile-consent.ts
+- [ ] Open a profile in a new window — local — src/app/profiles/index.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Name this agent (display name for the default profile) — REST /api/profiles/{name} — src/app/profiles/index.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Skills
 
@@ -372,6 +402,8 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Skill suggestions in composer — local — src/store/suggestion-providers/skill.ts
 - [ ] Skill curator status — REST /api/curator — src/api/system.ts
 - [ ] Background skill-curator control (pause/run) — REST /api/curator/paused, /run — src/api/system.ts
+- [ ] Capabilities page shell: tab row with live per-tab counts, shared search header and refresh hotkey — local (route ?tab=) — src/app/capabilities/index.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Capabilities scope selector (profile / gateway pills above every tab) — local — src/app/capabilities/scope-selector.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Tools / toolsets
 
@@ -443,6 +475,10 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Connector local server control — local + RPC — src/app/capabilities/connectors/local-server-control.tsx
 - [ ] Connector deeplinks — local — src/app/capabilities/connectors/data/deep-link.ts
 - [ ] Connector suggestions in composer — RPC connectors.list — src/store/connector-catalog.ts
+- [ ] Kanban board plugin (boards, cards, assignment to profiles, completion notify) — local + board HTTP API — src/plugins/kanban/board.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Bots roster / Bot Mode (bots page, avatar picker, per-bot advanced skills) — RPC profiles.describe / profiles.configure — src/plugins/hermes-bots/plugin.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Install a plugin from Git (repo URL plus Desktop/Agent targets) — local + RPC plugins.manage — src/app/settings/plugin-install-modal.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Connectors-page 'Add your own' custom MCP form with paste parsing — REST /api/mcp/servers — src/app/capabilities/connectors/add-server-form.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Memory
 
@@ -460,6 +496,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Compression aux-model timeout — config auxiliary.compression.timeout — src/app/settings/constants.ts
 - [ ] Reasoning blocks display toggle — config display.show_reasoning — src/app/settings/constants.ts
 - [ ] Memory provider troubleshooting status — local — src/app/settings/memory/*
+- [ ] Memory Graph overlay (starmap of skills and memories) — local — src/app/starmap/index.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Messaging gateways
 
@@ -490,6 +527,8 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Cron jobs section in sidebar — local — src/app/chat/sidebar/cron-jobs-section.tsx
 - [ ] Open cron run in chat — local — src/app/cron/open-cron-run.ts
 - [ ] Cron changed event — WS cron.changed — src/store/cron.ts
+- [ ] Per-job model override in the cron editor — REST /api/cron/jobs — src/app/cron/index.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Cron job row overflow (edit / run again / delete) and script-only badge — local — src/app/cron/index.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Artifacts / preview
 
@@ -541,6 +580,8 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Terminal toggle (⌃`) / new (⌃⇧`) / next/prev / close hotkeys — local — src/lib/keybinds/actions.ts
 - [ ] Review toggle (⌘G) / files hotkey — local — src/lib/keybinds/actions.ts
 - [ ] Terminal read (agent reads visible buffer) — SRV terminal.read — src/app/session/hooks/*
+- [ ] Logs panel in the right sidebar — local (gateway logs) — src/app/right-sidebar/index.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] 'Add to chat' from a pane (terminal output / preview selection into the composer) — local — src/app/right-sidebar/terminal/instance.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Voice
 
@@ -634,6 +675,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Rebind / clear / reset keys + conflict detection — local — src/store/keybinds.ts
 - [ ] Per-plugin contributed keybinds — local — src/lib/keybinds/plugin-actions.ts
 - [ ] Keybind deep-link capture mode — local — src/store/keybinds.ts
+- [ ] Approval card keyboard shortcuts (Esc / Enter) — local — src/lib/keybinds/approval-keys.ts ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Composer focus vs selection chord priority ladder — local — src/lib/keybinds/composer-focus-keys.ts ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Inline keybind hint chip — local — src/lib/keybinds/use-keybind-hint.ts ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Settings (shell)
 
@@ -645,6 +689,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
   ⟶ crates/hermes-core/src/settings.rs: every page and control in one table (labels, descriptions and option lists from the original; backend-config rows derived from /api/config/schema), ranked search, per-profile vs device store, conditional rows — 8 unit tests
 - [-] Legacy tab redirects (connections→gateway, mcp→capabilities) — local — src/app/settings/moved-tabs.ts
   ⟶ unsupported: the native app has no URL-based settings tabs; each page carries one registry id, so there is nothing to redirect
+- [ ] Export / Import / Reset config (settings footer actions) — local (config REST + file) — src/app/settings/index.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Settings — Model page
 
@@ -733,6 +778,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
   ⟶ row renders and persists; no in-app video
 - [~] Appearance plugin seam (appearance.extra) — local — src/app/settings/appearance-contrib.tsx
   ⟶ row renders and persists; plugins have no appearance contributions
+- [ ] Pet size slider and Roam toggle — local (pet store) — src/app/settings/pet-settings.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Settings — Workspace page
 
@@ -798,6 +844,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Provider STT models — config stt.{openai,groq,mistral,xai,deepinfra,elevenlabs}.* — src/app/settings/constants.ts
 - [ ] Max recording length — config voice.max_recording_seconds — src/app/settings/constants.ts
 - [ ] Client-direct voice — config voice.client_direct — src/app/settings/constants.ts
+- [ ] Voice recording shortcut hint row — local (informational) — src/app/settings/config-settings.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Settings — Advanced page
 
@@ -821,6 +868,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Quick entry enable — local (Electron quick-entry) — src/app/settings/quick-entry-settings.tsx
 - [ ] Quick entry shortcut — local (Electron) — src/app/settings/quick-entry-settings.tsx
 - [ ] Reset onboarding (developer) — local + RPC onboarding.reset_setup_profile — src/app/settings/developer-settings.tsx
+- [ ] Computer-use permissions panel — local (Electron permission probe) — src/app/settings/computer-use-panel.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Settings — Gateway / Connections page
 
@@ -855,12 +903,14 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Credits notifications — local — src/store/native-notifications.ts
 - [ ] Plugin notifications — local — src/store/native-notifications.ts
 - [ ] Completion sound — local — src/store/completion-sound.ts
+- [ ] Send test notification — local (Electron Notification) — src/app/settings/notifications-settings.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Settings — Sessions page
 
 - [ ] Auto-archive stale sessions — local — src/app/settings/sessions-settings.tsx
 - [ ] Default directory — local — src/app/settings/sessions-settings.tsx
 - [ ] Archived sessions list — REST /api/profiles/sessions — src/app/settings/sessions-settings.tsx
+- [ ] Archive after N days input — config sessions.auto_archive_days — src/app/settings/sessions-settings.tsx ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Settings — Vault page
 
@@ -916,6 +966,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Profile color swatches — local — src/lib/profile-color.ts
 - [ ] Starmap visualization (session map) — local — src/app/starmap/*
 - [ ] Pet overlay appearance — local — src/app/pet-overlay/pet-overlay-app.tsx
+- [ ] Accent color + custom color picker — local — src/themes/accents.ts, src/themes/accent-override.ts, src/i18n/en_theme_picker.ts ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Notifications
 
@@ -930,6 +981,8 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Tip popups — WS tip.show — src/store/tips.ts, src/components/tips/*
 - [ ] Completion sound — local — src/lib/completion-sound.ts
 - [ ] Notifications settings page — local — src/app/settings/notifications-settings.tsx
+- [ ] Notification recovery actions (Open Keys/Gateways/Maintenance, Restart Hermes) — local — src/store/notifications.ts (RECOVERY_ACTIONS) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Version-skew notices (backend/desktop out of date, update ready) — WS + local — src/store/notifications.ts (notifications.native/update copy) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Updates
 
@@ -942,6 +995,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Updates overlay UI — local — src/app/updates-overlay.tsx
 - [ ] Update channel select — local — src/app/settings/update-channel-row.tsx
 - [ ] Pre-update backup config — local (Electron) — electron/pre-update-backup-config.ts
+- [ ] Update-available notification + 'See what's new' — local — src/store/notifications.ts (updateReady*) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Window / tray / HUD / pet
 
@@ -972,6 +1026,12 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Window zoom / UI scale (Electron zoom) — local (Electron) — electron/zoom.ts, src/store/zoom.ts
 - [ ] Vibrancy / translucency window — local (Electron) (platform) — electron/translucency.ts
 - [ ] Behind/below window (HUD behind app) — local (Electron) — electron/window-below.ts
+- [ ] Titlebar haptics mute toggle — local (platform) — src/i18n/en.ts (titlebar.muteHaptics / unmuteHaptics) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Reset HUD size and position — local (Electron) — src/app/shell/titlebar-controls.tsx, src/i18n/en.ts (titlebar.resetHudLayout) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Titlebar unread-session badge — local — src/app/shell/titlebar-controls.tsx, src/i18n/en.ts (titlebar.unreadSessions) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Titlebar left/right contribution slots — local — src/app/shell/titlebar-controls.tsx (titleBar.left / titleBar.right) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Status bar approval-mode + YOLO pill — local — src/app/shell/hooks/use-statusbar-items.tsx, src/i18n/en.ts (shell.statusbar.yolo*) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
+- [ ] Status bar model pill + gateway menu — local — src/app/shell/statusbar-controls.tsx, src/i18n/en.ts (shell.gatewayMenu, shell.statusbar.model*) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)
 
 ## Onboarding / auth / billing
 
@@ -1053,3 +1113,5 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 ---
 
 _Generated from source. Total items: 793. Sections: 45._
+
+- [ ] Desktop log viewer (level + search) — local (Electron) — src/app/command-center/maintenance.tsx, src/i18n/en.ts (commandCenter.logFile/logLevel/logSearchPlaceholder) ⟶ added by the 2026-10-17 parity audit (found in source, was missing from this list)

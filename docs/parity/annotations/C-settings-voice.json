@@ -1,0 +1,1439 @@
+{
+ "SABT-001": {
+  "behavior": "Settings → About → Version & updates shows an update status card for the client and, when the connection is remote, a second card for the backend (no release notes). Version refreshes on open and on gateway change; update actions use REST /api/hermes/update plus the Electron updater.",
+  "states": "checking, up to date, update available, downloading, ready to install, updating, failed",
+  "test": "At #/settings?tab=about&page=updates press the update check and confirm the status card reflects the private test backend's version.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2190",
+  "unsure": "Rust renders Widget(\"about.version\"); no updater was found in the rewrite."
+ },
+ "SABT-002": {
+  "behavior": "Settings → About → Version & updates, 'Update channel' segmented control: 'Stable releases' / 'Every commit' (device store updates-channel.ts). Only a source checkout shows the row; packaged installs bake it. Switching to Stable asks 'Switch to stable releases?' first (confirm 'Switch to stable'); failure 'Could not change the update channel'.",
+  "states": "packaged (row absent), stable, main, pending (disabled), stable-confirm dialog, failed",
+  "test": "In a source checkout open #/settings?tab=about&page=updates, switch to Stable and confirm the confirmation dialog appears first.",
+  "rust_evidence": "",
+  "unsure": "No update channel handling exists in the Rust rewrite."
+ },
+ "SABT-003": {
+  "behavior": "The About page header renders a VersionHero with the running version and a VersionDetails block showing version/distribution labels (lib/version-label.ts, distribution-label.ts). Remote connections show the backend version card alongside the client's.",
+  "states": "version loaded, version unknown (hero omitted), client-only, client+backend",
+  "test": "At #/settings?tab=about&page=updates confirm the running version label matches the built Rust binary's version.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2190",
+  "unsure": "I did not read version-label.ts/distribution-label.ts, so the exact label format is unconfirmed."
+ },
+ "SABT-004": {
+  "behavior": "Settings → About → Uninstall: a 'Danger zone' card. A system-managed install shows 'This install is managed by your system, so Hermes cannot remove itself.' plus manual instructions; removal never deletes config/chats/secrets. Otherwise modes 'Uninstall Chat GUI only', 'Uninstall GUI + agent, keep my data', 'Uninstall everything', then 'Confirm uninstall'/'Yes, uninstall'.",
+  "states": "bridge absent (nothing), managed install (instructions), summary loaded, mode selected, confirm shown, running, error",
+  "test": "At #/settings?tab=about&page=uninstall confirm the danger zone shows the right option set for this machine (no destructive action need be run).",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2198",
+  "unsure": "Rust renders Widget(\"about.uninstall\"); no desktop-uninstall bridge exists in the rewrite."
+ },
+ "SABT-005": {
+  "behavior": "Settings → About also surfaces credits/licences information: the version/details block links to open-source licences. The parity row cites about-settings.tsx for it.",
+  "states": "details shown, version unknown (block omitted)",
+  "test": "At #/settings?tab=about&page=updates look for an open-source licences / credits entry and confirm the list of bundled licences is reachable.",
+  "rust_evidence": "",
+  "unsure": "I found no licences/credits control in about-settings.tsx — only VersionHero, UpdateStatusCard, UpdateChannelRow, VersionDetails and UninstallSection. The row may have been renumbered or removed."
+ },
+ "SADV-001": {
+  "behavior": "Settings → Advanced → Tool access, 'Enabled Toolsets' on config key toolsets: a comma-separated list input (keywords 'tools' in Rust). Clearing a previously non-empty list prompts the destructive confirm 'Remove all enabled toolsets? This disables memory, terminal, web search, delegation, and most other tools until you re-enable them.' A missing key is NOT treated as a clear.",
+  "states": "populated, emptied (confirm dialog), missing key (no dialog)",
+  "test": "At #/settings?tab=config:advanced&page=tools remove every toolset and confirm the wipe confirmation appears before saving.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1687",
+  "unsure": "Whether the Rust app implements the empty-list confirmation was not verified (Control::List only)."
+ },
+ "SADV-002": {
+  "behavior": "Settings → Advanced → Terminal backend, 'Execution Backend' select on config key terminal.backend with exactly local, docker, singularity, modal, daytona, ssh (default 'local'). The dedicated TerminalBackendPanel shows a live health probe per backend with status 'Ready' / 'Needs setup' and a 'Use this backend' action.",
+  "states": "per-backend readiness (Ready, Needs setup, Active), select open/closed",
+  "test": "At #/settings?tab=config:advanced&page=terminal pick 'docker' and confirm the Docker Image row appears (terminal.docker_image) and the backend probe updates.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1696",
+  "unsure": "The Rust registry lists only the config select — no health-probe panel was found."
+ },
+ "SADV-003": {
+  "behavior": "Settings → Advanced → Terminal backend, 'Command Timeout' number input on config key terminal.timeout: how long one command may run.",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:advanced&page=terminal set a short timeout and confirm a long command is killed at it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1712",
+  "unsure": "Unit and default are backend-owned."
+ },
+ "SADV-004": {
+  "behavior": "Settings → Advanced → Terminal backend shows one container-image text row per remote backend, each gated on the matching terminal.backend: 'Docker Image' (terminal.docker_image), 'Singularity Image' (terminal.singularity_image), 'Modal Image' (terminal.modal_image), 'Daytona Image' (terminal.daytona_image). Descriptions name the backend each image applies to.",
+  "states": "visible only for its backend (When::TerminalBackend); not set",
+  "test": "At #/settings?tab=config:advanced&page=terminal select 'docker' and confirm only 'Docker Image' appears; switch to 'modal' and confirm only 'Modal Image'.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1721",
+  "unsure": "Rust uses a TerminalBackend(&str) visibility predicate for each of the four; I did not verify it against the UI's live select value."
+ },
+ "SADV-005": {
+  "behavior": "Settings → Advanced → Output limits: 'Terminal Output Limit' (tool_output.max_bytes), 'File Page Limit' (tool_output.max_lines) and 'Line Length Limit' (tool_output.max_line_length), all number inputs.",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:advanced&page=output lower 'Terminal Output Limit' and confirm long terminal output is truncated earlier.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1761",
+  "unsure": "Units (bytes vs chars vs KB) are not stated in the desktop field copy."
+ },
+ "SADV-006": {
+  "behavior": "Settings → Advanced → Output limits, 'Checkpoint Limit' number input on config key checkpoints.max_snapshots: how many rollback snapshots are retained.",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:advanced&page=output lower it and confirm older checkpoints are pruned after more edits.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1788",
+  "unsure": "No description string in the original."
+ },
+ "SADV-007": {
+  "behavior": "Settings → Advanced → Agent limits, 'Max Agent Steps' on config key agent.max_turns: a text input (schema type text) — 'Upper bound for tool-calling turns before Hermes stops a run.'",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:advanced&page=runtime lower the bound and confirm a long tool-calling run stops at it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1797",
+  "unsure": "The original renders it as a text field even though the value is numeric (schema type), so non-numeric input is passed through."
+ },
+ "SADV-008": {
+  "behavior": "Settings → Advanced → Agent limits, 'API Retries' number input on config key agent.api_max_retries: how many times a failed API call is retried.",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:advanced&page=runtime set 0 and confirm a transient API failure is not retried.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1806",
+  "unsure": "Default not read."
+ },
+ "SADV-009": {
+  "behavior": "Settings → Advanced → Agent limits, 'Service Tier' select on config key agent.service_tier (also on Model → Main). Options come from the backend schema; Rust declares '(none)', 'normal', 'fast', 'auto', 'cold' ('fast = always, auto = first N seconds of each turn, cold = first turn only').",
+  "states": "unset, tier selected",
+  "test": "At #/settings?tab=config:advanced&page=runtime change Service Tier and confirm the same value shows on Model → Main (one config key, two pages).",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1815",
+  "unsure": "Original option labels unknown; the Rust list may not match the backend schema."
+ },
+ "SADV-010": {
+  "behavior": "Settings → Advanced → Tool access, 'Tool-Use Enforcement' on config key agent.tool_use_enforcement: a text input (keywords 'tools' in Rust) controlling how strictly the agent is forced to call tools.",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:advanced&page=tools set a value and confirm the agent's tool-calling behaviour changes on the next turn.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1830",
+  "unsure": "The desktop has NO description or enum for this key, so its accepted values are backend-defined and unknown here."
+ },
+ "SADV-011": {
+  "behavior": "Settings → Advanced → Subagents renders six delegation.* rows: Subagent Model (mono), Subagent Provider (text), Subagent Turn Limit and Parallel Subagents and Subagent Timeout (numbers), and Subagent Reasoning Effort — a select of '' + minimal, low, medium, high, xhigh, max, ultra, where '' shows '(none)' and inherits the agent's own effort.",
+  "states": "each row set/unset; reasoning effort '' (inherit) or a level",
+  "test": "At #/settings?tab=config:advanced&page=delegation set 'Parallel Subagents' to 3 and confirm three subagents may run at once.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1839",
+  "unsure": "delegation.reasoning_effort enum comes from ENUM_OPTIONS; the other five rely on the backend schema/inferred types."
+ },
+ "SADV-012": {
+  "behavior": "Settings → Advanced → Desktop & startup, 'In-App Update Local Changes' on config key updates.non_interactive_local_changes: segmented control with exactly ['stash', 'discard'] (default 'stash'). Description: in-app (no-terminal) updates keep local source edits (stash) or throw them away (discard); terminal updates always ask.",
+  "states": "stash, discard",
+  "test": "At #/settings?tab=config:advanced&page=desktop pick 'discard' and run an in-app update with local edits to confirm they are discarded.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1902",
+  "unsure": "Labels are prettyName-derived ('Stash'/'Discard')."
+ },
+ "SADV-013": {
+  "behavior": "Settings → Advanced → Desktop & startup, 'Keep computer awake' — a device-local segmented control with exactly Off, While working, Always (store keep-awake.ts, default 'off'). 'While working' holds the machine awake only while a turn is in flight; the display can still dim. Applies to this device only, not to the profile.",
+  "states": "off (default), while-working, always",
+  "test": "At #/settings?tab=config:advanced&page=desktop pick 'While working' and confirm the machine does not sleep during a turn.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:852",
+  "unsure": "The Electron power-save IPC has no Rust equivalent; prefs.rs only defaults 'hermes.desktop.keepAwakeMode.v1' to 'off'."
+ },
+ "SADV-014": {
+  "behavior": "Settings → Advanced → Desktop & startup, 'Disable F12 DevTools' — device-local toggle (store disable-f12.ts, default false). Blocks F12 from opening Developer Tools; Ctrl+Shift+I (Cmd+Opt+I on Mac) still works.",
+  "states": "off (default), on",
+  "test": "At #/settings?tab=config:advanced&page=desktop turn it on and confirm F12 no longer opens DevTools while Ctrl+Shift+I still does.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:870",
+  "unsure": "Slint has no DevTools; the setting has no meaning in the rewrite (device pref only)."
+ },
+ "SADV-015": {
+  "behavior": "Settings → Advanced → Desktop & startup, 'Always open links in external browser' — device-local toggle (store external-links.ts, default false). On: every clicked link opens in the system browser; 'Open in in-app browser' in the right-click menu still works.",
+  "states": "off (default), on",
+  "test": "At #/settings?tab=config:advanced&page=desktop enable it and click a link in a chat to confirm it opens in the system browser.",
+  "rust_evidence": "",
+  "unsure": "No external-link handling or pref key for this row was found in the Rust repo."
+ },
+ "SADV-016": {
+  "behavior": "Parity row claims a 'Warm bot backends (pool)' control in src/app/settings/pool-limits-setting.tsx that limits how many bot backends stay warm.",
+  "states": "unknown — the referenced control was not found in this checkout",
+  "test": "Search the built Settings → Advanced → Desktop & startup page (#/settings?tab=config:advanced&page=desktop) for a pool/warm-backend row; I could not locate one to test.",
+  "rust_evidence": "",
+  "unsure": "The source file app/settings/pool-limits-setting.tsx does NOT exist in this checkout, and no 'pool' copy exists under settings in en.ts; the only pool copy is the runtime notice poolSlotTimeoutBody ('Raise the limit in Settings → Advanced'). Behaviour unverifiable."
+ },
+ "SADV-017": {
+  "behavior": "Parity row claims a 'Backend idle timeout (pool)' control in the same pool-limits-setting.tsx — how long an idle warm bot backend is kept before being reaped.",
+  "states": "unknown — the referenced control was not found in this checkout",
+  "test": "Look for an idle-timeout row on #/settings?tab=config:advanced&page=desktop; none was found in the source to test.",
+  "rust_evidence": "",
+  "unsure": "Same missing file as SADV-016. Only the poolSlotTimeoutBody string ('Raise the limit in Settings → Advanced') proves a limit exists somewhere; no UI copy for it exists under settings in en.ts."
+ },
+ "SADV-018": {
+  "behavior": "Settings → Advanced → Desktop & startup, 'Quick Entry' toggle (QuickEntrySettings, manifest key advanced.quickEntry, available only when canUseQuickEntry()): 'Summon a small composer from anywhere with a global shortcut and fire a prompt without opening Hermes.' State comes from the main process (registered/error), saving via saveQuickEntrySettings.",
+  "states": "unsupported (row hidden), off, on, registered, error 'taken'/'invalid'",
+  "test": "At #/settings?tab=config:advanced&page=desktop enable Quick Entry and confirm the global shortcut summons the mini composer from another app.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1912",
+  "unsure": "Rust has no quick-entry implementation; only a notifications-group device toggle with a similar id exists."
+ },
+ "SADV-019": {
+  "behavior": "Settings → Advanced → Desktop & startup, 'Quick Entry shortcut' text input (default placeholder 'CommandOrControl+Shift+Space'). The field is a local draft committed on blur/Enter; status copy reads 'Shortcut is active.', 'Another app already uses this shortcut — pick a different one.' or 'Not a valid shortcut. Include at least one modifier key.' Disabled while Quick Entry is off.",
+  "states": "disabled (feature off), idle, active, taken, invalid",
+  "test": "At #/settings?tab=config:advanced&page=desktop type a chord already taken by another app and confirm the 'taken' message appears.",
+  "rust_evidence": "",
+  "unsure": "No Rust global-hotkey support was found."
+ },
+ "SADV-020": {
+  "behavior": "Settings → Advanced → Desktop & startup, 'Run onboarding again' row with a 'Run again' button: opens a new setup chat that walks through the first-run steps with your current model (startOnboarding with rerun:true). Failure shows 'Could not start onboarding'. The parity row's RPC name onboarding.reset_setup_profile does not appear in this file.",
+  "states": "idle, starting (button disabled), failed",
+  "test": "At #/settings?tab=config:advanced&page=desktop press 'Run again' and confirm a new onboarding chat opens against the private test backend.",
+  "rust_evidence": "",
+  "unsure": "Row cites src/app/settings/developer-settings.tsx, which does not exist; the live implementation is onboarding-settings.tsx and I found no onboarding.reset_setup_profile call."
+ },
+ "SAPP-001": {
+  "behavior": "Settings → Appearance → General, 'Language' row (manifest id appearance.language, keywords ['locale']) renders the LanguageSwitcher control in the action slot; description comes from t.language.description and swaps to the saving copy while a locale change is in flight (isSavingLocale). Device-local (not a config key), applied live.",
+  "states": "loaded, saving (description shows the 'saving' copy)",
+  "test": "At #/settings?tab=config:appearance&page=general change the language and confirm the UI re-renders in that locale without a restart.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:513",
+  "unsure": "Whether the Rust app ships any locale catalogs; it lists display.language as a Config select with options starting 'en'."
+ },
+ "SAPP-002": {
+  "behavior": "Settings → Appearance → General, 'Intro Splash' toggle (device pref hermes.desktop.intro-splash.v1) — 'The wordmark and prompt shown on an empty chat.' Off hides the wordmark/intro on an empty chat.",
+  "states": "on (default), off",
+  "test": "At #/settings?tab=config:appearance&page=general turn it off and confirm a new empty chat shows no intro splash.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:532",
+  "unsure": "Device pref default (on) inferred from the store; not read from prefs.rs defaults."
+ },
+ "SAPP-003": {
+  "behavior": "Settings → Appearance → General, 'Model Pricing' toggle (device pref hermes.desktop.model-pricing.v1) — 'Show input, output, and cache-read prices per million tokens in the model picker.'",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:appearance&page=general toggle it and reopen the model picker to confirm per-million-token prices appear/disappear.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:541",
+  "unsure": "The Rust model picker is Control::Widget('model'), which ui/settings.slint renders as a not-built chip."
+ },
+ "SAPP-004": {
+  "behavior": "Settings → Appearance → General, 'Reopen Last Chat on Launch' on config key display.resume_last_session: a toggle treated as ON unless the stored value is exactly false (default true). Saves a sparse patch through PUT /api/config so the cold-start restore gate sees it next launch — the change takes effect on the NEXT launch, not live.",
+  "states": "on (default / unset), off",
+  "test": "At #/settings?tab=config:appearance&page=general turn it off, quit, relaunch, and confirm a fresh new chat opens.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:550",
+  "unsure": "Rust stores this as config display.resume_last_session; whether its cold-start restore exists was not checked."
+ },
+ "SAPP-005": {
+  "behavior": "Settings → Appearance → General, 'In-App Tips' toggle (device pref hermes.desktop.tips.rotation.v1) — 'Occasional hints from the app and Hermes. Each tip appears once. Turns off automatically after your first 30 days; you can turn it back on.' A footnote action 'Show N tips again' (resetTips) appears only once tips have been spent.",
+  "states": "on, off, N tips spent (reset footnote visible)",
+  "test": "At #/settings?tab=config:appearance&page=general dismiss a tip, then use 'Show N tips again' and confirm the tip can appear once more.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:559",
+  "unsure": "Rust lists the label as 'In-App Tips'; no reset action was found in its registry."
+ },
+ "SAPP-006": {
+  "behavior": "Settings → Appearance → General, 'Guided Tours' toggle (device pref hermes.desktop.tours.v1) — 'Let Hermes spotlight each step as it guides you through the app. Turns off automatically after your first 30 days; you can turn it back on.'",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:appearance&page=general turn it on and trigger a tour to confirm the spotlight steps render.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:568",
+  "unsure": "No tour engine exists in the Rust repo as far as this pass found."
+ },
+ "SAPP-007": {
+  "behavior": "Settings → Appearance → Theme has the Light/Dark/System mode segmented control plus a full-width theme gallery (id appearance.theme): a 'Search your themes or the VS Code Marketplace…' box filters installed themes and live-searches the Marketplace, cards preview and select on click, user themes have a 'Remove theme' button, and a per-profile note appears only with 2+ profiles.",
+  "states": "theme selected, search filtering, no match ('No installed themes match \"<q>\".'), marketplace results (installed/installing), removable user theme",
+  "test": "At #/settings?tab=config:appearance&page=theme pick a built-in theme and confirm the app repaints; then search and install a Marketplace theme.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:586",
+  "unsure": "Rust renders a segmented mode control plus Widget(\"theme\"); ui/settings.slint shows a not-built chip for widgets other than the two font fields."
+ },
+ "SAPP-008": {
+  "behavior": "Settings → Appearance → Theme, 'Color Mode' segmented control built from MODE_OPTIONS: 'Light' ('Bright desktop surfaces'), 'Dark' ('Low-glare workspace'), 'System' ('Follow OS appearance'); the stored value is the ThemeMode id light|dark|system and the mode is applied on top of the selected palette. Device-local, applied live.",
+  "states": "light, dark, system (resolves to light/dark at runtime)",
+  "test": "At #/settings?tab=config:appearance&page=theme switch to 'System' and change the OS appearance to confirm the app follows.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:577",
+  "unsure": "Rust lists this as device key 'hermes-desktop-mode-v1'' with options Light/Dark/System; the original also has per-mode descriptions in the i18n catalog."
+ },
+ "SAPP-009": {
+  "behavior": "Settings → Appearance → Typography, 'UI Scale' segmented control with exactly the presets 90%, 100%, 110%, 125%, 150%, 175%; description is a formatter that appends the live value — 'Scales text and controls across the whole app. Cmd/Ctrl with +, - and 0 also works. Current: <n>%.' Device-local (pref key 'zoom') and applied live.",
+  "states": "each of the six presets; a non-preset percent renders no highlighted option",
+  "test": "At #/settings?tab=config:appearance&page=typography pick 125% and confirm the whole app scales; verify Ctrl/Cmd + and - also step it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:608",
+  "unsure": "Rust declares this as a Segmented device pref; whether the keyboard +,-,0 shortcuts exist there was not checked."
+ },
+ "SAPP-010": {
+  "behavior": "Settings → Appearance → Typography, 'Chat Text Size' segmented control with presets 90, 100, 110, 125, 150, 175 % and default 110 — 'Scales conversation text and the message editor relative to UI Scale. Sidebars and controls stay the same size.' Device-local, applied live.",
+  "states": "six presets, default 110",
+  "test": "At #/settings?tab=config:appearance&page=typography pick 150% and confirm only conversation text and the editor grow.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:617",
+  "unsure": "The original default (110) is a store constant; the Rust registry's declared default was not readable from the table."
+ },
+ "SAPP-011": {
+  "behavior": "Settings → Appearance → Typography, 'Chat Font' on config key desktop.font_family (ChatFontSetting widget): free-text font stack/name, placeholder 'OpenDyslexic or a CSS font stack', with a 'Preview' line showing 'The quick brown fox jumps over the lazy dog. 0123456789' and a 'Use theme font' reset. Description: pick an installed font for chat and the rest of the app; blank uses the theme's font.",
+  "states": "blank (theme font), custom value, reset available",
+  "test": "At #/settings?tab=config:appearance&page=typography type a font name and confirm chat text and the preview change.",
+  "rust_evidence": "crates/hermes-ui/ui/settings.slint:341",
+  "unsure": "Rust renders desktop.font_family as a TextControl widget; whether it applies the family to the UI or only stores it was not verified."
+ },
+ "SAPP-012": {
+  "behavior": "Settings → Appearance → Typography, 'Terminal Font' on config key terminal.font_family (TerminalFontSetting widget): placeholder 'MesloLGS NF or a CSS font stack', a 'Glyph preview' and a 'Use default' reset. Description notes Nerd Fonts render Powerlevel10k and shell icons and that blank uses bundled JetBrains Mono.",
+  "states": "blank (JetBrains Mono), custom value, reset available",
+  "test": "At #/settings?tab=config:appearance&page=typography set a Nerd Font and confirm the terminal shows the glyphs.",
+  "rust_evidence": "crates/hermes-ui/ui/settings.slint:341",
+  "unsure": "The Rust app bundles JetBrains Mono; whether a user font stack is honoured was not tested."
+ },
+ "SAPP-013": {
+  "behavior": "Settings → Appearance → Window & layout, 'Interface mode' segmented control over INTERFACE_MODES = ['simple', 'advanced'], default 'advanced' — 'Changes what is shown, not what Hermes can do.' Simple mode shadows several other preferences; shadowed rows append the t.interfaceMode.sessionNote sentence to their description. Device-local, applied live.",
+  "states": "simple, advanced (default); other rows show a 'shadowed by Simple mode' note",
+  "test": "At #/settings?tab=config:appearance&page=window-layout switch to Simple and confirm the chrome reduces and shadowed rows say so.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:644",
+  "unsure": "Whether the Rust app has a Simple/Advanced chrome distinction at all was not checked."
+ },
+ "SAPP-014": {
+  "behavior": "Settings → Appearance → Window & layout, 'Session List Density' segmented control with 'Compact', 'Comfortable', 'Detailed' (default 'compact') — 'Choose how much context appears beneath session titles in the sidebar.' Device-local, applied live.",
+  "states": "compact (default), comfortable, detailed",
+  "test": "At #/settings?tab=config:appearance&page=window-layout pick 'Detailed' and confirm session titles gain extra context lines.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:653",
+  "unsure": "The Rust sidebar may not render per-density detail lines."
+ },
+ "SAPP-015": {
+  "behavior": "Settings → Appearance → Window & layout, 'Tab Strip' segmented control with 'Auto', 'Always', 'Never' (device pref hermes.desktop.tabStripDefault, default 'auto') — 'Show tabs above a zone. Auto hides them for a single pane unless another chat or tile zone is open.'",
+  "states": "auto (default), always, never",
+  "test": "At #/settings?tab=config:appearance&page=window-layout pick 'Never' and confirm no tab strip renders above a zone.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:666",
+  "unsure": "The Rust app's pane/tab model was not inspected."
+ },
+ "SAPP-016": {
+  "behavior": "Settings → Appearance → Window & layout, 'App Actions' segmented control with 'Right' (default) and 'Left' — 'Where Settings, Layout, and HUD sit in the titlebar. Right leaves room for tabs on the left.' Device-local, applied live.",
+  "states": "right (default), left",
+  "test": "At #/settings?tab=config:appearance&page=window-layout pick 'Left' and confirm the titlebar action icons move.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:675",
+  "unsure": "The original only offers two sides; the Rust label is 'App Actions'."
+ },
+ "SAPP-017": {
+  "behavior": "Settings → Appearance → Window & layout, 'Minimize to tray' device toggle (IPC window.hermesDesktop.minimizeToTray; row hidden without the bridge). Off by default: closing the window hides it in the tray and keeps Hermes running. Tray unavailable swaps the description to 'The system tray is unavailable…'. Device-only.",
+  "states": "off (default), on, tray unavailable (alternate description), saving",
+  "test": "At #/settings?tab=config:appearance&page=window-layout enable it and close the window to confirm the app stays running in the tray.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:684",
+  "unsure": "The Rust rewrite has no tray implementation as far as this pass found."
+ },
+ "SAPP-018": {
+  "behavior": "Settings → Appearance → Window & layout, 'Window Translucency' — the row is omitted where TRANSLUCENCY_SUPPORTED is false (Linux). Clear shows a 0–100 Tint slider; Glass adds Fade plus Frost (Deep/Soft/Bright/Glare; three rungs on Windows) and Area (Whole window / Sidebar only). Dragging ghosts the overlay so the live window is the preview.",
+  "states": "unsupported (row absent), clear + tint, glass + tint/fade/frost/area, peek active, keyboard-stepped peek",
+  "test": "On a supported platform open #/settings?tab=config:appearance&page=window-layout and drag Tint to confirm the window itself changes while the overlay ghosts.",
+  "rust_evidence": "",
+  "unsure": "No translucency/blur support was found in the Slint rewrite; on Linux the original row does not exist at all."
+ },
+ "SAPP-019": {
+  "behavior": "Settings → Appearance → Window & layout, 'Chat Backdrop' toggle (store backdrop.ts, device pref) — 'The faint statue image behind the conversation.' Applied live.",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:appearance&page=window-layout toggle it and confirm the faint statue image behind the conversation appears/disappears.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:693",
+  "unsure": "The backdrop asset and its licence are not present in the Rust repo (no proprietary assets rule)."
+ },
+ "SAPP-020": {
+  "behavior": "Settings → Appearance → Window & layout, 'File Browser' toggle (store layout.ts, same state as the titlebar toggle and ⌘J) — 'Show the file browser beside the chat when a workspace is open. The titlebar toggle changes this too.' It persists across launches, so it is the standing default; Simple mode shadows it and the description then says so.",
+  "states": "off, on, shadowed by Simple mode (description note)",
+  "test": "At #/settings?tab=config:appearance&page=window-layout enable it and confirm the file browser pane opens and the titlebar toggle agrees.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:702",
+  "unsure": "No file-browser pane was found in the Rust app."
+ },
+ "SAPP-021": {
+  "behavior": "Settings → Appearance → Window & layout, 'Floating Composer' toggle (store composer-popout.ts, device) — 'Allow dragging the composer out of its dock. When off, it stays docked at the bottom.' Locked to the dock by default.",
+  "states": "off (locked, default), on (drag gestures enabled)",
+  "test": "At #/settings?tab=config:appearance&page=window-layout enable it and drag the composer upward to confirm it pops out.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:719",
+  "unsure": "No floating-composer support in the Rust repo."
+ },
+ "SAPP-022": {
+  "behavior": "Settings → Appearance → Chat display, 'Message Bubble' 0–100 slider (store user-bubble-transparency.ts) — 'How see-through your own messages are. Solid at 0; only the outline remains at 100.' Dragging ghosts the overlay so the bubble behind is the preview; the value shows as '<n>%'.",
+  "states": "0 (solid, default), 1–99, 100 (outline only)",
+  "test": "At #/settings?tab=config:appearance&page=chat-display drag the slider and confirm your own message bubbles fade with it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:730",
+  "unsure": "Rust declares this as a Slider device pref with unit '%'; the default was not readable from the table."
+ },
+ "SAPP-023": {
+  "behavior": "Settings → Appearance → Chat display, 'Text direction' segmented control over TEXT_DIRECTIONS = ['auto','rtl','ltr'], default 'auto', labelled 'Auto' / 'Right-to-left' / 'Left-to-right' — 'How chat messages and the composer choose their direction. Auto follows the first letter of each paragraph… Code always stays left-to-right.'",
+  "states": "auto (default), rtl, ltr",
+  "test": "At #/settings?tab=config:appearance&page=chat-display pick 'Right-to-left' and send an Arabic message to confirm alignment flips.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:743",
+  "unsure": "Slint text layout may not support per-paragraph auto direction."
+ },
+ "SAPP-024": {
+  "behavior": "Settings → Appearance → Chat display, 'Hide thread timeline bars' toggle (store thread-timeline.ts, default false) — 'Hide the navigation bars along the right edge of each conversation.'",
+  "states": "off (bars shown, default), on (bars hidden)",
+  "test": "At #/settings?tab=config:appearance&page=chat-display enable it and confirm the right-edge navigation bars disappear from a long chat.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:762",
+  "unsure": "The Rust transcript may not render timeline bars at all."
+ },
+ "SAPP-025": {
+  "behavior": "Settings → Appearance → Chat display, 'Message Reactions' toggle (device key hermes.desktop.reactions.v1, OFF by default) — 'iMessage-style emoji tapbacks — react to messages, and Hermes can react to yours.' It mirrors to backend config display.message_reactions (which gates the agent's react_to_message tool); persisted reactions still render while off.",
+  "states": "off (default), on; existing reactions still rendered while off",
+  "test": "At #/settings?tab=config:appearance&page=chat-display enable it and confirm the ☺ reaction slot appears on message rows.",
+  "rust_evidence": "",
+  "unsure": "Row cites config.set display.reactions but the code mirrors display.message_reactions; the Rust registry has no reactions row at all."
+ },
+ "SAPP-026": {
+  "behavior": "Settings → Appearance → Chat display, 'Vibe Hearts' toggle (store vibe-hearts-enabled.ts, ON by default — only an explicit 'off' disables it) — 'Floating hearts when you say thanks, ily, good bot, or send a heart. Separate from Message Reactions above.'",
+  "states": "on (default), off",
+  "test": "At #/settings?tab=config:appearance&page=chat-display turn it off and say 'thanks' to confirm no hearts float.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:788",
+  "unsure": "Rust device key hermes.desktop.vibeHearts.v1; no hearts animation exists in the Slint UI."
+ },
+ "SAPP-027": {
+  "behavior": "Settings → Appearance → Chat display, 'Tool Call Display' segmented control with 'Product' and 'Technical' (store tool-view.ts, default 'product') — 'Product hides raw tool payloads; Technical shows full input/output.' Product descriptions come from a.product/a.productDesc. Simple mode shadows it, appending the mode note.",
+  "states": "product (default), technical, shadowed by Simple mode",
+  "test": "At #/settings?tab=config:appearance&page=chat-display switch to 'Technical' and confirm tool rows show raw args and results.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:797",
+  "unsure": "The Rust tool rows may only implement one of the two views."
+ },
+ "SAPP-028": {
+  "behavior": "Settings → Appearance → Chat display, 'Hide code diffs' toggle (store tool-view.ts, default false) — 'Show file edits as inline tool rows with added/removed line counts, without the code.' Simple mode shadows it.",
+  "states": "off (diffs shown, default), on (counts only), shadowed note",
+  "test": "At #/settings?tab=config:appearance&page=chat-display enable it and confirm a file edit renders as a count-only row.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:806",
+  "unsure": "Rust has diff parsing in hermes-core (diff.rs) but no settings wiring was found."
+ },
+ "SAPP-029": {
+  "behavior": "Settings → Appearance → Chat display, 'Collapse thinking by default' toggle (store reasoning-disclosure.ts, default false) — 'Keep streamed reasoning available without expanding it until you open it.' Simple mode shadows it.",
+  "states": "off (expanded, default), on (collapsed), shadowed note",
+  "test": "At #/settings?tab=config:appearance&page=chat-display enable it and confirm a new reply's thinking section starts collapsed.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:815",
+  "unsure": "The Rust transcript's reasoning disclosure state was not inspected."
+ },
+ "SAPP-030": {
+  "behavior": "Settings → Appearance → Chat display, 'Inline Embeds' segmented control with 'Ask' (default), 'Always', 'Off' — 'Rich previews load from third-party sites (YouTube, X, …). Ask shows a placeholder until you allow each one; Always loads them automatically; Off keeps plain links.' A footnote action 'Reset N allowed services' appears once at least one embed was allowed (clearEmbedAllowed).",
+  "states": "ask (default), always, off; N allowed services (reset footnote)",
+  "test": "At #/settings?tab=config:appearance&page=chat-display pick 'Ask', open a YouTube link, allow it, then confirm the 'Reset N allowed services' footnote appears.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:824",
+  "unsure": "Inline embeds do not exist in the Rust transcript."
+ },
+ "SAPP-031": {
+  "behavior": "Settings → Appearance → Pet (id appearance.pet, 'Choose a pet') renders the petdex gallery with search, install/active cards, per-pet uninstall/rename/export, a 'Size' slider (0.1–3.0, default 0.33, shown as '<n>%') and a 'Roam' toggle. Failures: 'Could not adopt <slug>', 'Could not turn the pet on.', 'No pets available to turn on right now.'.",
+  "states": "loading, gallery list, search/no match ('No pets match \"<q>\".'), installed/active, unreachable petdex, size/roam set",
+  "test": "At #/settings?tab=config:appearance&page=pet install a pet, set Size and enable Roam, and confirm the mascot floats over the app.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:833",
+  "unsure": "Rust renders a Widget(\"pet\") chip; no petdex client exists in the rewrite."
+ },
+ "SAPP-032": {
+  "behavior": "Video playback speed is a device pref (store/video-playback-speed.ts, key hermes.desktop.videoPlaybackSpeed, default 1) that the transcript video component applies to HTMLVideoElement.playbackRate. There is NO settings row for it; the control lives on the video element in the chat.",
+  "states": "default 1, custom speed (persisted), invalid stored value (falls back to 1)",
+  "test": "Change a video's speed in a chat, restart, and confirm the rate persists; page: chat surface (#/), not Settings.",
+  "rust_evidence": "",
+  "unsure": "The parity row lists it under 'Settings — Appearance page' but no Appearance row or manifest entry exists for it in this checkout."
+ },
+ "SAPP-033": {
+  "behavior": "The Appearance page ends with a plugin seam: every contribution registered for area 'appearance.extra' mounts after the built-in rows, each in its own error boundary so a broken contribution degrades to an inline error. The slot renders on the top-level page only — a deep-linked subpage shows one built-in section and no plugin cards.",
+  "states": "no contributions (nothing rendered), N contributions, one contribution errored (inline boundary error)",
+  "test": "At #/settings?tab=config:appearance (no page param) confirm plugin-contributed cards render below the built-in rows, and that #/settings?tab=config:appearance&page=theme shows none.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has no plugin contribution seam as far as this pass found."
+ },
+ "SBIL-001": {
+  "behavior": "Settings → Billing → Overview reads RPC billing.state (and subscription.state) and renders Balance / Plan / Auto-refill summary cards, a CurrentPlanCard ('Change plan'/'View plans'), a Usage section and an Invoices section. States: not signed in ('Connect your Nous account'), free tier (\"You're on the Nous free tier\"), no payment method ('No payment method on file'), normal.",
+  "states": "loading skeleton, logged out, free tier, no card, normal, error",
+  "test": "At #/settings?tab=billing confirm the summary cards render from billing.state against the private test backend's billing fixtures.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2174",
+  "unsure": "Rust renders Widget(\"billing.overview\"); no billing RPC client was found."
+ },
+ "SBIL-002": {
+  "behavior": "Settings → Billing → Plans (sub-view ?bview=plans, only when the plan capability allows a change) is a grid of tiers with 'Current plan'/'Scheduled' markers and per-tier 'Choose'/'Change plan'/'Downgrade', a 'View plans' entry from the overview and 'Back to billing'. Unsupported changes: 'That change cannot be made here.'; empty catalog: 'No plans are available to change to right now.'",
+  "states": "overview, plans grid, current tier, scheduled change, confirming downgrade, checking change, undoing ('Undoing…'), cannot change, empty catalog",
+  "test": "At #/settings?tab=billing&bview=plans verify the tier grid and that a downgrade asks for confirmation before scheduling.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2174",
+  "unsure": "bview sub-view routing is a separate query param from the settings ?page= scheme."
+ },
+ "SBIL-003": {
+  "behavior": "Auto-refill row inside Billing: Manage opens a 'Threshold' field (aria 'Auto-refill threshold') and a 'Reload to' field, Save ('Saving…') and Cancel. Validation: 'Reload-to amount must be greater than the threshold.' plus per-field min/max/decimal messages. Turning it off asks 'Turn off auto-refill?' first; success 'Auto-refill updated.' Writes use RPC billing.auto_reload.",
+  "states": "off, on, managing (editable, prefilled), validation error, saving, updated, turn-off confirm",
+  "test": "At #/settings?tab=billing open Manage, set a reload-to below the threshold to trigger the validation message, then save a valid pair.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2174",
+  "unsure": "The gateway's billing.auto_reload handler requires the threshold field unconditionally (noted in auto-reload-row.tsx); the Rust side has no such call."
+ },
+ "SBIL-004": {
+  "behavior": "Buying credits: 'Buy credits now' with a custom amount, then RPC billing.charge and polling billing.charge_status ('Processing… checking settlement'). Outcomes '$<amount> added.' or 'Credits added.'; failures 'Charge failed', 'Charge outcome unconfirmed… check your balance/history before retrying', 'Charge could not be tracked', and the 5-minute 'Still processing after 5 minutes' timeout.",
+  "states": "idle, charging, polling, settled (success), failed, unconfirmed, untracked, timeout, refusal (3DS/expired/declined)",
+  "test": "At #/settings?tab=billing run a charge through the private test backend's simulated billing API and confirm the poller reaches a settled success message.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2174",
+  "unsure": "The simulated-api path (billing/simulated-api.ts) is a dev fixture; I did not confirm how the private test backend drives it."
+ },
+ "SBIL-005": {
+  "behavior": "Step-up verification (RPC billing.step_up) drives a 'Verify to continue' panel for Remote Spending: 'Open verification page', then 'Waiting for verification link…', resolving to 'Verification complete' ('Remote Spending is allowed for this terminal.') or 'Verification was not approved' (denied without allowing Remote Spending). The originating action stays retryable.",
+  "states": "idle, verifying, waiting, success, denied, refusal",
+  "test": "Trigger a step-up from a charge in the Rust app against the test backend and confirm the waiting state then either completion or denial.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2174",
+  "unsure": "How to force a step-up against the private test backend is unknown."
+ },
+ "SBIL-006": {
+  "behavior": "Subscription changes use RPC subscription.preview (chargeless quote) → confirm → subscription.change (scheduled: 'Change to <target> — takes effect <effectiveAt>. No charge now; you keep your current plan until then.'), and subscription.resume (immediate, no confirm). Also 'Checking this change…', 'Scheduling…', 'You are already on <name> — nothing to change.', 'Undo'.",
+  "states": "idle, previewing, ready (quote shown), scheduling, scheduleFailed, scheduled, resuming, undone",
+  "test": "At #/settings?tab=billing&bview=plans preview a change and confirm the quote text renders before any schedule is committed.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2174",
+  "unsure": "subscription.upgrade was not present in billing/api.ts (only preview/change/resume); the parity row may be stale."
+ },
+ "SBRW-001": {
+  "behavior": "Settings → Browser → Browser profile, 'Use My Real Browser Profile' toggle on config key browser.use_real_profile (off by default). On: Hermes copies the default Chromium browser's profile into a managed snapshot and drives it with its packaged Chromium; a non-Chromium default fails with a clear message. Off/on fires a notification with copy.enabledTitle/disabledTitle.",
+  "states": "off (default), on, toggle failed",
+  "test": "At #/settings?tab=config:browser&page=profile toggle it on and confirm the confirmation notice plus browser.use_real_profile=true in config.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1085",
+  "unsure": "The full consent description is a single long string; no sub-controls were found."
+ },
+ "SBRW-002": {
+  "behavior": "Settings → Browser → Local & private URLs, 'Browser Private URLs' toggle on config key browser.allow_private_urls: lets the browser tool reach private/loopback addresses.",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:browser&page=network toggle it and let the agent open a localhost URL to confirm the block is lifted.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1094",
+  "unsure": "No description string for this row in the original."
+ },
+ "SBRW-003": {
+  "behavior": "Settings → Browser → Local & private URLs, 'Local Browser For Private URLs' toggle on config key browser.auto_local_for_private_urls: when on, private-URL browsing is routed to a local browser automatically instead of a cloud backend.",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:browser&page=network enable it and confirm a private-URL fetch uses the local browser.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1103",
+  "unsure": "No description string in the original for this row."
+ },
+ "SCHT-001": {
+  "behavior": "Settings → Chat → Behavior, 'Personality' on config key display.personality: a select whose options are '' + BUILTIN_PERSONALITIES + any custom names from the root `personalities` or `agent.personalities` blocks (folding matches the Python runtime). The empty value renders as 'None' (not '(none)').",
+  "states": "unset ('None'), built-in selected, custom selected, empty list",
+  "test": "At #/settings?tab=config:chat&page=behavior pick a personality, start a new chat, and confirm the assistant style changes.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:898",
+  "unsure": "Whether Rust mirrors the root+agent personalities merge and neutral-name folding in personalityOptions()."
+ },
+ "SCHT-002": {
+  "behavior": "Settings → Chat → Behavior, 'Timezone' on config key timezone: a searchable combobox (schema.searchable, ~590 IANA zones) with placeholder 'Search…', empty message 'No results found', and clearable adding a 'System default' option. Description: 'IANA timezone identifier. Blank uses the system timezone.'",
+  "states": "set, cleared (System default), searching, no results",
+  "test": "At #/settings?tab=config:chat&page=behavior search 'Dubai' and pick Asia/Dubai; confirm timezone is written and clearing restores the system zone.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:923",
+  "unsure": "Rust uses Control::DynSelect for timezone; whether it is searchable/clearable in Slint was not verified."
+ },
+ "SCHT-003": {
+  "behavior": "Settings → Chat → Behavior, 'Reasoning Blocks' toggle on config key display.show_reasoning — 'Show reasoning sections when the backend provides them.' Off hides reasoning sections in the transcript without discarding them.",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:chat&page=behavior toggle it off and confirm reasoning sections disappear from a reply in the chat view.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:932",
+  "unsure": "Whether the Rust transcript renderer honours display.show_reasoning was not checked."
+ },
+ "SCHT-004": {
+  "behavior": "Settings → Chat → Attachments, 'Image Attachments' on config key agent.image_input_mode: segmented control with exactly ['auto', 'native', 'text'] (rendered 'Auto' / 'Native' / 'Text' via prettyName when no label map is supplied); default 'auto'. Description: 'Controls how image attachments are sent to the model.'",
+  "states": "auto, native, text",
+  "test": "At #/settings?tab=config:chat&page=attachments pick 'Text' and confirm a new image attachment is sent as a text description.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:941",
+  "unsure": "No i18n label map exists for these three, so the original shows the raw/'pretty' strings."
+ },
+ "SCHT-005": {
+  "behavior": "Settings → Chat → Attachments, 'Max preview / image load size' — a device-local number input in MB committing on blur/Enter through IPC. Description: default 16, remote non-image attach has a separate 256 MB cap, and a very high value loads whole files into memory. Empty resets to 16; values clamp to [1, 4096]; a failed write keeps the old value.",
+  "states": "default 16, custom value, clamped, empty→reset to default, bridge-write failure (keeps old value)",
+  "test": "At #/settings?tab=config:chat&page=attachments set 32 MB and confirm the change survives a restart and previews larger files.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:842",
+  "unsure": "Rust stores data-url-read-max as Store::Device in prefs.json; the original keeps it in Electron userData via IPC."
+ },
+ "SET-001": {
+  "behavior": "Settings is an overlay (#/settings) with a left nav built from SECTIONS plus extra views, a breadcrumb subpage header, and a 'Search' pill opening the ⌘K palette scoped to settings (nav.commandPalette); typing a printable character outside a field opens that palette seeded with it. Nav: Model, Chat, Appearance, Workspace, Safety, Browser, Vault, Memory, Voice, Advanced, Notifications, Billing.",
+  "states": "closed, open, palette-open (pill scales+fades), searching, subpage-selected",
+  "test": "Open #/settings in the Rust app, press ⌘K/Ctrl+K and type 'voice'; the palette lists settings hits and Enter lands on the row.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2286",
+  "unsure": "Rust search ranks/labels were not compared against the original palette."
+ },
+ "SET-002": {
+  "behavior": "Deep links resolve ?tab=<view>&page=<subpage>, plus ?setting=<manifest id> (?setting=appearance.tips) and legacy ?field=. A setting id routes to its subpage, then scrolls to #{setting-field-<id>} and flashes it for 1600 ms. Legacy targets: config:model?aux=→page=auxiliary, sessions?session=→page=archived, vault?kind|label|origin=→page=credentials. Unknown page falls back to the first subpage.",
+  "states": "resolved, redirected (page corrected via <Navigate replace>), highlighted, not-found (falls back to first page)",
+  "test": "Open #/settings?tab=config:appearance&setting=appearance.tips in the Rust app and confirm it lands on the General subpage with the Tips row flashed.",
+  "rust_evidence": "crates/hermes-ui/ui/settings.slint:502",
+  "unsure": "Rust's jump() takes (group,page,setting); whether legacy ?field=/?aux= redirects exist was not verified."
+ },
+ "SET-003": {
+  "behavior": "settings-manifest.ts is the searchable registry of hand-built rows: each key becomes the deep-link id '<view>.<kebab-key>' (settingId('appearance','tips')='appearance.tips'), its subpage route and its palette copy+keywords. Rows whose available() is false (minimizeToTray, translucency, hudModifier, screenshot, quickEntry) drop out of search; schema fields, credentials and plugins index themselves.",
+  "states": "row present, row unavailable (available() false → out of search)",
+  "test": "In the Rust app, search settings for 'tray' and confirm the row appears only when the platform bridge supports it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:76",
+  "unsure": "The Rust registry is a flat Setting table with a separate When predicate; no per-row available() equivalent was found."
+ },
+ "SET-004": {
+  "behavior": "moved-tabs.ts redirects a stale ?tab=mcp to the Capabilities route (?tab=connectors, carrying a ?server= row). ?tab=connections is still in SETTINGS_VIEWS and redirects to ?tab=gateway so old bookmarks resolve without flashing a fallback view.",
+  "states": "no-op (normal tabs), redirected (mcp→connectors, connections→gateway)",
+  "test": "Open #/settings?tab=mcp in the Rust app and confirm it lands on the Capabilities/Connectors page, and #/settings?tab=connections lands on Gateways.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust app has an equivalent legacy-tab redirect at all was not found; the registry only lists a 'gateway' group."
+ },
+ "SGTW-001": {
+  "behavior": "Settings → Gateways → This window renders the connection-mode chooser: local ('Start a private Hermes backend on localhost… works offline.'), remote, cloud ('Sign in once to Hermes Cloud and pick from the agents on your account — no URL to paste.') and SSH (launched on the remote over SSH and tunneled). An env-pinned connection shows an 'env override' pill and disables every option as read-only.",
+  "states": "local, remote, cloud, ssh; env-override (read-only); incomplete remote ('Enter a remote URL and sign in before switching to remote.')",
+  "test": "At #/settings?tab=gateway&page=connection switch to remote, fill URL+token, press 'Save and reconnect' and confirm the shell reconnects without closing.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2074",
+  "unsure": "Rust renders Widget(\"gateway.mode\"); the gateway group's 'connection' page exists but no mode chooser implementation was found."
+ },
+ "SGTW-002": {
+  "behavior": "Remote gateway fields: 'Remote URL' ('Base URL… Path prefixes are supported, for example /hermes.') and a password-style 'Session token' ('Paste session token'; blank keeps the saved token). Buttons 'Test remote', 'Save for next restart', 'Save and reconnect'. With no OS keyring a confirm asks 'Store the gateway token in plain text?'. Failures include 'Remote gateway test failed'.",
+  "states": "empty, incomplete (URL only / token missing), probing, auth via password / OAuth / token, signed in, plain-text confirm, saved, testing",
+  "test": "At #/settings?tab=gateway&page=connection enter the private test backend's URL and token, press Test remote, then Save and reconnect.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2074",
+  "unsure": "Rust has an RPC/REST client but no connection-config file handling for remote URL/token was found (the original stores it in Electron connection.json)."
+ },
+ "SGTW-003": {
+  "behavior": "Per-connection 'Extra gateway headers' — a name/value map editor in the connections registry editor: 'Add header' adds a row, each has a Remove action, and a saved value shows 'Saved — leave blank to keep'. Headers go on every HTTP and WebSocket request to that gateway, values are stored encrypted, and Hermes-managed headers (Authorization, Cookie, Host…) are ignored.",
+  "states": "no headers, rows added, value saved (blank keeps), remove row, header ignored (managed name)",
+  "test": "In #/settings?tab=gateway&page=devices edit a connection, add a header, save, reopen and confirm the value shows as saved.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has no connections registry; the parity row notes the store is Electron connection.json."
+ },
+ "SGTW-004": {
+  "behavior": "SSH connection fields: 'Connect via SSH' with Host ('user@host, or a Host alias from ~/.ssh/config.'; picker 'Select a host…' with 'Custom (enter manually)…'), User, Port, Identity file and 'Hermes path (optional)'. Buttons 'Test SSH' and 'Connect'. First host key is pinned; later changes fail closed. Distinct auth / host-key-changed / not-installed / timeout errors.",
+  "states": "no host, host picked (user/port/key enriched from ssh config), custom host, testing, reachable, each error class",
+  "test": "At #/settings?tab=gateway&page=connection pick an SSH host, press Test SSH and confirm 'Reachable: <host> (<platform>) — Hermes found'.",
+  "rust_evidence": "",
+  "unsure": "No SSH client/tunnel was found in the Rust repo."
+ },
+ "SGTW-005": {
+  "behavior": "Cloud connection: 'Sign in to Hermes Cloud', then an organization picker ('Choose an organization', 'Change org') and the 'Your agents' list ('Connect' per agent, 'Refresh'), with saved Cloud gateways listed separately. States: 'Signed in to Hermes Cloud', 'Loading your agents…', 'No agents found on this account…'. Failures: 'Hermes Cloud sign-in failed', 'Could not connect to that agent'.",
+  "states": "signed out, signing in, signed in, org selected, agents loading, no agents, connected (pill 'Connected'), saved-gateway list",
+  "test": "At #/settings?tab=gateway&page=connection sign in to Cloud, pick an org and connect an agent; confirm the window reconnects to it.",
+  "rust_evidence": "",
+  "unsure": "Cloud sign-in is an Electron bridge flow; no equivalent was found in the Rust repo."
+ },
+ "SGTW-006": {
+  "behavior": "Settings → Gateways → This window, 'Encrypt saved secrets with the OS keychain' toggle — off by default. On: gateway tokens and sign-in credentials are encrypted with the system keychain (Keychain Access / GNOME Keyring / Windows DPAPI) and the OS may prompt; off: plain files readable only by the user. Flipping re-encodes stored secrets; failure 'Could not change secret encryption'.",
+  "states": "off (default), on, busy (disabled), failed",
+  "test": "At #/settings?tab=gateway&page=connection toggle it and confirm the OS keychain prompt appears and the toggle keeps its new value.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2074",
+  "unsure": "No keychain/secret-storage implementation was found in the Rust repo."
+ },
+ "SGTW-007": {
+  "behavior": "Settings → Gateways → Saved connections is the connections registry: one row per connection with a kind pill (Local / Remote gateway / Hermes Cloud / SSH), 'Current' and 'App-managed' pills, Test, Edit, Remove ('Remove this connection?'), 'Make primary' and 'Add connection'. A launch toggle decides whether Sessions returns to the last-used gateway; 'Update all instances' fans out updates.",
+  "states": "empty ('No connections registered yet.'), list, editing, testing (Reachable / Connection test failed), remove-confirm, update-all running/done/failed, duplicate rejected",
+  "test": "At #/settings?tab=gateway&page=devices add an SSH connection, Test it, then Make primary and confirm Sessions opens on it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2094",
+  "unsure": "The original is a multi-connection registry (Electron main); Rust renders Widget(\"gateway.devices\") with no registry found."
+ },
+ "SGTW-008": {
+  "behavior": "Settings → Gateways → This window, 'Diagnostics' row with an 'Open logs' button that reveals desktop.log in the file manager — 'useful when the gateway fails to start'. The parity row also cites RPC diagnostics.share_nous + REST /api/ops/debug-share; those share-log endpoints live in the Maintenance surface, not this row.",
+  "states": "bridge available, bridge missing (row hidden)",
+  "test": "At #/settings?tab=gateway&page=connection press 'Open logs' and confirm desktop.log is revealed in the file manager.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2074",
+  "unsure": "I found no settings row for diagnostics.share_nous/debug-share in gateway-settings.tsx; only /api/ops/doctor|security-audit|backup exist in api/system.ts."
+ },
+ "SGTW-009": {
+  "behavior": "Gateway restart: REST POST /api/gateway/restart (api/system.ts restartGateway, optional profile). Before restarting it reads gateway_shared_with from the status response and, when the multiplexer carries 2+ profiles, names which profiles the restart will blip (default first); a standalone gateway or older backend restarts with no dialog. An action, not a settings row.",
+  "states": "standalone (no dialog), shared with N profiles (dialog lists them), restart in progress",
+  "test": "Against the private test backend with one profile, trigger restartGateway and confirm a single restart with no shared-profile dialog.",
+  "rust_evidence": "",
+  "unsure": "Where the Rust app triggers a restart (if anywhere) was not found."
+ },
+ "SGTW-010": {
+  "behavior": "Settings → Gateways → Remote updates: per managed-SSH connection an 'Update' button (disabled while running) drives a transactional remote update — sessions drain, the checkout updates, profiles are restored with a receipt. Statuses: 'Updating…', 'Updated', 'Updated — restore failed', 'Refused', 'Update failed', 'Update already in progress'; details include 'Receipt <id> · <outcome>'.",
+  "states": "unavailable (no SSH sources), idle, updating, updated, partial, refused, failed",
+  "test": "At #/settings?tab=gateway&page=managed-updates press Update on a managed SSH connection and confirm the receipt line appears.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2102",
+  "unsure": "Rust renders Widget(\"gateway.updates\"); no managed-update engine exists in the rewrite."
+ },
+ "SGTW-011": {
+  "behavior": "Maintenance operations behind the Settings surface: POST /api/ops/doctor ('Run doctor' — 'Health-check the install, config, and providers'), POST /api/ops/security-audit ('Security audit') and POST /api/ops/backup ('Backup'), each profile-scoped and returning an ActionResponse. They are surfaced from the Maintenance/system pages, not from a Gateways settings row.",
+  "states": "idle, running, succeeded, failed",
+  "test": "Trigger the doctor action against the private test backend and confirm a 200 ActionResponse with the operation name and output.",
+  "rust_evidence": "",
+  "unsure": "The parity row files these under 'Gateway / Connections page'; I could only confirm the endpoints in src/api/system.ts, not a settings row."
+ },
+ "SGTW-012": {
+  "behavior": "Same control as SGTW-008: the 'Open logs' button on the Diagnostics row calls window.hermesDesktop.revealLogs() to open desktop.log in the system file manager. It is hidden when the gateway page is rendered embedded (no bridge).",
+  "states": "bridge available, embedded (hidden)",
+  "test": "At #/settings?tab=gateway&page=connection press 'Open logs' and confirm the log file opens in a file manager.",
+  "rust_evidence": "",
+  "unsure": "The Rust app logs to stdout/file but has no reveal-in-file-manager wiring that I found."
+ },
+ "SGTW-013": {
+  "behavior": "When the connection was fixed by the launch environment (e.g. HERMES_DESKTOP_REMOTE_URL) the gateway page shows an 'env override' pill and the banner 'This connection was fixed by the way Hermes was launched.' — 'A startup setting outside the app chose this connection, so the options below are read-only. Restart Hermes without that setting… to change it here.' Every control is then disabled.",
+  "states": "not overridden (controls editable), overridden (all controls disabled, pill + banner shown)",
+  "test": "Launch the Rust app with the remote-URL env override set and confirm #/settings?tab=gateway&page=connection shows a read-only banner and disabled controls.",
+  "rust_evidence": "",
+  "unsure": "The exact env var names are referenced in comments (HERMES_DESKTOP_REMOTE_URL) but the full list was not enumerated."
+ },
+ "SKEY-001": {
+  "behavior": "Settings → Keyboard Shortcuts → Key bindings lists actions in collapsible categories (Composer, Profiles, Session, Navigation, View) with a 'Search shortcuts…' field (auto-expands; '—' when nothing matches). Clicking the caps rebinds ('Press a key…'); a diverged row shows 'Reset to default' (or 'Clear'); conflicts warn 'Also bound to “<label>”'. 'Reset all' restores every binding.",
+  "states": "default binding, rebound (reset shown), cleared (empty → 'set'), capturing, conflict warning, searching, no results ('—'), readonly rows (non-interactive caps)",
+  "test": "At #/settings?tab=keybinds&page=shortcuts rebind 'Open settings' to a new chord, confirm the conflict indicator when reusing a taken chord, then press 'Reset all'.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2048",
+  "unsure": "The Rust registry has a keybinds.list Widget row; no keybinding store or capture UI was found in the rewrite."
+ },
+ "SKEY-002": {
+  "behavior": "Settings → Keyboard Shortcuts → HUD gesture, 'Tap to summon HUD' toggle (IPC window.hermesDesktop.hudModifier; hidden without the bridge), off by default: tap-and-release ⌘+Option (Mac) or Ctrl+Alt (Windows/Linux) brings the HUD forward. An error banner with Retry covers input-permission, a missing helper, and unsupported sessions ('Linux requires X11; Wayland is not supported.').",
+  "states": "off (default), on, busy, state input-permission, state unavailable (missing-helper | unsupported-session), load/save error",
+  "test": "At #/settings?tab=keybinds&page=hud-gesture enable it on X11 and tap Ctrl+Alt to confirm the HUD comes forward; on Wayland confirm the unsupported-session notice.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2056",
+  "unsure": "No global HUD gesture exists in the Rust rewrite."
+ },
+ "SKEY-003": {
+  "behavior": "Settings → Keyboard Shortcuts → Screen capture, 'Screenshot shortcut' toggle (IPC window.hermesDesktop.screenshot; also atop Key bindings), off by default: pressing both Command keys from any app captures its frontmost window and attaches it to the draft, never sending. Statuses: 'Checking screenshot shortcut…', 'Screenshot shortcut is off.', 'Shortcut is ready.'",
+  "states": "off (default), on, checking, starting, ready, input-permission, screen-permission, error, capture-aborted (draft changed)",
+  "test": "At #/settings?tab=keybinds&page=screen-capture enable it, press both Command keys from another app, and confirm the shot attaches to the draft without sending.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2065",
+  "unsure": "The original gesture is macOS-only ('applies only to this Mac'); no screenshot shortcut exists in the Rust rewrite."
+ },
+ "SMEM-001": {
+  "behavior": "Settings → Memory & Context → Persistent memory, 'Persistent Memory' toggle on config key memory.memory_enabled — 'Save durable memories that can help future sessions.' Keyword 'remember' is attached in the Rust registry.",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:memory&page=persistent toggle it off and confirm no new durable memory is written after a session.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1112",
+  "unsure": "Default not read from /api/config/defaults."
+ },
+ "SMEM-002": {
+  "behavior": "Settings → Memory & Context → Persistent memory, 'User Profile' toggle on config key memory.user_profile_enabled — 'Maintain a compact profile of user preferences.'",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:memory&page=persistent toggle it and confirm USER.md stops/starts being updated after a session.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1124",
+  "unsure": "Default not read."
+ },
+ "SMEM-003": {
+  "behavior": "Settings → Memory & Context → Persistent memory, 'Memory Budget' number input on config key memory.memory_char_limit: the character budget for MEMORY.md.",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:memory&page=persistent lower the budget and confirm the backend refuses entries that would exceed it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1133",
+  "unsure": "No description string in the original; unit (characters) inferred from the key name."
+ },
+ "SMEM-004": {
+  "behavior": "Settings → Memory & Context → Persistent memory, 'Profile Budget' number input on config key memory.user_char_limit: the character budget for the user profile file.",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:memory&page=persistent change it and confirm the profile file respects the new cap.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1142",
+  "unsure": "No description string in the original."
+ },
+ "SMEM-005": {
+  "behavior": "Settings → Memory & Context → Persistent memory, 'Memory Provider' on config key memory.provider: a schema-driven select (discovery-driven options come from the backend, deliberately NOT from the desktop ENUM_OPTIONS); the empty value renders as 'Built-in only'. Choosing a real external provider mounts an extra MemoryConnect OAuth affordance and a ProviderConfigPanel underneath.",
+  "states": "built-in (''), external provider selected, OAuth connect offered, config panel mounted, unavailable",
+  "test": "At #/settings?tab=config:memory&page=persistent pick an installed provider and confirm the connect affordance plus provider config panel appear.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1148",
+  "unsure": "Rust has Control::DynSelect for memory.provider and When::Always; no provider-config-panel equivalent was found."
+ },
+ "SMEM-006": {
+  "behavior": "Settings → Memory & Context → Context & compression, 'Context Engine' on config key context.engine: segmented control with exactly ['compressor', 'default', 'custom'] (default 'compressor'). Description: 'Strategy for managing long conversations near the context limit.'",
+  "states": "compressor, default, custom",
+  "test": "At #/settings?tab=config:memory&page=context switch to 'default' and confirm long-session behaviour changes on the next turn.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1157",
+  "unsure": "i18n labels absent — prettyName renders 'Compressor'/'Default'/'Custom', while Rust hardcodes those same strings."
+ },
+ "SMEM-007": {
+  "behavior": "Settings → Memory & Context → Context & compression, 'Auto-Compression' toggle on config key compression.enabled — 'Summarize older context when conversations get large.'",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:memory&page=context toggle it and confirm a long conversation is (not) compressed.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1170",
+  "unsure": "Default not read from /api/config/defaults."
+ },
+ "SMEM-008": {
+  "behavior": "Settings → Memory & Context → Context & compression, 'Compression Threshold' number input on config key compression.threshold: the context fill ratio that triggers auto-compression.",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:memory&page=context lower the threshold and confirm compression fires earlier in a long chat.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1179",
+  "unsure": "No description string; unit (percent vs ratio) not stated in the desktop source."
+ },
+ "SMEM-009": {
+  "behavior": "Settings → Memory & Context → Context & compression, 'Codex Compression Auto-Raise' toggle on config key compression.codex_gpt55_autoraise — 'Raise compression to 85% for supported ChatGPT Codex OAuth models.'",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:memory&page=context toggle it and confirm the threshold rises to 85% for a Codex OAuth model.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1188",
+  "unsure": "Default not read."
+ },
+ "SMEM-010": {
+  "behavior": "Settings → Memory & Context → Context & compression, 'Compression Target' number input on config key compression.target_ratio: how far a summary is compressed.",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:memory&page=context change it and confirm the produced summary length follows.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1197",
+  "unsure": "No description string; whether the value is a ratio or percent is not stated."
+ },
+ "SMEM-011": {
+  "behavior": "Settings → Memory & Context → Context & compression, 'Protected Recent Messages' number input on config key compression.protect_last_n: the trailing messages never folded into a summary.",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:memory&page=context raise it and confirm the last N messages survive compression verbatim.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1206",
+  "unsure": "No description string in the original."
+ },
+ "SMEM-012": {
+  "behavior": "Settings → Memory & Context → Context & compression, 'Compression model timeout (s)' number input on config key auxiliary.compression.timeout — 'Seconds to wait for the auxiliary compression model per call (default 120). Raise for slow local models.'",
+  "states": "set, not set (default 120)",
+  "test": "At #/settings?tab=config:memory&page=context set 300 and confirm a slow local compression model is no longer timed out.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1215",
+  "unsure": "The 120 s default is stated only in the description text."
+ },
+ "SMOD-001": {
+  "behavior": "Settings → Model → Main model renders the 'Default Model' picker (description 'Used for new chats unless you pick a different model in the composer.'). Choosing a model writes the main assignment through REST /api/model/set and fires onMainModelChanged so the composer follows; the row is a widget, not a config-field autosave.",
+  "states": "loaded, loading (ModelSettingsSkeleton), error (readableError / 'restart required' on code skew)",
+  "test": "At #/settings?tab=config:model&page=main pick a different model from the private test backend and confirm new chats use it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:480",
+  "unsure": "Rust renders model.main as Control::Widget(\"model\") and ui/settings.slint shows a not-built Chip for non-font widgets."
+ },
+ "SMOD-002": {
+  "behavior": "'Main model context window (override)' — number input on config key model_context_length; description says 0 uses the selected model's detected value and that auxiliary/MoA models are unaffected. Empty input renders the 'Not set' placeholder; autosaves via the 550 ms debounced PUT /api/config.",
+  "states": "set (number), not set (0 / empty), loading",
+  "test": "At #/settings?tab=config:model&page=main type 200000, wait for autosave, and confirm model_context_length=200000 in the profile config.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:880",
+  "unsure": "Whether the Rust row clamps or validates the number beyond parse_value was not checked."
+ },
+ "SMOD-003": {
+  "behavior": "'Reasoning effort' on config key agent.reasoning_effort renders as a select whose options are '' followed by REASONING_EFFORTS = minimal, low, medium, high, xhigh, max, ultra; the empty value shows as '(none)'. Applies to new turns immediately.",
+  "states": "unset (renders '(none)'), each effort level",
+  "test": "At #/settings?tab=config:model&page=main set agent.reasoning_effort to 'high' and confirm the next turn reasons harder.",
+  "rust_evidence": "",
+  "unsure": "agent.reasoning_effort is routed to Model→Main by config-subpages but is NOT in SECTIONS keys; it only renders when the backend schema includes it."
+ },
+ "SMOD-004": {
+  "behavior": "'Service Tier' on config key agent.service_tier renders as a select. Its options come from the backend config schema (agent.service_tier is absent from the desktop ENUM_OPTIONS override list), so the exact labels are schema-driven.",
+  "states": "unset, tier selected",
+  "test": "At #/settings?tab=config:model&page=main (and Advanced → Agent limits) open the Service Tier select and confirm the offered values match GET /api/config/schema.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1815",
+  "unsure": "Original option labels unknown — the Rust registry invents ('(none)','normal','fast','auto','cold'); the Electron app relies on the backend schema."
+ },
+ "SMOD-005": {
+  "behavior": "'Fallback Models' on config key fallback_providers renders the dedicated structured editor FallbackModelsField (list of {provider, model} rows, full-width under the description), described 'Backup provider:model entries to try if the default model fails.' Not the generic comma list — the generic list branch would stringify objects to '[object Object]'.",
+  "states": "empty list, rows added, row removed",
+  "test": "At #/settings?tab=config:model&page=fallbacks add a provider:model row and confirm fallback_providers is a list of {provider,model} objects in config.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:889",
+  "unsure": "Rust Control::Fallback row_kind exists; the editor's add/remove UI in Slint was not inspected."
+ },
+ "SMOD-006": {
+  "behavior": "Settings → Model → Auxiliary models lists the side-task assignments (vision, compression, skills hub, approval, MCP, title generation, review) read from REST /api/model/auxiliary; each row picks provider+model. A notice flags auxiliary tasks still pinned to a provider that is not the main one (staleAuxAssignments).",
+  "states": "loaded, empty, stale-pin notice",
+  "test": "At #/settings?tab=config:model&page=auxiliary change one task's model and confirm the change comes back from /api/model/auxiliary.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:488",
+  "unsure": "Exact REST verbs for auxiliary writes were not read (only the read path)."
+ },
+ "SMOD-007": {
+  "behavior": "Settings → Model → Mixture of Agents reads REST /api/model/moa: presets each carry reference_models[] plus an aggregator, and a request is complete only when every slot has both provider and model (moaSlotComplete). The 'moa' virtual provider is excluded from slot provider options.",
+  "states": "loaded, preset selected, incomplete preset, empty",
+  "test": "At #/settings?tab=config:model&page=moa select a preset, fill provider+model in each reference slot, and confirm the MoA config round-trips.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:504",
+  "unsure": "Write path for MoA config (endpoint/verb) not read."
+ },
+ "SNOT-001": {
+  "behavior": "Settings → Notifications → Desktop alerts, 'Enable notifications' toggle (device key hermes:native-notifications, default true) — 'Off silences every notification below.' Intro caption: 'OS notifications (not in-app toasts). Per device.' Turning it off disables (greys) every kind toggle below; a hint reads 'Completion alerts only fire while Hermes is in the background.'",
+  "states": "on (default), off (all kind rows disabled)",
+  "test": "At #/settings?tab=notifications&page=alerts turn it off and confirm the seven kind toggles become disabled.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1912",
+  "unsure": "Rust uses device key hermes:native-notifications.enabled and cannot actually raise OS notifications."
+ },
+ "SNOT-002": {
+  "behavior": "Settings → Notifications → Desktop alerts, 'Approval needed' toggle (kind 'approval', default true) — 'A command is waiting for you to approve or reject it.' It is an attention kind, so it also fires while Hermes is focused if the prompt belongs to another session; the native notification carries Approve/Reject actions ('Approval needed — <session>'). Disabled while 'Enable notifications' is off.",
+  "states": "on (default), off, disabled (master off), firing",
+  "test": "At #/settings?tab=notifications&page=alerts leave it on, trigger an approval from another session, and confirm the OS notification with Approve/Reject appears.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1921",
+  "unsure": "The Approve/Reject actions live in Electron notifications; no Rust equivalent found."
+ },
+ "SNOT-003": {
+  "behavior": "Settings → Notifications → Desktop alerts, 'Input needed' toggle (kind 'input', default true) — 'Hermes asked a question or needs a password or secret.' Attention kind (fires while focused for another session); notification title 'Input needed — <session>', body 'Hermes is waiting for your response.'",
+  "states": "on (default), off, disabled (master off)",
+  "test": "At #/settings?tab=notifications&page=alerts keep it on and let the agent ask a question in a background session to see the notification.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1930",
+  "unsure": "None specific."
+ },
+ "SNOT-004": {
+  "behavior": "Settings → Notifications → Desktop alerts, 'Response ready' toggle (kind turnDone, default true) — 'A turn finished while Hermes was in the background.' Only fires while the app is not focused (the focusedHint says so).",
+  "states": "on (default), off, disabled (master off)",
+  "test": "At #/settings?tab=notifications&page=alerts keep it on, start a turn, switch away, and confirm the notification arrives on completion.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1939",
+  "unsure": "The 'only when unfocused' gate is renderer logic; whether Rust could reproduce it is open."
+ },
+ "SNOT-005": {
+  "behavior": "Settings → Notifications → Desktop alerts, 'Turn failed' toggle (kind turnError, default true) — 'Background turn errors.'",
+  "states": "on (default), off, disabled (master off)",
+  "test": "At #/settings?tab=notifications&page=alerts keep it on and force a background turn error to confirm the notification.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1948",
+  "unsure": "None specific."
+ },
+ "SNOT-006": {
+  "behavior": "Settings → Notifications → Desktop alerts, 'Background task finished' toggle (kind backgroundDone, default true) — 'A backgrounded terminal command completed.'",
+  "states": "on (default), off, disabled (master off)",
+  "test": "At #/settings?tab=notifications&page=alerts keep it on and background a terminal command to confirm the notification on completion.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1957",
+  "unsure": "None specific."
+ },
+ "SNOT-007": {
+  "behavior": "Settings → Notifications → Desktop alerts, 'Credit alerts' toggle (kind credits, default true) — 'Credit access is paused or restored.'",
+  "states": "on (default), off, disabled (master off)",
+  "test": "At #/settings?tab=notifications&page=alerts verify the toggle is present and persists; forcing a credits event needs a billing-capable backend.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1966",
+  "unsure": "How a credits event is simulated against the private test backend is unknown."
+ },
+ "SNOT-008": {
+  "behavior": "Settings → Notifications → Desktop alerts, 'Plugin notifications' toggle (kind plugin, default true) — 'A desktop plugin sent a notification while Hermes was in the background.'",
+  "states": "on (default), off, disabled (master off)",
+  "test": "At #/settings?tab=notifications&page=alerts keep it on and have an installed desktop plugin raise a notification to confirm it appears.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1975",
+  "unsure": "The Rust app has no desktop-plugin runtime."
+ },
+ "SNOT-009": {
+  "behavior": "Settings → Notifications → Sounds, 'Completion Sound' — a select of the sound presets (COMPLETION_SOUND_VARIANTS ids 1..n, e.g. 'Two-note comfort', 'Glass ping'; default variant id 1) plus a 'Preview' button that plays the chosen preset immediately. Description: 'Plays when an agent turn finishes. Pick a preset and preview it here.' Device-local.",
+  "states": "preset selected (default 1), previewing, out-of-range stored id (falls back to default)",
+  "test": "At #/settings?tab=notifications&page=sounds pick a preset, press Preview to hear it, then finish a turn and confirm the same sound plays.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1992",
+  "unsure": "The Rust row is a Select driven by the device pref; whether audio playback is implemented was not verified."
+ },
+ "SPLG-001": {
+  "behavior": "Settings → Plugins lists installed desktop plugins and their settings pages: a 'Desktop plugins' heading, a page count ('1 page' / '<n> pages') and nav children per plugin page. Empty 'No plugin has settings yet.'; an unknown plugin shows 'That plugin has no settings page. It may be disabled or uninstalled.' Actions: 'Manage plugins', 'Rescan', 'Reveal in file manager'.",
+  "states": "loading, empty, plugins listed, pages counted, deep-linked page open, missing plugin notice, pending/waiting",
+  "test": "At #/settings?tab=plugins confirm each installed plugin's settings pages are reachable and that an unknown plugin id shows the 'no settings page' notice.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2182",
+  "unsure": "Rust renders Widget(\"plugins.list\"); no plugin runtime exists in the rewrite."
+ },
+ "SPLG-002": {
+  "behavior": "A plugin's own settings page renders a declarative form from its field descriptors: types string, number, boolean, enum (choices), json and secret; labels humanized from the key when absent; an optional description; a 'Required' pill; and for secrets a hint naming the env var they are stored in. Save collects only changed fields (enums validated: '<label>: not one of <choices>').",
+  "states": "clean, dirty (dirty indicator), validation error, saving, saved, secret already set (hint shown)",
+  "test": "Open a plugin with settings at #/settings?tab=plugins, change a toggle and a text field, press Save and confirm the values persist after a reload.",
+  "rust_evidence": "",
+  "unsure": "No declarative plugin settings form exists in the Rust rewrite."
+ },
+ "SPLG-003": {
+  "behavior": "The single install dialog (Plugins tab, hermes:// link, setup chat card, raw git URL): 'Install plugin' — 'Review what this repository contains before installing anything.' with a 'Verified'/'Unverified' badge, Repository field, 'This package includes' (Agent plugin / Desktop UI), 'Install for profile', 'Enable agent plugin after install', 'Force reinstall' and 'Installing…'.",
+  "states": "idle, probing ('Inspecting repository…'), probe unavailable, nothing to install, selected components, insecure URL warning, installing, installed, failed, uncertain, already installed",
+  "test": "In the Rust app open the Plugins tab → Install, paste the private test backend's sample repo, review the component list and install; confirm the success notification.",
+  "rust_evidence": "",
+  "unsure": "The RPC plugins.catalog.lookup is referenced by the parity row; I only confirmed the desktop-side flow in plugin-install-modal.tsx."
+ },
+ "SPRV-001": {
+  "behavior": "Settings → Providers → Accounts lists OAuth provider accounts via REST /api/providers/oauth/*: sign-in/sign-out state per provider, status pills 'Connected', 'Reconnect', and errors like '<provider> sign-in did not complete'. Credentials are written to the profile's env store, not config.yaml.",
+  "states": "signed out, signing in, connected, reconnect needed, sign-in failed",
+  "test": "At #/settings?tab=providers&pview=accounts start a provider sign-in against the private test backend and confirm the account shows as connected.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2110",
+  "unsure": "Rust renders Widget(\"providers.accounts\"); no OAuth flow was found in the rewrite."
+ },
+ "SPRV-002": {
+  "behavior": "Settings → Tools & Keys and Providers → API keys render env-var credentials: each key shows Set/Not set, 'Reveal value'/'Hide value', 'Replace', 'Clear' and a menu with Docs and 'Manage in API Keys'. Saves notify 'Credential saved' ('<key> updated.') or '<key> removed.'; failures 'Failed to save <key>', 'Failed to reveal <key>'; Clear confirms 'Remove <key> from .env?'.",
+  "states": "loading, empty ('Nothing configured in this category yet.'), not set, set, revealed, saving, cleared, load failed",
+  "test": "At #/settings?tab=keys&kview=tools set a dummy key, Reveal it, then Clear it and confirm the notifications and the env store change.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2142",
+  "unsure": "Rust renders Widget(\"keys.tools\")/Widget(\"keys.settings\"); no env-var REST client was found."
+ },
+ "SPRV-003": {
+  "behavior": "Settings → Providers → Custom Endpoints manages OpenAI-compatible endpoints: a list (Active pill, 'API key set', Use/Edit/Delete) and an Add/Edit dialog with Name, Provider ID, Endpoint URL, Default Model, Context, API Key ('Leave blank to keep current key'), 'Use for new chats', 'Discover models' and API Mode incl. 'Auto-detect'. Test reports 'Endpoint is reachable.' or '<n> models found'.",
+  "states": "loading, empty, list, add/edit dialog, testing (reachable + model count), validation failed, activating, delete confirm, save failed",
+  "test": "At #/settings?tab=providers&pview=custom-endpoints add the private test backend as an endpoint, press Test, then Use and confirm new chats route to it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2126",
+  "unsure": "The exact endpoint/verb set (create/update/delete/activate) was not read beyond en.ts copy."
+ },
+ "SPRV-004": {
+  "behavior": "Settings → Providers → Local Models (nav entry only when the --local flag sets $localModelsEnabled; a stale ?pview=local falls back to accounts-shaped emptiness): a one-button quickstart that installs and starts a local runtime, plus a full pane with hardware, model catalog/browse, download progress and runtime controls via REST /api/local-models/*.",
+  "states": "flag off (nav entry hidden, pane refuses), flag on: status loading, quickstart, configure, install/downloading, running, stopped",
+  "test": "Launch the app with --local, open #/settings?tab=providers&pview=local and confirm the quickstart/catalog render against the private test backend.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2134",
+  "unsure": "No local-model runtime or --local flag was found in the Rust rewrite."
+ },
+ "SPRV-005": {
+  "behavior": "Settings → Tools & Keys → Tools is the 'tool' category view of the credential store: it lists every tool API key (filtering out channel-managed messaging credentials) and lets the user set, clear and reveal each, using the same useEnvCredentials lifecycle as the Providers → API keys view.",
+  "states": "loading, empty ('Nothing configured in this category yet.'), set/not set, revealed, saving",
+  "test": "At #/settings?tab=keys&kview=tools confirm tool-category keys only (messaging/channel-managed ones are absent) and set one.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2142",
+  "unsure": "VIEW_CATEGORIES maps tools→['tool'] and settings→['setting','messaging']; the Rust registry replicates the two page ids but not the category filter."
+ },
+ "SPRV-006": {
+  "behavior": "Provider grouping: raw env-var names fold into friendly cards by longest-prefix match on PROVIDER_GROUPS (Nous Portal, Fireworks AI, OpenRouter, Anthropic, xAI, Gemini, DeepSeek, DashScope (Qwen), GLM / Z.AI, Kimi, MiniMax, Hugging Face, OpenCode Zen/Go, NVIDIA NIM, Ollama Cloud, LM Studio, StepFun, Xiaomi MiMo, Arcee AI, GMI Cloud, Azure Foundry, AWS Bedrock), each with a tagline and docs URL.",
+  "states": "group with some keys set, group with none set, unmatched keys in the catch-all",
+  "test": "At #/settings?tab=keys&kview=settings set XAI_API_KEY and confirm it appears under the 'xAI' card with its tagline and Docs link, not under a generic group.",
+  "rust_evidence": "",
+  "unsure": "No provider-grouping logic was found in the Rust rewrite."
+ },
+ "SSAF-001": {
+  "behavior": "Settings → Safety → Approvals, 'Approval Mode' on config key approvals.mode: segmented control with exactly ['manual', 'smart', 'off'] (default 'manual'); description 'How Hermes handles commands that need explicit approval.' Rust attaches search keywords [\"yolo\",\"approve\",\"dangerous\"].",
+  "states": "manual, smart, off",
+  "test": "At #/settings?tab=config:safety&page=approvals set 'off' and confirm a normally-approved command runs without prompting.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1022",
+  "unsure": "Labels are prettyName-derived ('Manual'/'Smart'/'Off') — no i18n map."
+ },
+ "SSAF-002": {
+  "behavior": "Settings → Safety → Approvals, 'Approval Timeout' on config key approvals.timeout: number input — 'How long approval prompts wait before timing out.'",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:safety&page=approvals set a short timeout and confirm a pending approval prompt expires after it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1031",
+  "unsure": "Unit (seconds) and default are backend-owned and not stated in the desktop source."
+ },
+ "SSAF-003": {
+  "behavior": "Settings → Safety → Approvals, 'Confirm MCP Reloads' toggle on config key approvals.mcp_reload_confirm: when on, reloading MCP servers asks for confirmation first.",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:safety&page=approvals toggle it and reload MCP from Capabilities to confirm the prompt appears (or not).",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1040",
+  "unsure": "The desktop has no description string for this row (FIELD_DESCRIPTIONS omits it)."
+ },
+ "SSAF-004": {
+  "behavior": "Settings → Safety → Approvals, 'Command Allowlist' on config key command_allowlist: comma-separated list input of commands approved without a prompt.",
+  "states": "empty, entries listed",
+  "test": "At #/settings?tab=config:safety&page=approvals allowlist a command and confirm it no longer raises an approval.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1049",
+  "unsure": "No description string exists for this row in the original."
+ },
+ "SSAF-005": {
+  "behavior": "Settings → Safety → Privacy & network, 'Redact Secrets' toggle on config key security.redact_secrets — 'Hide detected secrets from model-visible content when possible.'",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:safety&page=privacy toggle it off and confirm a secret-looking string is no longer redacted in model-visible content.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1058",
+  "unsure": "Default not read from /api/config/defaults."
+ },
+ "SSAF-006": {
+  "behavior": "Settings → Safety → Privacy & network, 'Allow Private URLs' toggle on config key security.allow_private_urls: permits fetching private/loopback addresses.",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:safety&page=privacy toggle it and attempt a fetch of a localhost URL to confirm it is blocked/allowed.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1067",
+  "unsure": "No description string in the original for this row."
+ },
+ "SSAF-007": {
+  "behavior": "Settings → Safety → Checkpoints, 'File Checkpoints' toggle on config key checkpoints.enabled — 'Create rollback snapshots before file edits.'",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:safety&page=checkpoints enable it, let an edit run, and confirm a checkpoint snapshot exists.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1076",
+  "unsure": "Default not read; the Rust checkpoints page only carries this toggle plus checkpoints.max_snapshots under Advanced → Output limits."
+ },
+ "SSAF-008": {
+  "behavior": "Settings → Safety → Privacy & network renders two coupled opt-ins via RPC (not config autosave): 'Collect usage stats' ('Counts only, kept on this computer. Never your messages, files, paths or error text.') and 'Share usage stats with Nous' (disabled unless collection is on). An older backend keeps both disabled reading 'Update the Hermes backend to change this setting.'",
+  "states": "loaded, collect on/off, send on/off (gated by collect), busy, unavailable",
+  "test": "At #/settings?tab=config:safety&page=privacy toggle collection on and confirm 'Share usage stats with Nous' becomes enabled and the consent persists.",
+  "rust_evidence": "",
+  "unsure": "The exact shared_metrics.* RPC method names were not listed in the source I read."
+ },
+ "SSES-001": {
+  "behavior": "Settings → Sessions → Archive & retention, 'Auto-archive stale chats' on backend config sessions.auto_archive (sibling sessions.auto_archive_days): pinned chats are never archived and nothing is deleted. Turning it on reveals an 'Archive after' number input (min 1, default 3) with the unit 'days of inactivity'. Failure 'Could not update auto-archive'.",
+  "states": "off, on (+days input visible), days editing, save failed",
+  "test": "At #/settings?tab=sessions&page=archived enable auto-archive, set 1 day, and confirm a stale unpinned chat moves to the archive while a pinned one stays.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2012",
+  "unsure": "The Rust registry splits these into sessions.auto_archive and sessions.auto_archive_days rows; whether the days row is revealed conditionally was not checked."
+ },
+ "SSES-002": {
+  "behavior": "Settings → Sessions → Default project folder, 'Default project directory' with a 'Choose' button (native picker via IPC) that becomes 'Change' once set, plus 'Clear'. Title is the path or 'Not set'; description 'Defaults to <label>.'. Success 'Default project directory updated — start a new chat (Ctrl/⌘+N) for it to take effect'; failures 'Could not update/clear default directory'.",
+  "states": "not set (shows home default), set (Change + Clear), picking, updating, cleared",
+  "test": "At #/settings?tab=sessions&page=default-directory press Choose, pick a folder, then start a new chat and confirm it opens in that folder.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2038",
+  "unsure": "Rust stores 'project-dir' as a device Mono pref; no native folder picker was found."
+ },
+ "SSES-003": {
+  "behavior": "Settings → Sessions → Archive & retention lists every archived session under 'Archived sessions' with a count. Each row shows title, preview and '<folder> · <n> messages' with 'Unarchive' and 'Delete permanently' (confirm 'Permanently delete \"<title>\"? This cannot be undone.'). Empty 'Nothing archived'; loading 'Loading archived sessions…'; failures 'Could not load archived sessions'.",
+  "states": "loading, empty, list, busy row (spinner), unarchive success ('Restored'), delete confirm, deep-link highlight (?session=)",
+  "test": "At #/settings?tab=sessions&page=archived unarchive one chat and permanently delete another, confirming both the confirm dialog and the resulting list.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2030",
+  "unsure": "Rust renders Widget(\"sessions.archived-list\"); the Rust app's session store only reads the real session list, and archive support was not verified."
+ },
+ "SVLT-001": {
+  "behavior": "Settings → Passwords & Logins → Saved credentials lists vault items via RPC vault.list: a '<n> saved' count and rows with title, a source pill (e.g. '2FA auto') and Remove. Empty 'Nothing saved yet' / 'Ask the agent to sign into a site and it will ask you for the login once…'. Load failure 'Could not load vault items'; Remove confirms 'Delete this item?' ('This cannot be undone.')",
+  "states": "loading, empty, list, remove-confirm, removed, load failed, deep-link highlight (?kind/label/origin)",
+  "test": "At #/settings?tab=vault&page=credentials confirm items from the private test backend's vault appear and that removing one updates the list.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2158",
+  "unsure": "Rust renders Widget(\"vault.credentials\"); no vault RPC client was found in the rewrite."
+ },
+ "SVLT-002": {
+  "behavior": "'Add' opens 'Add a login, card or address' ('Stored encrypted on this machine. The agent never sees the password.') with Kind (Login / Payment card / Address), Label (required: 'A label is required.'), Site origin ('Enter a valid URL like https://example.com.') and kind-specific fields, plus an optional 'Authenticator key'. Saves via RPC vault.add → 'Saved.' ('Saving…' while in flight).",
+  "states": "closed, open (prefilled from ?kind/label/origin), kind switched, validation errors, saving, saved",
+  "test": "At #/settings?tab=vault&page=credentials press Add, save a login, and confirm it appears in the list with the '2FA auto' badge when a base32 key was given.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2158",
+  "unsure": "Exact vault.add parameter shape beyond {…payload, secret:{}} was not read in full."
+ },
+ "SVLT-003": {
+  "behavior": "Remove a saved item from the credentials list: the trash action opens confirm 'Delete this item?' ('\"<label>\" will be removed. This cannot be undone.') with a destructive 'Delete' confirm, then calls RPC vault.remove and drops the row.",
+  "states": "idle, confirm open, removing, removed, failed",
+  "test": "At #/settings?tab=vault&page=credentials delete an item and confirm it disappears and vault.list no longer returns it.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2158",
+  "unsure": "The error copy for a failed remove was not located in en.ts beyond loadFailed."
+ },
+ "SVLT-004": {
+  "behavior": "Vault lock/unlock per external password-manager source: 'Unlock' opens 'Unlock <name>' ('Enter your master password. It is handed to the password manager on this machine and discarded…') and calls RPC vault.unlock, then '<name> unlocked for this session.' Unlocked sources offer 'Lock' (RPC vault.lock) and auto-lock after 30 minutes idle or when Hermes closes.",
+  "states": "locked, unlocking, unlocked ('Unlocked for this session'), unlocking failed, auto-locked",
+  "test": "At #/settings?tab=vault&page=sources unlock 1Password with its master password, confirm the 'unlocked for this session' toast, then Lock it again.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2166",
+  "unsure": "The 30-minute idle re-lock lives in the backend; not verified."
+ },
+ "SVLT-005": {
+  "behavior": "Settings → Passwords & Logins → Password managers lists sources from RPC vault.sources with statuses 'Not detected', 'Off', 'Locked', 'Unlocked'; the toggle calls vault.source.set and failure shows 'Could not update password manager'. Per-state descriptions differ, and a missing source reads 'Not detected. Install the <name> command-line tool and sign in to it; Hermes picks it up automatically.'",
+  "states": "not detected, off, locked, unlocked, toggling, toggle failed",
+  "test": "At #/settings?tab=vault&page=sources toggle an installed password manager on/off and confirm vault.source.set drives the status change.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2166",
+  "unsure": "Which sources the private test backend reports was not checked."
+ },
+ "SVOI-001": {
+  "behavior": "Settings → Voice → Voice conversation, 'Voice Chat Mode' on config key voice.voice_chat_mode: segmented control with exactly ['chained', 'gpt-live'], default 'chained'. Description spells both out (chained = STT → Hermes → TTS with the providers below; gpt-live = one full-duplex model that bills $0.05/min and needs an OpenAI key).",
+  "states": "chained, gpt-live",
+  "test": "At #/settings?tab=config:voice&page=conversation switch to 'gpt-live' and confirm voice.voice_chat_mode changes and the next voice chat uses the live engine.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1224",
+  "unsure": "Labels are prettyName-derived ('Chained'/'Gpt-Live'); Rust hardcodes those strings."
+ },
+ "SVOI-002": {
+  "behavior": "Settings → Voice → Voice conversation, 'GPT-Live Voice' on config key voice.gpt_live.voice: free-input combobox (FREE_INPUT_KEYS — custom voice IDs accepted) suggesting marin, cedar, quartz, ripple, vesper, willow, stone, gleam, meridian, bossa, tempo, beacon, delta, cinder. 'Voice for GPT-Live mode. Custom voice IDs are accepted.'",
+  "states": "unset ('Not set' placeholder), suggestion picked, custom value typed",
+  "test": "At #/settings?tab=config:voice&page=conversation type a voice id not in the list and confirm it is saved to voice.gpt_live.voice.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1233",
+  "unsure": "Rust renders Control::Mono (plain text) — it does not show the suggestion list."
+ },
+ "SVOI-003": {
+  "behavior": "Settings → Voice → Voice conversation, 'GPT-Live Persona' on config key voice.gpt_live.instructions: a full-width textarea (schema.type 'text'). Description: 'Extra sentences for the live voice persona (tone, pace, language). Hermes keeps its own system prompt.'",
+  "states": "empty, text entered",
+  "test": "At #/settings?tab=config:voice&page=conversation enter a persona sentence and confirm it lands in voice.gpt_live.instructions and affects the live voice tone.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1242",
+  "unsure": "Whether the Rust Control::Text row renders as a multi-line editor in Slint was not verified."
+ },
+ "SVOI-004": {
+  "behavior": "Settings → Voice → Text to speech, 'Text-To-Speech Provider' select on config key tts.provider with exactly edge, elevenlabs, openai, xai, minimax, mistral, gemini, neutts, kittentts, piper (+ custom command providers merged from tts.providers.<name> / tts.<name>); default 'edge'. Only the selected provider's rows render.",
+  "states": "select open/closed, custom command provider appended",
+  "test": "At #/settings?tab=config:voice&page=speech select 'piper' and confirm only piper's voice row remains and tts.provider='piper' is written.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1251",
+  "unsure": "'deepinfra' is a runtime TTS provider but is missing from the original ENUM_OPTIONS list (helpers.ts notes this drift)."
+ },
+ "SVOI-005": {
+  "behavior": "Settings → Voice → Speech to text, 'Speech To Text' toggle on config key stt.enabled — 'Enable local or provider-backed speech transcription.' Off hides every stt.<provider>.* row and blocks voice mode.",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:voice&page=transcription toggle it off and confirm the STT provider and model rows disappear.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1274",
+  "unsure": "Effective default (true) inferred from helpers tests, not from /api/config/defaults."
+ },
+ "SVOI-006": {
+  "behavior": "Settings → Voice → Speech to text, 'Echo Transcripts' toggle on config key stt.echo_transcripts — 'Post the raw 🎙️ transcript of voice messages back to the chat.'",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:voice&page=transcription enable it, dictate, and confirm a raw 🎙️ transcript row appears.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1283",
+  "unsure": "Default not read."
+ },
+ "SVOI-007": {
+  "behavior": "Settings → Voice → Speech to text, 'Speech-To-Text Provider' select on config key stt.provider with exactly local, groq, openai, mistral, xai, elevenlabs, deepinfra (+ custom command providers); default 'local' when unset. Changing it re-scopes which stt.* model rows are visible.",
+  "states": "select open/closed, each provider",
+  "test": "At #/settings?tab=config:voice&page=transcription pick 'elevenlabs' and confirm the ElevenLabs STT rows (model, language, tags, diarization) appear.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1289",
+  "unsure": "Whether Rust merges user-defined command providers into this list was not verified."
+ },
+ "SVOI-008": {
+  "behavior": "Settings → Voice → Speech to text, 'Live Transcription' toggle on config key stt.streaming — 'Show text while you speak (OpenAI, xAI, ElevenLabs). Falls back to the recording on any failure.' Also selects stt.openai.streaming_model when the provider is openai.",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:voice&page=transcription enable it and dictate; partial words should appear while speaking.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1309",
+  "unsure": "Which providers the private test backend actually supports live streaming for was not tested."
+ },
+ "SVOI-009": {
+  "behavior": "Settings → Voice → Text to speech, 'Read Responses Aloud' toggle on config key voice.auto_tts — 'Automatically speak assistant responses.' Enabling also acquires the 'desktop:read-aloud' TTS lease.",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:voice&page=speech enable it, send a prompt, and confirm the reply is spoken aloud.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1318",
+  "unsure": "The renderer keeps a separate device pref mirror (hermes.desktop.autoSpeakReplies) that migrates once from config; not surfaced in the Rust registry."
+ },
+ "SVOI-010": {
+  "behavior": "Settings → Voice → Text to speech, 'Edge Voice' on config key tts.edge.voice: free-input combobox suggesting en-US-AriaNeural, en-US-JennyNeural, en-US-AndrewNeural, en-US-BrianNeural, en-US-GuyNeural, en-GB-SoniaNeural (the full Edge catalog is 400+, so custom ids are accepted). Renders only while tts.provider='edge' (the default).",
+  "states": "unset ('Not set'), suggestion picked, custom id",
+  "test": "At #/settings?tab=config:voice&page=speech with provider=edge set a custom voice id and confirm it persists to tts.edge.voice.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1324",
+  "unsure": "Rust renders Control::Mono, so the suggestion list is not shown."
+ },
+ "SVOI-011": {
+  "behavior": "Settings → Voice → Text to speech (provider=openai): 'OpenAI TTS Model' select on tts.openai.model with gpt-4o-mini-tts, tts-1, tts-1-hd, and 'OpenAI Voice' free-input combobox on tts.openai.voice suggesting alloy, ash, ballad, cedar, coral, echo, fable, marin, nova, onyx, sage, shimmer, verse. With tts-1/tts-1-hd the voice suggestions narrow to the 9 that model accepts.",
+  "states": "model gpt-4o-mini-tts (13 voices), tts-1 / tts-1-hd (9 voices), custom voice typed",
+  "test": "At #/settings?tab=config:voice&page=speech set model tts-1 and confirm 'marin' drops out of the voice suggestions.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1333",
+  "unsure": "Whether Rust reproduces the per-model voice narrowing (OPENAI_TTS1_VOICES) was not verified."
+ },
+ "SVOI-012": {
+  "behavior": "Settings → Voice → Text to speech (provider=elevenlabs): 'ElevenLabs Voice' on tts.elevenlabs.voice_id is a combobox seeded from the live account, falling back to free input when unreachable. 'ElevenLabs Model' select on tts.elevenlabs.model_id: eleven_v3, eleven_ttv_v3, eleven_multilingual_v2, eleven_turbo_v2, eleven_turbo_v2_5, eleven_flash_v2, eleven_flash_v2_5.",
+  "states": "account voices loaded (labels shown), account unreachable (free input), value not in list (kept)",
+  "test": "At #/settings?tab=config:voice&page=speech with provider=elevenlabs and a key set, confirm the voice dropdown lists account voices with labels.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1351",
+  "unsure": "Rust has both fields as Control::Mono — no live ElevenLabs voice fetch was found."
+ },
+ "SVOI-013": {
+  "behavior": "Settings → Voice → Text to speech (provider=xai) renders seven tts.xai.* rows: 'xAI (Grok) Voice' (voice_id, suggestion 'eve'), 'xAI Language' (e.g. en, or \"auto\"), 'xAI Playback Speed' (0.7 slower … 1.5 faster), 'xAI Auto Speech Tags' toggle, 'xAI Streaming Latency Optimization' (0 best quality … 2 lowest latency), 'xAI Sample Rate' (Hz), 'xAI Bit Rate' (bps, mp3 only).",
+  "states": "fields visible only while tts.provider='xai'; tags on/off; latency 0/1/2",
+  "test": "At #/settings?tab=config:voice&page=speech pick provider 'xai' and confirm all seven rows appear and persist under tts.xai.*.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1369",
+  "unsure": "Rust renders latency/sample rate/bit rate as Control::Number (no clamp); the original may clamp via the schema."
+ },
+ "SVOI-014": {
+  "behavior": "Settings → Voice → Text to speech also carries the other providers' rows, each visible only for its provider: minimax (speech-02-hd|speech-02-turbo + voice_id), mistral (voxtral-mini-tts-2603 + voice_id), gemini (2 models + 30 voices incl. Zephyr, Puck, Kore), neutts (model + device cpu|cuda|mps), kittentts (3 kitten-tts models + Jasper), piper (4 en_US/en_GB voices), deepinfra (model + voice).",
+  "states": "per-provider visibility; free input accepted everywhere except NeutTS device",
+  "test": "At #/settings?tab=config:voice&page=speech step through minimax, mistral, gemini, neutts, kittentts, piper and deepinfra and confirm the exact rows and suggestion lists for each.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1435",
+  "unsure": "Only NeutTS device and the STT ElevenLabs model / OpenAI streaming model are true Segmented controls in the Rust registry; the rest are Mono."
+ },
+ "SVOI-015": {
+  "behavior": "Settings → Voice → Speech to text (provider=local): 'Local Transcription Model' select on stt.local.model with tiny, base, small, medium, large-v3, turbo (default 'tiny') and 'Transcription Language' text input on stt.local.language.",
+  "states": "visible while stt.enabled and provider=local; hidden otherwise",
+  "test": "At #/settings?tab=config:voice&page=transcription with provider=local pick 'medium' and confirm stt.local.model is written.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1549",
+  "unsure": "Rust's description for this row is 'Local faster-whisper model size', which is not the original FIELD_LABELS copy."
+ },
+ "SVOI-016": {
+  "behavior": "Settings → Voice → Speech to text carries one model row per STT provider, visible only for the selected one: stt.openai.model (whisper-1, gpt-4o-mini-transcribe, gpt-4o-transcribe, gpt-transcribe) plus streaming_model, stt.groq.model, stt.mistral.model, stt.xai.model, stt.deepinfra.model, and ElevenLabs' model_id (scribe_v2|scribe_v1), language_code, tag_audio_events, diarize.",
+  "states": "per-provider visibility; free input for model names except ElevenLabs model",
+  "test": "At #/settings?tab=config:voice&page=transcription step through each STT provider and confirm the matching model row and its suggestion list.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1574",
+  "unsure": "Whether stt.deepinfra.model has any suggestion list at all is unclear (it is free-input only)."
+ },
+ "SVOI-017": {
+  "behavior": "Settings → Voice → Voice conversation, 'Max Recording Length' number input on config key voice.max_recording_seconds: caps one recording's duration; empty renders 'Not set'.",
+  "states": "set, not set, non-numeric rejected (kept 0 / last valid)",
+  "test": "At #/settings?tab=config:voice&page=conversation set a small value and confirm recording stops at that length.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1669",
+  "unsure": "Default and unit are backend-owned and not stated in the desktop source."
+ },
+ "SVOI-018": {
+  "behavior": "Settings → Voice → Voice conversation, 'Client Direct' toggle on config key voice.client_direct: when on the desktop calls the profile's STT/TTS providers itself (provider+keys from GET /api/audio/voice-config, keys held in renderer memory only, never persisted), falling back to the gateway relay for providers that can only run on the gateway host.",
+  "states": "on, off; per-provider direct vs relay",
+  "test": "At #/settings?tab=config:voice&page=conversation enable it, dictate, and confirm the request goes directly to the provider rather than the gateway relay.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1678",
+  "unsure": "The Rust label is 'Client Direct'; the original has no FIELD_LABELS entry for voice.client_direct, so the original label may be derived from the schema key instead."
+ },
+ "SWRK-001": {
+  "behavior": "Settings → Workspace → Projects & discovery, 'Working Directory' on config key terminal.cwd: a monospace text input (Control::Mono). Description: 'Default project folder for tool and terminal work.' Autosaves via PUT /api/config.",
+  "states": "set, not set ('Not set' placeholder)",
+  "test": "At #/settings?tab=config:workspace&page=projects set a folder path and confirm terminal.cwd is written for the profile.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:950",
+  "unsure": "Whether Rust offers a native folder picker for this field was not checked."
+ },
+ "SWRK-002": {
+  "behavior": "Settings → Workspace → Projects & discovery, 'Automatic Repository Discovery' toggle on config key desktop.repo_scan_enabled — 'Scan local folders for Git repositories to show in Projects.' Turning it on triggers a repo scan (scanAndRecordRepos) recorded as a discovery policy.",
+  "states": "on, off, scanning",
+  "test": "At #/settings?tab=config:workspace&page=projects enable it and confirm discovered Git repositories appear in Projects.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:959",
+  "unsure": "The Rust Projects view's repo-scan implementation was not inspected."
+ },
+ "SWRK-003": {
+  "behavior": "Settings → Workspace → Projects & discovery, 'Repository Discovery Roots' on config key desktop.repo_scan_roots: a comma-separated list input — the draft joins with ', ' and commits on blur/Enter to an array. Description: 'Folders to scan. Leave empty to scan your home directory.'",
+  "states": "empty (home dir), one/many roots, editing draft",
+  "test": "At #/settings?tab=config:workspace&page=projects enter two folders separated by commas and confirm desktop.repo_scan_roots is a 2-element array.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:968",
+  "unsure": "Whether Rust's Control::List commits on blur/Enter the same way (settings.slint List row) was not traced."
+ },
+ "SWRK-004": {
+  "behavior": "Settings → Workspace → Projects & discovery, 'Excluded Repository Paths' on config key desktop.repo_scan_exclude_paths: comma-separated list input; folders and their descendants are skipped during discovery.",
+  "states": "empty, paths listed",
+  "test": "At #/settings?tab=config:workspace&page=projects exclude a path and confirm that repo no longer appears in Projects.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:977",
+  "unsure": "Same list-commit caveat as SWRK-003."
+ },
+ "SWRK-005": {
+  "behavior": "Settings → Workspace → Files & execution, 'Code Execution Mode' on config key code_execution.mode: segmented control with exactly ['project', 'strict']; default 'project'. Description: 'How strictly code execution is scoped to the current project.'",
+  "states": "project, strict",
+  "test": "At #/settings?tab=config:workspace&page=files switch to 'strict' and confirm code execution is confined to the project root.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:986",
+  "unsure": "Labels are prettyName-derived ('Project' / 'Strict'); no i18n label map was found."
+ },
+ "SWRK-006": {
+  "behavior": "Settings → Workspace → Shell environment, 'Persistent Shell' toggle on config key terminal.persistent_shell — 'SSH backend: keep exported variables between commands. Off starts each command from the login environment; the working directory always carries over.'",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:workspace&page=shell toggle it and, with terminal.backend=ssh, confirm an exported variable survives the next command.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:995",
+  "unsure": "Backend default not read from /api/config/defaults."
+ },
+ "SWRK-007": {
+  "behavior": "Settings → Workspace → Shell environment, 'Environment Passthrough' on config key terminal.env_passthrough: comma-separated list input of variable names passed into tool execution.",
+  "states": "empty, one/many variables",
+  "test": "At #/settings?tab=config:workspace&page=shell add FOO and confirm a terminal tool call sees FOO in its environment.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1004",
+  "unsure": "Whether * patterns or exact names are expected was not documented in the source."
+ },
+ "SWRK-008": {
+  "behavior": "Settings → Workspace → Files & execution, 'File Read Limit' on config key file_read_max_chars: number input. Description: 'Maximum characters Hermes can read from one file request.'",
+  "states": "set, not set",
+  "test": "At #/settings?tab=config:workspace&page=files lower the limit and confirm a large file read is truncated at the new bound.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1013",
+  "unsure": "Default value not found in the desktop source (backend-owned)."
+ },
+ "SWRK-009": {
+  "behavior": "Device-local cap for local files Desktop loads as data URLs (attach + preview). The atom mirrors the Electron main process value under userData key 'hermes:data-url-read-max:*'; default 16 MB, clamped to 1–4096 MB, and a write failure keeps the previous value and surfaces the error notification.",
+  "states": "default 16, custom, clamped, write failure (old value retained)",
+  "test": "Set the cap to 64 MB at #/settings?tab=config:chat&page=attachments and confirm it is reflected after restarting the app.",
+  "rust_evidence": "",
+  "unsure": "Same underlying control as SCHT-005; the parity list treats it as a separate Workspace row but the only UI surface is Chat → Attachments."
+ },
+ "VOIC-001": {
+  "behavior": "Composer 'Start voice conversation' (keybind composer.voice; 'ctrl+b' on Mac, 'mod+alt+v' elsewhere) chains mic → STT → agent turn → TTS. Status cycles idle→listening→transcribing→thinking→speaking. With stt.enabled off it refuses with 'Configure speech-to-text to use voice mode.'; failures show 'Could not start voice session' or 'Voice transcription failed'.",
+  "states": "idle, listening, transcribing, thinking, speaking, muted",
+  "test": "In the Rust app against the private test backend, open a chat (#/), press the voice chord and speak; expect a submitted transcript then a spoken reply.",
+  "rust_evidence": "",
+  "unsure": "Rust has no voice-conversation code (no mic/STT/TTS modules); whether the chained loop is in scope is unconfirmed."
+ },
+ "VOIC-002": {
+  "behavior": "voice.voice_chat_mode='gpt-live' switches voice to one full-duplex OpenAI model that delegates real requests to Hermes; live errors show 'Live voice' / 'Live voice session ended' and fall back with GPT-Live voice chat is not available: <reason>. Using speech-to-text instead. Needs an OpenAI key, else 'Voice needs an OpenAI key. Add one in Settings → Keys.'",
+  "states": "connecting, live, delegating, ended(connectionLost|closed), unavailable",
+  "test": "Set voice.voice_chat_mode=gpt-live at #/settings?tab=config:voice&page=conversation, then start a voice chat (#/) and confirm the live session or the documented fallback notice.",
+  "rust_evidence": "",
+  "unsure": "GPT-Live wire contract (lib/voice-live.ts) not read in full; exact RPC names unverified."
+ },
+ "VOIC-003": {
+  "behavior": "Push-to-talk/dictation recorder wraps getUserMedia + MediaRecorder with an AudioContext level meter (PCM chunks reported via onPcmRate). Errors map to exact copy: 'No microphone was found.', 'Microphone is already in use by another app.', 'Microphone permission was denied.', 'Microphone constraints are not supported by this device.', 'Microphone failed'.",
+  "states": "idle, requesting, recording, stopping, errored",
+  "test": "Open a chat (#/), hold/press the dictation control and speak; expect the meter to move and one of the exact error strings when the mic is denied.",
+  "rust_evidence": "",
+  "unsure": "Rust mic capture not implemented; how the Slint UI would surface PCM is undefined."
+ },
+ "VOIC-004": {
+  "behavior": "Record → transcribe: on stop the blob (or the live stream's final text) goes to POST /api/audio/transcribe, or the /api/audio/transcribe-stream WS when stt.streaming is on, and the transcript is inserted into the composer. Failures notify 'Voice transcription failed', 'Voice recording failed', 'No speech detected' or 'Voice transcription is not available yet.'",
+  "states": "idle, recording, transcribing, inserted, failed",
+  "test": "In the Rust app, dictate into the composer (#/) and confirm the transcript text lands in the input; page: chat surface.",
+  "rust_evidence": "",
+  "unsure": "Timeout constants live in api/system.ts (180s–600s scaled by payload) — exact scaling formula not read."
+ },
+ "VOIC-005": {
+  "behavior": "Keybind 'composer.dictate' has NO default binding (defaults: [] in lib/keybinds/actions.ts) — dictation is opt-in. Rebind it at Settings → Keyboard Shortcuts → Key bindings ('Click a shortcut to rebind it'); it then shows a 'set'/'Press a key…' capture state. The row is listed under the Composer category.",
+  "states": "unbound (shows 'set'), bound, capturing",
+  "test": "Open #/settings?tab=keybinds&page=shortcuts, click the 'Voice dictation' caps, press a chord, then verify the chord starts dictation in a chat.",
+  "rust_evidence": "",
+  "unsure": "No keybind system in the Rust app was found in this pass."
+ },
+ "VOIC-006": {
+  "behavior": "Settings → Voice → Speech to text, 'Speech To Text' toggle bound to config key stt.enabled (boolean, default true per voiceFieldVisible tests). Off hides every stt.<provider>.* field and blocks voice mode with 'Configure speech-to-text to use voice mode.'. Saves via debounced autosave.",
+  "states": "on, off",
+  "test": "At #/settings?tab=config:voice&page=transcription toggle 'Speech To Text' off; the provider fields disappear and stt.enabled=false lands in config.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1274",
+  "unsure": "Backend default (true vs false) not read from /api/config/defaults."
+ },
+ "VOIC-007": {
+  "behavior": "Settings → Voice → Speech to text, 'Speech-To-Text Provider' select bound to stt.provider; options 'local','groq','openai','mistral','xai','elevenlabs','deepinfra' (plus user-defined command providers merged in). Default 'local' when unset. Only the selected provider's sub-fields render.",
+  "states": "select closed, open, empty ('' renders as '(none)')",
+  "test": "At #/settings?tab=config:voice&page=transcription change the provider select and confirm only that provider's model fields stay visible.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1289",
+  "unsure": "Whether the command-provider merge is mirrored in Rust (helpers.ts commandProviderNames) was not confirmed."
+ },
+ "VOIC-008": {
+  "behavior": "'Live Transcription' toggle bound to stt.streaming — 'Show text while you speak (OpenAI, xAI, ElevenLabs). Falls back to the recording on any failure.' When on, dictation opens the /api/audio/transcribe-stream WebSocket (client sends {\"sample_rate\":N} + s16le PCM + {\"eos\":true}; server sends partial/final/error) and streams partial text into the composer.",
+  "states": "on, off; ws: opening, open, partial, final, failed(fallback)",
+  "test": "Toggle at #/settings?tab=config:voice&page=transcription, then dictate in a chat and watch partial words appear while speaking.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1309",
+  "unsure": "Whether the Rust app can open a sibling WS at all (voice-stream.ts's resolveSiblingWsUrl equivalent) is unverified."
+ },
+ "VOIC-009": {
+  "behavior": "'Echo Transcripts' toggle bound to stt.echo_transcripts — 'Post the raw 🎙️ transcript of voice messages back to the chat.' When on, the raw transcript is posted as a chat message in addition to the transcribed input.",
+  "states": "on, off",
+  "test": "Enable at #/settings?tab=config:voice&page=transcription, dictate a message, and confirm a raw 🎙️ transcript row appears in the chat.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1283",
+  "unsure": "Whether echoing is done by the backend or the renderer was not traced."
+ },
+ "VOIC-010": {
+  "behavior": "Local STT: 'Local Transcription Model' select bound to stt.local.model, options 'tiny','base','small','medium','large-v3','turbo' (default 'tiny'); 'Transcription Language' text input bound to stt.local.language. Both render only while stt.provider is 'local' (the default when unset).",
+  "states": "visible (provider=local), hidden (other provider)",
+  "test": "At #/settings?tab=config:voice&page=transcription pick provider 'local' and change the model select; the value persists to stt.local.model.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1549",
+  "unsure": "Default 'tiny' is the first ENUM_OPTIONS entry; the backend's own default was not read."
+ },
+ "VOIC-011": {
+  "behavior": "Per-provider STT model fields (free-input comboboxes except ElevenLabs'): stt.openai.model 'whisper-1|gpt-4o-mini-transcribe|gpt-4o-transcribe|gpt-transcribe', stt.openai.streaming_model 'gpt-live-transcribe|gpt-transcribe|gpt-4o-transcribe|gpt-4o-mini-transcribe', stt.groq.model, stt.mistral.model, stt.xai.model, stt.deepinfra.model, stt.elevenlabs.model_id 'scribe_v2|scribe_v1'.",
+  "states": "visible only for the selected provider; free input accepts values outside the suggestion list",
+  "test": "At #/settings?tab=config:voice&page=transcription switch stt.provider through openai/groq/mistral/xai/deepinfra/elevenlabs and confirm the matching model field appears with the listed suggestions.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1574",
+  "unsure": "stt.el<…> exact free-input vs closed handling per key in Rust not verified field by field."
+ },
+ "VOIC-012": {
+  "behavior": "STT lease: starting dictation or the voice loop POSTs /api/audio/stt-lease (acquire) so the backend pre-loads the local faster-whisper model; stopping releases it. Lease name 'desktop:voice-input:<renderer>', serialized per (lease, owner) and coalesced; failures are swallowed (warm-up is an optimization).",
+  "states": "released, acquiring, held, failure (silently retried)",
+  "test": "Start and stop dictation in the Rust app against the private test backend and confirm acquire/release hits on /api/audio/stt-lease with the renderer-scoped lease name.",
+  "rust_evidence": "",
+  "unsure": "Exact request body/route of setSttLease in @/hermes not read."
+ },
+ "VOIC-013": {
+  "behavior": "Settings → Voice → Text to speech, 'Text-To-Speech Provider' select bound to tts.provider with options 'edge','elevenlabs','openai','xai','minimax','mistral','gemini','neutts','kittentts','piper' (+ custom command providers); default 'edge'. Only the selected provider's fields render.",
+  "states": "select closed, open",
+  "test": "At #/settings?tab=config:voice&page=speech change the provider select and confirm only that provider's voice/model rows remain.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1251",
+  "unsure": "'deepinfra' is a runtime TTS provider (helpers.ts BUILTIN_TTS_PROVIDERS) but is NOT in the original ENUM_OPTIONS list."
+ },
+ "VOIC-014": {
+  "behavior": "Per-provider TTS fields: tts.edge.voice (suggestions en-US-AriaNeural, en-US-JennyNeural, en-US-AndrewNeural, en-US-BrianNeural, en-US-GuyNeural, en-GB-SoniaNeural); tts.openai.model 'gpt-4o-mini-tts|tts-1|tts-1-hd' + voice (13, narrowed to 9 for tts-1/-hd); tts.elevenlabs.voice_id + model_id; tts.xai.*; tts.minimax.*; tts.mistral.*; tts.gemini.*; tts.neutts.*; tts.kittentts.*; tts.piper.voice.",
+  "states": "visible per provider; free-input combobox accepts custom voice IDs; ElevenLabs voice list empty until the account answers",
+  "test": "At #/settings?tab=config:voice&page=speech step through each TTS provider and confirm the exact per-provider rows and suggestion lists appear.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1324",
+  "unsure": "Whether Rust mirrors the OpenAI voice narrowing by model and the live ElevenLabs voice fetch."
+ },
+ "VOIC-015": {
+  "behavior": "Settings → Voice → Text to speech, 'Read Responses Aloud' toggle bound to config voice.auto_tts (also mirrored to the device pref 'hermes.desktop.autoSpeakReplies' by applyAutoSpeakFromConfig). When on, assistant replies are auto-spoken and a TTS lease 'desktop:read-aloud' is acquired.",
+  "states": "on, off; speaking, stopped",
+  "test": "Enable at #/settings?tab=config:voice&page=speech, send a prompt, and confirm the reply is spoken and /api/audio/tts-lease is acquired.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1318",
+  "unsure": "The desktop-only autoSpeakReplies mirror is not mentioned in the Rust registry entry."
+ },
+ "VOIC-016": {
+  "behavior": "Voice playback: text is sanitized (speech-text), cut into sentences, then played through a streaming session or a data-URL <audio> from REST /api/audio/speak; a 15 s stall watchdog rejects playback that never starts, and stopVoicePlayback() drains every live playback. Failures notify 'Voice playback failed'.",
+  "states": "idle, speaking, stalled, failed, stopped",
+  "test": "Trigger read-aloud in a chat and confirm audio plays, Stop/Esc cuts it, and a stalled stream is rejected rather than stuck 'Speaking'.",
+  "rust_evidence": "",
+  "unsure": "Whether the tier is scoped to /api/audio/speak (REST) or a WS stream for the Rust rewrite is unconfirmed."
+ },
+ "VOIC-017": {
+  "behavior": "Live voice WS on the sibling /api/voice endpoint (resolveGatewayWsUrl) carries the voice conversation stream; partial transcripts and audio frames flow over it rather than the gateway RPC channel.",
+  "states": "connecting, open, streaming, closed",
+  "test": "With the private test backend, start a voice chat in the Rust app and confirm a WebSocket to /api/voice opens for the session.",
+  "rust_evidence": "",
+  "unsure": "The file src/lib/voice-stream.ts documents /api/audio/transcribe-stream, not /api/voice — VOIC-017's '/api/voice' claim comes from the parity row, not from code I read."
+ },
+ "VOIC-018": {
+  "behavior": "Barge-in: a full-duplex VAD monitor watches the mic during generation and playback; sustained speech (>=80% of the last 300 ms above trigger) fires, a pre-roll MediaRecorder keeps the full utterance, and the captured text is transcribed and submitted instead of the playing reply. Tuned by voice.barge_in_threshold_multiplier (default 3) and disarmed entirely when voice.barge_in is false.",
+  "states": "armed, disarmed (voice.barge_in=false), calibrating, triggered, capturing",
+  "test": "Start a voice chat, speak over the reply, and confirm the new utterance replaces it with no lost opening words.",
+  "rust_evidence": "",
+  "unsure": "VAD/MediaRecorder have no Rust equivalent yet; the parity row cites WS voice.interrupted, which I could not find in lib/voice-barge-in.ts."
+ },
+ "VOIC-019": {
+  "behavior": "Wake word (always-listening) via RPC wake.status / wake.start / wake.stop / wake.resume (+ wake.feed / wake.pause referenced by the row); first wake.start may take up to 180 s while the onnxruntime engine lazy-installs. UI copy: Wake word \"<phrase>\" — listening / — off / — paused during voice chat; auto-arms on gateway-ready.",
+  "states": "off, arming, listening, paused (during voice chat), unavailable (older backend)",
+  "test": "Against the private test backend, toggle the wake-word button and confirm wake.status/wake.start responses drive the 'Wake word: \"<phrase>\" — listening' label.",
+  "rust_evidence": "",
+  "unsure": "The parity row lists wake.feed/wake.pause; I only saw wake.status/start/stop/resume in store/wake-word.ts."
+ },
+ "VOIC-020": {
+  "behavior": "Separate Electron wake-indicator window renders a lamp whose data-state is hidden/…, driven by IPC window.hermesDesktop.wakeIndicator.getState() and onState(); it does not read the gateway.",
+  "states": "hidden, listening, active (per data-state)",
+  "test": "Arm the wake word and confirm an independent indicator window (or its Rust equivalent) reflects state changes.",
+  "rust_evidence": "",
+  "unsure": "wake-indicator.css state names beyond 'hidden' were not enumerated."
+ },
+ "VOIC-021": {
+  "behavior": "TTS lease: enabling 'Read Responses Aloud' acquires 'desktop:read-aloud' and conversation mode acquires 'desktop:conversation:<renderer>' via POST /api/audio/tts-lease, pre-loading the configured provider; releasing the last lease unloads resident local models. Idempotent and failure-swallowing.",
+  "states": "released, acquiring (deduped), held",
+  "test": "Toggle read-aloud on and off in the Rust app against the private test backend and confirm one acquire then one release on /api/audio/tts-lease.",
+  "rust_evidence": "",
+  "unsure": "POST vs PUT for /api/audio/tts-lease (setTtsLease) not read."
+ },
+ "VOIC-022": {
+  "behavior": "Voice provider field visibility: a key tts.<p>.* renders only when tts.provider===p (fallback 'edge' when unset) and stt.<p>.* only when stt.provider===p (fallback 'local') AND stt.enabled is truthy. Search indexes only the visible fields, so every palette hit can actually mount.",
+  "states": "visible, hidden (wrong provider), hidden (stt.enabled off)",
+  "test": "At #/settings?tab=config:voice&page=speech set provider 'openai' and confirm tts.edge.voice disappears while tts.openai.* stays.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2244",
+  "unsure": "Rust's When::VoiceProvider predicate was seen by name only; its exact fallback logic was not compared line by line."
+ },
+ "VOIC-023": {
+  "behavior": "Settings → Voice → Voice conversation, 'Max Recording Length' number input bound to config voice.max_recording_seconds; empty renders as 'Not set'. Caps how long one recording may run.",
+  "states": "set, not set, invalid (non-numeric rejected)",
+  "test": "At #/settings?tab=config:voice&page=conversation enter a value and confirm voice.max_recording_seconds lands in config; record past it and confirm the recording stops.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1669",
+  "unsure": "Default value not found in the original source (backend-owned); boundary behaviour not traced."
+ },
+ "VOIC-024": {
+  "behavior": "Settings → Voice → Voice conversation, 'Client Direct' toggle bound to config voice.client_direct. When on, the desktop calls the profile's STT/TTS providers directly (GET /api/audio/voice-config supplies provider+keys, keys held in renderer memory only); providers that must run on the gateway resolve {mode:'relay'} and fall back to the relay endpoints.",
+  "states": "on, off; direct, relay (per provider)",
+  "test": "Enable at #/settings?tab=config:voice&page=conversation, dictate, and confirm the request goes straight to the provider instead of the gateway relay.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1678",
+  "unsure": "GET /api/audio/voice-config response shape not read end to end."
+ },
+ "VOIC-025": {
+  "behavior": "speech-text sanitizes a reply before speaking: strips emoji and fenced/inline code, turns markdown links into their text, collapses blank lines, drops 'Thinking…'-style lead-ins, and silences URLs and identifier-dense tokens (filenames, UUIDs, hashes, paths, MEDIA: chips) because voices read them character by character. Speak failures surface as 'Voice playback failed'.",
+  "states": "sanitized text, empty (nothing speakable)",
+  "test": "Read a reply containing a URL, a UUID and a code fence aloud and confirm none of those tokens are voiced.",
+  "rust_evidence": "",
+  "unsure": "The corpus mirror tools/tts_text_normalize.py is Python-side; no Rust port found."
+ },
+ "VOIC-026": {
+  "behavior": "spoken-reply tracks which assistant bubble was already spoken, keyed on the owning user turn (not the assistant ordinal, which hydration moves) per session, so a hydrated turn is not re-read and two turns both saying 'Done.' are each spoken once. isLiveTailReplyId matches 'assistant-stream-*' / 'inflight-assistant-*'.",
+  "states": "unspoken, spoken (per session+turn)",
+  "test": "Let a reply finish speaking, then trigger a session hydration/refresh and confirm the same turn is not spoken a second time.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust transcript reducer produces equivalent stream ids was not checked."
+ },
+ "_new_items": [
+  {
+   "section": "Settings (shell)",
+   "feature": "Export / Import / Reset config (settings footer actions)",
+   "surface": "local (config REST + file)",
+   "source": "src/app/settings/index.tsx",
+   "behavior": "The settings nav footer carries three icon buttons: 'Export config' (downloads hermes-config.json from getHermesConfigRecord; failure notifies 'Export failed'), 'Import config' (hidden file input; success 'Config imported', bad file 'Invalid config JSON') and 'Reset to defaults' (confirm 'Reset all settings to Hermes defaults?' then saveHermesConfig(getHermesConfigDefaults()); failure 'Reset failed')."
+  },
+  {
+   "section": "Settings — Voice page",
+   "feature": "Voice recording shortcut hint row",
+   "surface": "local (informational)",
+   "source": "src/app/settings/config-settings.tsx",
+   "behavior": "The Voice section renders one extra value-less row, 'Voice recording shortcut' — 'Set the voice recording shortcut in Settings → Keyboard Shortcuts (\"Start / stop voice conversation\"). The voice.record_key config value only applies to the CLI and TUI.' It has no control."
+  },
+  {
+   "section": "Settings — Notifications page",
+   "feature": "Send test notification",
+   "surface": "local (Electron Notification)",
+   "source": "src/app/settings/notifications-settings.tsx",
+   "behavior": "The Desktop alerts page ends with a 'Send test notification' button: it raises an OS notification ('Hermes' / 'Notifications are working.') and notifies 'Test sent. If nothing appears, check your OS notification permissions and Focus/Do Not Disturb.' or 'This system does not support native notifications.' when unsupported."
+  },
+  {
+   "section": "Settings — Sessions page",
+   "feature": "Archive after N days input",
+   "surface": "config sessions.auto_archive_days",
+   "source": "src/app/settings/sessions-settings.tsx",
+   "behavior": "Revealed only when 'Auto-archive stale chats' is on: a number input (min 1, default 3) labelled 'Archive after' with the unit 'days of inactivity', committed on blur and saved together with sessions.auto_archive."
+  },
+  {
+   "section": "Settings — Appearance page (Theme)",
+   "feature": "Install theme from VS Code Marketplace / remove theme",
+   "surface": "local (Marketplace + user themes)",
+   "source": "src/app/settings/appearance-settings.tsx",
+   "behavior": "On the Theme page the search box also live-searches the VS Code Marketplace: 'Install from VS Code' — paste a Marketplace extension id ('publisher.extension') and press 'Install' ('Installing…') to convert its color theme into a palette; failure 'Could not install that theme.', success 'Installed \"<name>\".' Installed user themes carry an 'Imported' badge and a 'Remove theme' trash button that uninstalls them."
+  },
+  {
+   "section": "Settings — Appearance page (Pet)",
+   "feature": "Pet size slider and Roam toggle",
+   "surface": "local (pet store)",
+   "source": "src/app/settings/pet-settings.tsx",
+   "behavior": "Below the pet gallery: a 'Size' slider ('Resize the floating mascot. Applies everywhere instantly.') clamped to 0.1–3.0 and shown as '<n>%' (default 0.33), and a 'Roam' toggle ('Let the pet wander the window on its own while idle.')."
+  },
+  {
+   "section": "Settings — Computer use panel",
+   "feature": "Computer-use permissions panel",
+   "surface": "local (Electron permission probe)",
+   "source": "src/app/settings/computer-use-panel.tsx",
+   "behavior": "A panel mounted from Capabilities → Toolsets for the 'computer_use' toolset, reporting 'Accessibility', 'Screen Recording' and 'Driver health' status with remediation actions. It lives in app/settings/ but is not reachable from any Settings page."
+  }
+ ]
+}

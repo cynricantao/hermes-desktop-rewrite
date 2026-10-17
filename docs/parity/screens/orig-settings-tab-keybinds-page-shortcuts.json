@@ -1,0 +1,2229 @@
+{
+ "hash": "#/settings?tab=keybinds&page=shortcuts",
+ "title": "Hermes",
+ "w": 1440,
+ "h": 900,
+ "texts": [
+  "Sessions",
+  "Bots",
+  "New session",
+  "Ctrl",
+  "N",
+  "Capabilities",
+  "Messaging",
+  "Artifacts",
+  "Scheduled jobs",
+  "No sessions yet",
+  "New project",
+  "Backend",
+  "ready",
+  "Smart",
+  "Model",
+  "Chat",
+  "Appearance",
+  "Workspace",
+  "Safety",
+  "Browser",
+  "Passwords & Logins",
+  "Memory & Context",
+  "Voice",
+  "Advanced",
+  "Notifications",
+  "Billing",
+  "Providers",
+  "Gateways",
+  "Keyboard Shortcuts",
+  "Key bindings",
+  "HUD gesture",
+  "Screen capture",
+  "Tools & Keys",
+  "Plugins",
+  "About",
+  "Settings",
+  "Click a shortcut to rebind it · Ctrl+/ reopens this panel.",
+  "Reset all",
+  "Composer",
+  "Focus composer",
+  "/",
+  "↵",
+  "Open model picker",
+  "Shift",
+  "M",
+  "Start / stop voice conversation",
+  "Alt",
+  "V",
+  "Start / stop dictation",
+  "set",
+  "Reasoning level up",
+  "Reasoning level down",
+  "Send message",
+  "Insert newline",
+  "Steer the running turn",
+  "Queue message",
+  "Send next queued turn",
+  "K",
+  "Reference files, folders, URLs",
+  "@",
+  "Slash command palette",
+  "Quick help",
+  "?",
+  "Cycle popover / history",
+  "↑",
+  "↓",
+  "Close popover · cancel run",
+  "Esc",
+  "L",
+  "Profiles",
+  "Switch to default profile",
+  "D",
+  "Switch to profile 1",
+  "1",
+  "Switch to profile 2",
+  "2",
+  "Switch to profile 3",
+  "3",
+  "Switch to profile 4",
+  "4",
+  "Switch to profile 5",
+  "5",
+  "Switch to profile 6",
+  "6",
+  "Switch to profile 7",
+  "7",
+  "Switch to profile 8",
+  "8",
+  "Switch to profile 9",
+  "9",
+  "Switch to profile 10",
+  "Switch to profile 11",
+  "Switch to profile 12",
+  "Switch to profile 13",
+  "Switch to profile 14",
+  "Switch to profile 15",
+  "Switch to profile 16",
+  "Switch to profile 17",
+  "Switch to profile 18",
+  "Next profile",
+  "]",
+  "Previous profile",
+  "[",
+  "Toggle all-profiles view",
+  "0",
+  "Create profile",
+  "Session",
+  "New session tab",
+  "T",
+  "New window",
+  "Next session",
+  "⇥",
+  "PgDn",
+  "Previous session",
+  "PgUp",
+  "Switch to recent session 1",
+  "Switch to recent session 2",
+  "Switch to recent session 3",
+  "Switch to recent session 4",
+  "Switch to recent session 5",
+  "Switch to recent session 6",
+  "Switch to recent session 7",
+  "Switch to recent session 8",
+  "Switch to recent session 9",
+  "Search sessions",
+  "F",
+  "Pin / unpin current session",
+  "Scroll conversation up one page",
+  "Scroll conversation down one page",
+  "Archive current session",
+  "New worktree",
+  "B",
+  "Open folder as project",
+  "O",
+  "Navigation",
+  "Open command palette",
+  "P",
+  "Open command center",
+  ".",
+  "Open settings",
+  ",",
+  "Open profiles",
+  "Open skills",
+  "Open messaging",
+  "Open artifacts",
+  "Open scheduled jobs",
+  "Open agents",
+  "View",
+  "Switch to tab 1",
+  "Switch to tab 2",
+  "Switch to tab 3",
+  "Switch to tab 4",
+  "Switch to tab 5",
+  "Switch to tab 6",
+  "Switch to tab 7",
+  "Switch to tab 8",
+  "Switch to tab 9",
+  "Toggle sessions sidebar",
+  "Cycle session grouping",
+  "Toggle file browser",
+  "J",
+  "Toggle status bar",
+  "S",
+  "Toggle tabs",
+  "Toggle profile rail",
+  "Toggle Simple mode",
+  "Toggle review pane",
+  "G",
+  "Show file browser",
+  "Toggle browser",
+  "Toggle HUD mode",
+  "H",
+  "Toggle terminal",
+  "`",
+  "New terminal",
+  "Next terminal",
+  "Previous terminal",
+  "Close terminal",
+  "W",
+  "Swap sidebar sides",
+  "\\",
+  "Close tab",
+  "Reopen closed tab",
+  "Find in page",
+  "Find next match",
+  "Find previous match",
+  "Toggle light / dark",
+  "X",
+  "Toggle layout edit mode",
+  "Send selection to composer",
+  "Copy terminal selection",
+  "C",
+  "Paste into terminal",
+  "Move HUD to pointer (global, while HUD is open)",
+  "Search"
+ ],
+ "controls": [
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "SESSIONS",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    0,
+    34,
+    74,
+    28
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "BOTS",
+   "slot": "pane-tab",
+   "box": [
+    74,
+    34,
+    48,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New session Ctrl N",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    68,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Capabilities",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    97,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Messaging",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    126,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Artifacts",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    155,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Scheduled jobs",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    184,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New project",
+   "slot": "button",
+   "box": [
+    79,
+    550,
+    101,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "default",
+   "type": "button",
+   "state": "pressed",
+   "box": [
+    12,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New profile",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    154,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Import profile…",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    176,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage profiles…",
+   "type": "button",
+   "box": [
+    198,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage gateways…",
+   "type": "button",
+   "box": [
+    224,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "NEW SESSION",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    260,
+    0,
+    107,
+    34
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Close",
+   "type": "button",
+   "box": [
+    343,
+    0,
+    24,
+    34
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New session tab",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    367,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    4,
+    880,
+    28,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Backend ready",
+   "type": "button",
+   "slot": "dropdown-menu-trigger",
+   "box": [
+    34,
+    880,
+    102,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Smart",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1377,
+    880,
+    59,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Close settings",
+   "slot": "button",
+   "box": [
+    1355,
+    57,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Model",
+   "type": "button",
+   "box": [
+    59,
+    59,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Model",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    61,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Chat",
+   "type": "button",
+   "box": [
+    59,
+    89,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Chat",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    91,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Appearance",
+   "type": "button",
+   "box": [
+    59,
+    119,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Appearance",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    121,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Workspace",
+   "type": "button",
+   "box": [
+    59,
+    149,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Workspace",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    151,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Safety",
+   "type": "button",
+   "box": [
+    59,
+    179,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Safety",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    181,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Browser",
+   "type": "button",
+   "box": [
+    59,
+    209,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Browser",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    211,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Passwords & Logins",
+   "type": "button",
+   "box": [
+    59,
+    239,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Passwords & Logins",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    241,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Memory & Context",
+   "type": "button",
+   "box": [
+    59,
+    269,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Memory & Context",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    271,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Voice",
+   "type": "button",
+   "box": [
+    59,
+    299,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Voice",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    301,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Advanced",
+   "type": "button",
+   "box": [
+    59,
+    329,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Advanced",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    331,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Notifications",
+   "type": "button",
+   "box": [
+    59,
+    359,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Notifications",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    361,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Billing",
+   "type": "button",
+   "box": [
+    59,
+    389,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Billing",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    391,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Providers",
+   "type": "button",
+   "box": [
+    59,
+    429,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Providers",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    431,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Gateways",
+   "type": "button",
+   "box": [
+    59,
+    459,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Gateways",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    461,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Keyboard Shortcuts",
+   "type": "button",
+   "box": [
+    59,
+    489,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Collapse: Keyboard Shortcuts",
+   "type": "button",
+   "slot": "button",
+   "state": "expanded",
+   "box": [
+    221,
+    491,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Key bindings",
+   "type": "button",
+   "box": [
+    79,
+    519,
+    168,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "HUD gesture",
+   "type": "button",
+   "box": [
+    79,
+    549,
+    168,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Screen capture",
+   "type": "button",
+   "box": [
+    79,
+    579,
+    168,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Tools & Keys",
+   "type": "button",
+   "box": [
+    59,
+    609,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Tools & Keys",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    611,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Sessions",
+   "type": "button",
+   "box": [
+    59,
+    639,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: Sessions",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    641,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Plugins",
+   "type": "button",
+   "box": [
+    59,
+    679,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "About",
+   "type": "button",
+   "box": [
+    59,
+    719,
+    188,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Expand: About",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    221,
+    721,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    59,
+    815,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    87,
+    815,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    115,
+    815,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Keyboard Shortcuts",
+   "slot": "button",
+   "box": [
+    382,
+    71,
+    105,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Reset all",
+   "type": "button",
+   "box": [
+    1264,
+    100,
+    62,
+    17
+   ]
+  },
+  {
+   "tag": "input",
+   "label": "Search shortcuts…",
+   "text": "Search shortcuts…",
+   "type": "text",
+   "box": [
+    337,
+    130,
+    987,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "COMPOSER",
+   "type": "button",
+   "box": [
+    323,
+    177,
+    105,
+    27
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "/ ↵",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1225,
+    209,
+    48,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift M",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    241,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Alt V",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1185,
+    273,
+    88,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    305,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    337,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    369,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "PROFILES",
+   "type": "button",
+   "box": [
+    323,
+    748,
+    96,
+    27
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl D",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    780,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 1",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    812,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 2",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    844,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 3",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    876,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 4",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    908,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 5",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    940,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 6",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    972,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 7",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1004,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 8",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1036,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 9",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1068,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Alt 1",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1185,
+    1100,
+    88,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Alt 2",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1185,
+    1132,
+    88,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Alt 3",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1185,
+    1164,
+    88,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Alt 4",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1185,
+    1196,
+    88,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Alt 5",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1185,
+    1228,
+    88,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Alt 6",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1185,
+    1260,
+    88,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Alt 7",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1185,
+    1292,
+    88,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Alt 8",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1185,
+    1324,
+    88,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Alt 9",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1185,
+    1356,
+    88,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift ]",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    1388,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift [",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    1420,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift 0",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    1452,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    1484,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "SESSION",
+   "type": "button",
+   "box": [
+    323,
+    1511,
+    89,
+    27
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl N",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1543,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl T",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1575,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift N",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    1607,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl ⇥ Ctrl PgDn",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1136,
+    1639,
+    138,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift ⇥ Ctrl PgUp",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1096,
+    1671,
+    178,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 1",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1703,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 2",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1735,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 3",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1767,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 4",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1799,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 5",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1831,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 6",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1863,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 7",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1895,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 8",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1927,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 9",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    1959,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift F",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    1991,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    2023,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "PgUp",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1232,
+    2055,
+    42,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "PgDn",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1232,
+    2087,
+    42,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    2119,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift B",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    2151,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl O",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2183,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "NAVIGATION",
+   "type": "button",
+   "box": [
+    323,
+    2210,
+    110,
+    27
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl K Ctrl P",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1155,
+    2242,
+    118,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl .",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2274,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl ,",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2306,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    2338,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    2370,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    2402,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    2434,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    2466,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    2498,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "VIEW",
+   "type": "button",
+   "box": [
+    323,
+    2525,
+    66,
+    27
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 1",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2557,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 2",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2589,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 3",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2621,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 4",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2653,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 5",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2685,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 6",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2717,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 7",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2749,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 8",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2781,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl 9",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2813,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl B",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2845,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    2877,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl J",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    2909,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift S",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    2941,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Alt T",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1185,
+    2973,
+    88,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    3005,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    3037,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl G",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    3069,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    3101,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift L",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    3133,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift H",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    3165,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl `",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    3197,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift `",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    3229,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift ↓",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    3261,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift ↑",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    3293,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift W",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    3325,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl \\",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    3357,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl W",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    3389,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift T",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    3421,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl F",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1216,
+    3453,
+    57,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    3485,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "set",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1245,
+    3517,
+    29,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Shift X",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1211,
+    3549,
+    62,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Rebind",
+   "text": "Ctrl Shift \\",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    3581,
+    97,
+    22
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Search Ctrl K",
+   "type": "button",
+   "box": [
+    654,
+    36,
+    132,
+    24
+   ]
+  }
+ ]
+}

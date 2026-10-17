@@ -1,0 +1,496 @@
+{
+ "hash": "#/session-import",
+ "title": "Hermes",
+ "w": 1440,
+ "h": 900,
+ "texts": [
+  "Sessions",
+  "Bots",
+  "New session",
+  "Ctrl",
+  "N",
+  "Capabilities",
+  "Messaging",
+  "Artifacts",
+  "Scheduled jobs",
+  "No sessions yet",
+  "New project",
+  "HERMES AGENT",
+  "Type a task, question, or snippet. I remember the session, cite my sources, and stop to ask when I'm unsure.",
+  "Scroll to bottom",
+  "⠋",
+  "⠙",
+  "⠹",
+  "⠸",
+  "⠼",
+  "⠴",
+  "⠦",
+  "⠧",
+  "⠇",
+  "⠏",
+  "Waking up …",
+  "Share usage stats?",
+  "Counts only. Never your messages or files.",
+  "Share with Nous",
+  "Keep on this computer",
+  "No thanks",
+  "Details",
+  "Mock Model",
+  "Med",
+  "Backend",
+  "ready",
+  "Smart",
+  "Continue from another app",
+  "Bring a conversation into Hermes and pick up where you left off.",
+  "Reading from",
+  "cynric-omarchy",
+  "Import into",
+  "default",
+  "All",
+  "Claude Code",
+  "Codex",
+  "No conversations found",
+  "Claude Code and Codex sessions on this backend will appear here.",
+  "A conversation worth continuing",
+  "Choose a session to read its history before bringing it into Hermes."
+ ],
+ "controls": [
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "SESSIONS",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    0,
+    34,
+    74,
+    28
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "BOTS",
+   "slot": "pane-tab",
+   "box": [
+    74,
+    34,
+    48,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New session Ctrl N",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    68,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Capabilities",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    97,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Messaging",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    126,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Artifacts",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    155,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Scheduled jobs",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    184,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New project",
+   "slot": "button",
+   "box": [
+    79,
+    550,
+    101,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "default",
+   "type": "button",
+   "state": "pressed",
+   "box": [
+    12,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New profile",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    154,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Import profile…",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    176,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage profiles…",
+   "type": "button",
+   "box": [
+    198,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage gateways…",
+   "type": "button",
+   "box": [
+    224,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "NEW SESSION",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    260,
+    0,
+    107,
+    34
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Close",
+   "type": "button",
+   "box": [
+    343,
+    0,
+    24,
+    34
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New session tab",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    367,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Share with Nous",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    1073,
+    806,
+    96,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Keep on this computer",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    1171,
+    806,
+    128,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "No thanks",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    1301,
+    806,
+    62,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Details",
+   "type": "button",
+   "slot": "button",
+   "box": [
+    1365,
+    806,
+    45,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Hide status stack",
+   "type": "button",
+   "slot": "status-drawer-toggle",
+   "state": "expanded",
+   "box": [
+    826,
+    821,
+    48,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Add context",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    285,
+    838,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "textbox",
+   "label": "Message",
+   "slot": "composer-rich-input",
+   "box": [
+    313,
+    835,
+    860,
+    29
+   ]
+  },
+  {
+   "tag": "textarea",
+   "box": [
+    312,
+    863,
+    1,
+    1
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Model · custom: mock-model",
+   "text": "Mock Model",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1177,
+    837,
+    99,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Effort: Med",
+   "text": "Med",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1280,
+    837,
+    57,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Voice dictation",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1341,
+    837,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Start voice conversation",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1369,
+    836,
+    26,
+    26
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Voice chat engine",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1395,
+    837,
+    20,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    4,
+    880,
+    28,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Backend ready",
+   "type": "button",
+   "slot": "dropdown-menu-trigger",
+   "box": [
+    34,
+    880,
+    102,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Smart",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1377,
+    880,
+    59,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Refresh",
+   "slot": "button",
+   "box": [
+    1325,
+    57,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Close",
+   "slot": "button",
+   "box": [
+    1355,
+    57,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "All",
+   "type": "button",
+   "state": "pressed",
+   "box": [
+    75,
+    248,
+    84,
+    21
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Claude Code",
+   "type": "button",
+   "box": [
+    161,
+    248,
+    84,
+    21
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Codex",
+   "type": "button",
+   "box": [
+    247,
+    248,
+    84,
+    21
+   ]
+  }
+ ]
+}

@@ -1,0 +1,839 @@
+{
+ "hash": "#/messaging",
+ "title": "Hermes",
+ "w": 1440,
+ "h": 900,
+ "texts": [
+  "Sessions",
+  "Bots",
+  "New session",
+  "Ctrl",
+  "N",
+  "Capabilities",
+  "Messaging",
+  "Artifacts",
+  "Scheduled jobs",
+  "No sessions yet",
+  "New project",
+  "Telegram",
+  "Discord",
+  "S",
+  "Slack",
+  "Mattermost",
+  "Matrix",
+  "WhatsApp",
+  "Signal",
+  "BlueBubbles (iMessage)",
+  "Email",
+  "SMS (Twilio)",
+  "D",
+  "DingTalk",
+  "F",
+  "Feishu / Lark",
+  "G",
+  "Google Chat",
+  "W",
+  "WeCom (group bot)",
+  "WeCom (app)",
+  "Weixin / WeChat (Personal)",
+  "QQ Bot",
+  "Yuanbao (元宝)",
+  "API server",
+  "Webhooks",
+  "A",
+  "A2A",
+  "B",
+  "Buzz",
+  "iMessage via Photon",
+  "I",
+  "IRC",
+  "L",
+  "LINE",
+  "M",
+  "Microsoft Graph Webhook",
+  "Microsoft Teams",
+  "ntfy",
+  "R",
+  "Raft",
+  "Relay (experimental)",
+  "SimpleX Chat",
+  "WhatsApp Cloud API",
+  "Disabled",
+  "Needs setup",
+  "Run Hermes from Telegram DMs, groups, and topics.",
+  "Quick setup",
+  "Recommended",
+  "Scan a QR code and confirm in Telegram. Hermes creates the bot and detects your Telegram user ID automatically.",
+  "Create with QR",
+  "Get your credentials",
+  "In Telegram, talk to @BotFather, run /newbot, and copy the token it gives you. Then grab your numeric user ID from @userinfobot.",
+  "Open setup guide",
+  "Required",
+  "Bot token",
+  "Create a bot with @BotFather, then paste the token it gives you.",
+  "Allowed Telegram user IDs",
+  "Recommended. Numeric IDs from @userinfobot, one per box. Without this, anyone can DM your bot.",
+  "Add another",
+  "Webhook secret",
+  "Secret token Telegram sends with each webhook update (required with TELEGRAM_WEBHOOK_URL)",
+  "Save changes",
+  "Backend",
+  "ready",
+  "Smart"
+ ],
+ "controls": [
+  {
+   "tag": "button",
+   "label": "Hide sidebar",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    14,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Open settings",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Layout editor",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1200,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "HUD mode",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1224,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Swap sidebar sides",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1248,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Show right sidebar",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1272,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "SESSIONS",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    0,
+    34,
+    74,
+    28
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "BOTS",
+   "slot": "pane-tab",
+   "box": [
+    74,
+    34,
+    48,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New session Ctrl N",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    68,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Capabilities",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    97,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Messaging",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    126,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Artifacts",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    155,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Scheduled jobs",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    184,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New project",
+   "slot": "button",
+   "box": [
+    79,
+    550,
+    101,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "default",
+   "type": "button",
+   "state": "pressed",
+   "box": [
+    12,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New profile",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    154,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Import profile…",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    176,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage profiles…",
+   "type": "button",
+   "box": [
+    198,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage gateways…",
+   "type": "button",
+   "box": [
+    224,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "input",
+   "label": "Search messaging...",
+   "text": "Try “matrix”",
+   "type": "text",
+   "box": [
+    294,
+    42,
+    61,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Telegram",
+   "type": "button",
+   "box": [
+    268,
+    87,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Discord",
+   "type": "button",
+   "box": [
+    268,
+    127,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "S Slack",
+   "type": "button",
+   "box": [
+    268,
+    167,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Mattermost",
+   "type": "button",
+   "box": [
+    268,
+    207,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Matrix",
+   "type": "button",
+   "box": [
+    268,
+    247,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "WhatsApp",
+   "type": "button",
+   "box": [
+    268,
+    287,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Signal",
+   "type": "button",
+   "box": [
+    268,
+    327,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "BlueBubbles (iMessage)",
+   "type": "button",
+   "box": [
+    268,
+    367,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Email",
+   "type": "button",
+   "box": [
+    268,
+    407,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "SMS (Twilio)",
+   "type": "button",
+   "box": [
+    268,
+    447,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "D DingTalk",
+   "type": "button",
+   "box": [
+    268,
+    487,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "F Feishu / Lark",
+   "type": "button",
+   "box": [
+    268,
+    527,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "G Google Chat",
+   "type": "button",
+   "box": [
+    268,
+    567,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "W WeCom (group bot)",
+   "type": "button",
+   "box": [
+    268,
+    607,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "W WeCom (app)",
+   "type": "button",
+   "box": [
+    268,
+    647,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Weixin / WeChat (Personal)",
+   "type": "button",
+   "box": [
+    268,
+    687,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "QQ Bot",
+   "type": "button",
+   "box": [
+    268,
+    727,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Yuanbao (元宝)",
+   "type": "button",
+   "box": [
+    268,
+    767,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "API server",
+   "type": "button",
+   "box": [
+    268,
+    807,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Webhooks",
+   "type": "button",
+   "box": [
+    268,
+    847,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "A A2A",
+   "type": "button",
+   "box": [
+    268,
+    887,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "B Buzz",
+   "type": "button",
+   "box": [
+    268,
+    927,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "iMessage via Photon",
+   "type": "button",
+   "box": [
+    268,
+    967,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "I IRC",
+   "type": "button",
+   "box": [
+    268,
+    1007,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "L LINE",
+   "type": "button",
+   "box": [
+    268,
+    1047,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "M Microsoft Graph Webhook",
+   "type": "button",
+   "box": [
+    268,
+    1087,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "M Microsoft Teams",
+   "type": "button",
+   "box": [
+    268,
+    1127,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "N ntfy",
+   "type": "button",
+   "box": [
+    268,
+    1167,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "R Raft",
+   "type": "button",
+   "box": [
+    268,
+    1207,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "R Relay (experimental)",
+   "type": "button",
+   "box": [
+    268,
+    1247,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "S SimpleX Chat",
+   "type": "button",
+   "box": [
+    268,
+    1287,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "W WhatsApp Cloud API",
+   "type": "button",
+   "box": [
+    268,
+    1327,
+    200,
+    36
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Create with QR",
+   "slot": "button",
+   "box": [
+    655,
+    267,
+    118,
+    24
+   ]
+  },
+  {
+   "tag": "a",
+   "text": "Open setup guide",
+   "slot": "button",
+   "box": [
+    642,
+    389,
+    121,
+    24
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Paste Telegram bot token",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    642,
+    525,
+    592,
+    32
+   ]
+  },
+  {
+   "tag": "a",
+   "slot": "tooltip-trigger",
+   "box": [
+    1242,
+    525,
+    32,
+    32
+   ]
+  },
+  {
+   "tag": "input",
+   "label": "Allowed Telegram user IDs 1",
+   "text": "Enter an ID",
+   "type": "text",
+   "slot": "input",
+   "box": [
+    642,
+    681,
+    592,
+    32
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Remove",
+   "slot": "tooltip-trigger",
+   "state": "disabled",
+   "box": [
+    1242,
+    681,
+    32,
+    32
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Add another",
+   "slot": "button",
+   "box": [
+    642,
+    721,
+    99,
+    28
+   ]
+  },
+  {
+   "tag": "a",
+   "slot": "tooltip-trigger",
+   "box": [
+    1242,
+    719,
+    32,
+    32
+   ]
+  },
+  {
+   "tag": "input",
+   "text": "Webhook secret",
+   "type": "password",
+   "slot": "input",
+   "box": [
+    642,
+    831,
+    632,
+    32
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "Enable Telegram",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "box": [
+    626,
+    850,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Save changes",
+   "slot": "button",
+   "state": "disabled",
+   "box": [
+    1186,
+    846,
+    112,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    4,
+    880,
+    28,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Backend ready",
+   "type": "button",
+   "slot": "dropdown-menu-trigger",
+   "box": [
+    34,
+    880,
+    102,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Smart",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1377,
+    880,
+    59,
+    20
+   ]
+  }
+ ]
+}

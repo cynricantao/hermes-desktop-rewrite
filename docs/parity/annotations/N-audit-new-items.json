@@ -1,0 +1,185 @@
+{
+ "CHAT-051": {
+  "behavior": "On an empty chat the composer placeholder cycles through 'What are we building?', 'Give Hermes a task', \"What's on your mind?\", 'Describe what you need', 'What should we tackle?', 'Ask anything', 'Start with a goal'; after the first turn it switches to 'Send follow-up' variants ('Send a follow-up', 'Add more context', 'Refine the request', \"What's next?\", 'Keep it going', 'Push it further', 'Adjust or continue'), and to 'Starting Hermes...' / 'Reconnecting to Hermes…' while the backend is not ready."
+ },
+ "CHAT-052": {
+  "behavior": "The queue panel lists parked turns with per-entry 'Edit', 'Delete', 'Send', 'Next' and 'Steer — redirect the live turn now' actions, an expand/collapse control ('Expand'/'Collapse') and a paused state ('{n} Queued — paused', 'Paused by Stop — resume sending the queued turns', 'Resume'); a lost turn reads 'Turn lost during restart' with 'Discard'/'Resume'."
+ },
+ "CHAT-053": {
+  "behavior": "The composer's context menu offers 'Prompt snippets…' ('Prompt snippets' — 'Pick a starter prompt to drop into the composer.'): 'Code review', 'Explain this' and 'Implementation plan', each dropping its text into the composer."
+ },
+ "CHAT-054": {
+  "behavior": "Right-clicking the composer offers a context menu (cut/copy/paste style actions plus composer-specific entries) rather than the browser default."
+ },
+ "CHAT-055": {
+  "behavior": "A '/'-triggered completion drawer lists 'Commands', 'Skills' and 'Options' with a 'Browse all…' entry and a 'Hotkeys' help footer; each row shows an icon, the command, and its argument hint."
+ },
+ "CHAT-056": {
+  "behavior": "A voice menu ('Voice', 'Voice chat engine') lets the user pick the engine — 'GPT-Live (full-duplex, delegates to Hermes)' ('Needs an OpenAI API key') or 'speech-to-text' — with a fan of mute/unmute ('Mute microphone'/'Unmute microphone') and end controls."
+ },
+ "CHAT-057": {
+  "behavior": "With a wake word configured the composer shows its state: 'Wake word \"{phrase}\"', 'Wake word: \"{phrase}\" — listening', '— off' and '— paused during voice chat'."
+ },
+ "CHAT-058": {
+  "behavior": "While a turn runs, the send control reflects the busy-submit policy (submit-as-steer vs queue) instead of silently dropping the press."
+ },
+ "CHAT-059": {
+  "behavior": "A prompt that could not be delivered after a restart is offered back for discard or retry so the draft is not lost silently."
+ },
+ "TRNS-038": {
+  "behavior": "A message action 'Read aloud' speaks that reply ('Stop reading' while playing, 'Read aloud failed' on error, hint 'Shift-click: read the full response')."
+ },
+ "TRNS-039": {
+  "behavior": "A per-message 'More actions' menu holds 'Copy', 'Copy full response', 'Branch in new chat', 'React', 'Read aloud', 'Restore checkpoint' ('Restore checkpoint — rerun from this prompt') and 'Review'."
+ },
+ "TRNS-040": {
+  "behavior": "Per-message checkpoint navigation: 'Restore previous checkpoint'/'Restore next checkpoint', opening a dialog 'Restore to this checkpoint?' with 'Restore & rerun'."
+ },
+ "TRNS-041": {
+  "behavior": "Scrolling to the top of a windowed transcript offers 'Show earlier messages'; loading the earlier window backfills without moving the viewport."
+ },
+ "TRNS-042": {
+  "behavior": "The transcript shows distinct wait copy: 'Hermes is loading a response', 'Processing prompt', and 'Loading {model} into memory' when a local model is being paged in."
+ },
+ "TRNS-043": {
+  "behavior": "Media references in replies render inline: images open on click, missing media falls back to 'Open {name}', and audio renders with a 'Preparing audio...' placeholder."
+ },
+ "TOOL-023": {
+  "behavior": "The tool feed shows a group header with counts and status ('N tool calls failed', 'Recovered after N failed steps', '1 step failed') and per-call status icons with accessible labels ('Running', 'Done', 'Error', 'Recovered')."
+ },
+ "TOOL-024": {
+  "behavior": "Each tool row offers copy actions matched to its content: 'Copy command', 'Copy output', 'Copy code', 'Copy file', 'Copy path', 'Copy URL', 'Copy query', 'Copy results', 'Copy content', 'Copy activity' and 'Raw response'."
+ },
+ "TOOL-025": {
+  "behavior": "A finished turn ends with 'This turn took {duration}' so per-turn cost is visible in the transcript."
+ },
+ "APRV-018": {
+  "behavior": "'Always allow…' opens a dialog 'Always allow this command?' explaining the pattern that will be permitted ('Always allow' description) with confirm/cancel, so a permanent allow is reviewable."
+ },
+ "APRV-019": {
+  "behavior": "When an approval is pending below the fold, a 'Approval needed' jump affordance appears (aria-label 'Approval needed') and scrolls the card into view."
+ },
+ "APRV-020": {
+  "behavior": "A clarify with several questions shows '{answered} of {total} answered' and 'N questions' progress, staging one question at a time so later questions stay disabled behind an earlier one."
+ },
+ "SESS-044": {
+  "behavior": "Right-clicking a session row opens the same action set as its menu ('Session actions'): Rename…, Pin/Unpin, Mark as read/unread, Archive, Export, Copy ID, New window, Open in new tab/split/terminal."
+ },
+ "SESS-045": {
+  "behavior": "If the session store is damaged the sidebar shows 'Session database is damaged' with a recovery guide, the exact quit/inspect instruction and a 'Recovery guide' link instead of an empty list."
+ },
+ "SESS-046": {
+  "behavior": "The section header offers 'New session in {label}', 'Mark all as read' (disabled when nothing is unread) and hover-revealed actions; the search box is labelled 'Search sessions' for assistive tech."
+ },
+ "PROJ-026": {
+  "behavior": "A project has an 'Idea' field ('What's this project about? (saved to IDEA.md)') with 'Generate idea'/'Generating…' and 'Shuffle templates', persisted as IDEA.md in the project folder."
+ },
+ "PROJ-027": {
+  "behavior": "Kanban task worktrees (`<repo>/.worktrees/t_<hex>`, the t_… id kanban_db mints) never get their own sidebar lane — they collapse into one session-derived kanban bucket — while user-named 'New worktree' dirs (`<repo>/.worktrees/<slug>`) stay as their own lanes, so ephemeral task checkouts cannot blow the sidebar up into hundreds of empty rows."
+ },
+ "PROJ-028": {
+  "behavior": "Each worktree lane offers 'Remove worktree' ('Could not remove worktree (uncommitted changes?)'), 'Copy path' and 'Reveal in folder', and shows 'Worktrees' in the coding status bar."
+ },
+ "SKIL-017": {
+  "behavior": "Open Capabilities → four tabs 'Skills' / 'Tools' / 'Connectors' / 'Plugins', each showing a live count that keeps updating for the tabs you are not on; the header search filters the active tab (search is hidden on Connectors and Plugins, which own their own search) and offers rotating hints built from your own data ('Try …'); the refresh hotkey re-reads skills, toolsets and the official hub index and fails to 'Skills failed to load' with a Retry."
+ },
+ "SKIL-018": {
+  "behavior": "Every Capabilities tab carries a scope selector: picking a profile scope pins all reads/writes on that tab (skills, toolsets, connectors, plugins) to that profile, and picking a registered gateway scope routes them to that backend; the selector is hidden for single-profile installs and replaced by a pinned note for plugin-embedded views."
+ },
+ "MODL-031": {
+  "behavior": "After the main model changes, Model → Main shows a warning '<N> auxiliary tasks (<names>) still run on <other providers>, not your main model.' with 'Reset all to main' and \"Don't show again\"; dismissing it is remembered per profile so it does not return for the same pairing."
+ },
+ "PLUG-025": {
+  "behavior": "The bundled kanban plugin adds a board route: boards switchable from a board switcher, tasks as cards that can be created/edited/deleted, moved between columns, commented on, reassigned to a profile ('reassign'), estimated, exported/imported as an archive, and completion notifications posted back to chat."
+ },
+ "PLUG-026": {
+  "behavior": "The bundled hermes-bots plugin registers its own sidebar group, routes and panes: a roster of bots with avatars, create/edit dialogs, per-bot advanced settings (disabled skills, model, groups menu) and group-chat workspaces, plus a profile-group header contribution that opens the bots screen."
+ },
+ "PLUG-027": {
+  "behavior": "The install modal takes a Git repo URL and target halves (Desktop target copies the desktop half onto this machine, Agent target installs into the selected profile); a package copied in by hand with no catalog entry or git remote cannot be agent-installed from here and says so."
+ },
+ "PLUG-028": {
+  "behavior": "'Add your own' in Connectors opens 'Connect to a custom MCP'; pasting a command snippet fills Name/Type/Command/Args/Env/CWD or URL/Headers/Auth, an unparseable paste says 'Nothing here reads as a server. Fill the fields below instead.', and Save writes exactly one new mcp.json entry after warning about local process commands."
+ },
+ "MEM-015": {
+  "behavior": "Opening the Memory Graph (status bar or /journey) shows an interactive map titled 'Memory Graph' ('<nodes> skills across <clusters> categories') with filters 'All'/'Used', a 'Refresh' action, node context menus, a playback hotkey, and a share box that copies/loads only the layout (never memory or skill text)."
+ },
+ "PROF-023": {
+  "behavior": "A profile's action menu offers 'Open in new window', which opens a second app window already switched to that profile so two profiles can be worked side by side."
+ },
+ "PROF-024": {
+  "behavior": "The profile editor offers 'Name this agent' with a 'Display name' field; the copy layer says 'Sets a display name shown across the app. The internal profile ID stays \"default\".' and the name is then used wherever the profile is shown."
+ },
+ "PANE-027": {
+  "behavior": "The right sidebar exposes a 'Logs' panel alongside Terminal/Files/Review; it streams the gateway/backend log tail and is the destination of the various 'Open logs' actions across settings and messaging."
+ },
+ "PANE-028": {
+  "behavior": "The terminal pane offers 'Add to chat', which puts the selected output into the composer as context instead of the user retyping it; the preview pane has the same affordance for previewed lines."
+ },
+ "CRON-013": {
+  "behavior": "The cron editor's Model select defaults to 'Default (global model)' and can pin a specific model for that job, so a scheduled job runs on the chosen model regardless of the global setting."
+ },
+ "CRON-014": {
+  "behavior": "Each job row has 'Edit job', 'Run again' and delete actions plus a 'script' badge for script-only jobs ('Script-only job (no AI prompt). Job id: …'); job rows also show 'Manage' and the runs toggle 'Show runs'/'Hide runs'."
+ },
+ "SET-005": {
+  "behavior": "The settings nav footer carries three icon buttons: 'Export config' (downloads hermes-config.json from getHermesConfigRecord; failure notifies 'Export failed'), 'Import config' (hidden file input; success 'Config imported', bad file 'Invalid config JSON') and 'Reset to defaults' (confirm 'Reset all settings to Hermes defaults?' then saveHermesConfig(getHermesConfigDefaults()); failure 'Reset failed')."
+ },
+ "SVOI-019": {
+  "behavior": "The Voice section renders one extra value-less row, 'Voice recording shortcut' — 'Set the voice recording shortcut in Settings → Keyboard Shortcuts (\"Start / stop voice conversation\"). The voice.record_key config value only applies to the CLI and TUI.' It has no control."
+ },
+ "SNOT-010": {
+  "behavior": "The Desktop alerts page ends with a 'Send test notification' button: it raises an OS notification ('Hermes' / 'Notifications are working.') and notifies 'Test sent. If nothing appears, check your OS notification permissions and Focus/Do Not Disturb.' or 'This system does not support native notifications.' when unsupported."
+ },
+ "SSES-004": {
+  "behavior": "Revealed only when 'Auto-archive stale chats' is on: a number input (min 1, default 3) labelled 'Archive after' with the unit 'days of inactivity', committed on blur and saved together with sessions.auto_archive."
+ },
+ "SAPP-034": {
+  "behavior": "Below the pet gallery: a 'Size' slider ('Resize the floating mascot. Applies everywhere instantly.') clamped to 0.1–3.0 and shown as '<n>%' (default 0.33), and a 'Roam' toggle ('Let the pet wander the window on its own while idle.')."
+ },
+ "SADV-021": {
+  "behavior": "A panel mounted from Capabilities → Toolsets for the 'computer_use' toolset, reporting 'Accessibility', 'Screen Recording' and 'Driver health' status with remediation actions. It lives in app/settings/ but is not reachable from any Settings page."
+ },
+ "KEYS-062": {
+  "behavior": "While an approval card is visible, Esc denies the request and Enter with an empty composer approves it once — checked before Esc-to-stop, so denying does not also cancel the turn."
+ },
+ "KEYS-063": {
+  "behavior": "A single ⌘/Ctrl+L is contested by 'Focus composer' and 'Send selection to composer'; the ladder in composer-focus-keys.ts decides per press which one claims it (selection wins when text is selected)."
+ },
+ "KEYS-064": {
+  "behavior": "Buttons can render their live keybinding as a hint chip (use-keybind-hint), so a control shows the same chord the shortcuts panel lists and hides it when the action is unbound."
+ },
+ "THEM-013": {
+  "behavior": "Theme/accent picker offers 'Accent color', 'Theme default', preset swatches and a 'Custom color' entry that overrides the theme accent; the choice persists per install."
+ },
+ "NOTI-012": {
+  "behavior": "Recognised errors carry a recovery action on the toast — 'Restart Hermes', 'Open Keys', 'Open Gateways', 'Open Maintenance' — so the user can act from the notification instead of hunting in settings."
+ },
+ "NOTI-013": {
+  "behavior": "When the app and backend versions diverge the app raises 'Backend out of date' ('Your Hermes backend is older than this desktop build and may not work correctly. Update to align them.') or 'Hermes app out of date', with actions 'Update app' / 'Update Hermes'; when changes are available it shows 'Update ready' ('<n> new changes available.') with \"See what's new\"."
+ },
+ "UPD-010": {
+  "behavior": "A background update check raises a notification titled 'Update ready' ('<n> new changes available.' or 'A new update is available.') with \"See what's new\" and, for AppInstaller installs, 'Update now and Windows will finish it for you.'"
+ },
+ "WIN-028": {
+  "behavior": "The titlebar has a haptics toggle reading 'Mute haptics' when on and 'Unmute haptics' when muted; on hardware without haptics the control is a no-op/hidden."
+ },
+ "WIN-029": {
+  "behavior": "With HUD mode up, a titlebar action 'Reset HUD size and position' restores the HUD's default size and placement — the recovery path after moving or resizing it."
+ },
+ "WIN-030": {
+  "behavior": "The sessions-sidebar titlebar button shows an unread badge and its tooltip appends ' · <n> unread session(s)', so background activity is visible without opening the sidebar."
+ },
+ "WIN-031": {
+  "behavior": "Pages and plugins can contribute controls into the titlebar's left/right slots; when a page contributes any, the fixed app-action cluster steps aside so the page owns the strip."
+ },
+ "WIN-032": {
+  "behavior": "The status bar carries an 'Approvals' pill showing the current mode (Manual / Smart / Off) that toggles it, and warns 'YOLO on — auto-approving dangerous commands. Shift+click toggles globally.' / 'YOLO off. Shift+click toggles globally.'"
+ },
+ "WIN-033": {
+  "behavior": "'Switch model' / 'Open model picker' opens the model menu from the model pill ('Model · <provider>: <model>', 'Switch model', 'no model'), and the gateway menu shows 'Gateway' with 'Connected'/'Connecting'/'Offline', 'Inference ready'/'Inference not ready', 'Reconnect gateway', 'Recent activity' and 'View all logs →'."
+ },
+ "EXTR-032": {
+  "behavior": "The command center exposes 'Log file' with the path, a 'Level' selector and 'Search log lines...' over the live desktop log, so a failure can be inspected in-app."
+ }
+}

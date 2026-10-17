@@ -1,0 +1,1432 @@
+{
+ "KEYS-001": {
+  "behavior": "⌘K or ⌘P (Linux Ctrl+K / Ctrl+P, action `nav.commandPalette`, label 'Open command palette') opens the palette overlay: search input focused, placeholder 'Search sessions, views, and actions'; rows grouped (Sessions/Views/Commands/Appearance) and ranked live. No match shows 'No matching results found.'",
+  "states": "closed, open, searching, ranked results, empty",
+  "test": "Against scripts/live-test-backend.sh (HERMES_DESKTOP_PORT set) press Ctrl+K then Ctrl+P in the Rust app; the palette opens focused and closes on Esc.",
+  "rust_evidence": "",
+  "unsure": "Palette component in Rust not found (no command-palette file under crates/hermes-ui). Overlay-vs-modal and close-on-second-⌘K unverified from source alone."
+ },
+ "KEYS-002": {
+  "behavior": "Palette/settings search spans config fields, credentials and non-config rows: `filterSettingsSearchEntries` matches label+context+description with exact > prefix > whole-word > substring ranking, so 'theme' surfaces the Appearance › Theme setting and selecting it jumps to that page focused.",
+  "states": "idle, query, ranked hits, no hits",
+  "test": "With the private test backend, search a known config key (e.g. 'theme') in the Rust settings search and confirm the same row is returned and deep-linked.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2286",
+  "unsure": "Rust settings::search ranking weights were not read in detail; parity of rank order unverified."
+ },
+ "KEYS-003": {
+  "behavior": "⌘. (Linux Ctrl+., action `nav.commandCenter`) opens the Command Center overlay titled 'Command Center'; it holds the palette plus usage/log/maintenance panels and closes via 'Close command center'.",
+  "states": "closed, open, palette sub-view, panel sub-view",
+  "test": "Against the private backend press Ctrl+. in the Rust app and check the Command Center overlay opens/closes without touching the chat.",
+  "rust_evidence": "",
+  "unsure": "No command-center code found in the Rust repo; the Electron file src/app/command-center/index.tsx (769 lines) was only skimmed, so sub-panel inventory is incomplete."
+ },
+ "KEYS-004": {
+  "behavior": "⌘, (Linux Ctrl+,, action `nav.settings`, label 'Open settings') opens the settings overlay; Esc closes it first before any other Esc handling.",
+  "states": "closed, open, page open, searching",
+  "test": "With the private backend press Ctrl+, in the Rust app: settings overlay opens; Esc closes it.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:319",
+  "unsure": ""
+ },
+ "KEYS-005": {
+  "behavior": "⌘/ (Linux Ctrl+/, action `keybinds.openPanel`) opens the Keyboard shortcuts panel: title 'Keyboard shortcuts', subtitle 'Click a shortcut to rebind it · <mod> reopens this panel.', search 'Search shortcuts…'; the panel lists every rebindable action plus the read-only rows.",
+  "states": "closed, open, searching, capturing a rebind",
+  "test": "Press Ctrl+/ in the Rust app against the private backend; the panel opens listing bindings from the Rust catalog.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2049",
+  "unsure": "The Rust keybinds entry is a settings page filled from a stub list; whether it renders real live bindings was not verified."
+ },
+ "KEYS-006": {
+  "behavior": "Enter in the composer sends the draft (read-only binding `composer.send` keys ['enter'], label 'Send message'); plain Enter adds no newline — ⇧Enter does.",
+  "states": "empty draft, typed draft, sending, running",
+  "test": "Against the private backend type a prompt and press Enter in the Rust app: a prompt.submit leaves and the transcript streams.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:364",
+  "unsure": "The ⇧Enter newline half of the row was only inferred from chat.slint:364 (`!e.modifiers.shift`)."
+ },
+ "KEYS-007": {
+  "behavior": "Read-only composer keys: Enter while a turn runs STEERS it (`composer.steer` keys ['enter'], label 'Steer the running turn'); ⌘Enter (Linux Ctrl+Enter) QUEUES instead (`composer.queue`, label 'Queue message').",
+  "states": "idle, running-turn (steer available), queued turns",
+  "test": "With the private backend start a turn, press Enter (steer is accepted) then Ctrl+Enter (message queues) and watch the queue count.",
+  "rust_evidence": "",
+  "unsure": "Neither composer.steer nor composer.queue was found in the Rust key handling; mapping of Enter-while-running to session.steer unconfirmed."
+ },
+ "KEYS-008": {
+  "behavior": "⌘⇧K (Linux Ctrl+Shift+K, read-only `composer.sendQueued`, label 'Send next queued turn') dispatches the next queued turn immediately instead of waiting for the current turn.",
+  "states": "queue empty (no-op), queue non-empty",
+  "test": "Against the private backend queue two messages, press Ctrl+Shift+K and check the second one is dispatched before the first finishes.",
+  "rust_evidence": "",
+  "unsure": "No queued-turn send path found in the Rust repo; string label only confirmed in en.ts."
+ },
+ "KEYS-009": {
+  "behavior": "Composer type-ahead keys: '@' opens the reference popover (`composer.mention`, label 'Reference files, folders, URLs'), '/' opens the slash-command popover (`composer.slash`, label 'Slash command palette'), '?' at an empty composer shows quick help (`composer.help`, label 'Quick help').",
+  "states": "popover closed, mention open, slash open, help open",
+  "test": "Against the private backend type '@', '/', '?' into the Rust composer and check each popover/help opens and Esc dismisses it.",
+  "rust_evidence": "",
+  "unsure": "No mention/slash/help popover code found in crates/hermes-ui; the row's per-key behaviour is taken from actions.ts + label strings only."
+ },
+ "KEYS-010": {
+  "behavior": "↑/↓ in the composer cycle the popover selection, and with no popover open walk the input history (`composer.history`, keys ['up','down'], label 'Cycle popover / history').",
+  "states": "popover open (navigating), popover closed (history), at history end",
+  "test": "With the private backend send two prompts, press ↑/↓ in the Rust composer and confirm the earlier drafts come back in order.",
+  "rust_evidence": "",
+  "unsure": "Rust composer history behaviour not implemented/located; whether history is per-session is unknown."
+ },
+ "KEYS-011": {
+  "behavior": "Esc closes an open composer popover, and with none open cancels the running turn (`composer.cancel`, keys ['escape'], label 'Close popover · cancel run').",
+  "states": "popover open, turn running, both, neither (no-op)",
+  "test": "Against the private backend press Esc mid-stream in the Rust app: the turn stops; press Esc again with nothing running: no error.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:335",
+  "unsure": "Rust Esc→stop is global (app-window.slint:325-335 closes settings/picker too); the popover-first ordering is not implemented, so exact precedence differs."
+ },
+ "KEYS-012": {
+  "behavior": "⌘L (Linux Ctrl+L, read-only row `composer.focus`, keys ['mod+l'], label 'Focus composer') moves focus into the composer from anywhere, like a browser address bar; the rebindable soft-focus action (`composer.focus` defaults ['/','enter']) lets typing '/' or Enter focus it too. Contested presses resolve via the priority ladder in focus-chord.ts.",
+  "states": "composer unfocused, focused, chord contested by text-selection",
+  "test": "With the private backend press Ctrl+L from the transcript in the Rust app and confirm the caret lands in the composer.",
+  "rust_evidence": "",
+  "unsure": "The soft '/' + Enter focus and the Ctrl+L/selection priority ladder were not found in the Rust code; only Enter-to-send exists."
+ },
+ "KEYS-013": {
+  "behavior": "⌘L / Ctrl+L is also the selection half of the chord: with text selected (terminal text, preview lines) it is sent into the composer as context (read-only `view.selectionToComposer`, keys ['mod+l'], label 'Send selection to composer').",
+  "states": "selection present (sends), no selection (focuses instead)",
+  "test": "Against the private backend select terminal output in the Rust app, press Ctrl+L and check the text is appended to the draft.",
+  "rust_evidence": "",
+  "unsure": "No selection-to-composer code in the Rust repo; which side of the shared Ctrl+L chord wins was not confirmed beyond actions.ts comments."
+ },
+ "KEYS-014": {
+  "behavior": "⌘⇧M (Linux Ctrl+Shift+M, action `composer.modelPicker`, label 'Open model picker') opens the live model dropdown on the composer under the pointer, else the active composer.",
+  "states": "closed, open, model options loading",
+  "test": "With the private backend press Ctrl+Shift+M in the Rust app and confirm the model list (from the test backend) opens on the active composer.",
+  "rust_evidence": "",
+  "unsure": "Rust has a model picker list but no keybinding for it (no `modelPicker` chord in app-window.slint/chat.slint)."
+ },
+ "KEYS-015": {
+  "behavior": "Voice toggle: ⌃B on macOS, ⌘⌥V (= Linux Ctrl+Alt+V, `composer.voice`, label 'Start / stop voice conversation') elsewhere — because off macOS `ctrl` folds to `mod` and would collide with the sidebar chord.",
+  "states": "off, listening, speaking, unavailable (no STT configured)",
+  "test": "Against the private backend press Ctrl+Alt+V in the Rust app: voice mode toggles or the 'Configure speech-to-text to use voice mode.' notice appears.",
+  "rust_evidence": "",
+  "unsure": "No voice toggle code found in crates/hermes-ui; the Linux default Ctrl+Alt+V is derived from isMacPlatform() in actions.ts:93."
+ },
+ "KEYS-016": {
+  "behavior": "Dictation ships deliberately unbound (`composer.dictate`, defaults []), label 'Start / stop dictation'; users assign a chord in the shortcuts panel.",
+  "states": "unbound (default), user-bound, recording",
+  "test": "With the private backend open the Rust shortcuts panel and confirm 'Start / stop dictation' is listed with no default chord.",
+  "rust_evidence": "",
+  "unsure": "Rust lists a 'Key bindings' page but dictation was not confirmed to be among its rows."
+ },
+ "KEYS-017": {
+  "behavior": "Reasoning level up/down ship unbound (`composer.reasoningUp`/`composer.reasoningDown`, defaults [], labels 'Reasoning level up'/'Reasoning level down'); with a MODIFIED user chord they may fire while the composer has focus (editableTargetPolicy: 'modified'), and stepping is clamped at off → minimal → … → xhigh.",
+  "states": "unbound, user-bound, at minimum clamp, at maximum clamp",
+  "test": "With the private backend bind a chord, step the reasoning level up/down and confirm it stops at the ends and does not eat bare typing.",
+  "rust_evidence": "",
+  "unsure": "The reasoning ladder values come from the actions.ts comment, not from reading the model-option store."
+ },
+ "KEYS-018": {
+  "behavior": "⌘N (Linux Ctrl+N, action `session.new`, label 'New session') creates a session via session.create and opens it; ⇧N no longer creates a session (a bare shifted letter hijacked typing).",
+  "states": "idle, creating, created",
+  "test": "Against scripts/live-test-backend.sh press Ctrl+N in the Rust app: a new chat appears in the sidebar and opens.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:318",
+  "unsure": ""
+ },
+ "KEYS-019": {
+  "behavior": "⌘T (Linux Ctrl+T, `session.newTab`, label 'New session tab') opens a new session tab in the focused zone; the tab appears in that zone's strip.",
+  "states": "no tabs, tab added, zone at cap",
+  "test": "With the private backend press Ctrl+T in the Rust app and check a second session tab appears next to the first.",
+  "rust_evidence": "",
+  "unsure": "The Rust zone/tab-strip model was not inspected; no Ctrl+T handler found in app-window.slint."
+ },
+ "KEYS-020": {
+  "behavior": "⌘⇧N (Linux Ctrl+Shift+N, `session.newWindow`, label 'New window') opens a second app window bound to the same gateway.",
+  "states": "single window, second window opened",
+  "test": "With the private backend press Ctrl+Shift+N in the Rust app and confirm a second window appears and connects.",
+  "rust_evidence": "",
+  "unsure": "crates/hermes-app only builds one window from what I read; multi-window support unverified."
+ },
+ "KEYS-021": {
+  "behavior": "⌃Tab / ⌃⇧Tab (literal Control on macOS) and ⌃PageDown / ⌃PageUp walk sessions in sidebar order (`session.next`/`session.prev`, labels 'Next session'/'Previous session').",
+  "states": "first session, middle, last (wraps)",
+  "test": "Against the private backend press Ctrl+Tab / Ctrl+Shift+Tab in the Rust app and step through the test sessions.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:323",
+  "unsure": "Wrap-around at the ends is not proven by the Rust call site (cycle-session takes a step only)."
+ },
+ "KEYS-022": {
+  "behavior": "⌃1…⌃9 (action `session.slot.N`, labels 'Switch to recent session 1'…'9') jump to the Nth most recent session; an empty slot is a no-op.",
+  "states": "slot filled, slot empty",
+  "test": "With ≥2 test sessions open press Ctrl+1 and Ctrl+2 in the Rust app and confirm it switches to the matching recent session.",
+  "rust_evidence": "",
+  "unsure": "No session-slot handling in the Rust repo; the 'recent' ordering used by the Electron app was not read from source."
+ },
+ "KEYS-023": {
+  "behavior": "⌘⇧F (Linux Ctrl+Shift+F, `session.focusSearch`, label 'Search sessions') focuses the sidebar session search, which queries the backend (REST /api/sessions/search).",
+  "states": "search unfocused, focused, query typed, no results",
+  "test": "Against the private backend load a session, press Ctrl+Shift+F and type a word from it: the session is listed by the search.",
+  "rust_evidence": "",
+  "unsure": "Rust sidebar has a search field but the chord and the /api/sessions/search call were not confirmed in Rust."
+ },
+ "KEYS-024": {
+  "behavior": "Pin / unpin the active session (`session.togglePin`, ships unbound, label 'Pin / unpin current session') from the shortcuts panel; it is opt-in so it cannot claim another global chord.",
+  "states": "unbound, pinned, unpinned",
+  "test": "With the private backend bind the action, toggle it and check the session list order/pin marker persists across a reload.",
+  "rust_evidence": "",
+  "unsure": "Rust session pinning (RPC surface) was not inspected for this row."
+ },
+ "KEYS-025": {
+  "behavior": "Archive the active session (`session.archive`, ships unbound, label 'Archive current session'); the issue suggested ⌘⇧⌫ / Ctrl+Shift+⌫ but no default is shipped because the action feels irreversible.",
+  "states": "unbound, archiving, archived",
+  "test": "Against the private backend archive a test session from the Rust app and confirm it leaves the active list and appears in Archived Chats.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:341",
+  "unsure": "rust_evidence only shows the Sessions › 'Archive & retention' settings page, not an archive-session action."
+ },
+ "KEYS-026": {
+  "behavior": "PageUp / PageDown scroll the transcript by one page (`conversation.scrollPageUp`/`Down`, labels 'Scroll conversation up one page'/'Scroll conversation down one page').",
+  "states": "at top, mid, at bottom",
+  "test": "With a long test session in the Rust app press PageUp/PageDown and confirm the transcript pages up/down without touching the composer.",
+  "rust_evidence": "",
+  "unsure": "Rust transcript scrolling keys not found; whether the composer swallows PgUp/PgDn while focused is unverified."
+ },
+ "KEYS-027": {
+  "behavior": "⌘⇧B (Linux Ctrl+Shift+B, `workspace.newWorktree`, label 'New worktree') spins up a new git worktree from the active repo and opens a session anchored there; outside a repo it cannot apply.",
+  "states": "no repo (declined), repo open, worktree created",
+  "test": "With the private backend (no git repo) press Ctrl+Shift+B in the Rust app: nothing is created and no error toast appears.",
+  "rust_evidence": "",
+  "unsure": "No worktree code in the Rust repo; the error path for 'not a repo' was not read."
+ },
+ "KEYS-028": {
+  "behavior": "⌘O (Linux Ctrl+O, `workspace.openFolder`, label 'Open folder as project') opens a native folder picker and upserts a project: enters the owning project if one exists, else creates one, landing on a fresh session.",
+  "states": "picker open, cancelled, existing project entered, new project created",
+  "test": "Against the private backend pick a folder in the Rust app and confirm a project row appears with a new session anchored to it.",
+  "rust_evidence": "",
+  "unsure": "Native folder-picker plumbing in the Rust app was not verified (RPC project.* surface not read)."
+ },
+ "KEYS-029": {
+  "behavior": "Navigation actions ship unbound and are assignable in the shortcuts panel: `nav.profiles` 'Open profiles', `nav.capabilities` 'Open skills', `nav.messaging` 'Open messaging', `nav.artifacts` 'Open artifacts', `nav.cron` 'Open scheduled jobs', `nav.agents` 'Open agents'. They are also plugin-runnable (PLUGIN_APP_ACTIONS).",
+  "states": "unbound, user-bound, target page open",
+  "test": "With the private backend bind one of them, fire it and confirm the matching Rust page opens.",
+  "rust_evidence": "",
+  "unsure": "Whether the Rust app has standalone Profiles/Capabilities/Messaging/Artifacts/Cron/Agents pages was not fully checked (plugins/artifacts sections belong to other annotators)."
+ },
+ "KEYS-030": {
+  "behavior": "⌘B (Linux Ctrl+B, `view.toggleSidebar`, label 'Toggle sessions sidebar') shows/hides the sessions sidebar; the titlebar button reads 'Hide sidebar' when open and 'Show sidebar' when hidden.",
+  "states": "open, hidden, animating",
+  "test": "Against the private backend press Ctrl+B in the Rust app: the sidebar collapses and the content reflows; press again to restore.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:320",
+  "unsure": ""
+ },
+ "KEYS-031": {
+  "behavior": "Cycle the sidebar's session grouping (`view.cycleSidebarGrouping`, ships unbound, label 'Cycle session grouping') so the mouse-only grouping control is reachable by keyboard.",
+  "states": "unbound, grouping modes cycled",
+  "test": "With the private backend bind the action, fire it and confirm the sidebar grouping changes and the choice persists across restart.",
+  "rust_evidence": "",
+  "unsure": "Rust sidebar grouping modes were not read; no equivalent action found in Rust."
+ },
+ "KEYS-032": {
+  "behavior": "⌘J (Linux Ctrl+J, `view.toggleRightSidebar`, label 'Toggle file browser') shows/hides the right sidebar; the titlebar button reads 'Hide right sidebar' / 'Show right sidebar'.",
+  "states": "open, hidden, animating",
+  "test": "Against the private backend press Ctrl+J in the Rust app: the right panel opens/closes.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has right-panel tokens in theme.slint (right-panel-w) but no toggle found in app-window.slint."
+ },
+ "KEYS-033": {
+  "behavior": "⌘⇧S (Linux Ctrl+Shift+S, `view.toggleStatusbar`, label 'Toggle status bar') shows/hides the status bar (⌘⇧S chosen because Hermes has no chord dispatcher for a ⌘K ⌘S two-stroke).",
+  "states": "visible, hidden",
+  "test": "With the private backend press Ctrl+Shift+S in the Rust app and confirm the status bar hides and comes back.",
+  "rust_evidence": "",
+  "unsure": "No status bar was found in crates/hermes-ui/ui/app-window.slint, so the row is likely unimplemented end-to-end."
+ },
+ "KEYS-034": {
+  "behavior": "⌥⌘T (Linux Ctrl+Alt+T, `view.toggleTabStrip`, label 'Toggle tabs') hides/shows the focused zone's top tab strip; it ships BOUND because hiding can remove the only affordance back.",
+  "states": "strip shown, strip hidden",
+  "test": "Against the private backend open two session tabs, press Ctrl+Alt+T and confirm the strip hides while the tabs survive.",
+  "rust_evidence": "",
+  "unsure": "Rust zone tab strip was not located; ⌥+letter resolves through comboFromEvent's event.code fallback per the source comment."
+ },
+ "KEYS-035": {
+  "behavior": "Toggle the profile rail (`view.toggleProfileRail`, ships unbound, label 'Toggle profile rail') — the rail is treated as a one-time preference, so no default chord.",
+  "states": "unbound, rail shown, rail hidden",
+  "test": "With the private backend bind it, toggle the rail and confirm the layout reflows and the state persists.",
+  "rust_evidence": "",
+  "unsure": "Profiles UI is inside other annotators' scope (PROF); presence in the Rust app not checked here."
+ },
+ "KEYS-036": {
+  "behavior": "Toggle Simple ↔ Advanced mode (`view.toggleSimpleMode`, ships unbound, label 'Toggle Simple mode'); ⌘K, the layout editor and Settings → Appearance are its doors.",
+  "states": "unbound, simple mode, advanced mode",
+  "test": "Against the private backend bind it and confirm switching modes changes the visible panes and persists.",
+  "rust_evidence": "",
+  "unsure": "interfaceMode exists in en.ts (4464) but the Rust equivalent was not found."
+ },
+ "KEYS-037": {
+  "behavior": "⌘G (Linux Ctrl+G, `view.toggleReview`, label 'Toggle review pane') shows/hides the review (source-control) pane in the right sidebar.",
+  "states": "hidden, shown, no repo",
+  "test": "With the private backend (dirty worktree) press Ctrl+G in the Rust app and confirm the review pane opens with the diff.",
+  "rust_evidence": "",
+  "unsure": "Review pane belongs to the right-panel section; its Rust state was not checked."
+ },
+ "KEYS-038": {
+  "behavior": "Show the files pane (`view.showFiles`, ships unbound, label 'Show file browser'); it is also plugin-runnable (PLUGIN_APP_ACTIONS).",
+  "states": "unbound, files pane shown",
+  "test": "With the private backend fire the action from the Rust shortcuts panel and confirm the file tree opens.",
+  "rust_evidence": "",
+  "unsure": "Not confirmed as present in Rust."
+ },
+ "KEYS-039": {
+  "behavior": "⌘⇧L (Linux Ctrl+Shift+L, `view.showBrowser`, label 'Toggle browser') opens the in-app browser preview using the address-bar chord with Shift added (plain ⌘L is the terminal selection shortcut).",
+  "states": "closed, open, loading url",
+  "test": "Against the private backend press Ctrl+Shift+L in the Rust app and confirm an embedded preview pane opens.",
+  "rust_evidence": "",
+  "unsure": "No in-app browser found in the Rust repo."
+ },
+ "KEYS-040": {
+  "behavior": "⌘⇧H (Linux Ctrl+Shift+H, `view.toggleHud`, label 'Toggle HUD mode') enters/leaves the chrome-free floating chat; the titlebar button reads 'HUD mode' / 'Exit HUD mode'.",
+  "states": "normal window, HUD open, HUD closed",
+  "test": "With the private backend press Ctrl+Shift+H in the Rust app and confirm the window switches to the chrome-free HUD shell and back.",
+  "rust_evidence": "",
+  "unsure": "No HUD shell in the Rust repo (WIN-008 covers the shell itself)."
+ },
+ "KEYS-041": {
+  "behavior": "⌃` (literal Control+backtick on every platform, `view.showTerminal`, label 'Toggle terminal') reveals the terminal pane, opening one if none exist.",
+  "states": "no terminal (creates), hidden (reveals), visible (hides)",
+  "test": "Against the private backend press Ctrl+` in the Rust app and confirm a terminal pane opens and toggles.",
+  "rust_evidence": "",
+  "unsure": "No terminal pane found in crates/hermes-ui."
+ },
+ "KEYS-042": {
+  "behavior": "⌃⇧` (`view.newTerminal`, label 'New terminal') spawns an additional terminal in the focused zone's tab rail.",
+  "states": "one terminal, extra terminal added",
+  "test": "With the private backend press Ctrl+Shift+` and confirm a second terminal tab appears.",
+  "rust_evidence": "",
+  "unsure": "Not implemented in Rust as far as I could see."
+ },
+ "KEYS-043": {
+  "behavior": "⌃⇧↓ walks to the next terminal and ⌃⇧↑ to the previous one (`view.nextTerminal` 'Next terminal' / `view.prevTerminal` 'Previous terminal').",
+  "states": "single terminal (no-op), multiple terminals",
+  "test": "Against the private backend open two terminals, press Ctrl+Shift+↓/↑ and watch the active rail item change.",
+  "rust_evidence": "",
+  "unsure": "Not implemented in Rust as far as I could see."
+ },
+ "KEYS-044": {
+  "behavior": "⌃⇧W (`view.closeTerminal`, label 'Close terminal') kills the active terminal; ⌘W and ⌘⇧[ ] are taken by other actions so this family stays on ctrl.",
+  "states": "terminal open, closed, last terminal closed",
+  "test": "With the private backend open a terminal, press Ctrl+Shift+W and confirm the pane closes without killing the app.",
+  "rust_evidence": "",
+  "unsure": "Not implemented in Rust as far as I could see."
+ },
+ "KEYS-045": {
+  "behavior": "⌘\\ (Linux Ctrl+\\, `view.flipPanes`, label 'Swap sidebar sides') mirrors the layout by flipping the left/right panes; the titlebar arrow-swap button does the same.",
+  "states": "layout normal, flipped",
+  "test": "Against the private backend press Ctrl+\\ in the Rust app and confirm the sidebar and right panel exchange sides.",
+  "rust_evidence": "",
+  "unsure": "No flip-layout code in the Rust repo."
+ },
+ "KEYS-046": {
+  "behavior": "⌘W (Linux Ctrl+W, `view.closeTab`, label 'Close tab') closes the focused zone's active tab (preview tab or tree tab); the uncloseable workspace tab is a no-op.",
+  "states": "closable tab, last/uncloseable tab (no-op)",
+  "test": "With the private backend press Ctrl+W on a preview tab in the Rust app: the tab closes and the app stays open.",
+  "rust_evidence": "",
+  "unsure": "Rust window-close semantics were not inspected; Ctrl+W is not bound in app-window.slint."
+ },
+ "KEYS-047": {
+  "behavior": "⌘⇧T (Linux Ctrl+Shift+T, `view.reopenTab`, label 'Reopen closed tab') reopens the last closed tab where it was.",
+  "states": "nothing to reopen (no-op), reopened",
+  "test": "Against the private backend close a tab, press Ctrl+Shift+T and confirm it returns in its old position.",
+  "rust_evidence": "",
+  "unsure": "Not found in the Rust repo."
+ },
+ "KEYS-048": {
+  "behavior": "⌘F (Linux Ctrl+F, `view.findInPage`, label 'Find in page') opens the find bar; it may fire from inside a textarea/contenteditable so ⌘F while typing in the composer focuses find, not the letter f. Match stepping buttons read 'Next match' / 'Previous match'.",
+  "states": "closed, open, matches found, no matches",
+  "test": "With the private backend press Ctrl+F in the Rust transcript and confirm a find bar opens and highlights matches.",
+  "rust_evidence": "",
+  "unsure": "No find bar in crates/hermes-ui."
+ },
+ "KEYS-049": {
+  "behavior": "Find next/previous ship unbound (`view.findNext` 'Find next match', `view.findPrevious` 'Find previous match') because ⌘G already belongs to `view.toggleReview`; while the find bar is OPEN its capture-phase listener claims ⌘G/⌘⇧G and stops propagation.",
+  "states": "bar closed (chord goes to review), bar open (chord steps matches), user-bound",
+  "test": "With the private backend press Ctrl+G with the find bar open (steps) and closed (toggles review) to confirm the capture-phase split.",
+  "rust_evidence": "",
+  "unsure": "Not implemented in Rust."
+ },
+ "KEYS-050": {
+  "behavior": "⇧⇧X — Shift+X (`appearance.toggleMode`, label 'Toggle light / dark') flips the appearance mode between light and dark.",
+  "states": "light, dark, system (toggles to the opposite of the resolved mode)",
+  "test": "With the private backend press Shift+X outside any input in the Rust app and confirm the theme flips.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:222",
+  "unsure": "Rust reads/writes the persisted mode (hermes-desktop-mode-v1) but no Shift+X key handler was found in app-window.slint."
+ },
+ "KEYS-051": {
+  "behavior": "⌘1…⌘9 (via `view.tabSlot.N`, labels 'Switch to tab 1'…'9', passthrough: true) activates the Nth visible tab of the zone under the pointer, else the focused zone, and passes through to the profile switcher when no eligible tab strip exists.",
+  "states": "no eligible strip (passes through), tab activated",
+  "test": "Against the private backend with two tabs under the pointer press Ctrl+2: the second tab activates; move the pointer away and Ctrl+2 switches profile instead.",
+  "rust_evidence": "",
+  "unsure": "Rust has neither tab slots nor profile switchers; the passthrough ordering is only evident from the key order in KEYBIND_ACTIONS."
+ },
+ "KEYS-052": {
+  "behavior": "Named-profile jumps: ⌘1…⌘9 (Linux Ctrl+1…9) for profiles 1-9, then ⌘⌥1…⌘⌥9 (Linux Ctrl+Alt+1…9) for 10-18 — `profile.switch.N`, labels 'Switch to profile N'; PROFILE_SLOT_COUNT is 18 and a missing slot is a no-op.",
+  "states": "profile exists, slot empty (no-op), 10-18 chord",
+  "test": "With test backend profiles created, press Ctrl+2 in the Rust app and confirm the active profile switches.",
+  "rust_evidence": "",
+  "unsure": "Profiles are another annotator's section; no Rust profile-switch chords found."
+ },
+ "KEYS-053": {
+  "behavior": "⌘D (Linux Ctrl+D, `profile.default`, label 'Switch to default profile') jumps back to the default profile; ⌘` and ⌘0 are avoided (macOS window cycling / zoom reset).",
+  "states": "non-default profile, default profile, slot unset",
+  "test": "Against the private backend switch to a named profile, press Ctrl+D and confirm the default profile is active again.",
+  "rust_evidence": "",
+  "unsure": "No profile switching detected in the Rust repo."
+ },
+ "KEYS-054": {
+  "behavior": "⌘⇧] next / ⌘⇧[ previous profile (`profile.next` 'Next profile', `profile.prev` 'Previous profile'), walking the profile list in order.",
+  "states": "first, middle, last (wraps)",
+  "test": "With the private backend press Ctrl+Shift+] and Ctrl+Shift+[ in the Rust app and confirm it steps through profiles.",
+  "rust_evidence": "",
+  "unsure": "No Rust implementation found."
+ },
+ "KEYS-055": {
+  "behavior": "⌘⇧0 (Linux Ctrl+Shift+0, `profile.toggleAll`, label 'Toggle all-profiles view') turns the all-profiles view on and off.",
+  "states": "all-profiles off, on",
+  "test": "Against the private backend press Ctrl+Shift+0 and confirm the sidebar shows every profile's sessions.",
+  "rust_evidence": "",
+  "unsure": "No Rust implementation found."
+ },
+ "KEYS-056": {
+  "behavior": "Create a profile (`profile.create`, ships unbound, label 'Create profile') from the shortcuts panel.",
+  "states": "unbound, dialog open, created",
+  "test": "With the private backend bind it, fire it and confirm the create-profile flow opens in the Rust app.",
+  "rust_evidence": "",
+  "unsure": "Profiles UI is out of this batch's scope; not verified."
+ },
+ "KEYS-057": {
+  "behavior": "Read-only HUD chord: ⌘⇧G (Linux Ctrl+Shift+G, `hud.snapToPointer`, label 'Move HUD to pointer (global, while HUD is open)') snaps the HUD window to the pointer. The chord is registered as a global OS shortcut in the main process only while HUD mode is up.",
+  "states": "HUD closed (unregistered), HUD open (registered), snapped",
+  "test": "With the private backend enter HUD-equivalent mode (if present) and press Ctrl+Shift+G; otherwise confirm the row lists the chord read-only.",
+  "rust_evidence": "",
+  "unsure": "No HUD or global-shortcut registration in the Rust repo; a native client would need OS-level shortcut registration."
+ },
+ "KEYS-058": {
+  "behavior": "Read-only terminal clipboard chords: ⌘C / ⌘V on macOS, Ctrl+Shift+C / Ctrl+Shift+V elsewhere (`view.terminalCopy` 'Copy terminal selection' / `view.terminalPaste` 'Paste into terminal'). Plain Ctrl+C also copies when text is selected and stays SIGINT with no selection, so it is not listed.",
+  "states": "selection present, no selection (SIGINT)",
+  "test": "With the private backend open a terminal in the Rust app, select text, press Ctrl+Shift+C and paste with Ctrl+Shift+V.",
+  "rust_evidence": "",
+  "unsure": "No terminal in the Rust app, so the chords are unverified there."
+ },
+ "KEYS-059": {
+  "behavior": "Rebinding flow: clicking a shortcut arms capture (`beginCapture` → `$capture`), 'Press a key…' waits, Backspace/Delete sets an empty combo (unbinding a shipped chord), Escape cancels; overrides persist under 'hermes.desktop.keybinds' as a diff against defaults, corrupt storage falls back to defaults, and conflicts are reported only against non-passthrough earlier actions.",
+  "states": "default, rebound, cleared (empty combo), capturing, conflict shown",
+  "test": "With the private backend rebind 'Toggle sessions sidebar' to Ctrl+Alt+B in the Rust app, restart, and confirm the chord and the persisted diff survive.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2050",
+  "unsure": "Rust lists a 'Key bindings' page (labeled 'Click a shortcut to rebind it.'), but no capture/persist/conflict machinery was found, so parity looks like a stub page."
+ },
+ "KEYS-060": {
+  "behavior": "Plugins contribute first-class keybinds through the `keybinds` registry area: a contribution carries id/category/defaults/label/run, appears in the panel, is rebindable, persists like a built-in, and cannot shadow a built-in id. Plugins may also invoke allowlisted built-ins via ctx.runAction (PLUGIN_APP_ACTIONS: view/navigation/composer/session only — nothing destructive).",
+  "states": "no contributions, contributed action present, rejected (built-in id shadow)",
+  "test": "With the private backend and a test plugin registered, confirm its shortcut appears in the Rust shortcuts list and fires.",
+  "rust_evidence": "",
+  "unsure": "No plugin keybind registry in the Rust repo (plugins overall are another annotator's section)."
+ },
+ "KEYS-061": {
+  "behavior": "Keybind capture mode: `$capture` holds the action currently listening (session-only, never persisted); captureStep maps Escape → cancel, Backspace/Delete → empty combo, a modifier-only press (combo null) → keep waiting, and any real chord → set.",
+  "states": "idle, capturing, waiting for a real key, cancelled, set",
+  "test": "With the private backend open the Rust shortcuts panel, arm a row, press modifiers only (nothing happens), then a real chord (it binds) and Esc (it cancels).",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:2053",
+  "unsure": "The row's name ('deep-link capture mode') suggests an external entry point into capture mode; I could not find a deep-link/URL that arms capture in the Electron source, so that part is unconfirmed."
+ },
+ "THEM-001": {
+  "behavior": "Appearance offers built-in themes plus a color mode: 'Light' ('Bright desktop surfaces'), 'Dark' ('Low-glare workspace'), 'System' ('Follow OS appearance'); a named theme sets palette and chat chrome while mode sets brightness. The picker title block reads 'Appearance' with intro 'Desktop-only. Mode is brightness; theme is palette and chat chrome.'",
+  "states": "light, dark, system, theme selected, following OS change",
+  "test": "With the private backend flip mode to Light/Dark/System in the Rust app and confirm surfaces, sidebar and text tokens follow.",
+  "rust_evidence": "crates/hermes-ui/ui/theme.slint:9",
+  "unsure": "The Rust theme global has one palette with dark/light variants; the Electron named-theme system (src/themes/*) has no Rust equivalent seen."
+ },
+ "THEM-002": {
+  "behavior": "Theme marketplace page inside the palette: search placeholder 'Search your themes or the VS Code Marketplace…', rows offer installing a marketplace theme, and pasting an extension id (e.g. dracula-theme.theme-dracula) converts its color theme to a desktop palette; no hits shows 'No matching themes.'",
+  "states": "idle, searching marketplace, results, no results, install error",
+  "test": "With the private backend open the Rust theme picker, search a theme name, and confirm local themes are found (no marketplace API testable offline).",
+  "rust_evidence": "",
+  "unsure": "The marketplace path needs network + VS Code Marketplace; not verifiable against the private test backend, and no Rust equivalent found."
+ },
+ "THEM-003": {
+  "behavior": "The backend owns the active skin: it announces it on gateway.ready and via the `skin.changed` WebSocket broadcast (and answers config.get skin); the renderer re-applies the skin when the event arrives, with same-name re-application used for missed-activation recovery.",
+  "states": "no skin, skin applied, skin changed broadcast, dedupe drop",
+  "test": "Against the private backend change the skin on the backend and confirm the Rust app repaints without a restart.",
+  "rust_evidence": "crates/hermes-core/src/prefs.rs:127",
+  "unsure": "Rust prefs only map the local key 'hermes-desktop-theme-v2'; no skin.changed handling was found in the Rust event loop."
+ },
+ "THEM-004": {
+  "behavior": "Local skin override: the main process reads a local display skin from the profile's Hermes home (readLocalDisplaySkin / readLocalSkinPayload) so a checkout-local skin paints before/without the backend, keyed per profile.",
+  "states": "no local skin, local skin present, profile switch changes the key",
+  "test": "With the private backend (isolated HERMES_HOME) write a local skin and confirm the Rust app picks it up without a gateway restart.",
+  "rust_evidence": "",
+  "unsure": "No local-skin reading in the Rust core; only the prefs-based mode/theme key exists."
+ },
+ "THEM-005": {
+  "behavior": "Window translucency: 'Window Translucency' with 'Clear' and 'Glass' modes ('Matte glass: the desktop shows through as a smooth blur while text stays sharp.'), Tint/Fade/Frost sliders, an Area scope, and separate tuning for light and dark; glass support is Windows-only, and it is disabled on unsupported platforms.",
+  "states": "unsupported platform (hidden/off), clear, glass, tint/fade changed",
+  "test": "With the private backend toggle translucency in the Rust app and confirm the window backing changes or the control is absent on this Linux session.",
+  "rust_evidence": "",
+  "unsure": "Slint has no per-window translucency token in theme.slint; platform gating (GLASS_SUPPORTED / TRANSLUCENCY_SUPPORTED) was not reimplemented in Rust as far as I saw."
+ },
+ "THEM-006": {
+  "behavior": "Chat backdrop: a boolean preference ('Chat Backdrop', 'The faint statue image behind the conversation.') that paints a faint statue image behind the transcript; stored under 'hermes.desktop.backdrop.v1' and reported as a feature toggle.",
+  "states": "off (default), on",
+  "test": "With the private backend turn the backdrop on in the Rust app and confirm an image renders behind the transcript and the choice persists.",
+  "rust_evidence": "",
+  "unsure": "The backdrop asset itself is a proprietary-looking image; no equivalent asset or Rust code found."
+ },
+ "THEM-007": {
+  "behavior": "Particles background: an animated particle field (particle-field.tsx/.css) renders as the ambient background when enabled, driven by the theme colors.",
+  "states": "off, on, reduced-motion",
+  "test": "With the private backend enable particles in the Rust app and confirm it animates and stops when reduce-motion is on.",
+  "rust_evidence": "",
+  "unsure": "No particle code or Rust equivalent found; whether it is user-toggleable was not confirmed from the settings manifest."
+ },
+ "THEM-008": {
+  "behavior": "Code editor theme: the embedded editor uses a GitHub-derived highlight theme selected by the resolved light/dark mode (githubEditorTheme(dark)), so code blocks and the editor follow the theme.",
+  "states": "light variant, dark variant, theme flip while open",
+  "test": "With the private backend flip the app theme with a code block visible in the Rust app and confirm highlight colors switch.",
+  "rust_evidence": "crates/hermes-core/src/highlight.rs:6",
+  "unsure": "The Rust highlighter is documented as theme-independent (classes carry colors), so the visual result may differ from the Electron GitHub theme."
+ },
+ "THEM-009": {
+  "behavior": "Brand icons / product identity: resolveBrandIcon(hostname) maps a gateway host to its brand icon and product identity (product-identity.cjs) so the window/tray shows the right product name and icon per connection.",
+  "states": "default identity, known host identity, unknown host (null)",
+  "test": "With the private backend connect to the test gateway and confirm the Rust app shows the expected product identity rather than a hardcoded one.",
+  "rust_evidence": "",
+  "unsure": "Rust has assets/icons/app-window.svg only; no host→brand mapping verified."
+ },
+ "THEM-010": {
+  "behavior": "Profile color swatches: PROFILE_SWATCHES provides the palette of allowed colors and profileColor/resolveProfileColor(with overrides) pick a stable color per profile, with profileColorSoft for tinted backgrounds.",
+  "states": "no profile, color assigned, override set",
+  "test": "With the private backend create two profiles and confirm the Rust app shows distinct profile colors and honors an override.",
+  "rust_evidence": "",
+  "unsure": "Profiles are another annotator's section; the Rust swatch list was not found."
+ },
+ "THEM-011": {
+  "behavior": "Starmap visualization (session map) appearance: force/graph layout of skills and memories colored by cluster, with light/dark-aware colors and a timeline view; subtitle reads '<nodes> skills across <clusters> categories'.",
+  "states": "loading, rendered, empty ('Nothing learned yet'), import mode",
+  "test": "With the private backend open the Rust memory graph (if present) and confirm nodes render with theme-aware colors.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:216",
+  "unsure": "rust_evidence is only a nav entry ('Open memory graph'); no starmap renderer found in Rust."
+ },
+ "THEM-012": {
+  "behavior": "Pet overlay appearance: the floating pet is themed to the app (light/dark), sized by pet scale, and reacts with animations/bubbles over the app; appearance page explains 'Adopt an animated petdex mascot that floats over the app and reacts to what Hermes is doing — running while tools execute, celebrating on success, sulking on errors.'",
+  "states": "no pet, pet visible, light, dark, scaled",
+  "test": "With the private backend adopt a test pet and confirm it renders over the Rust window and follows the theme.",
+  "rust_evidence": "",
+  "unsure": "No pet renderer in the Rust repo; the pet asset pipeline (petdex) is likely out of scope for a native rewrite."
+ },
+ "NOTI-001": {
+  "behavior": "In-app toasts: notify() enqueues a notification with kind error/warning/info/success, an optional action and placement ('default' | 'bottom-right'), auto-dismissing after a per-kind duration; the region has 'Hide'/'Show', '<n> more notifications', 'Clear all', 'Dismiss notification', 'Details' and 'Copy detail' ('Could not copy notification detail' on failure).",
+  "states": "empty, visible, stacked (more than N), detail expanded, dismissed, cleared all",
+  "test": "Against the private backend trigger an error (e.g. stop the backend) in the Rust app and confirm a toast appears with a dismiss control.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:54",
+  "unsure": "Rust has a single `banner` string with a banner-error flag (controller.rs:464) — no toast stack, kinds, actions or durations."
+ },
+ "NOTI-002": {
+  "behavior": "Butterbar: a top banner area where views register items (registerButterbar) with a tone ('accent'|'danger'|'info'|'neutral'|'success'|'warn'); users can dismiss closeable items and dismissals persist.",
+  "states": "none, one item, several items (ordered), dismissed, closeable vs not",
+  "test": "With the private backend trigger a condition that posts a butterbar in the Rust app; confirm the message appears at the top and dismisses.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:54",
+  "unsure": "Rust renders one banner slot (set_banner) with no tone list, stacking or persisted dismissals."
+ },
+ "NOTI-003": {
+  "behavior": "Terms/consent butterbar: while the free tier is available, a terms item is registered in the butterbar (TERMS_BUTTERBAR via useButterbar) prompting the user to accept terms before continuing.",
+  "states": "free tier unavailable (no bar), available (bar shown), accepted (bar gone)",
+  "test": "With the private backend in free-tier-available state confirm the terms banner shows in the Rust app and disappears after accepting.",
+  "rust_evidence": "",
+  "unsure": "Free tier is out of scope here; no Rust equivalent found."
+ },
+ "NOTI-004": {
+  "behavior": "Native OS notifications: per-device preferences (enabled flag plus one switch per kind) drive real OS notifications when the window is in the background; settings copy: 'OS notifications (not in-app toasts). Per device.', 'Enable notifications', 'Off silences every notification below.', 'Completion alerts only fire while Hermes is in the background.'",
+  "states": "unsupported platform, enabled, disabled, per-kind on/off, suppressed while focused",
+  "test": "Against the private backend press 'Send test notification' in the Rust settings and confirm an OS notification appears.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:702",
+  "unsure": "Rust implements the 'test-notification' settings action as an RPC call (title 'Hermes', body 'Test notification') rather than a local OS notification; no real OS notification path found."
+ },
+ "NOTI-005": {
+  "behavior": "Notification click actions: a native notification's click is resolved back to an in-app target (resolveNotificationAction) — e.g. focusing the session or opening the approval — so clicking an OS notification lands on the right view.",
+  "states": "no action, open session, open approval/input",
+  "test": "With the private backend fire an OS notification and click it; confirm the Rust app focuses the right session (needs a notification path first).",
+  "rust_evidence": "",
+  "unsure": "Depends on NOTI-004, which is not implemented in Rust; no action-resolution code found."
+ },
+ "NOTI-006": {
+  "behavior": "Notification registry: native notifications are held in a registry with a TTL (NOTIFICATION_RETENTION_TTL_MS) and released on close, so dead BrowserWindow/notification references are not retained.",
+  "states": "registered, released on click, released on close, expired by TTL",
+  "test": "With the private backend send many test notifications and confirm the Rust app does not leak or error after they close.",
+  "rust_evidence": "",
+  "unsure": "Not applicable without NOTI-004; no registry in Rust."
+ },
+ "NOTI-007": {
+  "behavior": "Agent notices: a WS notice payload is split into primary text and meta (splitMeta), accent/usage fraction is derived from the text, and it is either shown as an in-chat notice row or converted to a toast (noticeToToast) / native notification (nativeNoticeInput); clearAgentNotice(key) removes it.",
+  "states": "none, shown (in-chat or toast), usage-fraction accented, cleared",
+  "test": "Against the private backend emit a notice on the test backend and confirm the Rust transcript shows a notice row and later clears it.",
+  "rust_evidence": "",
+  "unsure": "The Rust event loop handles thinking.delta/status.update/tool.generating/message.start but I did not find notice handling (controller.rs:1027)."
+ },
+ "NOTI-008": {
+  "behavior": "Notification clearing: notifications are removed individually (dismissNotification) or all at once ('Clear all'), and the toast region can be hidden/shown without clearing.",
+  "states": "empty, one, many, dismissed one, cleared all, region hidden",
+  "test": "With the private backend raise two errors, dismiss one and 'Clear all' the rest in the Rust app and confirm the banner clears.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:72",
+  "unsure": "Rust has only dismiss-banner() for the single banner; no stack clearing."
+ },
+ "NOTI-009": {
+  "behavior": "Tip popups: the backend can show a tip (tip.show) and the client honours per-tip retirement ('Don't show this tip again'), an enable flag, a maximum spent-tip count and a next-show timestamp; shipped tips include 'Start fresh', 'Teach it once', 'One box for everything' and 'A local engine update is available' (action 'Update now').",
+  "states": "enabled, disabled, tip shown, retired, budget spent",
+  "test": "With the private backend send tip.show and confirm the Rust app shows the tip with a 'Don't show this tip again' control that persists.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:566",
+  "unsure": "rust_evidence is only a settings row about tips; no tip UI or tip.show handling found in Rust."
+ },
+ "NOTI-010": {
+  "behavior": "Completion sound: a chosen preset (COMPLETION_SOUND_VARIANTS) plays when an agent turn finishes, with a 'Preview' button in Settings → Notifications ('Completion Sound', 'Plays when an agent turn finishes. Pick a preset and preview it here.'), deduplicated per turn.",
+  "states": "disabled, preset selected, previewing, playing on turn end",
+  "test": "With the private backend finish a turn in the Rust app and confirm the selected sound plays (or silence when disabled).",
+  "rust_evidence": "",
+  "unsure": "No audio playback found in crates/hermes-ui; the settings row uses test-notification only."
+ },
+ "NOTI-011": {
+  "behavior": "Title 'Notifications', intro 'OS notifications (not in-app toasts). Per device.', master 'Enable notifications' ('Off silences every notification below.'), per-kind switches (Approval needed, Input needed, Response ready, Turn failed, Background task finished, Credit alerts, Plugin notifications), completion-sound block, 'Send test notification' ('Hermes'/'Notifications are working.').",
+  "states": "enabled, all-off, per-kind toggled, test sent, test unsupported",
+  "test": "Against the private backend open Notifications in the Rust settings and toggle the master switch plus send a test notification.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:266",
+  "unsure": "The Rust catalog has a Notifications group with 'Desktop alerts' and 'Sounds' pages, but the per-kind switches and native test path were not verified."
+ },
+ "UPD-001": {
+  "behavior": "macOS auto-updater (electron-updater): the app checks the configured feed, downloads in the background and offers 'Update now' / 'Maybe later', with staged copy 'Downloading…', 'Almost there…', 'Finishing up…'. On Linux there is no electron-updater path — this is macOS-only packaging behaviour.",
+  "states": "checking, available, downloading, ready to install, error, up to date",
+  "test": "Not testable in the Rust app: native Linux builds update by package or bundled runtime; verify the app reports 'This version of Hermes can't update itself from inside the app.' when unsupported.",
+  "rust_evidence": "",
+  "unsure": "Linux behaviour is derived from the Linux packaging (AppImage/.deb/.rpm) referenced in the guiSkew copy; I did not read electron/updater/mac.ts internals."
+ },
+ "UPD-002": {
+  "behavior": "Windows MSIX/AppInstaller update path: the app queries the AppInstaller feed (win32AppInstallerFeedPath(channel, light), parseCheckOutput) and tells the user 'A new version of Hermes is ready. Hermes will close, Windows will finish the update, and Hermes will reopen on its own.' Windows-only.",
+  "states": "checking, available, applying, check failed",
+  "test": "Not testable on Linux; the equivalent check for the Rust app is to verify it does not claim an in-app self-update on Linux.",
+  "rust_evidence": "",
+  "unsure": "The feed URL and AppInstaller behaviour were not read in full; the Linux answer for this row is 'not supported'."
+ },
+ "UPD-003": {
+  "behavior": "Source-checkout update handoff: for source installs the app cannot update itself and shows 'Update from your terminal' with 'You installed Hermes from the command line, so updates run there too. Paste this into your terminal:' and 'Hermes will pick up the new version next time you launch it.'; the handoff gate then waits for the marker before restarting.",
+  "states": "source checkout (manual), bundled (self-update), backend-managed",
+  "test": "With the private backend run an update check in the Rust app and confirm a source install yields the manual command instead of an in-app update button.",
+  "rust_evidence": "",
+  "unsure": "The exact handoff command string is generated in electron/updater/checkout.ts, which I did not read line by line."
+ },
+ "UPD-004": {
+  "behavior": "Update gate/marker: an on-disk marker (markerPath under HERMES_HOME) records an in-flight update with owner PID and create-time checks; the gate returns reason 'marker' | 'update-in-flight' | 'handoff' | null, waits for clearance (UPDATE_WAIT_TIMEOUT_MS 20 min, 1 s poll, 'clear'|'finished'|'timeout'|'cancelled') and requires a handoff dwell (2500 ms) before letting the UI proceed.",
+  "states": "clear, marker present, update in flight, handoff dwell, timeout, cancelled, stale marker",
+  "test": "With the private backend write a stale marker into an isolated HERMES_HOME and confirm the Rust app either ignores it or reports the gate state without hanging.",
+  "rust_evidence": "",
+  "unsure": "No marker/gate logic in the Rust repo; stale-marker handling (V1_MAX_AGE_S, pid liveness) was not fully read."
+ },
+ "UPD-005": {
+  "behavior": "Backend update check (REST /api/hermes/update/check): the app polls the backend for update status, shows 'Looking for updates…' then either 'You're running the latest version.' / 'The backend is running the latest version.', 'New update available' / 'Backend update available' with 'Update now'/'Maybe later', and error copy 'Couldn't check for updates' with 'Try again'.",
+  "states": "idle, checking, up to date, available, error, unsupported install type",
+  "test": "Against the private backend trigger an update check in the Rust app and confirm the status text matches the backend's answer.",
+  "rust_evidence": "crates/hermes-core/src/http.rs:1",
+  "unsure": "The Rust http.rs helper exists but no update-check call sites were found; en.ts strings are the only confirmation of copy."
+ },
+ "UPD-006": {
+  "behavior": "Managed (gateway) updates: for Desktop-managed SSH installs the settings page 'Managed updates' ('Update Desktop-managed SSH installs transactionally: sessions drain, the remote checkout updates, and every profile is restored with a correlated receipt.') runs an update with statuses idle/updating/updated/partial/refused/failed and a 'Receipt <id> · <outcome>' line plus restored-profile list.",
+  "states": "idle, updating (draining), updated, partial, refused, failed, already running",
+  "test": "Not testable against a local test backend: requires a Desktop-managed SSH install; verify the Rust app hides the page without one.",
+  "rust_evidence": "",
+  "unsure": "No managed-update code in the Rust repo; the receipt correlation lives in the Electron main process."
+ },
+ "UPD-007": {
+  "behavior": "Updates overlay: version details ('Version <v>', 'Commit', 'Build Origin', 'Distribution', 'Runtime', 'Install ID'), 'Check now', \"See what's new\", changelog buckets ('Fixed','Faster','Improved'), apply states 'Updating backend…' and 'Backend didn't come back online. The update may not have completed — check the backend host.'",
+  "states": "closed, open, checking, available, applying, done, error",
+  "test": "With the private backend open the updates overlay in the Rust app and confirm version details render and the close path works.",
+  "rust_evidence": "",
+  "unsure": "No updates overlay in crates/hermes-ui; how much of the mechanism list applies to a Linux native build is unverified."
+ },
+ "UPD-008": {
+  "behavior": "'Update channel' — 'Stable installs published releases only. Every commit follows the main branch as changes land.' — with 'Stable releases' / 'Every commit'; switching to stable confirms ('Switch to stable releases?' / 'Data written by newer code may not read correctly, so back it up first.') and rollback reads 'Back to stable release <v>'.",
+  "states": "stable, main/every-commit, switching (confirm dialog), failed",
+  "test": "With the private backend open the Rust update-channel row and confirm the confirm dialog appears before switching to stable.",
+  "rust_evidence": "",
+  "unsure": "No update-channel UI in Rust; the failure copy 'Could not change the update channel' implies a backend call whose surface was not read."
+ },
+ "UPD-009": {
+  "behavior": "Pre-update backup config: a config-driven flag (preUpdateBackupEnabled) decides whether the updater takes a backup of config/skills/sessions before applying an update; when off, updates proceed without a backup.",
+  "states": "enabled (no prompt), disabled (no backup)",
+  "test": "With an isolated HERMES_HOME, set the config flag and run the Rust update path; confirm no backup directory is created when disabled.",
+  "rust_evidence": "",
+  "unsure": "The maintenance copy 'Create backup' exists in the Electron maintenance page; the Rust app's backup behaviour was not read."
+ },
+ "WIN-001": {
+  "behavior": "Main window lifecycle: ensureMainWindow creates the single main window, activateWindow focuses/restores it on dock/taskbar activate (recreating it if it was destroyed), and shouldQuitOnLastChatClosed decides whether closing the last chat quits or keeps the app alive. Window bounds/state are persisted and restored per window.",
+  "states": "created, hidden, minimized, restored, closed (quit or keep alive), second instance focus",
+  "test": "With the private backend launch the Rust app twice and confirm the running instance is focused instead of a duplicate window.",
+  "rust_evidence": "crates/hermes-app/src/main.rs:1",
+  "unsure": "Rust builds one window at startup; second-instance activation, quit-on-last-chat and bounds persistence were not verified."
+ },
+ "WIN-002": {
+  "behavior": "Custom titlebar window controls: when customWindowControlsEnabled (Linux/Windows overlay) the titlebar draws its own minimize / maximize-restore / close cluster wired through performWindowControl, and windowControlState reports maximized/fullscreen so the restore glyph is correct.",
+  "states": "custom controls on, native frame, maximized, fullscreen, unfocused",
+  "test": "With the private backend maximize then restore the Rust window and confirm the titlebar glyph follows the state.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:345",
+  "unsure": "Rust draws a title strip but I found no minimize/maximize/close controls or window-state reporting; only a quit() callback exists."
+ },
+ "WIN-003": {
+  "behavior": "Titlebar app actions: TITLEBAR_FIXED_TOOLS plus contributions in the titleBar.left/right slots render beside the window controls — sidebar toggle ('Hide sidebar'/'Show sidebar'), 'Swap sidebar sides', 'Hide right sidebar'/'Show right sidebar', 'Open settings', 'Open memory graph', 'HUD mode'/'Exit HUD mode', 'Layout editor'.",
+  "states": "edge buttons visible/hidden, page owns titlebar slots, HUD-mode variant",
+  "test": "With the private backend click each titlebar button in the Rust app (sidebar toggle, swap sides, right sidebar, settings) and confirm each acts.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:345",
+  "unsure": "The Rust title strip has a sidebar toggle and settings entry; swap-sides, right-sidebar, HUD, layout editor and slots were not confirmed."
+ },
+ "WIN-004": {
+  "behavior": "Statusbar items toggled in 'Show in status bar': 'Approvals', 'Backend version', 'Cache hit rate', 'Command Center', 'Context meter', 'Turn timer', 'Session timer', 'Terminal', 'Tokens per second', 'Version & updates', 'Free tier', 'Workspace', 'System resources', plus 'Hide status bar' / 'Reset to defaults'.",
+  "states": "all hidden, default set, custom set, per-item hidden, reset, each item's live/empty value",
+  "test": "With the private backend toggle each status item in the Rust app and confirm the row updates and the choice persists across restart.",
+  "rust_evidence": "",
+  "unsure": "No status bar exists in crates/hermes-ui/ui/app-window.slint; the whole row is missing in Rust."
+ },
+ "WIN-005": {
+  "behavior": "System resources statusbar item: shows GPU utilization, GPU memory and RAM, with 'Unified memory — the GPU and system share this pool.' on unified-memory machines, a 'Resources…' loading state and a 'System resources' toggle; battery is read through the Electron system.battery path where available.",
+  "states": "off, loading, loaded (per-metric), unavailable on this hardware",
+  "test": "With the private backend enable the item in the Rust app and confirm it reports this machine's RAM (and no crash without a GPU).",
+  "rust_evidence": "",
+  "unsure": "No system-resource sampling in the Rust repo; a native build would read /proc and sysfs, which is a reimplementation decision."
+ },
+ "WIN-006": {
+  "behavior": "Tray icon + menu: a tray/StatusNotifier host holds a menu (show/hide window, quick actions, quit); on Linux the app checks for a real org.kde.StatusNotifierWatcher host (watchLinuxTrayHost) because Electron can create a Tray on stock GNOME with no host — so it never treats the Tray object alone as proof of a restore path.",
+  "states": "tray host present, no host (fallback), menu open, quit from tray",
+  "test": "With the private backend close the Rust window and confirm the app is still reachable (tray or taskbar) rather than being lost.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:1423",
+  "unsure": "rust_evidence is only the generic error/banner path; no tray or StatusNotifier code exists in the Rust repo, so Linux tray support is a gap."
+ },
+ "WIN-007": {
+  "behavior": "Minimize to tray: an on/off setting (IPC hermes:minimize-to-tray:get/set) makes the window hide to the tray on minimize instead of the taskbar, with a status object exposing whether it is enabled and available.",
+  "states": "unsupported platform (hidden), enabled, disabled, minimized to tray, restored",
+  "test": "With the private backend enable it in the Rust app (if present), minimize, and confirm the window can be restored.",
+  "rust_evidence": "",
+  "unsure": "The Rust app has no tray (WIN-006), so minimize-to-tray cannot work there yet."
+ },
+ "WIN-008": {
+  "behavior": "HUD mode shell: a chrome-free floating window with a composer and the live reply that floats over other apps; 'HUD mode' enters it and 'Exit HUD mode' leaves, with 'Reset HUD size and position' for layout recovery.",
+  "states": "normal window, HUD open, HUD moved/resized, HUD reset, exit",
+  "test": "With the private backend enter/leave HUD mode in the Rust app and confirm the floating chat still streams a reply.",
+  "rust_evidence": "",
+  "unsure": "No HUD shell in the Rust repo (no hud* file under crates/hermes-ui)."
+ },
+ "WIN-009": {
+  "behavior": "HUD modifier gesture: tap ⌘+Option (Mac) or Ctrl+Alt (Windows/Linux) to summon the HUD from any app ('Tap to summon HUD'). Off by default; on Linux the copy is explicit: 'This desktop session does not support global modifier taps. Linux requires X11; Wayland is not supported.'",
+  "states": "off (default), on (X11), unsupported on Wayland, helper missing, permission denied",
+  "test": "On this Wayland session enable the gesture in the Rust app and confirm it reports the Linux/Wayland unsupported message instead of failing silently.",
+  "rust_evidence": "",
+  "unsure": "No global modifier tap or helper binary in the Rust repo; the Linux answer for Wayland is 'unsupported' per the Electron copy."
+ },
+ "WIN-010": {
+  "behavior": "HUD snap to pointer: ⌘⇧G (Linux Ctrl+Shift+G, global chord registered only while HUD mode is up) moves the HUD so it sits at the pointer, clamped to the work area (clampHudOrigin / snapHudBounds) and scaled by the zoom factor.",
+  "states": "HUD open (chord active), snapped at edge (clamped), HUD closed (chord inactive)",
+  "test": "With the private backend enter HUD mode (if present) and press Ctrl+Shift+G near a screen edge; confirm the HUD clamps inside the work area.",
+  "rust_evidence": "",
+  "unsure": "No HUD or global-shortcut code in Rust."
+ },
+ "WIN-011": {
+  "behavior": "HUD click-through + glass: the HUD ignores mouse events where the user is not interacting (hudIgnoresMouse / useHudClickThrough) so clicks pass through to the app behind, and glass styling keeps the panel legible over other windows.",
+  "states": "interactive (captures mouse), idle (click-through), glass on/off",
+  "test": "With the private backend click through the HUD onto the app behind it and confirm the click reaches that app.",
+  "rust_evidence": "",
+  "unsure": "Not implemented in Rust; how click-through is expressed in Slint/Wayland was not established."
+ },
+ "WIN-012": {
+  "behavior": "HUD game overlay: while HUD mode is up over a fullscreen game the overlay keeps the HUD on top (game-overlay.ts + electron/hud-game-overlay.ts) rather than being hidden by the game's exclusive/fullscreen surface.",
+  "states": "not over a game, game fullscreen (overlay on), overlay disabled",
+  "test": "Not verifiable against the private test backend: needs a fullscreen game; check only that the Rust app has no crash path.",
+  "rust_evidence": "",
+  "unsure": "Electron-specific window-level/topmost behaviour; a Wayland native client cannot generally do this, so the Linux answer is likely 'not supported'."
+ },
+ "WIN-013": {
+  "behavior": "Quick Entry mini composer: a global-shortcut-triggered small composer that fires a prompt without opening Hermes; copy: 'Quick Entry', 'Summon a small composer from anywhere with a global shortcut and fire a prompt without opening Hermes.'",
+  "states": "not registered, registered, shortcut taken by another app, invalid shortcut (no modifier), window shown, prompt sent",
+  "test": "With the private backend register the shortcut in the Rust app, press it and confirm the mini composer appears and a prompt is sent to the test backend.",
+  "rust_evidence": "",
+  "unsure": "No quick-entry window or global shortcut registration in the Rust repo."
+ },
+ "WIN-014": {
+  "behavior": "Quick Entry default shortcut: QUICK_ENTRY_DEFAULT_SHORTCUT = 'CommandOrControl+Shift+Space' (so ⌘⇧Space on macOS, Ctrl+Shift+Space on Linux); registration reports 'taken' when another app owns it ('Another app already uses this shortcut — pick a different one.') and 'invalid' without a modifier ('Not a valid shortcut. Include at least one modifier key.').",
+  "states": "default, changed, active ('Shortcut is active.'), taken, invalid",
+  "test": "With the private backend press Ctrl+Shift+Space in the Rust app and confirm Quick Entry opens (or the taken notice appears).",
+  "rust_evidence": "",
+  "unsure": "Not implemented in Rust; the exact default was read from src/store/quick-entry.ts:38."
+ },
+ "WIN-015": {
+  "behavior": "Pet overlay: an animated desktop companion window that shows the selected pet (RPC pet.info, pet.select) and reacts to what Hermes is doing — running while tools execute, celebrating on success, sulking on errors; it can be turned on/off ('Turn on'/'Turn off') and needs a backend that supports pets ('Restart Hermes to use pets — the backend predates this feature.').",
+  "states": "no pet installed, installed but off, on, backend too old, gallery error",
+  "test": "With the private backend adopt a test pet and confirm the overlay appears and animates on tool activity.",
+  "rust_evidence": "",
+  "unsure": "No pet support in the Rust repo; pet RPC methods pet.info/pet.select/pet.gallery/pet.hatch/pet.generate/pet.scale/pet.rename/pet.remove exist on the backend but no Rust call sites were found."
+ },
+ "WIN-016": {
+  "behavior": "Pet roam: with roam enabled the pet wanders the window on its own while idle ('Let the pet wander the window on its own while idle.'), using roam-behavior.ts + use-pet-roam; it stops while a turn runs and resumes when idle.",
+  "states": "roam off, roaming, paused while working, out of bounds (bounced)",
+  "test": "With the private backend enable roam and confirm the pet moves while idle and stops during a turn.",
+  "rust_evidence": "",
+  "unsure": "Not implemented in Rust."
+ },
+ "WIN-017": {
+  "behavior": "Pet hatch from egg: after generating looks the user presses 'Hatch' (state 'Hatching your pet…') and the egg becomes the pet; the backend answers pet.hatch.",
+  "states": "generating, ready to hatch, hatching, hatched, hatch failed",
+  "test": "Not verifiable end-to-end without pet generation; against the private backend check the RPC is only issued when the backend advertises pet support.",
+  "rust_evidence": "",
+  "unsure": "Pet generation needs the petdex service; the private test backend may not support it, so 'stale backend' handling is the realistic check."
+ },
+ "WIN-018": {
+  "behavior": "Pet gallery: the petdex gallery lists pets with 'Installed' and 'Generated' tags, search ('Search pets…'), loading ('Loading petdex gallery…'), error ('Could not reach the petdex gallery.'), empty ('No matching pets.') and 'No pets available — pick one below to install.'",
+  "states": "loading, loaded, empty, error, installed, generated",
+  "test": "With the private backend open the pet gallery in the Rust app and confirm the unreachable/error copy appears cleanly when petdex is unavailable.",
+  "rust_evidence": "",
+  "unsure": "No gallery UI in the Rust repo; internet access to petdex makes full verification impossible offline."
+ },
+ "WIN-019": {
+  "behavior": "Pet generation (AI): 'Generate a pet' takes a description ('Describe a pet to generate…', 'Type a description, then press Enter to draft four looks.'), shows 'Generating…', can 'Retry', and reports 'Update Hermes to generate pets.' on an old backend; polling uses pet.generate + pet.generate.status.",
+  "states": "idle, generating, drafts ready, retry, failed, backend too old",
+  "test": "Against the private backend trigger a generate and confirm the Rust app surfaces the generation state/error rather than hanging.",
+  "rust_evidence": "",
+  "unsure": "Requires the petdex service; no Rust implementation found."
+ },
+ "WIN-020": {
+  "behavior": "Pet scale / rename / remove: the pet can be resized (pet.scale), renamed ('Rename pet' / 'Name your pet') and permanently deleted ('This permanently deletes the pet — it can't be reinstalled.'), each reporting failure copy like 'Could not turn the pet on.'",
+  "states": "scaled, renamed, delete confirm, deleted, failure",
+  "test": "With the private backend rename a test pet and confirm the new name persists after a reload.",
+  "rust_evidence": "",
+  "unsure": "Not implemented in Rust."
+ },
+ "WIN-021": {
+  "behavior": "Pet info bubbles / reactions: the pet shows a speech bubble derived from pet.info while Hermes works and reacts visually on success/error thresholds (pet-bubble.tsx), then returns to idle.",
+  "states": "idle, bubble showing, celebrating, sulking, bubble dismissed",
+  "test": "With the private backend run a turn and confirm the pet bubble appears and clears when the turn ends.",
+  "rust_evidence": "",
+  "unsure": "Not implemented in Rust."
+ },
+ "WIN-022": {
+  "behavior": "Pet zoom gesture / star shower: a pinch/zoom gesture (use-pet-zoom-gesture) scales the pet, and a star shower animation plays on a celebratory event (pet-star-shower.tsx).",
+  "states": "no gesture, zooming, scale clamped, star shower playing",
+  "test": "With the private backend pinch the pet in the Rust app and confirm the scale changes within clamp limits.",
+  "rust_evidence": "",
+  "unsure": "Not implemented in Rust; the gesture set may be touch/trackpad-specific and Electron-only."
+ },
+ "WIN-023": {
+  "behavior": "Wake indicator window: a small always-on-top cue window shown while the assistant is listening (wake word) so the user knows the mic is live; it hides again when listening stops.",
+  "states": "listening (shown), idle (hidden), unavailable",
+  "test": "With the private backend trigger a listening state (if voice is available) and confirm the Rust app shows/hides the cue.",
+  "rust_evidence": "",
+  "unsure": "A separate always-on-top window (wake-indicator-app.tsx, 42 lines) — no Rust equivalent found; whether the Rust app needs one depends on the voice implementation."
+ },
+ "WIN-024": {
+  "behavior": "Solve-in-page challenge window: a separate hardened BrowserWindow on the 'persist:hermes-challenge' partition at '/challenge' that walks phases working → interactive → done and reports an outcome (done|failed|closed|timeout|refused|error); only allowlisted portal URLs are loaded.",
+  "states": "open/working, interactive, done, failed, closed, timeout, refused",
+  "test": "Not verifiable against the private test backend (free-tier captcha only); check the Rust app never opens an unbounded webview.",
+  "rust_evidence": "",
+  "unsure": "Linux answer: security-sensitive — a native client should not embed a browser for this; whether the feature is needed at all is a product decision I cannot confirm."
+ },
+ "WIN-025": {
+  "behavior": "Window zoom / UI scale: ZOOM_STEP 0.1 with a stored zoom level ('hermes:desktop:zoomLevel'), clamped (clampZoomLevel), applied to the web contents as a zoom factor and re-asserted after resizes (ZOOM_RESIZE_REASSERT_DELAY_MS 100, up to 3 settle checks); the renderer shows it as a percentage ('$zoomPercent').",
+  "states": "100%, zoomed in/out, clamped at limits, restored after restart, resize re-assert",
+  "test": "With the private backend zoom the Rust app and confirm text/controls scale and the level survives a restart.",
+  "rust_evidence": "crates/hermes-ui/ui/theme.slint:60",
+  "unsure": "Rust exposes token-based font sizes (fs-xs…fs-greet) but no zoom level store, clamping or persistence."
+ },
+ "WIN-026": {
+  "behavior": "Vibrancy / translucency window: windowBackingOptions / windowBackgroundMaterialOptions set the native window background (transparent backing + material) and windowOpacityOptions applies a background opacity for the transparent HUD/translucent modes; opacityNeedsSetting avoids redundant writes.",
+  "states": "opaque, transparent backing, material set (platform-specific), opacity changed",
+  "test": "Not verifiable against the private test backend: requires a compositor supporting the material; on this Linux session check the Rust window simply stays opaque and usable.",
+  "rust_evidence": "",
+  "unsure": "Slint/Wayland translucency support was not investigated; macOS vibrancy obviously does not apply on Linux."
+ },
+ "WIN-027": {
+  "behavior": "Behind/below window: the HUD (or a companion window) can be placed directly below the foreground app window — getWindowsFailureReason / pickWindowBelow choose the window under the cursor and window-below keeps the target window pinned below while other windows stay above it.",
+  "states": "target found, no target, enumeration failed (reason shown), platform unsupported",
+  "test": "Not verifiable against the private test backend: needs a real desktop session; on Wayland check the Rust app reports an unsupported reason rather than silently doing nothing.",
+  "rust_evidence": "",
+  "unsure": "Requires OS window enumeration (Windows APIs / X11); on Wayland this is generally not possible, so the Linux answer is likely 'unsupported'."
+ },
+ "ONB-001": {
+  "behavior": "First-run setup gate decides 'continue-local' / 'remote-applied' / 'reset' and shows 'Hermes needs a one-time install' or 'Set up Hermes Desktop' ('Connect this app to a Hermes gateway you already run, or install Hermes locally on this computer.'), with stages Pending/Installing/Done/Skipped/Failed.",
+  "states": "fresh install, already installed, remote chosen, installing, failed, done",
+  "test": "On an isolated HERMES_HOME with the private test backend, launch the Rust app and confirm it does not show an install gate when a gateway is already reachable.",
+  "rust_evidence": "crates/hermes-core/src/backend.rs:1",
+  "unsure": "The Rust backend.rs spawns/discovers a local backend but I found no first-run gate, install stages or setup-choice UI."
+ },
+ "ONB-002": {
+  "behavior": "Bootstrap runner installs a bundled/source runtime in stages, streaming output with 'Fetching installer manifest...', 'Show installer output'/'Hide installer output', '<n> lines', 'Cancel install'/'Cancelling...', 'Full transcript saved to', and on failure 'Installation failed' with 'Reload and retry' / 'Open logs'.",
+  "states": "not needed (runtime present), stages running, cancelled, failed, done",
+  "test": "On an isolated HERMES_HOME, point the Rust app at the private test backend and confirm no bootstrap is attempted for a remote/existing backend.",
+  "rust_evidence": "",
+  "unsure": "Rust spawns a backend binary rather than installing a Python runtime; whether any bootstrap flow is needed was not determined."
+ },
+ "ONB-003": {
+  "behavior": "Onboarding state: the backend owns the run — onboarding.state returns eligible/run/run_id/session_id, and onboarding.mark_seen records that the user saw the onboarding surface, so a completed run is not offered again.",
+  "states": "eligible, running (run_id set), completed, not eligible, already seen",
+  "test": "Against the private test backend read onboarding.state in the Rust app and confirm a completed run is not re-offered after onboarding.mark_seen.",
+  "rust_evidence": "",
+  "unsure": "No onboarding RPC calls in the Rust core (only session/config/model methods were seen)."
+ },
+ "ONB-004": {
+  "behavior": "Ensure setup profile/session: the onboarding kickoff makes sure a setup profile and a setup session exist (onboarding.ensure_setup_profile / onboarding.ensure_setup_session) so the setup chat has a place to run.",
+  "states": "setup profile exists, created, setup session created",
+  "test": "Against the private test backend trigger setup in the Rust app and confirm the setup session appears with tests for the isolated profile only.",
+  "rust_evidence": "",
+  "unsure": "Source path in the row (src/app/contrib/onboarding-kickoff.ts) does not exist in this tree, so the mechanism is inferred from the RPC names; no Rust equivalent found."
+ },
+ "ONB-005": {
+  "behavior": "Onboarding chat: header '\"Let's get you setup with Hermes Agent\"' with 'Connect a model provider to start chatting. Most options take one click.', 'Continue without setup', 'I'll choose a provider later', and skip ('Skip setup' → 'Setup skipped').",
+  "states": "preparing install, starting, waiting, slow ('Setup is taking longer than usual.'), finished, skipped",
+  "test": "With the private test backend run the setup chat end-to-end in the Rust app and confirm the skip path ends the run without deleting the session.",
+  "rust_evidence": "",
+  "unsure": "Onboarding UI is absent from the Rust repo; the copy strings come from i18n only."
+ },
+ "ONB-006": {
+  "behavior": "Provider OAuth sign-in runs one of the flows — 'Opens your browser to sign in, then continues here' (PKCE), 'Opens a verification page in your browser — Hermes connects automatically' (device code), 'Sign in once in your terminal, then come back to chat' — reporting 'Starting sign-in for <provider>...', '<provider> connected', 'Sign-in failed. Try again.'",
+  "states": "idle, starting, waiting for browser, connected, expired ('The sign-in page timed out before you finished...'), failed",
+  "test": "Against the private test backend start a provider sign-in in the Rust app and confirm the OAuth URL is opened and the returned credentials land in the test config.",
+  "rust_evidence": "",
+  "unsure": "No provider OAuth flow in the Rust repo; also unverifiable offline for real providers, so the test should use a mock/denied flow."
+ },
+ "ONB-007": {
+  "behavior": "Native OAuth window: sign-in runs in a dedicated app window on a separate partition rather than the main renderer; when it closes early the app reports 'The sign-in window closed before authentication completed.'",
+  "states": "opened, completed, closed early, refused",
+  "test": "With the private test backend close the OAuth window early in the Rust app and confirm the 'closed before authentication completed' path (or the Rust equivalent) is shown.",
+  "rust_evidence": "",
+  "unsure": "Electron-specific window plumbing; how a Slint app would host an OAuth browser window was not investigated."
+ },
+ "ONB-008": {
+  "behavior": "Free-tier offer/provision: the backend offers free Nous inference (free_tier.provision / free_tier.status); the offer card reads 'Hermes is ready.' / 'Free · connectors included' with 'Begin' or 'Sign in with a Nous account instead', and the strip says 'Free Nous inference and connectors are now available.'",
+  "states": "unavailable, available (offer shown), provisioning, provisioned, dismissed",
+  "test": "Against the private test backend check free_tier.status in the Rust app and confirm the offer is only shown when the backend reports it.",
+  "rust_evidence": "",
+  "unsure": "No free-tier handling in the Rust core; the private test backend likely reports free tier unavailable, so the negative path is the realistic test."
+ },
+ "ONB-009": {
+  "behavior": "Free-tier sign-in: signing in with a Nous account uses a device-code style flow — 'Sign in with a Nous account to unlock more models and tools.', 'Enter this code in your browser to finish signing in.', 'Copy link', 'Do not share this code.', 'Waiting for sign-in…', 'Finishing sign-in…', then '<email> signed in.' and 'Your account now carries inference and tools.'",
+  "states": "idle, code shown, waiting, finishing, signed in, expired ('That sign-in link has expired'), superseded, busy, unreachable",
+  "test": "Against the private test backend start the free-tier sign-in and confirm the code/polling UI states appear and a cancel returns to the offer.",
+  "rust_evidence": "",
+  "unsure": "Requires the Nous service; not verifiable against the local private test backend."
+ },
+ "ONB-010": {
+  "behavior": "Free-tier challenge: the backend can push a free_tier.challenge over WS and the desktop answers with free_tier.challenge_result after solving it in the challenge window; failure modes are refused/timeout/error.",
+  "states": "no challenge, challenge received, solving, done, refused, timeout, error",
+  "test": "Against the private test backend emit a free_tier.challenge and confirm the Rust app answers challenge_result (or reports unsupported).",
+  "rust_evidence": "",
+  "unsure": "Both the WS event and the window are Electron-side; no Rust handling found."
+ },
+ "ONB-011": {
+  "behavior": "Model confirmation step: after a provider is connected the app sets the default model (REST /api/model/set) and validates the credential (/api/providers/validate), reporting '<provider> connected. Picking a default model...' and then returning to chat.",
+  "states": "picking, set, validation failed, model unavailable",
+  "test": "Against the private test backend connect a test provider and confirm /api/model/set is called with a model the backend advertises.",
+  "rust_evidence": "crates/hermes-core/src/http.rs:1",
+  "unsure": "Rust has an HTTP helper for the backend REST API, but no onboarding model-set call was found."
+ },
+ "ONB-012": {
+  "behavior": "Setup runtime check: the desktop asks the backend setup.runtime_check and setup.status to decide whether a provider is configured and the runtime is usable (the WS payload is only a hint; the status snapshot re-reads setup.status / setup.runtime_check / free_tier.status).",
+  "states": "ok, provider_configured false, runtime broken, checking",
+  "test": "Against the private test backend confirm the Rust app reads setup.status/setup.runtime_check before offering chat.",
+  "rust_evidence": "",
+  "unsure": "No setup.* calls in the Rust core; the Rust app appears to assume an already-configured backend."
+ },
+ "ONB-013": {
+  "behavior": "Billing gate: when a turn is blocked by exhausted credit the app records an active billing block per session (setBillingBlock/clearBillingBlock), offers a CTA ('Add credits' vs 'Open billing' via billingCtaLabel), requestBillingSettings() can jump to Settings → Billing, and runBillingRecovery(block) retries once credit returns.",
+  "states": "no block, blocked (CTA shown), settings requested, recovered, still blocked",
+  "test": "Against the private test backend force a credit-exhausted error and confirm the Rust app shows a block with a way to Billing instead of retrying endlessly.",
+  "rust_evidence": "",
+  "unsure": "No billing-block handling in the Rust repo; the error path was not exercised."
+ },
+ "ONB-014": {
+  "behavior": "Billing state + plans: the backend answers billing.state and subscription.* — current plan, tiers, a scheduled period-end change undoable with subscription.resume, 'change plan' allowed only for non-team contexts with can_change_plan, and a manage/portal_url link.",
+  "states": "loading, no plan (free), plan with tiers, change scheduled, team context (no self-serve), portal unavailable",
+  "test": "Against the private test backend open Billing in the Rust app and confirm the plan card renders from billing.state (or the empty state when unavailable).",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:273",
+  "unsure": "The Rust catalog has a Billing group with only an 'Overview' page; no billing.state fetch was found."
+ },
+ "ONB-015": {
+  "behavior": "Cloud team change: cloudTeamChanged(connection, org) detects that the signed-in Cloud organization changed for a connection, so the app can prompt the user and re-scope the session.",
+  "states": "no change, org changed (prompt), org unknown",
+  "test": "Against the private test backend switch the Cloud org for a connection and confirm the Rust app does not silently reuse the old scope.",
+  "rust_evidence": "",
+  "unsure": "Cloud connections are out of scope for the private test backend; no Rust equivalent found."
+ },
+ "ONB-016": {
+  "behavior": "First-run product tour: a spotlight tour over the real UI ('Quick tour' / 'Show me everything' / \"Skip, let's build something\") with beats 'Name', 'Accent color', 'Layout', 'Apps', 'Plugins', 'Tour', 'First task', and in-chat steps like 'Your chats' and 'Ask here'.",
+  "states": "idle, tour running (step n), skipped, completed, re-run available",
+  "test": "With the private test backend start and skip the tour in the Rust app and confirm the UI stays usable and the skip is remembered.",
+  "rust_evidence": "",
+  "unsure": "No tour engine in the Rust repo; the Slint UI has no DOM, so target collection (collectTourTargets) needs a reimplementation."
+ },
+ "ONB-017": {
+  "behavior": "Onboarding metrics: state transitions are reported to the backend as shared_metrics.desktop_onboarding (onboarding/guide-phase/sign-in transitions), letting hermes-attributed funnels measure where users drop off, including kills/skips.",
+  "states": "no transition, transition reported, reporting failure (silent)",
+  "test": "Against the private test backend complete and skip onboarding in the Rust app and confirm the reported payload names the same transition identifiers.",
+  "rust_evidence": "",
+  "unsure": "No shared_metrics calls in the Rust core; payload shape not read beyond the function names."
+ },
+ "RMT-001": {
+  "behavior": "Settings → Gateways ('Gateway Connection', 'Local by default. Use remote when this app should drive a Hermes backend elsewhere.') offers Local gateway or Remote gateway; the remote form asks 'Gateway URL' (placeholder 'https://gateway.example.com/hermes'), warns 'Enter a gateway URL first.' and reports 'Connected to <baseUrl> (<version>).'",
+  "states": "local, remote (url entered), testing, connected, probe failed, env override (read-only)",
+  "test": "With the private test backend's https base URL, enter the URL in the Rust app, press Test connection and confirm the returned version is shown and the connection is applied.",
+  "rust_evidence": "crates/hermes-core/src/backend.rs:1",
+  "unsure": "Rust backend.rs discovers/spawns a local backend; the remote URL + token settings page and its validation copy were not found in Rust."
+ },
+ "RMT-002": {
+  "behavior": "Gateway probe (HTTP + WS reachability): before offering sign-in the app probes the address, showing 'Detecting gateway authentication...' and on failure \"Hermes can't reach that address. Check the URL and that the other computer is running Hermes — sign-in options appear once it answers.\" with a 'Details' expander; it then reports the detected auth mode (token, OAuth/browser sign-in, or public).",
+  "states": "probing, token required, oauth required, public, unreachable (error), details shown",
+  "test": "Against the private test backend stop the backend, enter its URL in the Rust app and confirm the unreachable copy appears; restart and confirm detection succeeds.",
+  "rust_evidence": "crates/hermes-core/src/rpc.rs:1",
+  "unsure": "Rust has the WS client and an http helper, but no auth-mode probing/echo of the probe error copy was found."
+ },
+ "RMT-003": {
+  "behavior": "Remote auth modes: hosted gateways use OAuth (bearer token or cookie session) or username/password, self-hosted use a session token ('Paste the session token from the remote gateway .env file.'); an empty token warns 'Enter a session token before testing this gateway.'",
+  "states": "no auth, token, bearer oauth, cookie session, signed out, token missing (warning)",
+  "test": "Against the private test backend (token auth) paste the test token in the Rust app and confirm the readiness probe succeeds; clear it and confirm the warning.",
+  "rust_evidence": "crates/hermes-core/src/backend.rs:1",
+  "unsure": "Rust reads a token for its local backend; the multi-mode remote auth decision logic was not found."
+ },
+ "RMT-004": {
+  "behavior": "SSH remote lifecycle: the app spawns the gateway on a remote host over ssh (ssh-connection.ts + remote-lifecycle.ts, 1400+ lines each) — it opens a session, starts the remote gateway, forwards the port and tears it down on disconnect.",
+  "states": "configured, connecting, remote gateway starting, port forwarded, connected, disconnected, teardown, failed",
+  "test": "Not testable with the local private test backend; verify only that the Rust app offers no half-working SSH path (or fails with a clear message).",
+  "rust_evidence": "",
+  "unsure": "No SSH code in the Rust repo; the lifecycle size suggests significant reimplementation work (WIN/RMT platform rows)."
+ },
+ "RMT-005": {
+  "behavior": "SSH control-master reuse: shared connections reuse one ssh ControlMaster; controlMasterCloseAction(otherHolders) decides between 'exit-master' (no other holders) and 'release-only' so one consumer's disconnect does not kill everyone else's tunnel.",
+  "states": "no master, master shared by n holders, sole holder (exit), release-only",
+  "test": "Not testable locally: needs a real SSH host; on a shared master check that disconnecting one session keeps the others alive.",
+  "rust_evidence": "",
+  "unsure": "No Rust equivalent; needs an actual remote host, which the private test backend does not provide."
+ },
+ "RMT-006": {
+  "behavior": "SSH isolated keepalive: per-connection keepalives are registered in an isolated registry (createSshIsolatedKeepaliveRegistry) so a stalled connection is detected and reopened without affecting siblings.",
+  "states": "no connections, keepalive running, stalled (reopening), registry empty on shutdown",
+  "test": "Not testable locally; against a real host kill the tunnel and confirm it is reopened without dropping other connections.",
+  "rust_evidence": "",
+  "unsure": "No Rust equivalent."
+ },
+ "RMT-007": {
+  "behavior": "SSH bootstrap: when the remote host has no Hermes install the app bootstraps it over ssh (ssh-bootstrap-coordinator.ts), a long-running, resumable operation with its own UI states.",
+  "states": "not installed, bootstrapping, installed, refused, failed, already running",
+  "test": "Not testable locally; verify the Rust app never attempts a remote install against the local private backend.",
+  "rust_evidence": "",
+  "unsure": "No Rust equivalent; the installer script and its verification steps were not read."
+ },
+ "RMT-008": {
+  "behavior": "Remote session cookies / portal: the main process keeps remote session cookies and a portal session on a dedicated partition so authenticated HTTP and the WS upgrade reuse them across restarts.",
+  "states": "no cookies, session cookie set, portal session, expired (re-auth)",
+  "test": "Not testable locally; against a real remote gateway restart the app and confirm the session survives without re-login.",
+  "rust_evidence": "",
+  "unsure": "No cookie/session persistence in the Rust core; how Slint would keep a portal session was not investigated."
+ },
+ "RMT-009": {
+  "behavior": "Remote OAuth ticket: a short-lived ticket is minted for a remote sign-in and exchanged for the real credentials, so the desktop never has to hold a browser session itself.",
+  "states": "no ticket, ticket issued, exchanged, expired",
+  "test": "Not testable locally; the private test backend has no OAuth provider configured.",
+  "rust_evidence": "",
+  "unsure": "No Rust equivalent; ticket lifetime/format not read."
+ },
+ "RMT-010": {
+  "behavior": "Remote liveness / reauth: liveness probes run with 10 s timeouts and a failure limit of 3 inside a 60 s window before the connection is declared down (pooled connections get a 15-minute window), which latches a re-auth prompt until the user signs in again.",
+  "states": "healthy, probing, degraded (failures < limit), down (latched re-auth), reconnected",
+  "test": "Against the private test backend kill and restart the backend and confirm the Rust app reconnects automatically and only then clears its reauth latch.",
+  "rust_evidence": "crates/hermes-core/src/rpc.rs:1",
+  "unsure": "Rust has a gateway.ping heartbeat mentioned in core/lib.rs, but no failure-window/latch logic was verified."
+ },
+ "RMT-011": {
+  "behavior": "Hermes Cloud discovery: signing in to Hermes Cloud lists the agents on the account ('Your agents', 'Loading your agents…', 'No agents found on this account. Create one in the Nous portal, then refresh.') and lets the user pick one ('Connect'), choose an organization ('Choose an organization', 'Change org', 'Role: <role>'), or use a saved Cloud gateway ('Saved Cloud gateways', 'Use gateway').",
+  "states": "signed out ('Sign in to Hermes Cloud to discover the agents on your account.'), loading, agents listed, none, org picker, connected",
+  "test": "Not testable against the local private test backend (no Cloud account); verify the Rust app shows the signed-out state cleanly.",
+  "rust_evidence": "",
+  "unsure": "Cloud needs a network account; no Rust Cloud code found."
+ },
+ "RMT-012": {
+  "behavior": "Cloud agent provisioning: from the discovered list the app can create/provision a Cloud agent and then the connection appears in the registry; agents managed by Cloud show 'Managed by Hermes Cloud' and are skipped by 'Update all instances'.",
+  "states": "no agents, provisioning, provisioned, managed (update skipped), failed",
+  "test": "Not testable locally; confirms the Rust app does not fabricate a Cloud connection, erroring with the load-failure copy instead.",
+  "rust_evidence": "",
+  "unsure": "Cloud provisioning surface not read; no Rust equivalent."
+ },
+ "RMT-013": {
+  "behavior": "Connections registry: 'Registered gateways' lists this device and reachable gateways with kinds 'Local', 'Remote gateway', 'Hermes Cloud', 'SSH'; add/edit/remove ('\"<label>\" will be removed from this app. The instance itself is not touched'), 'Make primary', 'Test' → 'Reachable'; empty 'No connections registered yet.'",
+  "states": "empty, one local, several kinds, current/primary/managed pills, search no-match ('No gateways match your search.'), remove confirm, save failed",
+  "test": "With the private test backend open the Rust connections list and confirm the local connection is present, marked as current, and that 'Test' reports Reachable.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:292",
+  "unsure": "The Rust catalog has a Gateways group with 'This window'/'Saved connections' pages, but the registry store and its persistence were not verified."
+ },
+ "RMT-014": {
+  "behavior": "Connection switcher in the sidebar: a compact control listing the registered gateways with their health, letting the user switch the window's active gateway; the settings note explains 'Switch gateways from Sessions. Profiles, chats, messaging, and cron jobs stay with their gateway; work on other gateways keeps running.'",
+  "states": "single connection (hidden/simple), several, switching, current marked, switch failed",
+  "test": "With two connections registered (local test + a second) switch between them in the Rust app and confirm sessions reload for the new gateway.",
+  "rust_evidence": "",
+  "unsure": "No connection switcher in the Rust sidebar (app-window.slint sidebar has settings + session list only)."
+ },
+ "RMT-015": {
+  "behavior": "Connection glyph / health pill: each connection shows a glyph and a health pill derived from the gateway state — labels 'ready', 'needs setup', 'inference unavailable', 'checking', 'connecting', 'offline', 'restarting…' — plus connection-labelled tooltips ('SSH · <host>', 'Remote · <host>', 'Hermes Cloud · <host>').",
+  "states": "ready, needs setup, inference unavailable, checking, connecting, offline, restarting",
+  "test": "Against the private test backend stop it and confirm the Rust app shows an offline/degraded pill, then recovers when it restarts.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:180",
+  "unsure": "Rust shows a single connection string plus an error color; the pill vocabulary ('ready'/'needs setup'/…) is not implemented."
+ },
+ "RMT-016": {
+  "behavior": "Per-connection window state: window bounds/UI state are stored per connection (overlayWindowState/liveWindowState), so switching gateways restores that gateway's window layout instead of inheriting the previous one's.",
+  "states": "first connection state, second connection state, switching (restores), new connection (default)",
+  "test": "With two connections, resize the window on each, switch back and forth and confirm the Rust app restores per-connection bounds.",
+  "rust_evidence": "",
+  "unsure": "No window-state persistence at all was found in the Rust app (WIN-001)."
+ },
+ "RMT-017": {
+  "behavior": "Remote file picker / path bridging: browsing files on a remote gateway uses a remote-aware picker and bridges paths (wsl-path-bridge) so a path chosen remotely is translated for the backend rather than treated as a local path; file-menu copy warns 'That path is not on this computer — it lives on the backend machine. Use “Reveal in filetree”.'",
+  "states": "local picker, remote picker, path bridged, unsupported path (warning), load failed",
+  "test": "Against the private test backend open the file picker in the Rust app and confirm paths resolve on the backend, not on this machine.",
+  "rust_evidence": "",
+  "unsure": "No remote-aware file picker in the Rust repo (the right-panel files section belongs to another annotator)."
+ },
+ "RMT-018": {
+  "behavior": "Managed SSH update: for a Desktop-managed SSH install the app runs a transactional remote update — sessions drain, the remote checkout updates and profiles are restored with a correlated receipt — surfacing 'Draining sessions, updating the remote install, and restoring profiles…', 'Refused', 'Updated — restore failed' and 'Receipt <id> · <outcome>'.",
+  "states": "idle, updating, updated, partial, refused, failed, already running",
+  "test": "Not testable locally; verify the Rust app hides managed updates without a Desktop-managed SSH connection.",
+  "rust_evidence": "",
+  "unsure": "No Rust equivalent; needs a real SSH-managed install (1315-line Electron module)."
+ },
+ "RMT-019": {
+  "behavior": "Extra gateway headers are sent with every HTTP and WebSocket request to that gateway (for proxies such as Cloudflare Access); values are stored encrypted, Hermes-managed headers (Authorization, Cookie, Host) are ignored, a blank value keeps the saved secret.",
+  "states": "none, headers added, header removed, blank value keeps secret, duplicates rejected",
+  "test": "Against the private test backend add a header and confirm it arrives on the test backend's requests (echo/log side), then remove it.",
+  "rust_evidence": "",
+  "unsure": "The Rust WS/HTTP clients take no custom headers as far as I read; encryption of the values is Electron-only."
+ },
+ "RMT-020": {
+  "behavior": "WSL/WSLg support: when running under WSL the app launches the backend through the WSLg path and bridges clipboard images (wslg-launch.ts, wsl-clipboard-image.ts) so paste works on a Windows-hosted display.",
+  "states": "native Linux (not applicable), WSL detected, wslg launch, clipboard image bridged",
+  "test": "Check on this native Linux session that the Rust app does not attempt WSL-specific launch or clipboard bridging.",
+  "rust_evidence": "",
+  "unsure": "WSL-specific Electron behaviour; a native Linux binary only needs to not regress. Not verifiable without WSL."
+ },
+ "EXTR-001": {
+  "behavior": "Webhooks list: 'Search webhooks...', 'Subscriptions (<n>)' and 'Subscription changes hot-reload once the receiver is running. Disabled subscriptions reject incoming events.'; with the receiver off it shows 'Webhook receiver disabled' and an 'Enable webhooks' button.",
+  "states": "loading ('Loading webhooks...'), loaded, empty ('No webhook subscriptions yet.'), load failed ('Webhooks failed to load'), receiver disabled, receiver enabled",
+  "test": "With the private test backend create a subscription via the API, then open the Rust webhooks page and confirm the row appears with its enabled state.",
+  "rust_evidence": "",
+  "unsure": "No webhooks UI or REST helper call in the Rust repo; the exact list fields returned by /api/webhooks were not read."
+ },
+ "EXTR-002": {
+  "behavior": "'Enable webhooks' POSTs the platform enable ('Enabling...' → 'Enabled: \"<name>\"'); if the gateway needs a restart it says 'Webhooks are enabled, but the gateway still needs a restart before the receiver can come online.' with 'Restart gateway'; failure: 'Gateway restart failed<detail>'.",
+  "states": "disabled, enabling, enabled, restart needed, restarting, restart failed",
+  "test": "Against the private test backend enable webhooks in the Rust app and confirm the backend reports the platform enabled, then restart and confirm delivery works.",
+  "rust_evidence": "",
+  "unsure": "No Rust call site for /api/webhooks/enable; behaviour after restart (receiver live) was not exercised."
+ },
+ "EXTR-003": {
+  "behavior": "Delete a webhook (REST DELETE /api/webhooks/{name}): a confirm titled 'Delete webhook' with 'This will permanently remove <name>. This cannot be undone.'; success toasts 'Webhook deleted' and failure 'Failed to delete \"<name>\"'; the row button shows 'Deleting...' while in flight.",
+  "states": "confirm dialog open, cancelled, deleting, deleted, delete failed",
+  "test": "With the private test backend create a throwaway subscription, delete it from the Rust app and confirm it is gone from /api/webhooks (test backend only).",
+  "rust_evidence": "",
+  "unsure": "No Rust implementation found."
+ },
+ "EXTR-004": {
+  "behavior": "Per-webhook enabled toggle (REST PATCH /api/webhooks/{name}/enabled): flips one subscription on/off with toast copy 'Enabled: \"<name>\"' / 'Disabled: \"<name>\"' and failure 'Failed to turn \"<name>\" on|off'; disabled subscriptions reject incoming events.",
+  "states": "enabled, disabled, toggling, toggle failed",
+  "test": "Against the private test backend toggle a subscription off in the Rust app, POST a test event and confirm it is rejected.",
+  "rust_evidence": "",
+  "unsure": "No Rust implementation found."
+ },
+ "EXTR-005": {
+  "behavior": "Session import: 'Continue from another app' lists foreign Claude Code/Codex sessions with 'Finding conversations', 'Import into <destination>', 'Search loaded sessions', 'Load more sessions', preview ('Preview shortened for readability. The complete conversation is imported.') and 'Copies conversation text. Source files stay unchanged. Tool output and reasoning are not carried over.'",
+  "states": "scanning, list empty, list loaded, no matches ('No matching conversations'), preview loading, preview error ('Preview unavailable'), imported, import failed ('Could not import this conversation.'), already-imported snapshot",
+  "test": "Against the private test backend import one fixture foreign session in the Rust app and confirm the new session appears with the conversation text and no tool output.",
+  "rust_evidence": "",
+  "unsure": "No session-import UI or session.foreign.* calls in the Rust repo; I did not read src/app/session-import/api.ts line by line for payload shape."
+ },
+ "EXTR-006": {
+  "behavior": "Subagents list (RPC subagent.list with session_id): per-session child agents with status queued/running/completed/failed/interrupted and progress fields, rendered in the composer status stack and the agents page (title 'Spawn tree'), with counts '<n> subagents', '<n> running', '<n> failed' in the status bar.",
+  "states": "none, queued, running, completed, failed, interrupted, count overflow",
+  "test": "Against the private test backend spawn a subagent and confirm the Rust app lists it with a live status and drops it when it finishes.",
+  "rust_evidence": "",
+  "unsure": "No subagent.list call or spawn-tree UI in the Rust repo (subagent rows may overlap with other sections' status-stack items)."
+ },
+ "EXTR-007": {
+  "behavior": "Subagent tail (RPC subagent.tail with session_id): streams a child agent's transcript for the live view — 'Extended transcript', truncated to 'Showing the latest 16 KiB' and 'Live transcript unavailable' when the backend cannot provide it; requests are rejected for unowned sessions.",
+  "states": "no subagent, streaming, truncated, unavailable, rejected (unowned)",
+  "test": "Against the private test backend run a subagent that prints output and confirm the Rust app shows the tail (or the 'Live transcript unavailable' copy).",
+  "rust_evidence": "",
+  "unsure": "No Rust implementation found."
+ },
+ "EXTR-008": {
+  "behavior": "Subagent steer/interrupt (RPC subagent.steer, subagent.interrupt): sends guidance into a running child agent and can interrupt it; each is scoped to the owning session and rejected for unowned requests.",
+  "states": "running (steer enabled), interrupted, completed (no-op), rejected (unowned)",
+  "test": "Against the private test backend start a subagent, steer it and then interrupt it; confirm the test backend records both calls.",
+  "rust_evidence": "",
+  "unsure": "No Rust implementation found."
+ },
+ "EXTR-009": {
+  "behavior": "Subagent spawn tree save/load/list (RPC spawn_tree.save|load|list): the agent roster/spawn tree can be persisted, listed and reloaded so a delegation topology can be reused.",
+  "states": "no saved trees, saved, listed, loaded, load failed, corrupt tree",
+  "test": "Against the private test backend save a spawn tree, list it and load it back in the Rust app; confirm the loaded topology matches.",
+  "rust_evidence": "",
+  "unsure": "No Rust implementation found."
+ },
+ "EXTR-010": {
+  "behavior": "Delegation status/pause (RPC delegation.status, delegation.pause): reports whether background delegation is running and can pause it; the desktop keeps a per-session background resume marker so a resumed session shows that backgrounded work continued.",
+  "states": "idle, delegating, paused, resumed (resume marker), unknown",
+  "test": "Against the private test backend start a background delegation, pause it from the Rust app and confirm delegation.status flips.",
+  "rust_evidence": "",
+  "unsure": "src/store/background-delegation.ts is only 19 lines (a resume marker helper); the Rust repo has no delegation calls."
+ },
+ "EXTR-011": {
+  "behavior": "Background prompt / BTW (RPC prompt.background, prompt.btw; WS btw.complete): '/background' or the BTW path runs a prompt outside the active turn and reports completion through the btw.complete notification, which the app surfaces as a done indicator on the session.",
+  "states": "no background task, running (task_id), completed (btw.complete), failed",
+  "test": "Against the private test backend send a background prompt from the Rust app and confirm the btw.complete event lands and is surfaced.",
+  "rust_evidence": "",
+  "unsure": "No Rust call sites for prompt.background/prompt.btw and no btw.complete handling found in the Rust event loop."
+ },
+ "EXTR-012": {
+  "behavior": "Agents page (roster): a workspace view of active/spawned agents and their sessions (title 'Spawn tree', 'Close agents', live per-agent transcripts) fed by session.active_list plus the subagent snapshot; 'Open agents'/'Close agents' in the status bar toggles it.",
+  "states": "closed, open, no agents, agents running, transcript unavailable",
+  "test": "Against the private test backend with a running subagent open the agents page in the Rust app and confirm the roster matches subagent.list.",
+  "rust_evidence": "",
+  "unsure": "No agents page in the Rust UI; en.ts 'agents' block gives copy but the roster fields were not read."
+ },
+ "EXTR-013": {
+  "behavior": "Learning graph (REST /api/learning/graph): the skills/learning graph shown as 'Memory Graph' — nodes with categories, subtitle '<nodes> skills across <clusters> categories', filters 'All'/'Used'/'Learned', a Graph view, 'Refresh', loading ('Loading…'), empty ('Nothing learned yet' / 'As Hermes builds skills and memories for your work, they appear here.') and failure 'Could not load memory graph'.",
+  "states": "loading, loaded, empty, load failed, filtered, refreshed",
+  "test": "Against the private test backend open the memory graph in the Rust app and confirm nodes match /api/learning/graph.",
+  "rust_evidence": "",
+  "unsure": "No learning-graph rendering in the Rust repo; only a nav entry for the memory graph was found."
+ },
+ "EXTR-014": {
+  "behavior": "Learning node detail/edit/delete (REST /api/learning/node plus RPC learning.detail|edit|delete): a node can be opened for detail, its text edited and saved, or deleted, with the graph refreshed afterwards.",
+  "states": "detail loading, detail loaded, editing, saved, deleted, error",
+  "test": "Against the private test backend edit a learning node's text in the Rust app and confirm the change round-trips through /api/learning/node.",
+  "rust_evidence": "",
+  "unsure": "No Rust implementation found; request/response fields were not read."
+ },
+ "EXTR-015": {
+  "behavior": "Learning frames (RPC learning.frames): fetches the frames/context that produced a learned item, and archiving a learned skill asks for confirmation before the change (archive-skill-confirm-dialog).",
+  "states": "frames loading, frames loaded, archive confirm open, archived, cancelled",
+  "test": "Against the private test backend request frames for a known learning node in the Rust app and confirm the returned frames render.",
+  "rust_evidence": "",
+  "unsure": "The archive-skill dialog is 1 file in src/app/learning; I could not confirm its exact button labels, so no English string is quoted for it."
+ },
+ "EXTR-016": {
+  "behavior": "Insights (RPC insights.get): usage/insight summary rendered in the Command Center — 'Sessions', 'API calls', 'Tokens in/out', 'Est. cost' (with 'actual <cost>' when known), 'Daily tokens' ('input'/'output'), 'Top models', 'Top skills', '<n> actions' and a 'Log file' panel; empty states 'No usage in the last <period> days.', 'No daily activity.', 'No model usage yet.', 'No skill activity yet.'",
+  "states": "loading ('Loading usage...'), loaded, empty (per panel), error ('Retry'), period changed",
+  "test": "Against the private test backend call insights.get from the Rust app and confirm the same numbers appear as the backend reports.",
+  "rust_evidence": "",
+  "unsure": "insights.get exists in gateway-contract.openrpc.json, but there is no 'insights' string anywhere in apps/desktop/src, so the row's source (src/hermes.ts) is stale — the UI lives under the Command Center."
+ },
+ "EXTR-017": {
+  "behavior": "Starmap: 'Memory Graph' view combining a force-directed star map of skills/memories with a timeline, filters ('All'/'Used'/'Learned'), 'Graph' view toggle, refresh and a legend, over the learning graph data.",
+  "states": "loading, rendered, empty, filtered, timeline view, graph view",
+  "test": "Against the private test backend open the memory graph and timeline in the Rust app and confirm both render from the same node set.",
+  "rust_evidence": "",
+  "unsure": "No starmap renderer in the Rust repo (duplicate of THEM-011's visual side; keep the rows distinct)."
+ },
+ "EXTR-018": {
+  "behavior": "Starmap share code + controls: 'Share map' opens 'Import / export map' with the hint 'Copy the code to share this map, or paste one to load. It only includes the layout, not your memory or skill text.', 'Copy map code' → 'Copied!', 'Paste a map code…' → 'Load' ('Paste a map code to load it.' / 'Loaded a map with <n> nodes.'), an 'imported map' badge and 'Back to my map'.",
+  "states": "no code, copied, paste empty (hint), loaded, invalid code, imported view active",
+  "test": "With the private test backend export a map code in the Rust app, reset, paste it back and confirm the same layout loads with an 'imported map' badge.",
+  "rust_evidence": "",
+  "unsure": "No Rust implementation; the code format (share-code.ts) was not read."
+ },
+ "EXTR-019": {
+  "behavior": "Command center: a command console that resolves and dispatches commands — command.resolve suggests/parses a name and command.dispatch runs it with args (the same path slash commands use as a fallback for skill/send/alias directives), rendering structured output or 'error: invalid response: command.dispatch'.",
+  "states": "closed, open, typing (resolving), dispatched, output rendered, error output",
+  "test": "Against the private test backend dispatch a harmless command (e.g. a read-only one) from the Rust command center and confirm the backend records it.",
+  "rust_evidence": "",
+  "unsure": "No command-center UI or command.* calls in the Rust repo; the full resolve/dispatch contract was not read."
+ },
+ "EXTR-020": {
+  "behavior": "Maintenance: 'Run doctor' ('Health-check the install, config, and providers'), 'Security audit' ('Scan config and skills for risky settings'), 'Create backup' ('Zip config, memories, skills, and sessions'), 'Debug share' ('Upload a redacted report + logs, get shareable links (auto-deletes in 6h)'), plus a 'Skill curator' block (Paused/Active/Disabled).",
+  "states": "idle, running (per action), done with output, failed, curator paused/active/disabled",
+  "test": "With the private test backend (isolated HERMES_HOME) run 'Run doctor' from the Rust app and confirm the report renders and nothing is written outside the isolated home.",
+  "rust_evidence": "",
+  "unsure": "No ops calls in the Rust repo; the exact report rendering was not read."
+ },
+ "EXTR-021": {
+  "behavior": "Desktop telemetry: feature-use and daily metrics are reported to the backend as shared_metrics.desktop_feature_use / desktop_daily (feature-area and toggle records built by desktop-metrics.ts) so usage is attributable per feature area.",
+  "states": "consent unknown, reporting, disabled, report failure (silent)",
+  "test": "Against the private test backend use a tracked feature in the Rust app and confirm the reported event names match the Electron ones in the backend log.",
+  "rust_evidence": "",
+  "unsure": "The Rust repo makes no shared_metrics calls; the event-name catalogue is large (desktop-metrics.ts is 999 lines) and was only sampled."
+ },
+ "EXTR-022": {
+  "behavior": "Startup latency reporting: on boot the client reports how long it took to reach a usable state (shared_metrics.startup_latency) so slow starts are visible in telemetry.",
+  "states": "not reported, reported once, repeated report avoided, report failure",
+  "test": "With the private test backend measure a Rust app launch and confirm exactly one startup_latency event of the expected shape is reported.",
+  "rust_evidence": "",
+  "unsure": "src/app/gateway/report-startup-latency.ts is only 27 lines; the Rust app has no equivalent and PERF.md measures first-frame separately."
+ },
+ "EXTR-023": {
+  "behavior": "Friction/dislike reporting: explicit user friction signals (e.g. an error toast category) and dislikes are reported as shared_metrics.desktop_friction / shared_metrics.desktop_dislike, with a throttle so repeat reports collapse.",
+  "states": "none, friction reported (classified), dislike reported, deduped",
+  "test": "Against the private test backend trigger a classified error toast in the Rust app and confirm the friction event with its category is reported.",
+  "rust_evidence": "",
+  "unsure": "No Rust implementation; the category enum and throttle window were not read."
+ },
+ "EXTR-024": {
+  "behavior": "Diagnostics share to Nous: 'Send diagnostics to Nous' with a privacy notice (debug bundle to Nous-internal storage, logs up to 512 KB each, secrets redacted, auto-deletes after 14 days), 'Upload'/'Uploading…', success 'Diagnostics sent', failure 'Upload failed' plus the `hermes debug share --nous` hint.",
+  "states": "idle, uploading, done (link), failed, cancelled, no view link (upload ID quoted)",
+  "test": "Against the private test backend confirm the Rust app only offers this with explicit user action and reports the failure path when the upload is refused (never uploads real data in tests).",
+  "rust_evidence": "",
+  "unsure": "No Rust implementation; this row must never be exercised against the real Nous service in tests."
+ },
+ "EXTR-025": {
+  "behavior": "i18n backend language packs (RPC i18n.languages, i18n.catalog for the 'desktop' surface): the language list is bundled ∪ plugin ∪ backend; the switcher shows 'Language', 'Choose the language for the desktop interface.', 'Saving language…', 'Language update failed', 'No languages found'.",
+  "states": "bundled only, backend languages merged, catalog loading, switched, save failed, no results",
+  "test": "With the private test backend that exposes i18n.languages fetch the catalog for one language in the Rust app and confirm strings switch (Rust UI is English-only strings today).",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:303",
+  "unsure": "Rust has a Keyboard Shortcuts/About settings catalog in English only; no i18n.catalog fetch or locale switching was found."
+ },
+ "EXTR-026": {
+  "behavior": "Slash command catalog (local registry): the composer knows every desktop command and completes them — '/palette' ('Open the fuzzy command palette (also Ctrl+P)'), '/pet' ('Toggle or adopt a petdex mascot (/pet, /pet list, /pet boba)'), '/hatch' ('Generate a new pet (opens the pet generator)').",
+  "states": "catalog loaded, filtering, completion shown, unknown command, command executed",
+  "test": "Against the private test backend type '/' in the Rust composer and confirm the offered commands match the registry (or that no catalog exists yet).",
+  "rust_evidence": "",
+  "unsure": "No slash catalog in the Rust repo; the JSON registry stays with the Electron app, so the Rust app would need its own copy or a backend source."
+ },
+ "EXTR-027": {
+  "behavior": "Electron preload bridge: the renderer talks to the main process through a narrow, typed preload API (connection lookup per profile, gateway WS URL, window open/relay, agents roster, ambient cues, glass/translucency support flags, local skin, launch flags) with contextIsolation on — no Node API reaches the page.",
+  "states": "main process only, bridge available, missing flag (feature hidden), invoke failure",
+  "test": "In the Rust app this surface should not exist at all: verify there is no IPC bridge and that every capability is implemented in-process.",
+  "rust_evidence": "crates/hermes-app/src/main.rs:1",
+  "unsure": "A Slint app has no preload/IPC layer; the parity question is whether each bridged capability has an in-process equivalent, which the row list splits across other sections."
+ },
+ "EXTR-028": {
+  "behavior": "CDP / dev inspector: DevTools/CDP access is gated — the 'Disable F12 DevTools' advanced setting ('Block F12 from opening Developer Tools. Ctrl+Shift+I (or Cmd+Opt+I on Mac) still works.') decides whether F12 opens the inspector, and dev-cdp.ts decides which devtools/CDP features are exposed.",
+  "states": "dev build, packaged with setting on (F12 blocked), packaged with setting off (F12 opens), electron-only entry denied",
+  "test": "In the Rust app verify there is no F12/CDP hook and that debugging uses Slint's own tooling instead.",
+  "rust_evidence": "",
+  "unsure": "Electron-specific; the Rust answer is 'not applicable', but whether the Rust app exposes any debug/DevTools affordance was not checked."
+ },
+ "EXTR-029": {
+  "behavior": "Renderer accessibility tree: shouldEnableRendererAccessibility/enableRendererAccessibility turn on the Chromium accessibility tree (for screen readers / automation) only when needed, then release it, so the cost is paid on demand.",
+  "states": "disabled (default off), enabled, released",
+  "test": "In the Rust app confirm screen-reader support exists through Slint's accessibility tree or is declared unsupported, rather than being silently missing.",
+  "rust_evidence": "",
+  "unsure": "Slint's accessibility support level was not investigated; no Rust code found for this."
+ },
+ "EXTR-030": {
+  "behavior": "Crash forensics / lag watchdog: installCrashForensics logs crash reasons (describeCrashReason), and markExpectedTransition/isExpectedTransition stop expected teardown errors being reported as crashes; a main-process lag watchdog additionally reports stalls so a hang is distinguishable from a crash.",
+  "states": "running, expected transition marked, unexpected crash logged, lag detected and logged",
+  "test": "With the private test backend in an isolated home, kill the Rust app and confirm it logs a crash/exit reason without claiming a false crash on normal quit.",
+  "rust_evidence": "crates/hermes-app/src/main.rs:1",
+  "unsure": "The Rust app initialises logging at startup but I found no crash-forensics or lag-watchdog equivalent."
+ },
+ "EXTR-031": {
+  "behavior": "Log rotation + desktop.log: the desktop log rotates at LOG_MAX_BYTES (10 MiB) keeping LOG_BACKUP_COUNT (3) .N backups, discards when an active log exceeds LOG_DISCARD_BYTES (4×10 MiB), and polls the active log every ACTIVE_LOG_POLL_MS (5 min) to reclaim it if another process grew it; the log path is surfaced as 'Log file' in the command center.",
+  "states": "under limit, rotated (backups created), oversized discarded, active log reclaimed, log level changed ('Level')",
+  "test": "Against the private test backend enable a debug log in the Rust app, grow it past the limit and confirm rotation keeps ≤3 backups and no unbounded growth.",
+  "rust_evidence": "",
+  "unsure": "The Rust app logs to stdout/file via its logging setup; rotation thresholds and the 'Log file'/'Level' UI were not found in Rust."
+ },
+ "_new_items": [
+  {
+   "section": "Command palette & shortcuts",
+   "feature": "Insert newline in composer (⇧Enter)",
+   "surface": "local",
+   "source": "src/lib/keybinds/actions.ts (KEYBIND_READONLY composer.newline)",
+   "behavior": "⇧Enter inserts a newline instead of sending ('Insert newline'); listed read-only in the shortcuts panel next to 'Send message' so the pair is discoverable."
+  },
+  {
+   "section": "Command palette & shortcuts",
+   "feature": "Approval card keyboard shortcuts (Esc / Enter)",
+   "surface": "local",
+   "source": "src/lib/keybinds/approval-keys.ts",
+   "behavior": "While an approval card is visible, Esc denies the request and Enter with an empty composer approves it once — checked before Esc-to-stop, so denying does not also cancel the turn."
+  },
+  {
+   "section": "Command palette & shortcuts",
+   "feature": "Composer focus vs selection chord priority ladder",
+   "surface": "local",
+   "source": "src/lib/keybinds/composer-focus-keys.ts",
+   "behavior": "A single ⌘/Ctrl+L is contested by 'Focus composer' and 'Send selection to composer'; the ladder in composer-focus-keys.ts decides per press which one claims it (selection wins when text is selected)."
+  },
+  {
+   "section": "Command palette & shortcuts",
+   "feature": "Inline keybind hint chip",
+   "surface": "local",
+   "source": "src/lib/keybinds/use-keybind-hint.ts",
+   "behavior": "Buttons can render their live keybinding as a hint chip (use-keybind-hint), so a control shows the same chord the shortcuts panel lists and hides it when the action is unbound."
+  },
+  {
+   "section": "Appearance / themes",
+   "feature": "Accent color + custom color picker",
+   "surface": "local",
+   "source": "src/themes/accents.ts, src/themes/accent-override.ts, src/i18n/en_theme_picker.ts",
+   "behavior": "Theme/accent picker offers 'Accent color', 'Theme default', preset swatches and a 'Custom color' entry that overrides the theme accent; the choice persists per install."
+  },
+  {
+   "section": "Notifications",
+   "feature": "Notification recovery actions (Open Keys/Gateways/Maintenance, Restart Hermes)",
+   "surface": "local",
+   "source": "src/store/notifications.ts (RECOVERY_ACTIONS)",
+   "behavior": "Recognised errors carry a recovery action on the toast — 'Restart Hermes', 'Open Keys', 'Open Gateways', 'Open Maintenance' — so the user can act from the notification instead of hunting in settings."
+  },
+  {
+   "section": "Notifications",
+   "feature": "Version-skew notices (backend/desktop out of date, update ready)",
+   "surface": "WS + local",
+   "source": "src/store/notifications.ts (notifications.native/update copy)",
+   "behavior": "When the app and backend versions diverge the app raises 'Backend out of date' ('Your Hermes backend is older than this desktop build and may not work correctly. Update to align them.') or 'Hermes app out of date', with actions 'Update app' / 'Update Hermes'; when changes are available it shows 'Update ready' ('<n> new changes available.') with \"See what's new\"."
+  },
+  {
+   "section": "Updates",
+   "feature": "Update-available notification + 'See what's new'",
+   "surface": "local",
+   "source": "src/store/notifications.ts (updateReady*)",
+   "behavior": "A background update check raises a notification titled 'Update ready' ('<n> new changes available.' or 'A new update is available.') with \"See what's new\" and, for AppInstaller installs, 'Update now and Windows will finish it for you.'"
+  },
+  {
+   "section": "Window / tray / HUD / pet",
+   "feature": "Titlebar haptics mute toggle",
+   "surface": "local (platform)",
+   "source": "src/i18n/en.ts (titlebar.muteHaptics / unmuteHaptics)",
+   "behavior": "The titlebar has a haptics toggle reading 'Mute haptics' when on and 'Unmute haptics' when muted; on hardware without haptics the control is a no-op/hidden."
+  },
+  {
+   "section": "Window / tray / HUD / pet",
+   "feature": "Reset HUD size and position",
+   "surface": "local (Electron)",
+   "source": "src/app/shell/titlebar-controls.tsx, src/i18n/en.ts (titlebar.resetHudLayout)",
+   "behavior": "With HUD mode up, a titlebar action 'Reset HUD size and position' restores the HUD's default size and placement — the recovery path after moving or resizing it."
+  },
+  {
+   "section": "Window / tray / HUD / pet",
+   "feature": "Titlebar unread-session badge",
+   "surface": "local",
+   "source": "src/app/shell/titlebar-controls.tsx, src/i18n/en.ts (titlebar.unreadSessions)",
+   "behavior": "The sessions-sidebar titlebar button shows an unread badge and its tooltip appends ' · <n> unread session(s)', so background activity is visible without opening the sidebar."
+  },
+  {
+   "section": "Window / tray / HUD / pet",
+   "feature": "Titlebar left/right contribution slots",
+   "surface": "local",
+   "source": "src/app/shell/titlebar-controls.tsx (titleBar.left / titleBar.right)",
+   "behavior": "Pages and plugins can contribute controls into the titlebar's left/right slots; when a page contributes any, the fixed app-action cluster steps aside so the page owns the strip."
+  },
+  {
+   "section": "Window / tray / HUD / pet",
+   "feature": "Status bar approval-mode + YOLO pill",
+   "surface": "local",
+   "source": "src/app/shell/hooks/use-statusbar-items.tsx, src/i18n/en.ts (shell.statusbar.yolo*)",
+   "behavior": "The status bar carries an 'Approvals' pill showing the current mode (Manual / Smart / Off) that toggles it, and warns 'YOLO on — auto-approving dangerous commands. Shift+click toggles globally.' / 'YOLO off. Shift+click toggles globally.'"
+  },
+  {
+   "section": "Window / tray / HUD / pet",
+   "feature": "Status bar model pill + gateway menu",
+   "surface": "local",
+   "source": "src/app/shell/statusbar-controls.tsx, src/i18n/en.ts (shell.gatewayMenu, shell.statusbar.model*)",
+   "behavior": "'Switch model' / 'Open model picker' opens the model menu from the model pill ('Model · <provider>: <model>', 'Switch model', 'no model'), and the gateway menu shows 'Gateway' with 'Connected'/'Connecting'/'Offline', 'Inference ready'/'Inference not ready', 'Reconnect gateway', 'Recent activity' and 'View all logs →'."
+  },
+  {
+   "section": "Extras: webhooks, imports, subagents, learning, telemetry",
+   "feature": "Desktop log viewer (level + search)",
+   "surface": "local (Electron)",
+   "source": "src/app/command-center/maintenance.tsx, src/i18n/en.ts (commandCenter.logFile/logLevel/logSearchPlaceholder)",
+   "behavior": "The command center exposes 'Log file' with the path, a 'Level' selector and 'Search log lines...' over the live desktop log, so a failure can be inspected in-app."
+  },
+  {
+   "section": "Extras: webhooks, imports, subagents, learning, telemetry",
+   "feature": "Shared-metrics consent (local / off / share)",
+   "surface": "RPC shared_metrics.set",
+   "source": "src/store/shared-metrics.ts (SHARED_METRICS_CHOICES, $sharedMetricsConsent)",
+   "behavior": "The user chooses how hermes-attributed metrics behave: 'local' (recorded locally only), 'off', or 'share' (sent to the relay); the choice round-trips through shared_metrics.set and gates every shared_metrics.* report."
+  }
+ ]
+}

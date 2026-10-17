@@ -1,0 +1,1565 @@
+{
+ "CHAT-001": {
+  "behavior": "Type in the composer and press Enter (or click the round Send arrow) → RPC `prompt.submit`; optimistic user bubble appears at once, draft clears, the Send arrow becomes a Stop square while the turn runs, and the status line shimmers 'Thinking'. Backend rejects → toast 'Message failed: {e}'.",
+  "states": "empty draft (Send muted, disabled), typed (Send accent), streaming (Stop square), attachment uploading, queued, error banner 'Message failed: {e}'",
+  "test": "Against the private backend, type a prompt and press Enter; assert a user row then a growing assistant row appear and the draft is empty.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:934 ('prompt.submit'); crates/hermes-ui/ui/chat.slint:364 (Enter → send)",
+  "unsure": "submit.ts (60 KB) read only via comments; optimistic-attachment/ref-sync and queue-drain edge cases not traced. Rust has no queued-turn fallback."
+ },
+ "CHAT-002": {
+  "behavior": "While a turn is running, press Enter in the composer → the draft is sent as a steer to the live turn ('Steer the current run'; queue-panel variant 'Steer — redirect the live turn now'). If the turn ends first the steer is queued: 'no active turn — queued for next: \"…\"'.",
+  "states": "idle (Enter submits), busy (Enter steers), steer-queued notice, 'steer rejected — no active turn, queued for next turn', usage error '/steer <prompt>'",
+  "test": "Private backend: start a long turn, type a second prompt, press Enter, confirm the running turn consumes it (session.steer in the RPC trace).",
+  "rust_evidence": "",
+  "unsure": "Enter-while-busy is blocked in Rust (`if root.running { return accept; }`), so no steer exists. Did not verify whether a Steer button also exists in the tile UI."
+ },
+ "CHAT-003": {
+  "behavior": "While a turn runs, press ⌘/Ctrl+Enter ('Queue message') → the draft is parked in the session queue instead of sent; the queue panel header reads '1 Queued' (pluralised) above the composer.",
+  "states": "empty queue (panel hidden), 'N Queued', 'N Queued — paused' after Stop, per-entry Edit/Delete/Send, drain-failure banner 'Queued message not sent'",
+  "test": "Private backend: while streaming, ⌘Enter a message, assert the queue chip appears with the draft text and the composer is emptied.",
+  "rust_evidence": "",
+  "unsure": "The ⌘Enter → enqueue wiring lives in the composer, not in composer-queue.ts; I did not open the handler. Fenced `@terminal` transport is runtime-only and never persisted."
+ },
+ "CHAT-004": {
+  "behavior": "With queued turns pending, press ⌘⇧K ('Send next queued turn', panel button 'Next') → the head of the queue is submitted immediately rather than waiting for the current turn to settle; failure re-parks it with 'Queued message not sent'.",
+  "states": "queue empty (no-op), pending, sending, failure banner 'Queued message not sent' / body 'A queued turn kept failing to send. It is still in the queue — try sending it again.'",
+  "test": "Private backend: queue two messages during a turn, press ⌘⇧K, assert the first prompt turn starts before the running one finishes.",
+  "rust_evidence": "",
+  "unsure": "Confirmed only from KEYBIND_READONLY (mod+shift+k) and the composer.queueSendNext/labels; the dispatch site was not read."
+ },
+ "CHAT-005": {
+  "behavior": "Click the Stop square in the composer (Esc with the transcript focused also works) while a turn runs → RPC `session.interrupt`; streaming stops, the partial reply is finalised, the composer returns to a Send arrow and the status line disappears.",
+  "states": "idle (Send arrow), running (Stop square, aria-label 'Stop'), stopping, interrupted/finalised partial reply, queue switched to 'paused'",
+  "test": "Private backend: start a long turn, press the Stop button, assert the assistant row stops growing and the status line clears.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:479 ('session.interrupt'); crates/hermes-ui/ui/chat.slint:419 (square icon while running); crates/hermes-ui/ui/app-window.slint:335 (Esc stops)",
+  "unsure": "Rust does not implement the queue-pause side effect ('N Queued — paused') or the 'Resume' affordance."
+ },
+ "CHAT-006": {
+  "behavior": "While a turn runs, send a second text-only prompt as a redirect ('Redirect the current run') → RPC `session.redirect`; the live turn abandons its current plan for the new instruction. Only a non-empty, non-slash text entry can ride a redirect.",
+  "states": "busy (redirect offered), steer-only entries ineligible, slash commands ineligible, no active turn (falls back to queue)",
+  "test": "Private backend: start a multi-step turn, redirect it, assert the tool ticker switches to work matching the new instruction.",
+  "rust_evidence": "",
+  "unsure": "`session.redirect` appears in use-prompt-actions/index.ts but I did not find the button/label that triggers it (composer.redirect is the only string)."
+ },
+ "CHAT-007": {
+  "behavior": "Edit or rewind a prior user turn and resend → the transcript is truncated at that ordinal (`session.history` cut carrying expectedOrdinal, plus confirm_empty_truncate when truncating to nothing) then `prompt.submit` runs the edited text; the removed content is placed in the composer.",
+  "states": "editing, confirmed cut, empty-truncate confirm prompt, 'session busy' interrupt-and-retry, rewind error",
+  "test": "Private backend: send two turns, edit the first and resend, assert the transcript now contains the edited user row and only the new reply.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:934 ('prompt.submit') — no history-truncate/rewind path in the Rust repo",
+  "unsure": "rewind.ts is 32 KB; I read its exported planner names and comments only, not the exact confirm copy for empty truncation (i18n key not located)."
+ },
+ "CHAT-008": {
+  "behavior": "Press Shift+Enter in the composer → a newline is inserted and nothing is sent (`composer.newline`, fixed/non-rebindable; shown in the shortcuts panel as 'Insert newline').",
+  "states": "n/a (always available while the input has focus)",
+  "test": "Private backend: type 'a', Shift+Enter, 'b', assert the composer holds two lines and no turn was submitted.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:364 (Enter is only consumed without Shift, so Shift+Enter reaches the TextInput)",
+  "unsure": "None observed."
+ },
+ "CHAT-009": {
+  "behavior": "Press Esc while the transcript (not the input) has focus and a turn is running → stops the run, same as the Stop button. Esc is ignored when focus is in an input/contenteditable, when a clarify/approval is pending, or when a dialog/popover is open (that overlay owns Esc).",
+  "states": "running+transcript focused (cancels), typing (ignored), awaiting input (ignored), overlay open (ignored), settings/picker open (closes that instead)",
+  "test": "Private backend: start a turn, click the transcript, press Esc; assert the turn stops. Then press Esc while typing in the composer and assert it does not stop.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:335 (Esc stops the run); app-window.slint:331-333 (approval card owns Esc/Enter first)",
+  "unsure": "Rust does not model the awaitingInput guard, so Esc stops a run even while an approval card is pending (Esc denies instead, per line 332)."
+ },
+ "CHAT-010": {
+  "behavior": "The composer is a contentEditable rich editor: pasted/inserted references become atomic chips, the empty state paints a placeholder via a `data-empty` marker, and only a single trailing <br> counts as empty so the placeholder does not cover typed text.",
+  "states": "empty (placeholder), typed, chip present, undo/redo history",
+  "test": "Not directly testable in the Rust app (no rich editor): check the Rust composer is a plain TextInput and record the gap.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:373 (plain multi-line TextInput, no chips)",
+  "unsure": "src/app/chat/composer/rich-editor.tsx does not exist — the implementation is rich-editor.ts plus editor components I did not open."
+ },
+ "CHAT-011": {
+  "behavior": "With the empty chat focused, Enter focuses the composer; typing a printable character focuses it and types that character; '/' opens the slash palette. Surfaces that own keys (dialogs, menus, terminal, an open clarify card) are excluded, and ⌘V/Ctrl+V on non-editable chrome routes the clipboard into the composer.",
+  "states": "empty chrome (soft focus armed), input focused (no-op), overlay/dialog open (excluded), background-tab clarify card (excluded)",
+  "test": "Private backend: click empty chat background, press 'h', assert the composer has focus and contains 'h'.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:340 (forward-focus: input); crates/hermes-ui/ui/app-window.slint:423 (hero composer focuses on init)",
+  "unsure": "Rust has no type-to-focus handler, so a printable key on the chat background does nothing; paste-to-focus is not implemented."
+ },
+ "CHAT-012": {
+  "behavior": "Press ⌘/Ctrl+L anywhere → focus moves to the composer ('Focus composer', fixed row shared with the selection shortcut). If a terminal or preview selection exists, that capture-phase handler consumes the chord first and sends the selection to the composer instead.",
+  "states": "composer already focused (no-op), selection present (selection wins), overlay open (chord still focuses)",
+  "test": "Private backend: click the transcript, press Ctrl+L, assert keyboard focus lands in the composer input.",
+  "rust_evidence": "",
+  "unsure": "Rust binds Ctrl+N/,/B/Q/Tab but not Ctrl+L. The priority ladder in focus-chord.ts is comment-derived only."
+ },
+ "CHAT-013": {
+  "behavior": "Type '/' in the composer → a completion popover lists the gateway catalog ('Commands', 'Skills', 'Options' / 'Browse all…'), filtered by the text after '/'; RPC `commands.catalog` then `complete.slash`; no hits → 'No matches.'; while fetching it shows a loading state.",
+  "states": "closed, loading, results, 'No matches.', action-completion row, cached (no debounce)",
+  "test": "Private backend: type '/' and assert at least one command row; type 'zzz' and assert 'No matches.'",
+  "rust_evidence": "",
+  "unsure": "Skill catalogue/cache scoping is per session and per routed profile; not exercised."
+ },
+ "CHAT-014": {
+  "behavior": "Send a message beginning with '/' → RPC `slash.exec` (some commands go through `command.dispatch`); client-owned commands such as `/skin` and `/pdf` are handled locally. If a turn is already running the kickoff is parked: 'session busy — message queued to send when the current turn finishes'.",
+  "states": "dispatched, queued ('session busy — message queued…'), refused ('session busy — stop the current reply first (Stop button or Esc), then send this command'), 'skill payload missing message' / 'empty message' errors",
+  "test": "Private backend: send '/help', assert the command result renders as a system/assistant row and no turn was queued.",
+  "rust_evidence": "",
+  "unsure": "slash.ts is 60 KB; the full command table (browser.manage, process.stop, session.compress, wake.start, prompt.btw, prompt.background) was only glimpsed via RPC-name greps."
+ },
+ "CHAT-015": {
+  "behavior": "Type '@' in the composer → a path/kind completion popover; typing after '@kind:' queries RPC `complete.path` and shows a loading state until results arrive (cached queries skip the debounce and loading).",
+  "states": "closed, kind list, querying (loading), results, empty results",
+  "test": "Private backend: type '@' and assert file/kind rows appear; type 'zzz' after '@' and assert an empty state.",
+  "rust_evidence": "",
+  "unsure": "Did not confirm the exact empty-state string for @-completions ('no matches' is shared with slash completions)."
+ },
+ "CHAT-016": {
+  "behavior": "Type ':' in the composer → emoji-name completion answered from a local table (no RPC); a cached name skips the debounce and the loading state; choosing one inserts the emoji.",
+  "states": "closed, matching, cached (instant), no matches",
+  "test": "Private backend: type ':smile' and assert a matching emoji row with no network call.",
+  "rust_evidence": "",
+  "unsure": "The emoji table's source (bundled list vs intl) was not opened."
+ },
+ "CHAT-017": {
+  "behavior": "Type '?' on an empty composer (or the help affordance) → a quick-help hint listing composer hotkeys, with footer '… opens the full panel · backspace dismisses'. Backspace/typing dismisses it; the panel itself is 'Keyboard shortcuts'.",
+  "states": "hidden, shown (hotkey list), dismissed by backspace",
+  "test": "Private backend: press '?' on an empty composer and assert a hint panel appears and Backspace closes it.",
+  "rust_evidence": "",
+  "unsure": "Whether the hint requires an empty composer before the '?' is typed was inferred from the hint's own copy, not from code I read."
+ },
+ "CHAT-018": {
+  "behavior": "With the completion popover closed, press ↑/↓ in the composer → the draft cycles backwards/forwards through this session's previously sent user messages ('Cycle popover / history'); the first ↑ from a fresh draft restores the last sent message, ↓ past the newest returns to the saved draft.",
+  "states": "not browsing, browsing history, empty history (ring empty → no-op)",
+  "test": "Private backend: send two prompts, press ↑ twice, assert the draft shows the older prompt, then ↓ to return.",
+  "rust_evidence": "",
+  "unsure": "The exact reset rules (resetBrowseState) and per-session keying were read from exported names/comments only."
+ },
+ "CHAT-019": {
+  "behavior": "Press ⌘/Ctrl+Z in the composer → undoes the last edit; ⌘⇧Z (and Ctrl+Y) redoes it. History snapshots whole editor states, including chip insertions and restored drafts.",
+  "states": "undo available, redo available, at oldest/newest (no-op)",
+  "test": "Private backend: type a sentence, press Ctrl+Z, assert the text reverts; Ctrl+Shift+Z restores it.",
+  "rust_evidence": "",
+  "unsure": "undo-history.ts exports isUndoShortcut/isRedoShortcut; I did not verify which extra chords (Ctrl+Y) are accepted."
+ },
+ "CHAT-020": {
+  "behavior": "Paste an image, drop a file, or use '+ → Images…/Files…/URL…' → an attachment chip is added and uploads (RPC `image.attach_bytes`/`image.attach`); the chip shows a spinner while uploading, is clickable to preview (aria-label 'Preview {label}'), and 'Remove {label}' detaches it. A file that cannot be read toasts 'Could not attach X.url'.",
+  "states": "empty, uploading (spinner + aria-busy), uploaded (clickable preview), failed (destructive border), lightbox open",
+  "test": "Private backend: attach a PNG via the picker, assert a chip with a thumbnail appears and the send carries the image; check for a spinner during upload.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:403-404 (IconButton 'Add files' calls root.attach()) — the callback is declared but never bound in app-window.slint, so no picker opens",
+  "unsure": "Whether the Rust attach callback is wired in a newer branch; in this checkout clicking '+' does nothing."
+ },
+ "CHAT-021": {
+  "behavior": "Click the × on an attachment chip → the chip is removed locally and RPC `image.detach` releases the server-side copy; blob preview URLs are revoked so the lightbox stops pointing at a dead blob.",
+  "states": "attached, removing (optimistic), removal failed (chip returns), uploading chip cannot be detached cleanly",
+  "test": "Private backend: attach an image, click ×, assert the chip disappears and the next send contains no image block.",
+  "rust_evidence": "",
+  "unsure": "use-composer-actions.ts is 26 KB and covers drops/paths too; I did not confirm the exact toast copy on a failed detach."
+ },
+ "CHAT-022": {
+  "behavior": "Attach a file (picker, drag, or the session hook's `file.attach`) → chip labelled with the file name and 'Attaching…' while it uploads; once synced, '@file:' refs are rewritten to workspace-relative paths the gateway can resolve.",
+  "states": "attaching ('Attaching…', spinner), attached, upload failed, drop-then-Enter raced (re-upload guard)",
+  "test": "Private backend: attach a text file, assert the chip shows the name, then send and assert the file content is in the prompt.",
+  "rust_evidence": "",
+  "unsure": "The row's source (use-prompt-actions/index.ts, 54 KB) bundles many verbs; the specific attach entry point was seen only by name."
+ },
+ "CHAT-023": {
+  "behavior": "Send the desktop '/pdf' command (or a PDF path) → RPC `pdf.attach`; the PDF is registered as an attachment for the turn instead of being inlined as text.",
+  "states": "attached, unsupported/typed-in-a-browsing-prefix (command not surfaced), error",
+  "test": "Private backend: run the /pdf desktop command with a PDF path and assert a pdf attachment chip/turn.",
+  "rust_evidence": "",
+  "unsure": "desktop-slash-commands.ts exposes the desktop command table; I did not find the literal /pdf entry, so the exact invocation may differ."
+ },
+ "CHAT-024": {
+  "behavior": "Paste a very large block of plain text → it is converted into a text attachment file (named `pasted_content_<stamp>_<hex>.txt`) and the chip reads 'Pasted content' instead of the path; only text past the character threshold collapses, short pastes stay inline.",
+  "states": "inline paste, collapsed to attachment ('Pasted content' chip), threshold not met",
+  "test": "Private backend: paste 50k of text and assert one attachment chip labelled 'Pasted content'; paste two lines and assert they stay in the composer.",
+  "rust_evidence": "",
+  "unsure": "The row's RPC surface (paste.collapse) and the src file large-paste.tsx were never located — the policy lives in large-paste.ts and the collapse call site is elsewhere."
+ },
+ "CHAT-025": {
+  "behavior": "Drag OS files over the chat region → the drop zone arms (depth counter prevents flicker on nested children) and dropping attaches them. Session drags left native DnD and are not accepted here.",
+  "states": "inactive, drag-over (armed), dropped, disabled when the zone opts out",
+  "test": "Skip in the Rust app (no drop zone): record that dropping a file on the window does nothing.",
+  "rust_evidence": "",
+  "unsure": "Native OS file drops in the Slint app are unverified — no drop-handling code found in the Rust UI."
+ },
+ "CHAT-026": {
+  "behavior": "While files or a session are dragged over the chat area, a full-bleed overlay shows the outcome label ('Drop files to attach' / 'Drop to link this chat'); the overlay is pointer-events-none so the drop lands on the real target, and the last label is held through the fade-out.",
+  "states": "hidden, files-drag label, session-drag label, fading out",
+  "test": "Skip in the Rust app (no overlay) — nothing renders during a drag.",
+  "rust_evidence": "",
+  "unsure": "Only the component comments were read; the exact label strings come from composer.dropFiles/dropSession."
+ },
+ "CHAT-027": {
+  "behavior": "Trigger the OS screenshot shortcut (or the picker) → the native capture is saved to bytes and ingested through the same image path as a paste (RPC `image.attach_bytes`), adding a chip to the draft that owned the gesture even if the OS focus was elsewhere.",
+  "states": "idle, capturing, attaching, cancelled (no chip), re-entrancy guarded (busy flag)",
+  "test": "Not testable in the Rust app: no screen-capture path exists.",
+  "rust_evidence": "",
+  "unsure": "The capture itself is Electron-native (electron/ main process); I did not open the main-process handler."
+ },
+ "CHAT-028": {
+  "behavior": "Typing or dragging a path inserts an inline reference chip (`@file:`/`@folder:`/`@session:` etc.) whose value carries the metadata the agent needs (e.g. `@session:<profile>/<id>` for session_search) and whose label shows a friendly title. Dropping a sidebar session builds the same chip.",
+  "states": "typed ref, dragged ref, session-chip label fallback, empty editor sentinel handling",
+  "test": "Not testable in the Rust app: the composer has no chip model.",
+  "rust_evidence": "",
+  "unsure": "The full `@kind:` vocabulary lives across inline-refs.ts/path-refs.ts/slash-refs.ts; I read only inline-refs.ts."
+ },
+ "CHAT-029": {
+  "behavior": "Type or paste a link with an explicit http(s) scheme → it is converted into a truncating `@url:` chip (the same thing '+ → URL…' inserts, dialog title 'Attach a URL', description 'Hermes will fetch the page and include it as context for this turn.'). Bare hostnames are deliberately not linkified.",
+  "states": "url chip inserted, dialog open (placeholder 'https://…', hint 'Include the full URL, e.g. …'), unbalanced tail trimmed, chip label truncated",
+  "test": "Not testable in the Rust app: no URL chips or attach-URL dialog.",
+  "rust_evidence": "",
+  "unsure": "url-dialog.tsx is listed as a co-source of the row but I only read url-refs.ts."
+ },
+ "CHAT-030": {
+  "behavior": "Click the model chip under the composer → a picker opens listing providers as headers with their models, the current one ticked; choosing one applies it (REST /api/model/set) and closes the picker. Failure toasts 'Could not switch model: {e}' / the load error 'Could not load models: {e}'.",
+  "states": "closed, open (grouped list, current ticked), loading spinner in the pill, disabled while there is no live menu, error toast",
+  "test": "Private backend: open the chip, pick a different model, assert the chip label updates and `/api/model/set` was called.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:443 (model Chip → pick-model); crates/hermes-ui/ui/app-window.slint:161-238 (ModelPicker with headers + check icon); controller.rs:1137 ('model.options')",
+  "unsure": "The reasoning submenu inside the catalog model rows is not implemented in Rust."
+ },
+ "CHAT-031": {
+  "behavior": "A reasoning-effort pill sits next to the model pill showing the active model's effort level ('Off'…'xhigh'; a clamped pick renders 'Ultra→Max') and opens the same Thinking/Fast/Effort rows; it is hidden when the catalog says the model has no reasoning control or while there is no live menu.",
+  "states": "hidden (no reasoning control / gateway closed), label, pending (spinner), disabled",
+  "test": "Private backend: with a reasoning-capable model picked, assert the effort pill appears next to the model chip and changing it calls config.set('agent.reasoning_effort').",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:907,989 (set_effort_label from model.options reasoning_effort); crates/hermes-ui/ui/chat.slint:445 (Chip secondary = effort-label)",
+  "unsure": "Rust displays the effort label but has no picker or hotkey to change it (no config.set of agent.reasoning_effort found)."
+ },
+ "CHAT-032": {
+  "behavior": "Press the reasoning-level-up / down chord → the effort steps one notch through off → minimal → … → xhigh, clamped at both ends. Both actions ship unbound; only a combo with a real modifier can fire while the composer has focus.",
+  "states": "unbound by default, rebindable in the shortcuts panel ('Reasoning level up'/'Reasoning level down'), clamped at the ends",
+  "test": "Private backend: bind a chord in Settings → Keyboard Shortcuts, press it, assert the effort pill changes.",
+  "rust_evidence": "",
+  "unsure": "Defaults are empty arrays — verifiable only from actions.ts, not from a shipped binding."
+ },
+ "CHAT-033": {
+  "behavior": "Each mounted composer runs in its own scope object: the main chat uses the default scope (module-level attachment atom, focus-bus target 'main'), a session tile mounts its own. The scope decides which composer receives attachments, insert routing and Esc semantics; draft text is not scoped (it stashes per session key).",
+  "states": "main scope, tile scope, multiple composers coexisting",
+  "test": "Not user-visible; verify instead that the Rust app has a single composer with no per-pane scope.",
+  "rust_evidence": "",
+  "unsure": "This row is internal plumbing (profile/agent routing is named in the row but the file is about composer instances); I did not find profile/agent routing in scope.tsx."
+ },
+ "CHAT-034": {
+  "behavior": "A floating pill strip above the composer shows per-session micro-actions (e.g. coding/preview/voice badges). A running action swaps its glyph for a loading icon; other badges disable while one runs; the strip never becomes pointer-events-none so a drag region behind it cannot steal clicks.",
+  "states": "default, hover (chrome action hover), focus-visible, disabled (opacity-50, cursor-default), running (loading glyph)",
+  "test": "Not testable in the Rust app: there is no badge strip above the composer.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:431-448 (chips row shows only the cwd chip and the model chip)",
+  "unsure": "Which actions register badges is plugin/contrib-driven; the concrete list was not enumerated."
+ },
+ "CHAT-035": {
+  "behavior": "Contextual suggestion pills render beside the micro-action badges, one per suggestion the session's providers earned (e.g. 'Use skill: {skill}', 'Add {server}', 'Set up GitHub', 'Schedule this'). Each pill narrates its lifecycle: label → working label (click again requests cancel) → done label; failures raise a toast.",
+  "states": "idle label, working (spinner, cancel on second click), done, failed",
+  "test": "Not testable in the Rust app: no suggestion bus or pills.",
+  "rust_evidence": "",
+  "unsure": "The provider list is registry-driven; only the i18n labels seen in en.ts are enumerated here."
+ },
+ "CHAT-036": {
+  "behavior": "Drag the composer out of its slot / use the pop-out affordance → the composer becomes a floating surface at a saved, clamped position (POPOUT_WIDTH_REM, readPopoutBounds), and the gesture can be disabled by a store flag.",
+  "states": "docked, popped out (floating, draggable), bounds clamped to the window, gestures disabled",
+  "test": "Not testable in the Rust app: the composer is fixed in the layout.",
+  "rust_evidence": "",
+  "unsure": "The pop-out in the Electron app is a renderer-side floating surface, not a second OS window; the row calls it 'floating window'."
+ },
+ "CHAT-037": {
+  "behavior": "When a draft survives a reload/reopen, a notice appears in the composer reading 'Restored your unsent message' with an 'Undo' button and a close × (aria-label 'Close'). It never steals focus or navigates.",
+  "states": "hidden, shown (undo offered), dismissed/closed, undone",
+  "test": "Private backend: type a draft, restart the Rust app, assert whether any restore notice appears (expected: none).",
+  "rust_evidence": "",
+  "unsure": "Rust does persist nothing about the composer draft across restarts; no draft-restore code found."
+ },
+ "CHAT-038": {
+  "behavior": "Opening a chat with no messages shows the full-height intro splash: a wordmark plus headline/body copy picked from intro-copy.jsonl by the session's personality ('Ready when you are', 'How can I help today?', …), with a fallback set when the personality is neutral, and the composer centred below it. First message → splash disappears.",
+  "states": "shown (personality variant, seed-randomised), hidden once a message exists, non-primary pane (no splash)",
+  "test": "Private backend: open an empty session and assert a greeting plus the centred composer; send a message and assert the splash is replaced by the transcript.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:400-434 (greeting + hero Composer when rows are empty); controller.rs:233-237 (greeting_for_hour: 'Good morning'/'Good afternoon'/'Good evening'/'Up late')",
+  "unsure": "Rust's empty state is a time-based greeting, not the personality-driven headline/body from intro-copy.jsonl."
+ },
+ "CHAT-039": {
+  "behavior": "Click the mic button ('Voice dictation') → recording starts ('Listening', button becomes 'Stop listening and send'/'Stop dictation'), audio is transcribed via REST /api/audio/transcribe, and the transcript is inserted into the composer. Errors surface e.g. 'Microphone access denied.', 'No speech detected'.",
+  "states": "idle, recording ('Listening', mic icon), transcribing (spinner, 'Transcribing dictation'), denied/error, unsupported runtime ('This runtime does not support microphone recording.')",
+  "test": "Not testable in the Rust app: no voice button; record the gap.",
+  "rust_evidence": "",
+  "unsure": "`start-voice-button.tsx` also exposes the voice-engine menu (GPT-Live vs speech-to-text), which is out of this row's scope."
+ },
+ "CHAT-040": {
+  "behavior": "Toggle voice conversation (⌃B on macOS, ⌘⌥V elsewhere; label 'Start / stop voice conversation') → a live voice session starts ('End voice conversation' / 'End'), the composer switches to listening mode, and turns are delegated to Hermes. Failures surface as 'Could not start voice session', 'Voice transcription is not available yet.'",
+  "states": "off, starting, listening ('Listening'), speaking ('Speaking'), end ('End'), unavailable/error, busy guard",
+  "test": "Not testable in the Rust app: RPC voice.toggle is not implemented.",
+  "rust_evidence": "",
+  "unsure": "use-voice-conversation.ts is 38 KB and covers the GPT-Live path, barge-in arming and transcript delivery; only the exported hook was read."
+ },
+ "CHAT-041": {
+  "behavior": "While a reply is being read aloud, speaking over it (above the barge-in threshold) stops playback and starts listening again; saying the wake/stop phrase (e.g. 'Say \"…\" to end the voice chat.') ends the voice chat. An explicit empty stop-word list disables spoken stop.",
+  "states": "monitoring, barge-in triggered (playback interrupted), stop phrase matched, disabled by config",
+  "test": "Not testable in the Rust app: no voice playback or microphone monitor.",
+  "rust_evidence": "",
+  "unsure": "Threshold defaults live in voice-barge-in.ts; I did not verify the per-profile stop-word defaults."
+ },
+ "CHAT-042": {
+  "behavior": "While the mic is recording or a reply is playing, a small canvas level meter ('voice activity') animates next to the composer, with a live-region label so screen readers announce the state; inactive it pulses at reduced opacity.",
+  "states": "inactive (pulse, opacity 45), active (opacity 80, live canvas), recording (mic icon), preparing (spinner)",
+  "test": "Not testable in the Rust app.",
+  "rust_evidence": "",
+  "unsure": "Whether the canvas renders under reduce-motion is not handled in the component I read."
+ },
+ "CHAT-043": {
+  "behavior": "When sounds are enabled, a completion chime plays as a reply lands and a thinking hum plays while a turn runs; both can be previewed from Settings → Sounds (playCompletionSound, previewCompletionSound) and thinking sound starts/stops on the running edge.",
+  "states": "disabled by pref, completion chime, thinking hum active/inactive, preview",
+  "test": "Not testable in the Rust app: no sound playback.",
+  "rust_evidence": "",
+  "unsure": "Which variants ship (COMPLETION_SOUND_VARIANTS) and the audio assets were not inspected."
+ },
+ "CHAT-044": {
+  "behavior": "Toggle 'Read replies aloud' → each completed assistant reply is spoken via RPC voice.tts; the composer shows 'Reading aloud'/'Speaking response' and the toggle becomes 'Stop reading replies aloud'.",
+  "states": "off, enabled (auto-speak), speaking ('Reading aloud'), stopped",
+  "test": "Not testable in the Rust app: voice.tts is not implemented.",
+  "rust_evidence": "",
+  "unsure": "Interaction with voice-conversation mode (the hook may defer to the live session) was not traced."
+ },
+ "CHAT-045": {
+  "behavior": "When a session goal is active the status stack shows 'Goal active' (or 'Goal paused'/'Goal waiting'/'Goal blocked'/'Goal done') with 'Turn {n}/{max}', 'Criteria · {count}' and a menu: pause/resume goal, add/remove criterion, clear goal — each destructive action confirms ('Clear goal?' / 'Are you sure you want to clear the active goal? This cannot be undone.').",
+  "states": "no goal (row hidden), active, paused, waiting/due ('due — waiting for idle'), blocked, done, busy (menu items disabled), error toast 'Action failed: {msg}'",
+  "test": "Private backend: start a goal, pause and resume it from the status stack, assert the badge text follows goal.pause/goal.resume replies.",
+  "rust_evidence": "",
+  "unsure": "Status-stack rows do not exist in the Rust UI; the RPC names here (goal.*, subgoal.*) differ from the row's declared `session.control`."
+ },
+ "CHAT-046": {
+  "behavior": "Heartbeat and loop session controls appear in the status stack: 'Heartbeat active' with 'every {n}m' / 'next {time}' / 'Fired {n} times', menu pause/resume/clear (confirm 'Clear heartbeat?'); a loop shows 'Loop active' / 'Run {i}/{n}' with pause/resume/stop and 'Loop deferred' when a goal owns the session.",
+  "states": "inactive (hidden), active, paused, deferred, finished, busy (disabled items), confirm dialogs",
+  "test": "Private backend: start a heartbeat, pause it from the row, assert heartbeat.pause was sent and the badge shows 'Heartbeat paused'.",
+  "rust_evidence": "",
+  "unsure": "Heartbeat RPC names (heartbeat.*) versus the row's `session.control`; loop controls live in a sibling file not probed in depth."
+ },
+ "CHAT-047": {
+  "behavior": "A coding-status row above the composer shows the working tree for the session's repo: branch name (or 'detached'/'No branch'/'Not a git repository'), 'Clean'/'{n} changed', ahead/behind counts, and hover actions to open changes, switch branch, stage/revert/commit/push or 'Create PR'. Commit placeholder: 'Message ({shortcut} to commit)'.",
+  "states": "no repo ('Not a git repository'), clean, changed, staged, detached, ahead/behind, read-only scope, hover (actions revealed), busy (commit generating), error 'Could not switch to {branch}'",
+  "test": "Private backend: open a session in a git worktree and assert the branch name plus 'Clean' or '{n} changed' renders.",
+  "rust_evidence": "crates/hermes-core/src/diff.rs (diff parsing helpers exist) — no status-stack row in the Rust UI",
+  "unsure": "The row's listed source (coding-row.tsx) is the compact bar; the get-commit/changed-file RPCs live in the status-stack directory I did not enumerate."
+ },
+ "CHAT-048": {
+  "behavior": "When a preview/dev-server artifact is tracked, a preview-status row appears in the status stack with the preview label and an open action; while opening it pulses ('animate-pulse'), and the row is aria-hidden for screen readers.",
+  "states": "hidden, shown, opening (pulse), preview unavailable",
+  "test": "Not testable in the Rust app: no preview-status row.",
+  "rust_evidence": "",
+  "unsure": "Only preview-row.tsx was read; the underlying preview-status store was not."
+ },
+ "CHAT-049": {
+  "behavior": "The status stack can be collapsed/expanded from a small handle whose aria-label is 'Show status stack' / 'Hide status stack', with aria-expanded and aria-controls wired; collapsed content is aria-hidden.",
+  "states": "expanded, collapsed (aria-hidden body), toggled by the handle",
+  "test": "Not testable in the Rust app: no status stack.",
+  "rust_evidence": "",
+  "unsure": "Where the collapse preference is persisted was not checked."
+ },
+ "CHAT-050": {
+  "behavior": "Sessions can contribute their own action list to the composer ('agent actions') — a per-session subscribed atom of {id,label,icon,disabled} entries that the composer renders as a menu; the store de-dupes identical entries on write.",
+  "states": "no actions (menu hidden), list present, entry disabled individually",
+  "test": "Not testable in the Rust app: no composer action menu.",
+  "rust_evidence": "",
+  "unsure": "The renderer for these actions (session menu) is elsewhere; I only read the store."
+ },
+ "TRNS-001": {
+  "behavior": "While a turn runs, each WS `message.delta` appends to the live assistant bubble (markdown re-rendered as it streams); `message.complete` settles it and appends 'This turn took {duration}'. A failed turn renders an error card with 'Retry', 'Details', 'Copy error details', 'Compress conversation' and 'Switch provider'.",
+  "states": "streaming (growing bubble + thinking indicator), settled (hover actions: Copy / Copy full response / Branch in new chat), stopped ('Response stopped'), error card (title varies by errorCodes, e.g. 'The AI service is busy'), loading placeholder ('Hermes is loading a response')",
+  "test": "Private backend: send a prompt and assert the assistant row grows character-by-character and then shows the turn duration.",
+  "rust_evidence": "crates/hermes-core/src/transcript.rs:263-352 (message.delta / reasoning.delta / tool.start / tool.complete / message.complete handlers); crates/hermes-ui/ui/chat.slint:223-233 (markdown StyledText row)",
+  "unsure": "assistant-message.tsx is 50 KB; the full error-card matrix (i18n assistant.thread.errorCodes.*) was read from en.ts, not from the component."
+ },
+ "TRNS-002": {
+  "behavior": "A user turn renders as a right-aligned bubble (max ~82 % width, surface background) with hover actions — 'Copy', 'Edit message', restore-checkpoint, stop while live — plus an agent avatar when the session is agent-scoped. Editing swaps the bubble for an edit composer and 'Send edited message' resubmits.",
+  "states": "default, hover (actions revealed), text selected (copy affordance takes over), editing, agent avatar present/absent, sticky when scrolled",
+  "test": "Private backend: hover a user bubble and assert the action row appears; click Edit and assert an edit composer replaces the bubble.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:196-215 (user bubble: right-aligned, Theme.surface, 0.82 max width) — no hover actions",
+  "unsure": "The restore-checkpoint controls share this row; their exact copy ('Restore & rerun', 'Restore to this checkpoint?') lives under assistant.thread.restore*."
+ },
+ "TRNS-003": {
+  "behavior": "Non-assistant rows render as system notices: background-task results and notices render as a bordered, subdued row with icon and text rather than a bubble.",
+  "states": "notice (info, surface background), error notice (danger tint), background-result variant",
+  "test": "Private backend: trigger a notice (e.g. a failed request) and assert a bordered non-bubble row appears above the composer.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:240-249 (kind 3 notice row, danger tint when item.error)",
+  "unsure": "Only the two exported components were read; the mapping from message role to each variant was not traced."
+ },
+ "TRNS-004": {
+  "behavior": "Each assistant message is rendered from its parts: text parts through the markdown renderer, reasoning parts as a collapsible 'Thinking'/'Thought'/'Thought briefly'/'Thought for {duration}' disclosure, and tool parts through the tool feed. An empty continuation after a tool start is dropped rather than leaving an empty header.",
+  "states": "text part, reasoning part (collapsed/expanded, live vs settled), tool part, empty continuation (not rendered)",
+  "test": "Private backend: run a turn with reasoning and a tool call; assert a 'Thought for Ns' disclosure appears above the reply.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:132-174, 217-221 (ThinkingBlock with 'Thinking'/'Thought process' labels)",
+  "unsure": "MESSAGE_PARTS_COMPONENTS is exported as one mapping object; I did not enumerate every part kind."
+ },
+ "TRNS-005": {
+  "behavior": "Assistant text renders as markdown: headings, lists, emphasis, links (with a hover-revealed full URL label), images ('Loading {name}...' → 'Open {name}' if it fails), blockquotes and hr. Raw HTML is shielded by markdown-preprocess so directive lines do not leak as text.",
+  "states": "prose, link (loading/loaded/broken label), image loaded ('Open {name}' on failure), code fence (delegated), streaming",
+  "test": "Private backend: send a reply containing a heading, a list, a link and a broken image; assert each renders with the expected label.",
+  "rust_evidence": "crates/hermes-core/src/markdown.rs:198 (split into prose/code/table segments); crates/hermes-ui/src/rows.rs:60 (markdown() → StyledText::from_markdown with plain-text fallback)",
+  "unsure": "Slint StyledText renders only the CommonMark inline subset, so headings/lists may differ from the Electron output; rows.rs does not consume markdown::split()."
+ },
+ "TRNS-006": {
+  "behavior": "GFM tables render in a dedicated table view: header row plus resizable columns (drag the header sash; widths persist per table key via markdown-table-widths), with the separator dashed on hover.",
+  "states": "rendered, column resizing (sash hover, drag), persisted widths, narrow/overflow",
+  "test": "Private backend: send a table and assert it renders as a grid with borders, then drag a header divider and assert the width sticks.",
+  "rust_evidence": "crates/hermes-core/src/markdown.rs:13-15, 254 (table detection with buffered incomplete delimiter/row) — not rendered as a grid in the Slint UI",
+  "unsure": "chat.slint has no table component; tables currently fall through StyledText, so cell layout is unverified."
+ },
+ "TRNS-007": {
+  "behavior": "Fenced code blocks render with Shiki syntax highlighting and a copy affordance ('Copy code'), keeping the same pre/code geometry during the debounce so an empty intermediate render does not jump the layout.",
+  "states": "highlighting (debounced, geometry held), highlighted, copied, unknown language (plain), long block",
+  "test": "Private backend: send a ```rust fence and assert tokens are coloured and a Copy button appears.",
+  "rust_evidence": "crates/hermes-core/src/highlight.rs:436-517 (syntect worker, class-based spans) — no code-block view wired into the Slint UI (rows.rs uses StyledText only)",
+  "unsure": "Whether a coding PR wires highlight.rs into chat.slint is unverified in this checkout; no reference from hermes-ui was found."
+ },
+ "TRNS-008": {
+  "behavior": "Diff content renders through the diff view: file headers stripped from the body, per-line +/- colouring, an expandable file panel, and virtual padding for lines before/after the preview window.",
+  "states": "rendered diff, collapsed/expanded file panel, long diff (virtual padding), inline code",
+  "test": "Private backend: run a patch tool call and assert added/removed lines are green/red with line numbers.",
+  "rust_evidence": "crates/hermes-core/src/diff.rs (unified-diff parser with +/- counts, code_index) — no diff view in the Slint UI; ToolRow only carries added/removed counts (rows.rs:14)",
+  "unsure": "The Rust tool row shows +N/-N badges but no line-level diff rendering."
+ },
+ "TRNS-009": {
+  "behavior": "Tool output and terminal text containing ANSI SGR codes render with their colours (parseAnsi → ansiColorClass) instead of raw escape sequences.",
+  "states": "plain text (no codes), colourised, unknown/unsupported codes stripped",
+  "test": "Private backend: run a command that emits coloured output and assert no literal '[31m' appears and the text is tinted.",
+  "rust_evidence": "",
+  "unsure": "No ANSI parser in the Rust repo; tool output is shown verbatim in ToolGroup (chat.slint:118-126)."
+ },
+ "TRNS-010": {
+  "behavior": "Reasoning streams into a collapsible disclosure: WS reasoning.delta fills it live with a shimmering 'Thinking' label, and on settle the label becomes 'Thought for {duration}' (or 'Thought briefly'). Collapsed-by-default and the show/hide preference come from config (`display.show_reasoning`).",
+  "states": "hidden by config, live ('Thinking', shimmer), settled collapsed, settled expanded, not available",
+  "test": "Private backend: run a reasoning-capable model and assert a disclosure appears while thinking and collapses to 'Thought for Ns' when the reply starts.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:132-174, 217-221 (ThinkingBlock, 'Thinking' vs 'Thought process'); crates/hermes-core/src/transcript.rs:275 (reasoning.delta)",
+  "unsure": "Rust shows reasoning whenever a reasoning string exists (or while streaming with empty text); the `display.show_reasoning` config gate is not consulted in the UI."
+ },
+ "TRNS-011": {
+  "behavior": "Reasoning effort maps to discrete step levels (REASONING_STEP_LEVELS, normalized) and a per-session effort choice is written through RPC config.set for that session, so step rows can show/step the level.",
+  "states": "level list, normalized/clamped level, per-session override written",
+  "test": "Private backend: change the effort level and assert the session's config.set payload carries the normalized level.",
+  "rust_evidence": "",
+  "unsure": "This row is about the effort *levels* module; the visible 'reasoning step rows' UI was not found in the file listed."
+ },
+ "TRNS-012": {
+  "behavior": "While a turn runs, a turn-activity indicator narrates what the agent is doing (from tool.start/tool.complete) and stays quiet for silent tools; after TURN_QUIET_S with no events it switches to the generic thinking state so the same seconds are not counted twice.",
+  "states": "narrating a tool, quiet (thinking), settling, done",
+  "test": "Private backend: run a multi-tool turn and assert the status line text follows the running tool and falls back to 'Thinking' between calls.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:281-299 (live status line with ShimmerText and sparkles pulse)",
+  "unsure": "The Rust status string comes from AppState.status supplied by the controller; whether it narrates individual tools was not traced."
+ },
+ "TRNS-013": {
+  "behavior": "At the end of a turn the tool calls collapse into a one-line run summary ('Ran 2 commands', 'Edited 1 file', 'Recovered after 1 failed step', '1 step failed', 'Failed to list skills' when a skill call failed), expandable to the individual rows.",
+  "states": "running summary, done summary, recovered, failed ('N steps failed'), expanded/collapsed, skill-activity variant",
+  "test": "Private backend: run a turn with two shell commands and assert the collapsed row reads 'Ran 2 commands' and expands to two rows.",
+  "rust_evidence": "crates/hermes-ui/src/rows.rs:40-58 (group_label: 'Ran N commands'/'Edited N files'/'Used N tools'/'Running <cmd>'); crates/hermes-ui/ui/chat.slint:36-130 (collapsible ToolGroup)",
+  "unsure": "The Rust label set does not include recovered/failed phrasings; rows.rs has no 'step failed' wording."
+ },
+ "TRNS-014": {
+  "behavior": "When a turn changed files, a changed-files card lists them with diff counts and links; the header reads '{n} files changed' (singular '1 file changed') and rows open the file/diff.",
+  "states": "hidden (no changes), listed, row hover, diff unavailable",
+  "test": "Private backend: run a patch tool call and assert a changed-files card lists the edited file with a +N/-N count.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:65-66 (per-row +N/-N badges) — no changed-files card",
+  "unsure": "changed-files-card.tsx is 3.4 KB; the data source (REST /api/git vs local diff) was not confirmed from the component."
+ },
+ "TRNS-015": {
+  "behavior": "A timeline rail beside the transcript marks turns and jumps to them; clicking an unloaded entry requests that window with a per-entry loading state, and older turns behind the window show 'Show earlier messages'.",
+  "states": "rail visible, entry hover, entry loading (loadingId), jump executed, 'Show earlier messages' affordance",
+  "test": "Private backend: with a long transcript, click a rail entry and assert the transcript scrolls to that turn.",
+  "rust_evidence": "",
+  "unsure": "The rail's visibility rule and the aria label 'Conversation timeline' come from timeline.tsx only; the list side lives in list.tsx."
+ },
+ "TRNS-016": {
+  "behavior": "Timestamps appear on message hover ('Today, {time}' / 'Yesterday, {time}') and as a timeline stamp next to rail entries; hover time is hidden while a stop/restore control occupies the slot.",
+  "states": "hover (timestamp shown), running (replaced by Stop), restore available, hidden",
+  "test": "Private backend: hover a settled assistant row and assert a relative timestamp appears.",
+  "rust_evidence": "",
+  "unsure": "MessageHoverTime is a separate component not probed; only timeline-timestamp.tsx was read."
+ },
+ "TRNS-017": {
+  "behavior": "Messages carry emoji reactions: a quick-reaction row (hover-tinted chips), a searchable picker ('Search…'), and a badge row showing counts; toggling sends RPC message.react and other clients' changes arrive via WS message.reaction.",
+  "states": "none, reacted by me (active), counts with others, picker open, search no-results, streaming message (react disabled)",
+  "test": "Private backend: react to an assistant message and assert a badge with count 1 appears and survives a reload.",
+  "rust_evidence": "",
+  "unsure": "QUICK_REACTIONS contents (which emoji ship) were not enumerated."
+ },
+ "TRNS-018": {
+  "behavior": "When vibe hearts are enabled (a local pref), a heart burst plays over the composer as a celebration (e.g. on a first successful reply); disabled means no animation at all.",
+  "states": "enabled, disabled, bursting, reduce-motion",
+  "test": "Not testable in the Rust app: no celebration animation exists.",
+  "rust_evidence": "",
+  "unsure": "The trigger condition for a burst was not read (vibe-hearts.tsx is a canvas/field renderer); reduce-motion handling unverified."
+ },
+ "TRNS-019": {
+  "behavior": "Paragraphs can contain registry-backed transcript directives (a plugin registers a directive id and a renderer); the directive is resolved per paragraph and the surrounding text keeps its plain-text projection when unresolved.",
+  "states": "resolved (custom block rendered), unresolved (plain text), plugin hot-loaded",
+  "test": "Not testable in the Rust app: no directive registry.",
+  "rust_evidence": "",
+  "unsure": "The directive syntax itself lives in lib/transcript-directives.ts (segmentTranscriptDirectives) and was read only at export level."
+ },
+ "TRNS-020": {
+  "behavior": "An artifact produced by the session renders inline as a card: kind label ('Code' / 'Interactive page' / 'Graphic'), 'Generating… {n} lines' while streaming, '{n} versions' badge, and an 'Open' button that opens the artifact view.",
+  "states": "generating (live line counter), ready (Open enabled), streaming (Open disabled), versioned, missing body",
+  "test": "Private backend: ask for an HTML artifact and assert the card appears with 'Open' once generation finishes.",
+  "rust_evidence": "",
+  "unsure": "The artifact registry/store behind the card was not probed."
+ },
+ "TRNS-021": {
+  "behavior": "A preview directive renders a sandboxed inline frame of a file/preview inside the transcript, sized from measured content, with a skeleton ('animate-pulse') while it loads; theme variables are bridged into the frame and postMessage acknowledgements are throttled.",
+  "states": "loading (pulse skeleton), rendered, measurement ack, unavailable preview",
+  "test": "Not testable in the Rust app: no inline preview frame.",
+  "rust_evidence": "",
+  "unsure": "inline-preview-directive.tsx is 21 KB (intent scripting, chrome injection); the full directive grammar was not read."
+ },
+ "TRNS-022": {
+  "behavior": "A generated image renders inline with a zoom/open affordance (aria-label 'Rendering image' while pending with aria-live=polite), and actions to open or download it appear on hover.",
+  "states": "pending ('Rendering image', polite live region), loaded (hover actions), download in progress ('saving'), failed",
+  "test": "Private backend: ask for an image and assert an inline image appears with hover actions.",
+  "rust_evidence": "",
+  "unsure": "The zoomable-image.tsx sibling listed in the row was not read."
+ },
+ "TRNS-023": {
+  "behavior": "A video produced in the transcript plays inline; playback position is remembered per video key so a re-render does not restart the clip.",
+  "states": "loaded, playing, position remembered/restored, loading (skeleton)",
+  "test": "Not testable in the Rust app: no video element.",
+  "rust_evidence": "",
+  "unsure": "Whether the video directive is the same as the inline-preview directive was not confirmed."
+ },
+ "TRNS-024": {
+  "behavior": "A ```mermaid fence renders as a diagram via a mermaid renderer (cached by source), falling back to the code block when rendering fails.",
+  "states": "rendering, rendered (cached), failed (code fallback)",
+  "test": "Not testable in the Rust app: mermaid is not bundled.",
+  "rust_evidence": "",
+  "unsure": "The failure fallback path (fail.tsx / rich-boundary.tsx) was not read."
+ },
+ "TRNS-025": {
+  "behavior": "Links to known providers (YouTube, X, Spotify, Instagram, TikTok, Pinterest, Vimeo, Maps) render as rich embeds when the provider matches; the providers live under embeds/providers and each supplies its own frame URL (e.g. pinterest → assets.pinterest.com/ext/embed.html?id=…).",
+  "states": "provider matched (embed frame), not matched (plain link), provider disabled by consent",
+  "test": "Not testable in the Rust app: no embed rendering.",
+  "rust_evidence": "",
+  "unsure": "The row's source is a glob (embeds/providers/*); I read providers/detect.test.ts only, so the per-provider URL rules are partly unverified."
+ },
+ "TRNS-026": {
+  "behavior": "Before an embed loads, a facade/consent prompt asks whether to allow that provider (privacy gate: loading an embed reaches a third party). Allowing grants that provider for the session; embed mode and allowed-provider state live in $embedMode/$embedAllowed.",
+  "states": "facade (not yet allowed), consent prompt, allowed, declined, cleared",
+  "test": "Not testable in the Rust app: no embeds.",
+  "rust_evidence": "",
+  "unsure": "The consent copy itself was not located (embed-consent.tsx has no localised strings in en.ts that I matched)."
+ },
+ "TRNS-027": {
+  "behavior": "Inline SVG, listing and frame embeds render through their own renderers (SvgRenderer, listing-embed, frame-embed) inside the same embed boundary as the social providers.",
+  "states": "svg rendered, listing rendered, frame rendered, failure boundary",
+  "test": "Not testable in the Rust app.",
+  "rust_evidence": "",
+  "unsure": "Only svg-embed.tsx was probed; listing-embed.tsx and frame-embed.tsx were not opened."
+ },
+ "TRNS-028": {
+  "behavior": "If Stop lands before the agent honours the interrupt, the interrupted `message.complete` partial is merged into the stopped bubble — extend-only, so a shorter or different text never replaces what the user already saw; if nothing was painted, the partial is added as a new row. The row is labelled 'Response stopped'.",
+  "states": "stopped with painted bubble (extended), stopped with nothing painted (row added), shorter partial rejected, settled (non-interim)",
+  "test": "Private backend: press Stop mid-reply and assert the bubble keeps its text and is marked stopped, then assert no duplicate row appears.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:479 ('session.interrupt') — no partial-merge logic found",
+  "unsure": "The row's source path is interrupted-reply.tsx but the implementation is interrupted-reply.ts (2331 bytes); I read its comments, not the merge helper."
+ },
+ "TRNS-029": {
+  "behavior": "The transcript keeps only a bounded window of messages in the DOM: a budget plus a minimum message count, windows aligned to branch groups, grown by an advance window when the user scrolls up, capped by MAX_SESSION_WINDOWS per session.",
+  "states": "full (inside budget), windowed, advancing on scroll-up, capped at max windows",
+  "test": "Skip (perf): open a very long live session and assert scrolling stays smooth and older turns load on demand.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:266-279 (ListView = virtualised rows, single `for` child)",
+  "unsure": "Rust truncates long tool output (rows.rs:29, 200 lines) rather than windowing messages; no message-count budget exists."
+ },
+ "TRNS-030": {
+  "behavior": "Opening a session restores its scroll position; while streaming the view sticks to the bottom, and scrolling up marks the thread as scrolled-up and reveals a 'Scroll to bottom' button that also shows an animated count of messages below the viewport.",
+  "states": "at bottom (button hidden), scrolled up (button visible, count animating), approval pending ('Approval needed' variant), session switched (state reset)",
+  "test": "Private backend: stream a long reply, scroll up, assert the follow stops and a scroll-to-bottom button appears; click it and assert the tail is pinned again.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:270-272 (follow recomputed on scroll), 320-323 (scroll-to-end); app-window.slint autoscroll hook",
+  "unsure": "Rust has no persisted per-session scroll restore and no visible scroll-to-bottom button (it auto-follows)."
+ },
+ "TRNS-031": {
+  "behavior": "Press ⌘/Ctrl+F → the find bar opens over the transcript with a query field and a match counter ('{n}/{m}' style label); while open it claims ⌘G / ⌘⇧G for next/previous ('Next match' / 'Previous match'). Esc closes it and clears the query.",
+  "states": "closed, open (no query), matches found (ordinal + count), no matches, closed (query reset, selection restored)",
+  "test": "Private backend: open find, type a word present in the transcript, assert the counter and that ⌘G steps to the next hit.",
+  "rust_evidence": "",
+  "unsure": "Rust binds Ctrl+N/,/B/Q/Tab only; no find bar exists. The exact counter copy was not found in en.ts."
+ },
+ "TRNS-032": {
+  "behavior": "With text selected in the terminal or preview pane, press ⌘/Ctrl+L → the selection is captured (capture-phase, stopping propagation) and sent into the composer as context instead of focusing it; the selection is fenced as transport so a later chord cannot re-inject the same output.",
+  "states": "no selection (chord focuses composer), selection present (selection wins), already-consumed label (no re-injection)",
+  "test": "Not testable in the Rust app: no terminal/preview selection model.",
+  "rust_evidence": "",
+  "unsure": "The row points at actions.ts (read-only keybind row 'Send selection to composer', mod+l); the handler lives in the terminal/preview components I did not open."
+ },
+ "TRNS-033": {
+  "behavior": "A chat text-scale preference (presets) scales transcript typography independently of the UI zoom, applied live from the store.",
+  "states": "preset values, live change, persisted",
+  "test": "Change the Rust app's chat text scale setting and assert the transcript font size changes.",
+  "rust_evidence": "crates/hermes-ui/ui/theme.slint (Theme.fs-* tokens, single scale)",
+  "unsure": "Rust has one fixed type scale; whether any chat-only scale setting exists in settings.rs was not checked."
+ },
+ "TRNS-034": {
+  "behavior": "Copying a selection serialises the selection structure and guarantees readable ink on the clipboard: the guard rewrites colours that would be invisible on the copied background; same-scheme, editable-field and empty selections pass through untouched.",
+  "states": "guard installed, dark-on-dark fixed, light-on-light fixed, passthrough (editable field / empty)",
+  "test": "Select part of a reply, copy it and paste into a light document; assert the text is readable.",
+  "rust_evidence": "",
+  "unsure": "The guard is a renderer-side clipboard hook; whether Slint exposes an equivalent copy path was not verified."
+ },
+ "TRNS-035": {
+  "behavior": "The transcript is virtualised: a render budget per pane (clamped for hidden panes), anchor-before-prepend handling, run-start snapping and re-pinning on reload; empty sessions render the empty placeholder, loading sessions a spinner and 'Loading session'.",
+  "states": "empty (placeholder), session loading (spinner + 'Loading session'), populated, windowed, text selected (backfill frame), hidden pane (reduced budget)",
+  "test": "Private backend: open a long session and assert only a bounded number of rows is rendered while scrolling stays smooth.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:266 (ListView virtualises rows)",
+  "unsure": "list.tsx is 67 KB; the budget/snap policy details were read from exported names only."
+ },
+ "TRNS-036": {
+  "behavior": "If a single message's renderer throws, an error boundary catches it and shows a fallback in place of that message so the rest of the transcript keeps rendering.",
+  "states": "normal, render error (inline fallback), recovery on re-render",
+  "test": "Not directly testable against the Rust app; verify no crash occurs when a row fails to lay out.",
+  "rust_evidence": "",
+  "unsure": "The fallback copy for a failed message was not located in en.ts."
+ },
+ "TRNS-037": {
+  "behavior": "Timeline jumps are remembered as a history: jumping to a turn pushes an entry so the user can go back/forward ('Go forward') through visited positions, and switching sessions resets the history.",
+  "states": "no history, entries pushed, forward available, reset on session switch",
+  "test": "Not testable in the Rust app: no timeline rail.",
+  "rust_evidence": "",
+  "unsure": "use-timeline-history.ts is 4 KB; the exact back/forward UI (Go forward is the only i18n string) was not confirmed."
+ },
+ "TOOL-001": {
+  "behavior": "Each `tool.start` creates a row that narrates the call using a per-tool title ('Reading file' → 'Read file', 'Running command' → 'Ran command', 'Searching web' → 'Searched web', 'Scripting' → 'Ran code'); `tool.output`/streamed text fills the body and `tool.complete` flips the status icon to Done ('Done'/'Error'/'Recovered'), with the row collapsible.",
+  "states": "pending (spinner, e.g. 'Running command'), streaming output, Done, Error, Recovered, collapsed/expanded, interrupted ('Interrupted'), result unavailable ('Result unavailable')",
+  "test": "Private backend: run a prompt that calls the terminal, then assert a collapsed tool group row appears while running and settles to a done state with output available on expand.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:36-130 ('Ran N commands' group, '$ cmd' rows, spinner when state == 0, danger colour when state == 2); crates/hermes-ui/src/rows.rs:12-38",
+  "unsure": "The row's source is a glob (`tool/*`); I did not open fallback.tsx's full feed chrome or the per-tool renderer table."
+ },
+ "TOOL-002": {
+  "behavior": "A tool result renders a one-line summary plus metadata: 'Returned {n} items' (or '0 items' / 'Returned an empty object' for JSON), and failures extract a readable error message via extractToolErrorMessage instead of dumping the raw payload.",
+  "states": "items summary, empty object, zero items, error extracted, metadata tooltip",
+  "test": "Private backend: run a tool that returns a list; assert the row summary reads 'Returned N items' and the error form for a failing tool reads cleanly.",
+  "rust_evidence": "crates/hermes-ui/src/rows.rs:29 (truncate_lines: '… N earlier lines' tail)",
+  "unsure": "The exact phrasing of formatToolResultSummary was only partly visible; the Rust row has no summary line, only truncated output."
+ },
+ "TOOL-003": {
+  "behavior": "A tool-view preference switches tool rows between 'product' summaries and a 'technical' view, and optionally hides code diffs; the disclosure open/closed state per tool row is persisted (capped at 240 entries) and Simple mode forces product mode with diffs folded without changing either preference.",
+  "states": "product (default), technical, hide-code-diffs on/off, disclosure open/closed persisted, Simple-mode override",
+  "test": "Switch the Rust app's tool view mode and assert tool rows change between product phrasing and technical form.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:178 (transcript-mode 0 normal / 1 thinking / 2 verbose drives the same idea)",
+  "unsure": "Rust's transcript-mode is a single tristate setting, not two independent preferences; whether it is persisted per session was not checked."
+ },
+ "TOOL-004": {
+  "behavior": "Terminal tool output renders in a dedicated terminal output block (monospace, wrapped, no ANSI escapes left over) rather than as generic prose.",
+  "states": "streaming output, complete, empty output, truncated",
+  "test": "Private backend: run `ls` and assert the output appears in a monospace block with a `$` prefix.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:107 ('$ ' prefix for terminal rows), 118-126 (monospace output, max 14 lines)",
+  "unsure": "Rust elides output beyond 14 lines in the row (rows.rs keeps 200 lines), so long output is not fully viewable."
+ },
+ "TOOL-005": {
+  "behavior": "ANSI colour codes inside tool output are rendered as colours via the shared AnsiText component rather than shown as escape sequences.",
+  "states": "plain, colourised, codes stripped",
+  "test": "Private backend: run a command that emits colour and assert no literal escape text shows in the tool row.",
+  "rust_evidence": "",
+  "unsure": "No ANSI handling anywhere in the Rust repo (core or UI)."
+ },
+ "TOOL-006": {
+  "behavior": "While a tool's arguments/output are still being generated (WS tool.generating), the row shows a pending shimmer/spinner icon (aria-hidden) next to the title until it settles.",
+  "states": "generating (pending icon), settled, none",
+  "test": "Private backend: watch a slow tool call and assert a spinner precedes the completed row.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:54, 105 (Spinner while a tool is running); crates/hermes-ui/src/controller.rs:1027 (tool.generating event handled)",
+  "unsure": "status-pending-icon.tsx is 270 bytes (a shimmer glyph); the Rust spinner is a plain arc spinner, not a shimmer."
+ },
+ "TOOL-007": {
+  "behavior": "Individual tool rows can be dismissed: dismissToolRow adds the row id to a per-session dismissed set ($dismissedToolRows / $toolRowDismissed), hiding it until cleared.",
+  "states": "visible, dismissed, cleared (all restored)",
+  "test": "Private backend: dismiss one tool row and assert it disappears while the rest of the group stays.",
+  "rust_evidence": "",
+  "unsure": "The visible affordance that calls dismissToolRow was not located."
+ },
+ "TOOL-008": {
+  "behavior": "While a tool call is still being drafted (arguments arriving), the session records which tool is drafting ($draftingToolSessions / sessionDraftingTool) so the transcript can show an in-progress card before the call is complete.",
+  "states": "no drafting tool, drafting (per session), cleared",
+  "test": "Private backend: watch a streamed tool call and assert an in-progress card appears before the arguments finish.",
+  "rust_evidence": "",
+  "unsure": "No drafting concept in the Rust repo; tool rows appear only once tool.start arrives."
+ },
+ "TOOL-009": {
+  "behavior": "Tool activity/progress is shown only when the config gate allows it ($showToolActivity from config, toolProgressVisible), and risky output flagged by WS tool.output_risk is surfaced on the row.",
+  "states": "activity hidden by config, visible, risk flagged/warned, cleared",
+  "test": "Private backend: run a tool whose output the backend flags as risky and assert the row shows a warning treatment.",
+  "rust_evidence": "",
+  "unsure": "tool-activity.ts is 774 bytes (only the visibility gate); the risk-surfacing consumer and its rendered form were not found."
+ },
+ "TOOL-010": {
+  "behavior": "A delegate/subagent call renders its own card: a status glyph (pending spinner 'breathe', done check 'Done', error alert 'Error') with an accessible label, expandable to the child's progress and files.",
+  "states": "pending (spinner), done (check), error (alert), recovered (warning tint), expanded/collapsed, open vs cursor-default",
+  "test": "Private backend: run a task that delegates and assert a delegate card appears with a spinner and then a done check.",
+  "rust_evidence": "",
+  "unsure": "The live subagent stream itself lives in the 'Spawn tree' pane ('Live subagent activity for the current turn.', empty state 'No live subagents') — a separate surface not covered by this row."
+ },
+ "TOOL-011": {
+  "behavior": "When a request falls back to another provider/model, the fallback tool card explains the switch: it is collapsible (aria-expanded), shows the recovered/error status ('Recovered', with an amber alert icon), and a technical trace of the run items.",
+  "states": "fallback engaged, recovered, error, collapsed/expanded, technical trace shown, preview scope",
+  "test": "Private backend: force a provider failure to trigger a fallback and assert a fallback card appears with the recovered status.",
+  "rust_evidence": "",
+  "unsure": "fallback.tsx is 43 KB and covers several sub-behaviours (preview scope, vision image, hide-code-diffs); I read only its exported symbols and state classes."
+ },
+ "TOOL-012": {
+  "behavior": "Skill tool calls render a skill-specific title instead of the generic tool name: 'Listing skills'/'Listed skills', 'Loading skill'/'Loaded skill', 'Reading skill resource'/'Read skill resource', with matching failure phrasings ('Failed to load skill', 'Skill result unavailable').",
+  "states": "pending (loading/listing/reading), done, failed, unavailable",
+  "test": "Private backend: run a /skill command and assert the tool row reads 'Loaded skill' rather than the raw tool name.",
+  "rust_evidence": "",
+  "unsure": "The Rust group label uses the raw tool name/context (rows.rs:40), so skill calls would read 'Used 1 tool'."
+ },
+ "TOOL-013": {
+  "behavior": "An MCP setup card asks for the servers to add, showing install/enable/authorize verbs with per-row busy and disabled states; it refuses to submit until required credentials are filled ('Fill in the required credentials first'), reports 'Installed {server}'/'Authorized {server}', and on success notes 'Server saved, but reloading MCP tools failed — they load next session' when the reload fails.",
+  "states": "offer (Install/Enable/Authorize), form (empty → busy+disabled), sending, installed/authorized/enabled, failed, env-required refusal, gateway disconnected ('Hermes is offline right now. Reconnect, then send it again.')",
+  "test": "Private backend: trigger an MCP setup suggestion and assert the card lists servers with an Install action; submit with an empty required field and assert the refusal.",
+  "rust_evidence": "",
+  "unsure": "The card's RPC surface (mcp.* / connectors.*) was not enumerated from the component."
+ },
+ "TOOL-014": {
+  "behavior": "A catalog-install tool card lists catalog entries (expandable name list) with Install actions; while sending, the card disables controls and shows an indeterminate progress bar labelled with the 'installing' copy.",
+  "states": "listed, expanded names, installing (indeterminate progress, disabled), installed, failed",
+  "test": "Private backend: ask to install a plugin and assert the card shows a list plus an Install button and a progress bar while installing.",
+  "rust_evidence": "",
+  "unsure": "The RPC used to install (plugins.manage appears in the file) was only seen as a string; the row declares no RPC surface."
+ },
+ "TOOL-015": {
+  "behavior": "Connector tool cards drive a connection request: each row has a verb (open/authorize/…) whose phases (CONNECTOR_CARD_PHASES) control enabled/busy/disabled; a refused re-mint toasts and leaves the row unchanged, focus is handed off to the new row, and disabled rows refuse focus.",
+  "states": "offer, working (busy), waiting for link (verb disabled), open, done, refused re-mint (toast), keyboard focus handoff",
+  "test": "Private backend: trigger a connector request, click Authorize, and assert the card moves to a working state and then a done link.",
+  "rust_evidence": "",
+  "unsure": "The `connectors.*` RPC family and the directory-card sibling were not enumerated."
+ },
+ "TOOL-016": {
+  "behavior": "An agent-spawned chat is rendered as a tool card in the transcript, offering to open the new session (RPC session.create under the hood).",
+  "states": "created (open link), creating, failed",
+  "test": "Not testable: verify in the Rust app that no such card exists and record the gap.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:888 ('session.create') — used for the New chat button, not for an in-transcript card",
+  "unsure": "src/components/assistant-ui/start-chat-tool.tsx does not exist in this checkout, and no start_chat tool title is in en.ts — I could not confirm what renders this."
+ },
+ "TOOL-017": {
+  "behavior": "When a turn dispatches work to another agent/session, a delivery notice row renders in the transcript naming the target ('dispatched to {target}') with the agent avatar and the reply text from the result, expandable like a system notice.",
+  "states": "dispatched, reply received, avatar present, expandable",
+  "test": "Private backend: run a delegated task and assert a delivery row names the target agent.",
+  "rust_evidence": "",
+  "unsure": "The exact copy for dispatchedTo/replyTextFromResult was not extracted (no matching en.ts keys found)."
+ },
+ "TOOL-018": {
+  "behavior": "Duplicate final tool rows are collapsed: a continuous run of the same tool is kept as one visual block and a repeated final row (collapse-duplicate-final) is dropped instead of rendering twice after a stream reconnect.",
+  "states": "single row, collapsed duplicates, duplicate final dropped, reconnected stream",
+  "test": "Private backend: interrupt and resume a turn and assert the finished tool row is not duplicated.",
+  "rust_evidence": "",
+  "unsure": "src/lib/tool-run-continuity.ts does not exist in this checkout (only tool-run-continuity.test.ts); the implementation moved and I could not read it."
+ },
+ "TOOL-019": {
+  "behavior": "The renderer for a tool call is chosen by a class mapping: file-edit tools (isFileEditTool), card tools (isCardTool, e.g. connection cards keyed by CONNECTION_CARD_KEY), silent tools (isSilentTool, no row) and everything else falls back to the generic row.",
+  "states": "generic row, file-edit row, card row, silent (no row)",
+  "test": "Private backend: run a silent tool and assert it does not add a row; run a file edit and assert the edit-styled row.",
+  "rust_evidence": "crates/hermes-ui/src/rows.rs:52-57 (is_command / is_edit distinctions drive 'Ran N commands' vs 'Edited N files')",
+  "unsure": "The concrete isSilentTool / isCardTool name lists were not enumerated from tool-render-class.ts."
+ },
+ "TOOL-020": {
+  "behavior": "A run ticker shows elapsed time next to a running tool group (ToolRunTicker) and stops when the run settles.",
+  "states": "running (ticking), settled (frozen), hidden",
+  "test": "Private backend: watch a running tool group and assert a duration grows on the row, then freezes.",
+  "rust_evidence": "crates/hermes-ui/src/rows.rs:26 (per-tool duration formatted '{d:.1}s' once known)",
+  "unsure": "Rust shows a per-tool duration but no live ticker for the group as a whole."
+ },
+ "TOOL-021": {
+  "behavior": "Tool groups and tool rows are disclosure rows: clicking the header toggles the body ('Ran 3 commands >' style), the caret rotates on expand, the hover background is a tight pill, and aria-expanded is set when the row is toggleable (a non-toggleable row is cursor-default).",
+  "states": "collapsed (caret right), expanded (caret rotated, height animated), hover, focus-visible, non-toggleable (disabled)",
+  "test": "Private backend: click a collapsed tool group and assert the tool rows appear; click again and assert they collapse.",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:36-130 (ToolGroup: chevron rotates 90deg, height+opacity animated, accessible-expandable/expanded)",
+  "unsure": "Rust's expanded state is driven by transcript-mode, not per-row user toggles, so the expansion is not remembered per row."
+ },
+ "TOOL-022": {
+  "behavior": "Tool arguments/results that are JSON can be opened in a document editor with a Format action (aria-label from t.common.formatJson) that pretty-prints the JSON; the editor disables its controls while busy.",
+  "states": "read-only view, editor open, formatted, disabled while busy",
+  "test": "Not testable in the Rust app: tool arguments are not inspectable or editable.",
+  "rust_evidence": "",
+  "unsure": "The `document.json` RPC string appears in the file but its role (load/save of the document) was not confirmed."
+ },
+ "APRV-001": {
+  "behavior": "A server `approval` request renders a card above the composer: title ('Approval needed'), optional description, the command in a monospace block, and 'Deny' / 'Always allow' (when offered) / 'Allow for session' / 'Allow once', footer 'Enter to allow once · Esc to deny'. Pending approvals stack with an animated queue; reduce-motion disables the animation.",
+  "states": "pending, submitting (busy → all buttons disabled), stacked (multiple pending), reduced motion, settled/dismissed, gateway offline ('Reconnect'), 'Command details' expansion",
+  "test": "Private backend: trigger a command needing approval and assert the card shows the command; click 'Allow once' and assert an approval.respond reply and the card dismissing.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:242-281 (ApprovalCard: Deny / Always allow / Allow for session / Allow once + footer 'Enter to allow once · Esc to deny'); crates/hermes-ui/src/controller.rs:1041-1054, 544 ('approval.respond'), 1429 (approval_choices)",
+  "unsure": "Rust renders a single card (no stack/queue or animation) and does not model a submitting/busy disabled state."
+ },
+ "APRV-002": {
+  "behavior": "Approval decisions appear as activity inside the turn they belong to: `isApprovalActivity` marks the events, and `isCurrentTurnMessage` keeps them inside the live turn's activity feed rather than as separate transcript rows.",
+  "states": "approval activity in the current turn, approval activity from an older turn (not shown live), none",
+  "test": "Private backend: approve a command and assert the approval appears in the running turn's activity, not as a standalone row.",
+  "rust_evidence": "",
+  "unsure": "approval-activity.ts is only 653 bytes (two predicates); the component that renders the feed was not located."
+ },
+ "APRV-003": {
+  "behavior": "With an approval card open, Enter on an empty composer allows once; Enter with focus on a button activates that button; Esc denies. The keys are ignored while typing in a non-empty editable target, and buttons that are disabled refuse the key.",
+  "states": "empty composer (Enter = allow once), focus on a button (Enter = activate), non-empty input (Enter types), Esc = deny, disabled button (key ignored), no approval pending (keys released)",
+  "test": "Private backend: with the approval card up, press Enter and assert the command runs; repeat with Esc and assert it is denied.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:331-333 (Esc → deny, Enter on an empty draft → allow once); app-window.slint:332 (checked before Esc-to-Stop)",
+  "unsure": "The Rust handler does not check whether focus is inside an editable field, so a modified Enter while typing may still approve."
+ },
+ "APRV-004": {
+  "behavior": "An approval-mode control offers 'Manual' / 'Smart' / 'Off' (the 'off' option is highlighted as active); choosing one writes the `approvals.mode` config for the profile and the status-bar item reflects it. A profile switch reconciles the mode from that profile's config.",
+  "states": "manual, smart, off (highlighted), profile switched (re-read), save in flight, save failed",
+  "test": "Private backend: switch approvals.mode to Off and assert the backend receives config.set('approvals.mode','off').",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:1022-1030 (\"approvals.mode\", 'Approval Mode', Segmented Manual/Smart/Off); crates/hermes-ui/ui/settings.slint:312 (segmented control rendering)",
+  "unsure": "Rust exposes the mode only inside the Settings modal — there is no status-bar menu or per-profile reconcile."
+ },
+ "APRV-005": {
+  "behavior": "Approval modes are tracked per profile: the store reads `approvals.mode` from the profile config (config.get) and writes changes back with config.set, reconciling when the user switches profiles.",
+  "states": "mode known, mode unknown/unloaded, profile switched (reconciled), write failed",
+  "test": "Private backend: switch profile and assert the approval mode shown follows the new profile's config.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:575, 1278 ('/api/profiles') — the Rust app has no per-profile approval-mode store",
+  "unsure": "The row is titled 'Pending approvals list (RPC approval.pending)' but the referenced source (approval-mode.ts) contains no pending list and no `approval.pending` call."
+ },
+ "APRV-006": {
+  "behavior": "A clarify request renders as an in-transcript tool card of 1–5 questions, each with a hint ('Pick one' / 'Select all that apply'), choice rows, an 'Other (type your answer)' free-text row and a 'Skip' option; the header shows progress ('1 of N answered') and submits the answers as the tool result.",
+  "states": "loading ('Loading question…'), ready, partially answered (progress), multi-select, skipped ('Skipped'), no answer ('No answer'), submitting, send failed ('Could not send clarify response')",
+  "test": "Private backend: trigger a clarify and assert the question card renders with choice rows; pick one and assert the tool row settles with the answer.",
+  "rust_evidence": "",
+  "unsure": "clarify/index.tsx is 3.3 KB (a dispatcher); the per-question UI lives in pending.tsx/core, which I read only partly."
+ },
+ "APRV-007": {
+  "behavior": "Each clarify option is a choice row with a key badge showing the number/letter that selects it ('1', '2', …) and a label; while the request is not ready or an answer is being sent every row is disabled (opacity 50, cursor-not-allowed), including the 'Other' row's badge.",
+  "states": "enabled, hover, focus-visible, disabled (dimmed), selected, multi-select toggled, other-row textarea",
+  "test": "Private backend: with a clarify open, press '2' and assert the second option is chosen and the form submits.",
+  "rust_evidence": "",
+  "unsure": "letterFor/keyBadge mapping (1–9 vs letters) was inferred from APRV-008's title; not read in code."
+ },
+ "APRV-008": {
+  "behavior": "While a clarify card is focused, digits 1–9 select the corresponding option (toggling it in multi-select mode) and Enter submits; the handler bails when the focus is in a text field so typing '2' in the free-text row does not pick option 2.",
+  "states": "keyboard active (choices), text field focused (keys pass through), non-multi (select replaces), multi (toggle), submit on Enter",
+  "test": "Private backend: press '1' then Enter on a clarify and assert the first option is the submitted answer.",
+  "rust_evidence": "",
+  "unsure": "The exact key set (whether letters A–E are also bound, and whether Escape skips) was not read out of use-clarify-keys.ts."
+ },
+ "APRV-009": {
+  "behavior": "A clarify tool call renders in a pending state until the live request lands: every control is disabled while the request is not ready ('Clarify request is not ready yet'), questions arrive progressively (later questions stay disabled behind an earlier one's spinner), and asking a question shows 'Loading question…' rather than an endless spinner. Settled answers render as a settled card.",
+  "states": "not ready (disabled), loading question, ready, answering, staged per question, settled, gateway disconnected ('Hermes is offline right now. Reconnect, then send it again.')",
+  "test": "Private backend: trigger a clarify and assert the card appears disabled then becomes answerable without a spinner staying forever.",
+  "rust_evidence": "",
+  "unsure": "pending.tsx is 12 KB (staging per qid, clarify.lock interaction); the settled rendering is in settled.tsx which I did not read."
+ },
+ "APRV-010": {
+  "behavior": "An onboarding setup clarify asks the user to pick options and confirms with 'Confirm and continue', sending a setup_choose server response.",
+  "states": "picks offered, none selected, confirmed, cancelled",
+  "test": "Not testable in the Rust app: no onboarding/setup clarify surface.",
+  "rust_evidence": "",
+  "unsure": "src/components/assistant-ui/clarify/setup-pending.tsx does not exist in this checkout (only the 'Confirm and continue' and 'Setup note' strings remain), so I could not confirm the current setup-clarify flow."
+ },
+ "APRV-011": {
+  "behavior": "If a clarify request never reached the renderer, the transcript shows an undelivered notice instead of a question: \"This question didn't reach the app, so it can't be answered here. Press Stop to end the turn, then reply in chat.\"",
+  "states": "undelivered notice shown, normal question (notice hidden)",
+  "test": "Private backend: drop the clarify event and assert the notice text appears in place of the question card.",
+  "rust_evidence": "",
+  "unsure": "The notice component is 587 bytes; the trigger condition (use-undelivered) was not read."
+ },
+ "APRV-012": {
+  "behavior": "Resuming or reopening a session restores a still-pending approval (restorePendingApproval) so the card is shown again rather than being lost with the previous renderer.",
+  "states": "restored (card shown), nothing pending, already answered (not restored)",
+  "test": "Private backend: leave an approval pending, switch sessions and come back; assert the card is still there.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:1009-1014 (a server request is cancelled/cleared when its id stops matching, i.e. no restore path)",
+  "unsure": "The clarify half of the row (restore-pending-clarify.ts) was not present in the file list I probed."
+ },
+ "APRV-013": {
+  "behavior": "When the agent asks for a credential, a masked input prompt titled 'Secret required' appears with description 'Hermes needs a credential to continue.' and placeholder 'secret value'; submitting sends the value as the input response (failure: 'Could not send secret').",
+  "states": "requested (input focused), typing (masked), submitting, send failed, gateway disconnected ('Hermes is offline right now. Reconnect, then send it again.')",
+  "test": "Private backend: trigger a secret request and assert a masked field appears and the value is returned as the response (never echoed in the transcript).",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs (server requests other than 'approval' are declined: 'declining unsupported server request')",
+  "unsure": "The prompt rendering lives in a shared prompts component; only the gateway-event handler was read, so the masked-input details come from i18n."
+ },
+ "APRV-014": {
+  "behavior": "A sudo request renders an 'Administrator password' prompt with placeholder 'sudo password' (for both terminal and display-install sudo); submitting returns the password to the waiting request (failure: 'Could not send sudo password').",
+  "states": "requested, typing (masked), submitting, send failed, declined",
+  "test": "Private backend: trigger a sudo prompt and assert the password is sent and the command continues.",
+  "rust_evidence": "",
+  "unsure": "The sudo request arrives through the same input-requests handler as secret/connection; the per-kind distinguishing logic was not read in detail."
+ },
+ "APRV-015": {
+  "behavior": "A connection request (remote OAuth/pairing, MCP or catalog targets) renders a card that names the target and the operation vendors, shows a platform restriction only when the entry is platform-limited, and answers with RPC `connection.respond`; a re-mint is guarded so a refused reissue is a toast and the row is left unchanged.",
+  "states": "offered (link to open), waiting for credentials, working, minted/done, refused re-mint, waiting on env fields, toolkit/account metadata present",
+  "test": "Private backend: trigger a connector connection request and assert the card appears with an authorize action and that answering sends connection.respond.",
+  "rust_evidence": "",
+  "unsure": "connection-request.ts is 21 KB covering catalog/MCP/managed targets; I read only its exported names and the comments attached to them."
+ },
+ "APRV-016": {
+  "behavior": "A free-tier challenge prompt appears when unsigned-in usage is challenged, runs the challenge and reports back with the `free_tier.challenge_result` reply (the free-tier error copy set covers refusal, rate-limit, capacity, outage and route failures).",
+  "states": "challenge shown, running, passed, failed, capacity/rate-limited copy variants",
+  "test": "Not testable against a signed-in private backend; assert no challenge UI exists in the Rust app.",
+  "rust_evidence": "",
+  "unsure": "Only runFreeTierChallenge was found; the challenge's visible prompt copy lives in the freeTier i18n group, which I did not enumerate."
+ },
+ "APRV-017": {
+  "behavior": "Clarify requests are single-flight per session: the store keeps one active request per session id, normalises the question/choice payloads (MAX_CHOICE_CHARS, drops malformed entries, honouring multi_select only alongside surviving choices), and holds settled results separately; the request claims a clarify.lock so a second consumer cannot answer it.",
+  "states": "no request, one active request, settled result kept, malformed choices dropped, unlimited-choice error, lock held/refused",
+  "test": "Private backend: send two clarifys in a row and assert the second cannot be answered until the first settles.",
+  "rust_evidence": "",
+  "unsure": "clarify.ts is 13.5 KB; the lock's refusal path and the empty-session-key behaviour were read only from comments."
+ },
+ "SESS-001": {
+  "behavior": "The sidebar lists sessions from the backend (REST /api/profiles/sessions), grouped by date dividers ('Earlier today', 'Yesterday', 'Earlier this week', 'Earlier this month', 'Last week') with 'Pinned' first, and virtualises once the list passes VIRTUALIZE_THRESHOLD. While loading it shows skeleton rows; an empty list shows 'No sessions yet', a filtered-empty list 'No sessions match these filters'.",
+  "states": "loading (skeletons), populated, pinned group, virtualised (> threshold), empty ('No sessions yet'), filtered empty ('No sessions match these filters'), load failed ('Could not load sessions')",
+  "test": "Private backend: create two sessions and assert both appear under a 'Today'/'Earlier today' divider; type a nonsense search and assert 'No matching chats'.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:1075 ('session.list'), 1086 (publish_sessions); crates/hermes-core/src/sessions.rs:13 (group_by_age → Today/Yesterday/Previous 7 days/Older); crates/hermes-ui/ui/app-window.slint:141-157 (Recents list + 'No chats yet'/'No matching chats')",
+  "unsure": "Rust loads at most 200 sessions in one call and has no paging, pinning or virtualisation; its divider labels differ from the Electron set."
+ },
+ "SESS-002": {
+  "behavior": "The sidebar's recents feed is a separate lighter fetch (REST /api/profiles/sessions/sidebar) rendered by the same section component, with its own empty state and a project-tree skeleton while the overview loads.",
+  "states": "loading (skeletons), populated, empty, projects loading (overview skeleton)",
+  "test": "Private backend: assert the sidebar populates from the recents feed without waiting for the full session list.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:1075 (single 'session.list' call, no sidebar-specific feed)",
+  "unsure": "sessions-section.tsx serves both rows SESS-001 and SESS-002; I could not separate the recents-specific props beyond `emptyState`/`forceEmptyState`."
+ },
+ "SESS-003": {
+  "behavior": "Clicking a session in the sidebar opens it: the renderer hydrates the transcript (RPC session.history / REST /api/sessions/{id}/messages), shows a loading spinner with 'Loading session', and restores busy/running state and the session title, model and cwd.",
+  "states": "loading ('Loading session', spinner), loaded, route/selection mismatch (guard), busy session (running indicator), open failed ('Could not open chat: {e}')",
+  "test": "Private backend: click a session with existing turns and assert its rows render and the title/model/cwd chips update.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:959-999 (open → 'session.resume' + load_history + title/model/effort/cwd labels; error banner 'Could not open chat: {e}')",
+  "unsure": "Rust opens via session.resume with source='desktop' rather than session.history + /api/sessions/{id}/messages; whether a read-only history fetch exists was not confirmed."
+ },
+ "SESS-004": {
+  "behavior": "Press ⌘/Ctrl+N or click 'New session' → a fresh session is created (RPC session.create on first send) and the chat shows the empty intro with the composer focused, route '#/'.",
+  "states": "empty intro shown, draft present, creating, create failed ('Could not create {}: {e}')",
+  "test": "Private backend: press Ctrl+N and assert the transcript empties, the greeting shows and the composer has focus.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:309 (Ctrl+N → new-chat), 397-434 (hero composer focused when rows are empty); crates/hermes-ui/src/controller.rs:888 ('session.create')",
+  "unsure": "Rust's New chat uses session.create eagerly rather than lazily on first send, so an unused chat may leave an empty session behind."
+ },
+ "SESS-005": {
+  "behavior": "Press ⌘T → a new session opens as a tab, created unlisted so the sidebar has no row until its first turn persists; that first send seeds the row with the user's text as a preview, and the server's auto-title supersedes it later.",
+  "states": "tab created (unlisted, reads 'New session'), first send (row seeded), title replaced by server, tab drag (startNewSessionDrag)",
+  "test": "Not testable in the Rust app: no tabs.",
+  "rust_evidence": "",
+  "unsure": "new-session-drag.ts is the drag-to-create path; the ⌘T open path lives elsewhere (keybinds/use-keybinds)."
+ },
+ "SESS-006": {
+  "behavior": "Press ⌘⇧N → a new OS window opens with its own session ('New window'), tracked by the Electron main process (session-windows.ts).",
+  "states": "window opened, main window, per-window session tracking",
+  "test": "Not testable in the Rust app: single window only.",
+  "rust_evidence": "",
+  "unsure": "electron/session-windows.ts was not read line by line; the row is main-process behaviour."
+ },
+ "SESS-007": {
+  "behavior": "Press ⌃Tab / ⌃⇧Tab (also ⌃PageDown/⌃PageUp) → a switcher overlay appears cycling sessions in sidebar order with a highlighted entry; releasing/confirming opens the highlighted session, and the overlay hides after SWITCHER_REVEAL_MS.",
+  "states": "switcher closed, open (highlighted index), wrapping past the ends, revealed then auto-hidden",
+  "test": "Private backend: open three sessions, press Ctrl+Tab and assert focus moves to the next session and wraps to the first.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:323-324 (Ctrl+Tab / Ctrl+Backtab → cycle-session); crates/hermes-core/src/sessions.rs:43 (cycle_index, wrapping at both ends) — no switcher overlay",
+  "unsure": "Rust cycles immediately without showing the switcher HUD, so there is no highlighted preview."
+ },
+ "SESS-008": {
+  "behavior": "Press ⌃1…⌃9 ('Switch to recent session N') → the Nth session in the sidebar order is activated; the slot actions are rebindable and ship unbound by default users can override.",
+  "states": "slot bound/default ctrl+1..9, slot N beyond the list (no-op), rebindable",
+  "test": "Private backend: with 3+ sessions, press Ctrl+2 and assert the second session opens.",
+  "rust_evidence": "",
+  "unsure": "Only the KEYBIND_ACTIONS defaults were read (ctrl+1..ctrl+9); the dispatcher is in use-keybinds, not probed."
+ },
+ "SESS-009": {
+  "behavior": "Closing a session (RPC session.close) detaches the chat without deleting it: the route leaves the session, and it stays listed in the sidebar for later reopening.",
+  "states": "closing, closed (still listed), close failed, close on a running session",
+  "test": "Private backend: close a session and assert it disappears from the open view but is still in the sidebar and reopens intact.",
+  "rust_evidence": "crates/hermes-core/examples/probe.rs:57 ('session.close') — the Rust UI has no close action (sessions are switched, not closed)",
+  "unsure": "The UI affordance for Close was not located in session-actions-menu.tsx."
+ },
+ "SESS-010": {
+  "behavior": "Deleting a session asks for confirmation — 'Delete session?' / 'This will permanently delete \"{title}\". This cannot be undone.' — then sends RPC session.delete, tombstones the row locally ('Deleting…' → 'Session deleted') and removes it from every list; a tombstoned id is never resumed by a later refresh.",
+  "states": "confirm dialog, deleting ('Deleting…'), deleted ('Session deleted'), delete failed, tombstoned (excluded from refresh/resume)",
+  "test": "Private backend: delete a session, confirm, assert it leaves the sidebar and does not reappear after a refresh.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:497 ('session.delete'); error banner 'Could not delete chat: {e}'",
+  "unsure": "Rust deletes without a confirmation dialog and has no tombstone/refresh guard."
+ },
+ "SESS-011": {
+  "behavior": "The session actions menu offers 'Archive' (RPC session.archive, also unarchive), 'Export', 'Copy ID' ('Could not copy session ID'), 'Pin'/'Unpin', 'Mark as read'/'Mark as unread' and 'New window'; the shortcut for archive ships unbound.",
+  "states": "menu open, archive/unarchive, export, copy ID, action failed, item disabled (no session id / no target)",
+  "test": "Private backend: archive a session from its menu and assert it leaves the recents list and appears under the Archived filter.",
+  "rust_evidence": "",
+  "unsure": "session-actions-menu.tsx is 28 KB and also holds the rename flow; the archive item's exact copy comes from sidebar.row.archive/unarchive."
+ },
+ "SESS-012": {
+  "behavior": "Pin/unpin a session (menu item, or Shift-click a chat per the 'Shift-click a chat to pin' hint) → the row moves into a 'Pinned' group and the change is written through REST /api/sessions/{id}; local writes are mirrored until the server confirms (unconfirmed-pin tracking).",
+  "states": "unpinned, pinned (Pinned group, first), pin write unconfirmed, sync failed, all pinned hint ('Everything here is pinned. Unpin a chat to show it in recents.')",
+  "test": "Private backend: pin a session and assert it moves to the Pinned group and the pin survives a reload.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:1097-1099 (SessionItem.pinned exists but is always false — pinning is not implemented)",
+  "unsure": "The transport (REST PATCH vs a pin RPC) was inferred from the store's mirror logic, not from an explicit call site."
+ },
+ "SESS-013": {
+  "behavior": "Rename a session from its menu → 'Rename session' dialog saying 'Leave empty to clear.'; saving sends RPC session.title and the row shows 'Renamed' (failure: 'Rename failed'). Sessions without turns are auto-titled by the backend, and rows without a title fall back to 'Chat {id}' / 'Untitled session'.",
+  "states": "rename dialog, empty title (clear, kept local because the RPC rejects clears), renamed, rename failed, auto title from first message, untitled fallback",
+  "test": "Private backend: rename a session and assert the sidebar label updates and survives a reload.",
+  "rust_evidence": "crates/hermes-core/src/sessions.rs:57 (display_title: title, else preview, else 'Untitled')",
+  "unsure": "Rust has no rename UI; only the display fallback exists."
+ },
+ "SESS-014": {
+  "behavior": "Hide a session from the sidebar (RPC session.set_hidden) so it stays on disk but drops out of the list; list density ('compact'/'comfortable'/'detailed') is a separate local preference stored alongside.",
+  "states": "visible, hidden, density compact/comfortable/detailed",
+  "test": "Private backend: hide a session and assert it leaves the sidebar while still being reachable by search.",
+  "rust_evidence": "",
+  "unsure": "session-list-density.ts (726 bytes) holds only the density atom; the hide action itself is not in this file."
+ },
+ "SESS-015": {
+  "behavior": "A session can be marked unread ('Mark as unread', 'Finished — unread'); opening it clears unread state. Writes go to the backend (REST PATCH /api/sessions/{id}) and are guarded for UNREAD_WRITE_GUARD_MS so a click-through cannot race the write (failure: 'Could not update unread state').",
+  "states": "read, unread, write guard active, mark-all-read ('Mark all as read', disabled when nothing is unread), write failed",
+  "test": "Private backend: mark a session unread, reload, and assert the unread dot is still there; open it and assert the dot clears.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs (no unread state on SessionItem); app-window.slint:45-56 (SessionItem has no unread field)",
+  "unsure": "The REST patch vs RPC choice was inferred from the row's surface field, not from a call site I read."
+ },
+ "SESS-016": {
+  "behavior": "Press ⌘⇧F ('Search sessions') or type in the sidebar search box ('Search sessions…', aria 'Search sessions') → the list is filtered; unsubmitted queries can be matched locally (sessionMatchesSearch) and a server search (REST /api/sessions/search) serves the deep results. Empty result: 'No sessions match \"{query}\".'",
+  "states": "idle, typing (local match), server search in flight, results, no matches, cleared ('Clear search')",
+  "test": "Private backend: type part of a session title in the sidebar search and assert only matching rows remain.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:96-113 (sidebar search box, accessible-label 'Search chats'); crates/hermes-ui/src/controller.rs:1087-1090 (local title filter over the loaded list)",
+  "unsure": "Rust filters only the titles it already loaded (limit 200) — no server-side search over message bodies."
+ },
+ "SESS-017": {
+  "behavior": "Sessions can be sorted by 'Updated' (recency, the default), 'Created', 'Title', 'Cost' or 'Tokens', or ordered 'Manual'; the rank ids override the backend order for the non-recency options only.",
+  "states": "updated (default), created, title, cost, tokens, manual, order override empty for updated/manual",
+  "test": "Private backend: switch the sort to Title and assert the sidebar reorders alphabetically.",
+  "rust_evidence": "crates/hermes-core/src/sessions.rs:13 (age grouping only; rows keep backend order)",
+  "unsure": "The visible sort control (which menu the options live in) was not located — sidebar-sort.ts exports only $sidebarSessionRankIds."
+ },
+ "SESS-018": {
+  "behavior": "A density preference ('compact' / 'comfortable' / 'detailed') changes the row height and how much metadata each session row shows; it is a local preference.",
+  "states": "compact, comfortable (default), detailed",
+  "test": "Switch the Rust app's session density and assert the sidebar row height/metadata changes.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:143-147 (fixed NavItem rows, no density)",
+  "unsure": "Which store persists the density and its default value were not read (the file is 726 bytes, an atom plus setter)."
+ },
+ "SESS-019": {
+  "behavior": "A grouping control cycles the sidebar between flat and workspace-grouped views ('Group by workspace' / 'Ungroup sessions' with aria 'Group sessions by workspace' / 'Show sessions as a single list'); ordering within groups is either recency, manual drag order, or fresh-first reconciliation.",
+  "states": "grouped, ungrouped, manual order, recency order, fresh-first, reorder merged with filters",
+  "test": "Private backend: toggle grouping and assert sessions move under workspace headers and back into one list.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:143-146 (date-divider headers only; no grouping toggle)",
+  "unsure": "The grouping control's shortcut (view.cycleSidebarGrouping) ships unbound by default."
+ },
+ "SESS-020": {
+  "behavior": "Press ⌘/Ctrl+B ('Toggle sessions sidebar') or the titlebar button → the sidebar collapses/expands with an animated width; the state and the pane width persist (layout store, SIDEBAR_DEFAULT_WIDTH…MAX).",
+  "states": "expanded, collapsed (animated width), width custom/reset, persisted across restart",
+  "test": "Press Ctrl+B and assert the sidebar animates closed and back open, and that the state survives a restart.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:34-35 (sb-w animated), 311 (Ctrl+B toggles), titlebar button 'Toggle sidebar (Ctrl+B)'",
+  "unsure": "Rust does not persist the collapsed state or allow a custom sidebar width."
+ },
+ "SESS-021": {
+  "behavior": "The sidebar filter menu ('Filters') groups toggles for Status ('Working', 'Needs input', 'Idle', 'Open', 'Closed', 'Archived', 'Merged'), PR ('No PR'), Profile, Project and 'Unread', plus Grouping/Ordering and 'Reset to defaults'; an unmatched selection shows 'No sessions match these filters'. 'Mark all as read' is disabled when nothing is unread.",
+  "states": "closed, open, filters active, no matches, mark-all-read disabled/enabled, reset to defaults",
+  "test": "Private backend: enable the 'Unread' filter and assert only unread sessions remain.",
+  "rust_evidence": "",
+  "unsure": "filter-menu.tsx is 18 KB; I read only its exported component and the i18n key set, so the exact grouping of each toggle is unverified."
+ },
+ "SESS-022": {
+  "behavior": "Session rows carry a colour dot (per-session override via $sessionColorOverrides, else derived) and a status dot ('Session running' / 'Needs your input' / background task / draft) that tracks live session state without rebuilding on every busy flip.",
+  "states": "no dot, colour override, running (spinner dot), needs input, finished unread, draft, background running",
+  "test": "Private backend: while a turn runs, assert the session row shows a running indicator and clears when the turn settles.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:45-56 (SessionItem has a `running` field, currently never set true by publish_sessions)",
+  "unsure": "Whether the Rust controller ever sets `running` was not confirmed; publish_sessions writes false."
+ },
+ "SESS-023": {
+  "behavior": "Sessions can be shown as tiles in a grid: each tile is a full chat surface with its own transcript, composer, busy pill and resume state; a tile whose backend identity changed is unbound and closed, and tiles resume only when their stored row exists.",
+  "states": "tile open, restoring ('CenteredThreadSpinner'), busy pill, wrong backend (WRONG_BACKEND_TILE_ERROR), resume failed, closed, title backfill",
+  "test": "Not testable in the Rust app: no tile/pane grid.",
+  "rust_evidence": "",
+  "unsure": "session-tile.tsx is 39 KB; I read only its exported guards and comments."
+ },
+ "SESS-024": {
+  "behavior": "Non-session routes can be opened as tiles (route tiles): openRouteTile adds a tile for a route key and closeRouteTile removes it, with a watcher keeping the set in sync.",
+  "states": "tile open, closed, watched/synced",
+  "test": "Not testable in the Rust app: no route tiles.",
+  "rust_evidence": "",
+  "unsure": "route-tiles.ts is 1.5 KB; which routes can tile was not enumerated."
+ },
+ "SESS-025": {
+  "behavior": "The layout supports splitting into panes and mirroring a session into more than one pane, with pane-scoped state and a sash-based shell for resizing.",
+  "states": "single pane, split (multiple panes), mirrored session in two panes, pane focused, footer/leaf pane",
+  "test": "Not testable in the Rust app: single conversation column.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint (single Sidebar + main column; no pane shell)",
+  "unsure": "Both referenced paths are stale — the implementation is src/app/chat/pane-mirror.ts and src/components/pane-shell/ (tree/, geometry.ts, pane-lifecycle.ts), which I did not read."
+ },
+ "SESS-026": {
+  "behavior": "A fleet rail groups live sessions across gateways/profiles ('Agents': DEFAULT_PROFILE, per-profile route keys, a rest bucket with a count of remaining agents) so multi-gateway work is visible at a glance.",
+  "states": "single gateway (rail minimal), multiple groups, rest bucket with count, no agents",
+  "test": "Not testable in the Rust app: one gateway, no fleet rail.",
+  "rust_evidence": "",
+  "unsure": "fleet-rail.ts exports only route-key helpers (fleetRouteKey, buildRestGroups, countRestAgents); the rail component is elsewhere."
+ },
+ "SESS-027": {
+  "behavior": "Sessions can be grouped by gateway and profile, each group collapsible (aria-expanded) with a 'Group actions' menu: rename group ('Display name' — 'Display name only; gateway and profile names stay unchanged.'), move up/down (disabled at the ends), reorder and 'Reset name' (disabled when no alias).",
+  "states": "single group (no headers), multiple groups, group expanded/collapsed, alias set/unset, rename dialog, move up/down disabled at ends",
+  "test": "Not testable in the Rust app: no gateway/profile grouping.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:575, 1278 ('/api/profiles') — profiles are listed for settings, not for sidebar grouping",
+  "unsure": "gateway-groups.tsx was read only through its exported component and i18n strings."
+ },
+ "SESS-028": {
+  "behavior": "Session rows can be reordered by drag (sortable bindings), except where the shell owns the press (shellOwnsPress) so dragging inside a row's own controls does not start a reorder; the resulting order is the manual order.",
+  "states": "dragging, drop target (insertion), shell owns press (no drag), order persisted (manual)",
+  "test": "Not testable in the Rust app: no drag reorder.",
+  "rust_evidence": "",
+  "unsure": "Where the manual order is persisted for sessions (sidebar-sort vs layout) was not traced."
+ },
+ "SESS-029": {
+  "behavior": "When more sessions exist than are shown, a 'Load more' row appears at the bottom of the list; clicking it loads the next page ('Load {step} more') and the row shows 'Loading…' with a spinner and is disabled while loading.",
+  "states": "hidden (all loaded), 'Load more', 'Load {step} more', loading ('Loading…', spinner, disabled)",
+  "test": "Private backend: with more sessions than one page, click Load more and assert additional rows appear.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:1075 (single call with limit 200; no paging)",
+  "unsure": "The page size (SIDEBAR_SESSIONS_PAGE_SIZE) lives in the layout store, not in this component."
+ },
+ "SESS-030": {
+  "behavior": "A session usage/token meter shows the session's token use (RPC session.usage / REST /api/analytics/usage), typically in the status bar, so the user can see context consumption per session.",
+  "states": "unknown (not yet fetched), loaded, growing while streaming, error",
+  "test": "Private backend: send a turn and assert the session's token usage is displayed and increases.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs (no usage field); controller.rs has no session.usage call",
+  "unsure": "use-session-actions/index.ts is 148 KB so I did not find the usage call site; the row's status-bar rendering lives in the shell."
+ },
+ "SESS-031": {
+  "behavior": "A context-usage panel shows the breakdown (RPC session.context_breakdown): 'Context Usage', '{used} / {max} Tokens', '{percent}% Full' and category rows (System prompt, Tool definitions, Skills, Memory, Rules, MCP, Conversation, Subagent definitions), 'Loading breakdown…' while fetching, 'No context data yet' when empty.",
+  "states": "loading ('Loading breakdown…'), loaded, empty ('No context data yet'), refetching after compression/undo, invalidated on session switch",
+  "test": "Private backend: open the context panel after a turn and assert the category rows and token summary render.",
+  "rust_evidence": "",
+  "unsure": "The panel's host component (status bar) was not located; only the hook was read."
+ },
+ "SESS-032": {
+  "behavior": "Branch a session at a message or as a whole (RPC session.branch / session.branch_stored / session.branch_whole): the new branch gets its own session and the create key is stable so the same branch is not created twice; 'Branch in new chat' opens it in a new tab. Empty/ineligible sessions refuse with 'Nothing to branch' / 'Start or resume a chat before branching.'",
+  "states": "branch at message, branch whole, stored vs in-memory branch, create-key dedupe, refusal (nothing to branch / needs an open chat)",
+  "test": "Private backend: branch a session at a message and assert a new session appears containing only the turns up to that point.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:888 ('session.create') — no branch RPC",
+  "unsure": "branch-create-key.ts (1.3 KB) holds only the key helper; the menu item and its copy are elsewhere."
+ },
+ "SESS-033": {
+  "behavior": "Compress a session manually (RPC session.compress): the session is marked compacting ($compactingSessions / sessionCompacting), UI shows the in-progress state, and if a turn is running the compression is deferred (markCompressDeferred) and reconciled when it finishes ('Context compression finished').",
+  "states": "idle, compacting (per session), deferred, deferred-done notification, failed ('Could not compress the conversation')",
+  "test": "Private backend: compress a long session and assert the transcript shrinks and the context panel updates.",
+  "rust_evidence": "",
+  "unsure": "compaction.ts (2.3 KB) is only the store; the trigger (slash command or status bar) was not located."
+ },
+ "SESS-034": {
+  "behavior": "Undo the last turn(s) (RPC session.undo, `/undo [N]`): the removed message is placed back in the composer and a note reports it — 'undid 1 message — the removed message is in the composer' / 'nothing to undo'.",
+  "states": "undone (composer populated), nothing to undo, usage error ('usage: /undo [N]'), multiple undos",
+  "test": "Private backend: send a turn, run /undo, assert the user text returns to the composer and the turn is gone.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs (no session.undo call)",
+  "unsure": "The undo call site in the 148 KB use-session-actions/index.ts was not pinpointed."
+ },
+ "SESS-035": {
+  "behavior": "A target session that is gone is resolved/revived before sending: resolveTargetSessionId checks the stored id and calls session.resume (or session.most_recent) to bring it back, so a send after a restart does not fail with a missing session.",
+  "states": "live session, target missing (resumed), most-recent fallback, resume failed ('Resume failed', 'Session not found'), stranded (overlay)",
+  "test": "Private backend: restart the backend, then send into the previously open session and assert it resumes rather than erroring.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:965 ('session.resume' with source 'desktop'); app-window.slint — resume on open only, not before send",
+  "unsure": "Rust resumes when opening a chat; it does not resolve/revive a target at send time."
+ },
+ "SESS-036": {
+  "behavior": "Session status is polled (RPC session.status) to keep the sidebar's running/needs-input state fresh, and desktop slash commands such as the session commands use it; `/session` style desktop commands are resolved from the desktop command table.",
+  "states": "polled status current, stale, gateway down, status unavailable",
+  "test": "Private backend: start a turn and assert the session row shows running without a manual refresh.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:1003 ('sessions.changed'), 1027-1032 (message.*/tool.generating/status.update event handling) — push-based rather than polling",
+  "unsure": "The row's source (desktop-slash-commands.ts, 34 KB) mentions session.status tangentially; I did not find the polling site."
+ },
+ "SESS-037": {
+  "behavior": "A background sweep prunes dead sessions: when a profile's live list no longer contains a stored session it is declared dead and removed from the UI, with a cap so a constantly-changing busy list cannot starve the sweep. An empty (not yet loaded) list declares nothing dead.",
+  "states": "sweep idle, sweep running, session declared dead/removed, list empty (nothing declared), busy list churn (guarded)",
+  "test": "Private backend: delete a session server-side and assert the sidebar row disappears within one sweep.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:1003 ('sessions.changed' triggers a refresh, which replaces the whole list)",
+  "unsure": "The sweep's interval and the starvation guard's exact rule were read from comments only."
+ },
+ "SESS-038": {
+  "behavior": "A watchdog marks a busy session quiet when its stream goes silent for longer than SESSION_WATCHDOG_TIMEOUT_MS, and a 'gone' latch suppresses further resume attempts for a session the backend no longer knows, so the UI stops retrying and stops showing a phantom spinner.",
+  "states": "busy, quiet after timeout (stalled), gone-latched (no more resumes), recovered",
+  "test": "Private backend: kill a stream mid-turn and assert the session stops showing as running after the timeout.",
+  "rust_evidence": "crates/hermes-core/src/sessions.rs (no watchdog); controller.rs has no stall detection",
+  "unsure": "src/store/session-watchdog.ts does not exist in this checkout (implementation moved into session-states.ts, which exports $stalledSessionIds / SESSION_WATCHDOG_TIMEOUT_MS); I read only those names."
+ },
+ "SESS-039": {
+  "behavior": "A pane or route that can no longer be resolved renders a placeholder instead of a blank area (zones.missingPane → 'missing pane: {paneId}').",
+  "states": "resolved, missing pane placeholder, panes restored",
+  "test": "Skip: verify the Rust app never renders a blank conversation column when a session id is unknown.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs (a failed open shows the banner 'Could not open chat: {e}' and leaves the previous view)",
+  "unsure": "The referenced source (src/app/retirement-view.tsx) is the discontinued-build notice in the updates dialog ('This build of Hermes is no longer supported'), not a broken-session pane — the row's source looks stale."
+ },
+ "SESS-040": {
+  "behavior": "Per-session runtime state is cached per backend/agent scope: $sessionStates keys busy/needs-input/blocked state by a composite scope (gateway + profile + agent), and the pruner keeps only live scopes (busy or needs-input) so a stale scope cannot leak state into another backend's session with the same id.",
+  "states": "scope registered, live scope (busy/needs-input kept), stale scope pruned, secondary-gateway pruned, stalled state",
+  "test": "Private backend: open the same session id via two gateways and assert each surface shows its own busy state.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:940 (single `client` per window; no per-scope cache)",
+  "unsure": "session-states.ts is 126 KB; I read only its exported atoms and the watchdog comments."
+ },
+ "SESS-041": {
+  "behavior": "Unread state is aggregated across connections via the live session roster (RPC session.active_list): a session that finished a turn on another gateway is marked unread here, with the same write guard as local unread changes.",
+  "states": "unread from a remote connection, read locally, guard active, aggregation unavailable",
+  "test": "Private backend: finish a turn on a second connection and assert the session shows as unread.",
+  "rust_evidence": "",
+  "unsure": "The row's source file (session-unread-remote.ts, 3.5 KB) handles the write guard and mark/clear only; the active_list aggregation lives elsewhere."
+ },
+ "SESS-042": {
+  "behavior": "If a routed session exhausts every resume retry, a full-window overlay covers the thread and hides the composer: \"Couldn't load this session\" / 'The connection to this session failed and automatic retries gave up. Check that the gateway is running, then try again.' with 'Retry' and 'Start new session' actions.",
+  "states": "hidden, shown (resume exhausted), retrying, start-new-session taken, dismissed",
+  "test": "Private backend: strand a session (kill and restart the backend while resuming) and assert the overlay with both actions appears.",
+  "rust_evidence": "crates/hermes-ui/src/controller.rs:986 (open failure → banner 'Could not open chat: {e}')",
+  "unsure": "Rust shows a dismissible banner instead of a blocking overlay with a Retry/Start-new-session action row."
+ },
+ "SESS-043": {
+  "behavior": "A hotkey moves focus into the session sidebar so the list can be navigated from the keyboard, with focus returning to the composer on Escape.",
+  "states": "sidebar focused, composer focused, focus released",
+  "test": "Press the sidebar focus chord and assert the session list takes keyboard focus.",
+  "rust_evidence": "",
+  "unsure": "src/store/session-sidebar-focus.ts does not exist in this checkout and I found no equivalent store, so both the chord and the behaviour are unconfirmed."
+ },
+ "PROJ-001": {
+  "behavior": "The sidebar has a Projects section listing saved projects (groups of folders/repos/worktrees) loaded with RPC projects.list; each project expands to its folders/repos and their sessions, and the list degrades to a scan-based view when the RPC is unavailable ($projectsRpcAvailable). The section is labelled 'Projects' with 'New project' and a 'Show projects'/'Show sessions' toggle.",
+  "states": "loading (tree skeleton), populated, empty ('No sessions yet'), RPC unavailable (fallback), scan in progress ($reposScanning), hidden from sidebar ('Hidden from sidebar')",
+  "test": "Private backend: create a project and assert it appears under the Projects section with its folder listed.",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:128 (NavItem 'Projects' — declared but has no clicked handler)",
+  "unsure": "projects.ts is 60 KB; I enumerated its RPC calls (projects.list/create/update/delete/tree/add_folder/… ) but not the full tree model."
+ },
+ "PROJ-002": {
+  "behavior": "Click 'New project' → a dialog titled 'New project' ('Name a workspace and add one or more folders.') with a name field (placeholder 'e.g. Skunkworks'), an 'Add folder' list ('Add folder', 'No folders added yet.', per-row remove), and Create/confirm buttons; while submitting the fields and buttons are disabled.",
+  "states": "closed, open (empty name), name typed, folders added (removable chips), submitting (disabled), create failed ('Could not create project')",
+  "test": "Private backend: create a project named 'Alpha' with one folder and assert it appears in the sidebar and survives a reload.",
+  "rust_evidence": "",
+  "unsure": "project-dialog.tsx (12 KB) is the dialog; whether it is also used for rename was not confirmed."
+ },
+ "PROJ-003": {
+  "behavior": "A project's 'Actions' menu offers 'Rename…' ('Rename project'), 'Appearance' (colour/icon), 'Set active', 'Add folder', 'Hide from sidebar', 'Delete' and folder actions; the menu itself is revealed on hover (aria-label 'Actions'). Renaming sends RPC projects.update.",
+  "states": "menu hidden (revealed on row hover), open, item disabled (project already active), rename dialog, saved",
+  "test": "Private backend: rename a project and assert the sidebar label changes and persists.",
+  "rust_evidence": "",
+  "unsure": "project-menu.tsx serves rows PROJ-003/004/008/009; I could not confirm which items map to projects.update vs add_folder/remove_folder individually."
+ },
+ "PROJ-004": {
+  "behavior": "Deleting a project asks for confirmation, stating 'This removes the saved project from Hermes. Files, git repos, and worktrees stay untouched.', then sends RPC projects.delete and removes the project from the sidebar.",
+  "states": "confirm dialog, deleting, deleted, delete failed, 'Force remove' variant",
+  "test": "Private backend: delete a project and assert it leaves the sidebar while its folder is untouched on disk.",
+  "rust_evidence": "",
+  "unsure": "Whether 'Force remove' is part of the same confirm dialog or a separate removal path (worktree removal) was not confirmed."
+ },
+ "PROJ-005": {
+  "behavior": "Projects can be archived (RPC projects.archive) so they drop out of the sidebar's live list without being deleted.",
+  "states": "active, archived, unarchived",
+  "test": "Private backend: archive a project and assert it stops appearing in the sidebar.",
+  "rust_evidence": "",
+  "unsure": "projects.archive is in the gateway contract but I did not find the call in projects.ts's RPC-name list, so its UI trigger is unconfirmed."
+ },
+ "PROJ-006": {
+  "behavior": "Clicking a project ('Open {label}') enters it — the sidebar scopes to that project's workspace groups (repos and their worktree lanes) — and 'All projects' / 'back' leaves it. Lanes are ordered by most-recent activity with empty lanes sunk last, and empty worktree lanes are injected from a live `git worktree list` as a visual enhancer only, never as session membership.",
+  "states": "all-projects scope, entered project (scoped groups), no folders ('No folders added yet.'), lane expanded/collapsed, empty lane (visual), detached session ('detached')",
+  "test": "Private backend: enter a project and assert the sidebar shows only that project's sessions; go back and assert the full list returns.",
+  "rust_evidence": "",
+  "unsure": "workspace-groups.ts is 38 KB of pure helpers; the enter/leave action and its RPC (projects.set_active) call site were not read."
+ },
+ "PROJ-007": {
+  "behavior": "A project can be marked primary (RPC projects.set_primary) and shows a 'primary' badge; the menu item 'Set active' is disabled for the project that is already active.",
+  "states": "primary (badge), active, disabled item when already active",
+  "test": "Private backend: set a primary project and assert the badge appears on that row only.",
+  "rust_evidence": "",
+  "unsure": "Whether the 'Set active' menu item calls set_primary or set_active (they are different RPCs) was not confirmed."
+ },
+ "PROJ-008": {
+  "behavior": "Add a folder to an existing project from its menu ('Add folder' / 'Add folder' dialog title) → RPC projects.add_folder; the folder appears under the project and new sessions created there use it as the cwd.",
+  "states": "no folders ('No folders added yet.'), folder added, duplicate path, add failed, item disabled without a project path",
+  "test": "Private backend: add a second folder to a project and assert both are listed.",
+  "rust_evidence": "",
+  "unsure": "The path picker itself is Electron-native (select-paths-dialog); the renderer side was not read."
+ },
+ "PROJ-009": {
+  "behavior": "Remove a folder from a project ('Remove' / aria 'Remove folder') → RPC projects.remove_folder; the folder leaves the project but stays on disk.",
+  "states": "folder removable, removed, removal failed, last folder removed (project left empty)",
+  "test": "Private backend: remove a project's only folder and assert the project shows 'No folders added yet.'",
+  "rust_evidence": "",
+  "unsure": "Whether removal is immediate or confirmed was not determined from project-menu.tsx."
+ },
+ "PROJ-010": {
+  "behavior": "A loaded project tree (RPC projects.tree) supplies the folders/repos/worktrees shown in the sidebar, with $projectTreeLoading driving skeleton rows while it loads.",
+  "states": "loading (skeleton), loaded, empty tree, load failed",
+  "test": "Private backend: open a project with a repo and assert the repo plus its worktree lanes appear in the tree.",
+  "rust_evidence": "",
+  "unsure": "project-tree.ts is 636 bytes (an atom); the fetch site and its error handling were not read."
+ },
+ "PROJ-011": {
+  "behavior": "A project's facts (stack, commands and other reconnaissance) are fetched with RPC project.facts and used to prime new sessions and project headers.",
+  "states": "unknown (not fetched), loaded, stale after changes, unavailable",
+  "test": "Private backend: open a project's facts and assert the stack/command summary matches the folder's contents.",
+  "rust_evidence": "",
+  "unsure": "project.facts is in the gateway contract but I did not find its call site in the probed files."
+ },
+ "PROJ-012": {
+  "behavior": "Inside an entered project the sidebar lists that project's sessions (RPC projects.project_sessions), showing skeletons while loading and a retry affordance on failure; nothing loaded yet still reports loading so the sidebar keeps showing skeletons.",
+  "states": "loading (skeletons), loaded, failed (retry), project unknown (no fetch)",
+  "test": "Private backend: enter a project with two sessions and assert exactly those two appear.",
+  "rust_evidence": "",
+  "unsure": "The hook returns {project, failed, loading, retry}; the retry affordance's copy was not located."
+ },
+ "PROJ-013": {
+  "behavior": "The project for the current working directory is resolved (RPC projects.for_cwd) so the sidebar can scope itself to the repo the session lives in; ALL_PROJECTS / exitProjectScope resets that scope.",
+  "states": "scoped to a project, all-projects scope, no project for cwd (unscoped)",
+  "test": "Private backend: open a session whose cwd sits inside a project folder and assert the sidebar scopes to that project.",
+  "rust_evidence": "",
+  "unsure": "project-scope.ts is 1.2 KB (an atom plus exit helper); the for_cwd call site was not found."
+ },
+ "PROJ-014": {
+  "behavior": "Automatic repository discovery scans the configured roots (RPC projects.discover_repos) with a scanning indicator ($reposScanning) and surfaces the repositories it finds as project candidates ('Auto-discovered').",
+  "states": "idle, scanning (indicator), repos found, none found, scan error, discovery disabled (config)",
+  "test": "Private backend: enable repo discovery for a temp folder containing a git repo and assert the repo appears as auto-discovered.",
+  "rust_evidence": "",
+  "unsure": "The scan trigger RPC itself lives in projects.ts (60 KB) and was seen only as a name; the picker/dialog that confirms the discovered repos was not read."
+ },
+ "PROJ-015": {
+  "behavior": "Settings → Projects & discovery exposes discovery: 'Automatic Repository Discovery' ('Scan local folders for Git repositories to show in Projects.'), 'Repository Discovery Roots' ('Folders to scan. Leave empty to scan your home directory.') and 'Excluded Repository Paths', bound to desktop.repo_scan_* config keys.",
+  "states": "enabled/disabled toggle, roots list empty (home) or custom, exclusions list, saved, save failed",
+  "test": "Private backend: set a discovery root and assert config.set('desktop.repo_scan_roots', …) is written and a rescan picks up repos there.",
+  "rust_evidence": "crates/hermes-core/src/settings.rs:962-980 ('desktop.repo_scan_enabled', 'desktop.repo_scan_roots', 'desktop.repo_scan_exclude_paths') — the keys exist in the Rust settings manifest",
+  "unsure": "Rust mirrors the config keys, but the discovery scan itself (projects.discover_repos) is not implemented in the Rust UI."
+ },
+ "PROJ-016": {
+  "behavior": "Repositories the user accepts from a scan are recorded (RPC projects.record_repos) so they become saved projects/entries rather than being re-discovered each time.",
+  "states": "unrecorded (candidate), recorded, record failed",
+  "test": "Private backend: record a discovered repo and assert it persists as a project entry after a reload.",
+  "rust_evidence": "",
+  "unsure": "The confirmation UI that calls record_repos was not located."
+ },
+ "PROJ-017": {
+  "behavior": "Press ⌘⇧B ('New worktree') → a git worktree is created for the active repo in the Electron main process (git worktree add --allow-empty for an empty branch), never initialising a directory that already sits inside a repo; failures toast 'Could not create worktree'. The worktree then appears as a lane in the project tree.",
+  "states": "no repo (unavailable), branch name typed, creating, created (lane appears), create failed, remote backend (probe unavailable), 'Remove worktree' ('Could not remove worktree (uncommitted changes?)')",
+  "test": "Not testable in the Rust app: no git operations.",
+  "rust_evidence": "",
+  "unsure": "electron/git-worktree-ops.ts is main-process code; the renderer-side dialog wiring is in worktree-dialog.tsx, which I read only superficially."
+ },
+ "PROJ-018": {
+  "behavior": "The base-branch picker searches the repo's branches ('Search branches…', 'Loading branches…', 'No branches found', 'No branches found') and preselects the repo's default branch (origin/HEAD) when known; it lists the repo once per mount so an empty list is treated as real.",
+  "states": "loading, list, filtered list, empty ('No branches found'), disabled, preselected default branch",
+  "test": "Private backend: open the picker on a repo and assert branches list with the default preselected.",
+  "rust_evidence": "",
+  "unsure": "base-branch-picker.tsx is 6 KB; the branch source (local git vs backend RPC) was not confirmed."
+ },
+ "PROJ-019": {
+  "behavior": "The 'New worktree' dialog ('Name the branch for this worktree.') takes a branch name (placeholder 'e.g. my-feature') plus a base-branch picker and an 'open existing branch' vs 'new worktree' choice ('Convert a branch' / 'Convert a branch…' — 'Open checked-out branches, or create a worktree for a free branch.'); while pending the controls are disabled.",
+  "states": "open, branch name typed, base branch chosen, branches loading ('Loading branches…'), pending (disabled), create failed ('Could not create worktree')",
+  "test": "Not testable in the Rust app: no worktree dialog.",
+  "rust_evidence": "",
+  "unsure": "The dialog's folder selection and its interaction with the project tree were not traced."
+ },
+ "PROJ-020": {
+  "behavior": "Press ⌘O ('Open folder as project') → the OS folder picker opens and the chosen folder becomes a project (upsert: enters the existing project if one owns the folder, else creates one) with a fresh session anchored there. Unavailable on remote backends.",
+  "states": "picker open, cancelled, folder chosen (project created/entered), remote backend (unavailable)",
+  "test": "Not testable in the Rust app: no native folder picker (the folder chip's pick-folder callback is unbound).",
+  "rust_evidence": "crates/hermes-ui/ui/chat.slint:438-441 ('Project or folder' chip → root.pick-folder()) — the callback has no handler in app-window.slint",
+  "unsure": "electron/select-paths-dialog.ts is 671 bytes (the dialog properties); the confirm/upsert logic lives in the renderer."
+ },
+ "PROJ-021": {
+  "behavior": "Move a session's workspace (session.workspace.move / session.cwd.set) from the composer cwd chip or the project menu ('Move to project', 'Moved to {name}'). A busy session refuses with 'Stop the running turn, then move the chat'; a folderless project says 'That project has no folder to move into'.",
+  "states": "moved ('Moved to {name}'), busy refusal ('Stop the running turn, then move the chat'), no folder, no other projects, move failed ('Could not move session')",
+  "test": "Private backend: move a session into another project and assert its cwd chip changes and the row appears under the new project.",
+  "rust_evidence": "",
+  "unsure": "use-cwd-actions.ts (4.8 KB) surfaces the busy-reason mapping only; the cwd chooser UI is the composer chip, which is unbound in Rust."
+ },
+ "PROJ-022": {
+  "behavior": "A project's appearance can be set: an icon grid (PROJECT_ICONS, each button aria-labelled by its name) and a colour choice ('No color'), saved to the project (RPC projects.update).",
+  "states": "picker open, icon selected, colour selected, 'No color' (cleared), saved",
+  "test": "Private backend: set a colour/icon on a project and assert the sidebar row reflects it after a reload.",
+  "rust_evidence": "",
+  "unsure": "project-appearance.tsx is 2.4 KB; whether the write goes through projects.update was inferred from the row surface, not read."
+ },
+ "PROJ-023": {
+  "behavior": "The sidebar filters the Projects tree to projects that actually have sessions (filterToSessionBearingProjects) so an empty project does not render as a dead group; while the tree is still loading the filter fails open (resolveLiveProjectFilter).",
+  "states": "tree loading (fail-open, all shown), filtered (session-bearing only), live project kept, empty project hidden",
+  "test": "Private backend: create an empty project and assert it does not add an empty group while the tree loads, then is filtered out.",
+  "rust_evidence": "",
+  "unsure": "project-filter.ts is 1.4 KB of pure predicates; the sidebar's use of them was not read."
+ },
+ "PROJ-024": {
+  "behavior": "Workspace pages can contribute their own controls into a shared page header slot (WorkspacePageHeaderControl), so a page owns its header buttons instead of the shell guessing them.",
+  "states": "no controls, controls registered, host context missing (no render)",
+  "test": "Not testable in the Rust app: no workspace page header.",
+  "rust_evidence": "",
+  "unsure": "workspace-page-header.tsx is 1.3 KB of context plumbing; the rendered header lives elsewhere."
+ },
+ "PROJ-025": {
+  "behavior": "The sidebar's top nav links to workspace routes: 'Agents' (/agents), 'Capabilities' (/capabilities), 'Messaging' (/messaging), 'Artifacts' (/artifacts), 'Scheduled jobs' (/cron), plus the session route (/) and Settings; plugins can add rows to the same nav through the `sidebar.nav` registry area, and each row lights up when its route is active.",
+  "states": "default rows, contributed rows, route active (row selected), route inactive, plugin page missing",
+  "test": "Private backend: click each top-nav row in the Rust app and assert the page it opens (Rust shows a single placeholder page for unbuilt sections).",
+  "rust_evidence": "crates/hermes-ui/ui/app-window.slint:128-132 (NavItems 'Projects', 'Artifacts', 'Scheduled', 'Customize'); app-window.slint placeholder 'Nothing on this page yet — its feature is still on the parity checklist.'",
+  "unsure": "Rust only wires 'New chat' and 'Customize'; the other three nav rows are inert placeholders."
+ },
+ "_new_items": [
+  {
+   "section": "Chat & composer",
+   "feature": "Composer placeholder rotation (new session vs follow-up)",
+   "surface": "local",
+   "source": "src/i18n/en.ts (composer.newSessionPlaceholders), src/app/chat/composer/index.tsx",
+   "behavior": "On an empty chat the composer placeholder cycles through 'What are we building?', 'Give Hermes a task', \"What's on your mind?\", 'Describe what you need', 'What should we tackle?', 'Ask anything', 'Start with a goal'; after the first turn it switches to 'Send follow-up' variants ('Send a follow-up', 'Add more context', 'Refine the request', \"What's next?\", 'Keep it going', 'Push it further', 'Adjust or continue'), and to 'Starting Hermes...' / 'Reconnecting to Hermes…' while the backend is not ready."
+  },
+  {
+   "section": "Chat & composer",
+   "feature": "Composer queue panel",
+   "surface": "local",
+   "source": "src/app/chat/composer/queue-panel.tsx, queue-slot.tsx",
+   "behavior": "The queue panel lists parked turns with per-entry 'Edit', 'Delete', 'Send', 'Next' and 'Steer — redirect the live turn now' actions, an expand/collapse control ('Expand'/'Collapse') and a paused state ('{n} Queued — paused', 'Paused by Stop — resume sending the queued turns', 'Resume'); a lost turn reads 'Turn lost during restart' with 'Discard'/'Resume'."
+  },
+  {
+   "section": "Chat & composer",
+   "feature": "Prompt snippets menu",
+   "surface": "local",
+   "source": "src/app/chat/composer/context-menu.tsx (composer.promptSnippets)",
+   "behavior": "The composer's context menu offers 'Prompt snippets…' ('Prompt snippets' — 'Pick a starter prompt to drop into the composer.'): 'Code review', 'Explain this' and 'Implementation plan', each dropping its text into the composer."
+  },
+  {
+   "section": "Chat & composer",
+   "feature": "Composer context menu",
+   "surface": "local",
+   "source": "src/app/chat/composer/context-menu.tsx",
+   "behavior": "Right-clicking the composer offers a context menu (cut/copy/paste style actions plus composer-specific entries) rather than the browser default."
+  },
+  {
+   "section": "Chat & composer",
+   "feature": "Completion drawer / command palette inside the composer",
+   "surface": "local",
+   "source": "src/app/chat/composer/completion-drawer.tsx",
+   "behavior": "A '/'-triggered completion drawer lists 'Commands', 'Skills' and 'Options' with a 'Browse all…' entry and a 'Hotkeys' help footer; each row shows an icon, the command, and its argument hint."
+  },
+  {
+   "section": "Chat & composer",
+   "feature": "Voice menu / voice engine rows",
+   "surface": "local",
+   "source": "src/app/chat/composer/voice-menu.tsx, voice-engine-rows.tsx, voice-fan.tsx",
+   "behavior": "A voice menu ('Voice', 'Voice chat engine') lets the user pick the engine — 'GPT-Live (full-duplex, delegates to Hermes)' ('Needs an OpenAI API key') or 'speech-to-text' — with a fan of mute/unmute ('Mute microphone'/'Unmute microphone') and end controls."
+  },
+  {
+   "section": "Chat & composer",
+   "feature": "Wake-word indicator",
+   "surface": "local",
+   "source": "src/i18n/en.ts (composer.wakeWord*)",
+   "behavior": "With a wake word configured the composer shows its state: 'Wake word \"{phrase}\"', 'Wake word: \"{phrase}\" — listening', '— off' and '— paused during voice chat'."
+  },
+  {
+   "section": "Chat & composer",
+   "feature": "Composer busy-submit gate",
+   "surface": "local",
+   "source": "src/app/chat/composer/busy-submit-state.ts",
+   "behavior": "While a turn runs, the send control reflects the busy-submit policy (submit-as-steer vs queue) instead of silently dropping the press."
+  },
+  {
+   "section": "Chat & composer",
+   "feature": "Discard lost prompt",
+   "surface": "local",
+   "source": "src/app/chat/composer/discard-lost-prompt.ts",
+   "behavior": "A prompt that could not be delivered after a restart is offered back for discard or retry so the draft is not lost silently."
+  },
+  {
+   "section": "Transcript",
+   "feature": "Read aloud from a message",
+   "surface": "local + RPC voice.tts",
+   "source": "src/components/assistant-ui/thread/assistant-message.tsx",
+   "behavior": "A message action 'Read aloud' speaks that reply ('Stop reading' while playing, 'Read aloud failed' on error, hint 'Shift-click: read the full response')."
+  },
+  {
+   "section": "Transcript",
+   "feature": "Message action menu (More actions)",
+   "surface": "local",
+   "source": "src/components/assistant-ui/thread/assistant-message.tsx",
+   "behavior": "A per-message 'More actions' menu holds 'Copy', 'Copy full response', 'Branch in new chat', 'React', 'Read aloud', 'Restore checkpoint' ('Restore checkpoint — rerun from this prompt') and 'Review'."
+  },
+  {
+   "section": "Transcript",
+   "feature": "Checkpoint restore controls",
+   "surface": "local",
+   "source": "src/i18n/en.ts (assistant.thread.restore*)",
+   "behavior": "Per-message checkpoint navigation: 'Restore previous checkpoint'/'Restore next checkpoint', opening a dialog 'Restore to this checkpoint?' with 'Restore & rerun'."
+  },
+  {
+   "section": "Transcript",
+   "feature": "Show earlier messages / backfill",
+   "surface": "local",
+   "source": "src/components/assistant-ui/thread/list.tsx",
+   "behavior": "Scrolling to the top of a windowed transcript offers 'Show earlier messages'; loading the earlier window backfills without moving the viewport."
+  },
+  {
+   "section": "Transcript",
+   "feature": "Response loading / processing states",
+   "surface": "local",
+   "source": "src/i18n/en.ts (assistant.thread.loadingResponse, processingPrompt, loadingLocalModel)",
+   "behavior": "The transcript shows distinct wait copy: 'Hermes is loading a response', 'Processing prompt', and 'Loading {model} into memory' when a local model is being paged in."
+  },
+  {
+   "section": "Transcript",
+   "feature": "Image / video / audio transcript media",
+   "surface": "local",
+   "source": "src/components/assistant-ui/markdown-text.tsx",
+   "behavior": "Media references in replies render inline: images open on click, missing media falls back to 'Open {name}', and audio renders with a 'Preparing audio...' placeholder."
+  },
+  {
+   "section": "Tools",
+   "feature": "Tool feed chrome (group header, counts)",
+   "surface": "local",
+   "source": "src/components/assistant-ui/tool/fallback.tsx",
+   "behavior": "The tool feed shows a group header with counts and status ('N tool calls failed', 'Recovered after N failed steps', '1 step failed') and per-call status icons with accessible labels ('Running', 'Done', 'Error', 'Recovered')."
+  },
+  {
+   "section": "Tools",
+   "feature": "Tool output copy actions",
+   "surface": "local",
+   "source": "src/i18n/en.ts (assistant.tool.copy*)",
+   "behavior": "Each tool row offers copy actions matched to its content: 'Copy command', 'Copy output', 'Copy code', 'Copy file', 'Copy path', 'Copy URL', 'Copy query', 'Copy results', 'Copy content', 'Copy activity' and 'Raw response'."
+  },
+  {
+   "section": "Tools",
+   "feature": "Tool timing and 'this turn took' footer",
+   "surface": "local",
+   "source": "src/i18n/en.ts (assistant.thread.turnDuration)",
+   "behavior": "A finished turn ends with 'This turn took {duration}' so per-turn cost is visible in the transcript."
+  },
+  {
+   "section": "Approvals",
+   "feature": "Approval 'Always allow' rule editor",
+   "surface": "RPC approvals.*",
+   "source": "src/i18n/en.ts (assistant.approval.always*)",
+   "behavior": "'Always allow…' opens a dialog 'Always allow this command?' explaining the pattern that will be permitted ('Always allow' description) with confirm/cancel, so a permanent allow is reviewable."
+  },
+  {
+   "section": "Approvals",
+   "feature": "Approval jump / pending count affordance",
+   "surface": "local",
+   "source": "src/components/assistant-ui/tool/approval.tsx",
+   "behavior": "When an approval is pending below the fold, a 'Approval needed' jump affordance appears (aria-label 'Approval needed') and scrolls the card into view."
+  },
+  {
+   "section": "Approvals",
+   "feature": "Clarify multi-question progress",
+   "surface": "local",
+   "source": "src/components/assistant-ui/clarify/core/question-block.tsx",
+   "behavior": "A clarify with several questions shows '{answered} of {total} answered' and 'N questions' progress, staging one question at a time so later questions stay disabled behind an earlier one."
+  },
+  {
+   "section": "Sessions",
+   "feature": "Session row context menu",
+   "surface": "local",
+   "source": "src/app/chat/sidebar/session-actions-menu.tsx",
+   "behavior": "Right-clicking a session row opens the same action set as its menu ('Session actions'): Rename…, Pin/Unpin, Mark as read/unread, Archive, Export, Copy ID, New window, Open in new tab/split/terminal."
+  },
+  {
+   "section": "Sessions",
+   "feature": "Session import",
+   "surface": "local route",
+   "source": "src/app/routes.ts (SESSION_IMPORT_ROUTE = '/session-import')",
+   "behavior": "A '/session-import' route lets the user import sessions from another Hermes install (session.foreign.list/preview/import RPCs), with its own page rather than a chat."
+  },
+  {
+   "section": "Sessions",
+   "feature": "Command center page",
+   "surface": "local route",
+   "source": "src/app/routes.ts (COMMAND_CENTER_ROUTE)",
+   "behavior": "'/command-center' hosts the command palette/center page opened by ⌘K/⌘P and ⌘. with 'Command palette' and a 'Close command center' control."
+  },
+  {
+   "section": "Sessions",
+   "feature": "Corrupt session-database recovery",
+   "surface": "local",
+   "source": "src/i18n/en.ts (sidebar.storageCorrupt*)",
+   "behavior": "If the session store is damaged the sidebar shows 'Session database is damaged' with a recovery guide, the exact quit/inspect instruction and a 'Recovery guide' link instead of an empty list."
+  },
+  {
+   "section": "Sessions",
+   "feature": "Sidebar header actions (new session in project, mark all read, search aria)",
+   "surface": "local",
+   "source": "src/i18n/en.ts (sidebar.newSessionIn, markAllRead)",
+   "behavior": "The section header offers 'New session in {label}', 'Mark all as read' (disabled when nothing is unread) and hover-revealed actions; the search box is labelled 'Search sessions' for assistive tech."
+  },
+  {
+   "section": "Projects",
+   "feature": "Project idea (IDEA.md) editor",
+   "surface": "local",
+   "source": "src/i18n/en.ts (projects.idea*)",
+   "behavior": "A project has an 'Idea' field ('What's this project about? (saved to IDEA.md)') with 'Generate idea'/'Generating…' and 'Shuffle templates', persisted as IDEA.md in the project folder."
+  },
+  {
+   "section": "Projects",
+   "feature": "Kanban task worktree folding",
+   "surface": "local",
+   "source": "src/app/chat/sidebar/projects/workspace-groups.ts (kanbanWorktreeDir)",
+   "behavior": "Kanban task worktrees (`<repo>/.worktrees/t_<hex>`, the t_… id kanban_db mints) never get their own sidebar lane — they collapse into one session-derived kanban bucket — while user-named 'New worktree' dirs (`<repo>/.worktrees/<slug>`) stay as their own lanes, so ephemeral task checkouts cannot blow the sidebar up into hundreds of empty rows."
+  },
+  {
+   "section": "Projects",
+   "feature": "Worktree lane management",
+   "surface": "local",
+   "source": "src/i18n/en.ts (projects.removeWorktree, projects.copyPath, projects.reveal)",
+   "behavior": "Each worktree lane offers 'Remove worktree' ('Could not remove worktree (uncommitted changes?)'), 'Copy path' and 'Reveal in folder', and shows 'Worktrees' in the coding status bar."
+  }
+ ]
+}

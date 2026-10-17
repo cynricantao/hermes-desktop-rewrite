@@ -1,0 +1,374 @@
+[
+ {
+  "name": "orig-home",
+  "hash": "#/",
+  "controls": 33,
+  "texts": 36
+ },
+ {
+  "name": "orig-command-center",
+  "hash": "#/command-center",
+  "controls": 25,
+  "texts": 19
+ },
+ {
+  "name": "orig-capabilities",
+  "hash": "#/capabilities",
+  "controls": 400,
+  "texts": 276
+ },
+ {
+  "name": "orig-messaging",
+  "hash": "#/messaging",
+  "controls": 66,
+  "texts": 76
+ },
+ {
+  "name": "orig-webhooks",
+  "hash": "#/webhooks",
+  "controls": 22,
+  "texts": 19
+ },
+ {
+  "name": "orig-artifacts",
+  "hash": "#/artifacts",
+  "controls": 27,
+  "texts": 21
+ },
+ {
+  "name": "orig-cron",
+  "hash": "#/cron",
+  "controls": 39,
+  "texts": 35
+ },
+ {
+  "name": "orig-profiles",
+  "hash": "#/profiles",
+  "controls": 25,
+  "texts": 31
+ },
+ {
+  "name": "orig-agents",
+  "hash": "#/agents",
+  "controls": 20,
+  "texts": 16
+ },
+ {
+  "name": "orig-starmap",
+  "hash": "#/starmap",
+  "controls": 20,
+  "texts": 16
+ },
+ {
+  "name": "orig-session-import",
+  "hash": "#/session-import",
+  "controls": 37,
+  "texts": 49
+ },
+ {
+  "name": "orig-settings-tab-config-model-page-main",
+  "hash": "#/settings?tab=config:model&page=main",
+  "controls": 71,
+  "texts": 48
+ },
+ {
+  "name": "orig-settings-tab-config-model-page-fallbacks",
+  "hash": "#/settings?tab=config:model&page=fallbacks",
+  "controls": 67,
+  "texts": 43
+ },
+ {
+  "name": "orig-settings-tab-config-model-page-auxiliary",
+  "hash": "#/settings?tab=config:model&page=auxiliary",
+  "controls": 91,
+  "texts": 70
+ },
+ {
+  "name": "orig-settings-tab-config-model-page-moa",
+  "hash": "#/settings?tab=config:model&page=moa",
+  "controls": 83,
+  "texts": 59
+ },
+ {
+  "name": "orig-settings-tab-config-chat-page-behavior",
+  "hash": "#/settings?tab=config:chat&page=behavior",
+  "controls": 67,
+  "texts": 45
+ },
+ {
+  "name": "orig-settings-tab-config-chat-page-attachments",
+  "hash": "#/settings?tab=config:chat&page=attachments",
+  "controls": 66,
+  "texts": 43
+ },
+ {
+  "name": "orig-settings-tab-config-appearance-page-general",
+  "hash": "#/settings?tab=config:appearance&page=general",
+  "controls": 74,
+  "texts": 54
+ },
+ {
+  "name": "orig-settings-tab-config-appearance-page-theme",
+  "hash": "#/settings?tab=config:appearance&page=theme",
+  "controls": 84,
+  "texts": 69
+ },
+ {
+  "name": "orig-settings-tab-config-appearance-page-typography",
+  "hash": "#/settings?tab=config:appearance&page=typography",
+  "controls": 86,
+  "texts": 61
+ },
+ {
+  "name": "orig-settings-tab-config-appearance-page-window-layout",
+  "hash": "#/settings?tab=config:appearance&page=window-layout",
+  "controls": 82,
+  "texts": 66
+ },
+ {
+  "name": "orig-settings-tab-config-appearance-page-chat-display",
+  "hash": "#/settings?tab=config:appearance&page=chat-display",
+  "controls": 82,
+  "texts": 69
+ },
+ {
+  "name": "orig-settings-tab-config-appearance-page-pet",
+  "hash": "#/settings?tab=config:appearance&page=pet",
+  "controls": 70,
+  "texts": 46
+ },
+ {
+  "name": "orig-settings-tab-config-workspace-page-projects",
+  "hash": "#/settings?tab=config:workspace&page=projects",
+  "controls": 69,
+  "texts": 46
+ },
+ {
+  "name": "orig-settings-tab-config-workspace-page-shell",
+  "hash": "#/settings?tab=config:workspace&page=shell",
+  "controls": 67,
+  "texts": 42
+ },
+ {
+  "name": "orig-settings-tab-config-workspace-page-files",
+  "hash": "#/settings?tab=config:workspace&page=files",
+  "controls": 67,
+  "texts": 43
+ },
+ {
+  "name": "orig-settings-tab-config-safety-page-approvals",
+  "hash": "#/settings?tab=config:safety&page=approvals",
+  "controls": 69,
+  "texts": 45
+ },
+ {
+  "name": "orig-settings-tab-config-safety-page-privacy",
+  "hash": "#/settings?tab=config:safety&page=privacy",
+  "controls": 70,
+  "texts": 46
+ },
+ {
+  "name": "orig-settings-tab-config-safety-page-checkpoints",
+  "hash": "#/settings?tab=config:safety&page=checkpoints",
+  "controls": 66,
+  "texts": 40
+ },
+ {
+  "name": "orig-settings-tab-config-browser-page-profile",
+  "hash": "#/settings?tab=config:browser&page=profile",
+  "controls": 65,
+  "texts": 39
+ },
+ {
+  "name": "orig-settings-tab-config-browser-page-network",
+  "hash": "#/settings?tab=config:browser&page=network",
+  "controls": 66,
+  "texts": 39
+ },
+ {
+  "name": "orig-settings-tab-config-memory-page-persistent",
+  "hash": "#/settings?tab=config:memory&page=persistent",
+  "controls": 69,
+  "texts": 46
+ },
+ {
+  "name": "orig-settings-tab-config-memory-page-context",
+  "hash": "#/settings?tab=config:memory&page=context",
+  "controls": 71,
+  "texts": 49
+ },
+ {
+  "name": "orig-settings-tab-config-voice-page-conversation",
+  "hash": "#/settings?tab=config:voice&page=conversation",
+  "controls": 71,
+  "texts": 49
+ },
+ {
+  "name": "orig-settings-tab-config-voice-page-transcription",
+  "hash": "#/settings?tab=config:voice&page=transcription",
+  "controls": 70,
+  "texts": 50
+ },
+ {
+  "name": "orig-settings-tab-config-voice-page-speech",
+  "hash": "#/settings?tab=config:voice&page=speech",
+  "controls": 69,
+  "texts": 45
+ },
+ {
+  "name": "orig-settings-tab-config-advanced-page-desktop",
+  "hash": "#/settings?tab=config:advanced&page=desktop",
+  "controls": 77,
+  "texts": 61
+ },
+ {
+  "name": "orig-settings-tab-config-advanced-page-runtime",
+  "hash": "#/settings?tab=config:advanced&page=runtime",
+  "controls": 71,
+  "texts": 47
+ },
+ {
+  "name": "orig-settings-tab-config-advanced-page-tools",
+  "hash": "#/settings?tab=config:advanced&page=tools",
+  "controls": 70,
+  "texts": 43
+ },
+ {
+  "name": "orig-settings-tab-config-advanced-page-terminal",
+  "hash": "#/settings?tab=config:advanced&page=terminal",
+  "controls": 74,
+  "texts": 53
+ },
+ {
+  "name": "orig-settings-tab-config-advanced-page-delegation",
+  "hash": "#/settings?tab=config:advanced&page=delegation",
+  "controls": 74,
+  "texts": 49
+ },
+ {
+  "name": "orig-settings-tab-config-advanced-page-output",
+  "hash": "#/settings?tab=config:advanced&page=output",
+  "controls": 72,
+  "texts": 45
+ },
+ {
+  "name": "orig-settings-tab-providers",
+  "hash": "#/settings?tab=providers",
+  "controls": 70,
+  "texts": 48
+ },
+ {
+  "name": "orig-settings-tab-gateway-page-connection",
+  "hash": "#/settings?tab=gateway&page=connection",
+  "controls": 73,
+  "texts": 54
+ },
+ {
+  "name": "orig-settings-tab-gateway-page-devices",
+  "hash": "#/settings?tab=gateway&page=devices",
+  "controls": 68,
+  "texts": 49
+ },
+ {
+  "name": "orig-settings-tab-gateway-page-managed-updates",
+  "hash": "#/settings?tab=gateway&page=managed-updates",
+  "controls": 65,
+  "texts": 40
+ },
+ {
+  "name": "orig-settings-tab-keybinds-page-shortcuts",
+  "hash": "#/settings?tab=keybinds&page=shortcuts",
+  "controls": 164,
+  "texts": 195
+ },
+ {
+  "name": "orig-settings-tab-keybinds-page-hud-gesture",
+  "hash": "#/settings?tab=keybinds&page=hud-gesture",
+  "controls": 66,
+  "texts": 40
+ },
+ {
+  "name": "orig-settings-tab-keybinds-page-screen-capture",
+  "hash": "#/settings?tab=keybinds&page=screen-capture",
+  "controls": 65,
+  "texts": 38
+ },
+ {
+  "name": "orig-settings-tab-keys",
+  "hash": "#/settings?tab=keys",
+  "controls": 144,
+  "texts": 76
+ },
+ {
+  "name": "orig-settings-tab-vault-page-credentials",
+  "hash": "#/settings?tab=vault&page=credentials",
+  "controls": 65,
+  "texts": 41
+ },
+ {
+  "name": "orig-settings-tab-vault-page-sources",
+  "hash": "#/settings?tab=vault&page=sources",
+  "controls": 64,
+  "texts": 43
+ },
+ {
+  "name": "orig-settings-tab-notifications-page-alerts",
+  "hash": "#/settings?tab=notifications&page=alerts",
+  "controls": 73,
+  "texts": 56
+ },
+ {
+  "name": "orig-settings-tab-notifications-page-sounds",
+  "hash": "#/settings?tab=notifications&page=sounds",
+  "controls": 66,
+  "texts": 41
+ },
+ {
+  "name": "orig-settings-tab-billing",
+  "hash": "#/settings?tab=billing",
+  "controls": 64,
+  "texts": 43
+ },
+ {
+  "name": "orig-settings-tab-sessions-page-archived",
+  "hash": "#/settings?tab=sessions&page=archived",
+  "controls": 65,
+  "texts": 43
+ },
+ {
+  "name": "orig-settings-tab-sessions-page-default-directory",
+  "hash": "#/settings?tab=sessions&page=default-directory",
+  "controls": 65,
+  "texts": 41
+ },
+ {
+  "name": "orig-settings-tab-plugins",
+  "hash": "#/settings?tab=plugins",
+  "controls": 62,
+  "texts": 38
+ },
+ {
+  "name": "orig-settings-tab-about-page-updates",
+  "hash": "#/settings?tab=about&page=updates",
+  "controls": 68,
+  "texts": 58
+ },
+ {
+  "name": "orig-settings-tab-about-page-uninstall",
+  "hash": "#/settings?tab=about&page=uninstall",
+  "controls": 66,
+  "texts": 42
+ },
+ {
+  "name": "orig-chat-reply",
+  "hash": "#/local-016a3ab4735155a06a96af8babac6546af8c7381270108c2d632636200e394dd",
+  "controls": 52,
+  "texts": 40
+ },
+ {
+  "name": "orig-chat-tool-row",
+  "hash": "#/local-016a3ab4735155a06a96af8babac6546af8c7381270108c2d632636200e394dd",
+  "controls": 60,
+  "texts": 43
+ }
+]

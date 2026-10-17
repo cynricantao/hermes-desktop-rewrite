@@ -1,0 +1,507 @@
+{
+ "hash": "#/cron",
+ "title": "Hermes",
+ "w": 1440,
+ "h": 900,
+ "texts": [
+  "Sessions",
+  "Bots",
+  "New session",
+  "Ctrl",
+  "N",
+  "Capabilities",
+  "Messaging",
+  "Artifacts",
+  "Scheduled jobs",
+  "No sessions yet",
+  "New project",
+  "Backend",
+  "ready",
+  "Smart",
+  "0 jobs",
+  "No scheduled jobs yet",
+  "Blueprints",
+  "Morning briefing",
+  "Important-mail monitor",
+  "Weekly review",
+  "Workday start reminder",
+  "Custom reminder",
+  "Evening wind-down",
+  "Topic news digest",
+  "Bills & renewals reminder",
+  "Price & availability watch",
+  "Competitor news watch",
+  "Habit check-in",
+  "Hydration & movement nudge",
+  "Weekly meal plan",
+  "Daily learning drip",
+  "Gratitude & reflection prompt",
+  "On-this-day discovery",
+  "Schedule a prompt to run on a cron expression. Hermes will run it and deliver results to the destination you pick.",
+  "New cron"
+ ],
+ "controls": [
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "SESSIONS",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    0,
+    34,
+    74,
+    28
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "BOTS",
+   "slot": "pane-tab",
+   "box": [
+    74,
+    34,
+    48,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New session Ctrl N",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    68,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Capabilities",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    97,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Messaging",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    126,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Artifacts",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    155,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Scheduled jobs",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    184,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New project",
+   "slot": "button",
+   "box": [
+    79,
+    550,
+    101,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "default",
+   "type": "button",
+   "state": "pressed",
+   "box": [
+    12,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New profile",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    154,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Import profile…",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    176,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage profiles…",
+   "type": "button",
+   "box": [
+    198,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage gateways…",
+   "type": "button",
+   "box": [
+    224,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "NEW SESSION",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    260,
+    0,
+    107,
+    34
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Close",
+   "type": "button",
+   "box": [
+    343,
+    0,
+    24,
+    34
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New session tab",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    367,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    4,
+    880,
+    28,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Backend ready",
+   "type": "button",
+   "slot": "dropdown-menu-trigger",
+   "box": [
+    34,
+    880,
+    102,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Smart",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1377,
+    880,
+    59,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Close cron",
+   "slot": "button",
+   "box": [
+    1355,
+    57,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "input",
+   "label": "Search cron jobs...",
+   "text": "Search cron jobs...",
+   "type": "text",
+   "box": [
+    91,
+    107,
+    184,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New cron",
+   "slot": "tooltip-trigger",
+   "box": [
+    69,
+    188,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Morning briefing",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    242,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Important-mail monitor",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    270,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Weekly review",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    298,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Workday start reminder",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    326,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Custom reminder",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    354,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Evening wind-down",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    382,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Topic news digest",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    410,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Bills & renewals reminder",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    438,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Price & availability watch",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    466,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Competitor news watch",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    494,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Habit check-in",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    522,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Hydration & movement nudge",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    550,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Weekly meal plan",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    578,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Daily learning drip",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    606,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Gratitude & reflection prompt",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    634,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "On-this-day discovery",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    69,
+    662,
+    208,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New cron",
+   "slot": "button",
+   "box": [
+    799,
+    515,
+    71,
+    24
+   ]
+  }
+ ]
+}

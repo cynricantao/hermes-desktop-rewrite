@@ -1,0 +1,4874 @@
+{
+ "hash": "#/capabilities",
+ "title": "Hermes",
+ "w": 1440,
+ "h": 900,
+ "texts": [
+  "Sessions",
+  "Bots",
+  "New session",
+  "Ctrl",
+  "N",
+  "Capabilities",
+  "Messaging",
+  "Artifacts",
+  "Scheduled jobs",
+  "No sessions yet",
+  "New project",
+  "Skills",
+  "53",
+  "Tools",
+  "23",
+  "Connectors",
+  "Plugins",
+  "↓ Most used",
+  "airtable",
+  "Productivity",
+  "architecture-diagram",
+  "Creative",
+  "arxiv",
+  "Research",
+  "ascii-video",
+  "baoyu-infographic",
+  "blocked-page-recovery",
+  "Web",
+  "box",
+  "claude-code",
+  "Autonomous-Ai-Agents",
+  "claude-design",
+  "codebase-inspection",
+  "Software-Development",
+  "codex",
+  "competitor-news-monitor",
+  "computer-use",
+  "design-md",
+  "document-to-action-items",
+  "docx",
+  "dogfood",
+  "email-inbox-triage",
+  "Email",
+  "gif-search",
+  "Media",
+  "github",
+  "google-workspace",
+  "grounded-citations",
+  "hermes-agent",
+  "hermes-agent-skill-authoring",
+  "himalaya",
+  "humanizer",
+  "inspecting-hermes-desktop-dom",
+  "llm-wiki",
+  "manim-video",
+  "maps",
+  "meeting-action-items",
+  "node-inspect-debugger",
+  "notion",
+  "obsidian",
+  "Note-Taking",
+  "opencode",
+  "p5js",
+  "pdf",
+  "popular-web-designs",
+  "powerpoint",
+  "product-price-monitor",
+  "python-debugpy",
+  "requesting-code-review",
+  "simplify-code",
+  "songsee",
+  "songwriting-and-ai-music",
+  "spike",
+  "systematic-debugging",
+  "teams-meeting-pipeline",
+  "test-driven-development",
+  "weekly-review-planning",
+  "xlsx",
+  "xurl",
+  "Social-Media",
+  "youtube-content",
+  "Available to install",
+  "1password",
+  "Security",
+  "Install",
+  "3-statement-model",
+  "Finance",
+  "accelerate",
+  "Mlops",
+  "actual-setup",
+  "Devops",
+  "adversarial-ux-test",
+  "Dogfood",
+  "agent-merge-conflict-arbiter",
+  "agentmail",
+  "ai-presenter-video",
+  "anatomy",
+  "antigravity-cli",
+  "archify",
+  "ascii-art",
+  "ast-grep",
+  "audiocraft-audio-generation",
+  "auteur",
+  "axolotl",
+  "baoyu-article-illustrator",
+  "baoyu-comic",
+  "bioinformatics",
+  "blackbox",
+  "blogwatcher",
+  "brag",
+  "brag-slim",
+  "canvas",
+  "chroma",
+  "clip",
+  "cloudflare-temporary-deploy",
+  "Web-Development",
+  "code-wiki",
+  "comfyui",
+  "comps-analysis",
+  "concept-diagrams",
+  "creative-ideation",
+  "darwinian-evolver",
+  "dcf-model",
+  "decision-questionnaire",
+  "docker-management",
+  "domain-intel",
+  "draw-your-font",
+  "dream-loop",
+  "drug-discovery",
+  "dspy",
+  "duckduckgo-search",
+  "dynamic-workflow",
+  "evaluating-llms-harness",
+  "evm",
+  "Blockchain",
+  "excalidraw",
+  "excel-author",
+  "faiss",
+  "fastmcp",
+  "Mcp",
+  "fitness-nutrition",
+  "Health",
+  "flash-attention",
+  "gitnexus-explorer",
+  "godmode",
+  "grill-me",
+  "grok",
+  "guidance",
+  "har-derived-api-client",
+  "heartmula",
+  "here-now",
+  "hermes-s6-container-supervision",
+  "honcho",
+  "huggingface-hub",
+  "huggingface-tokenizers",
+  "hyperframes",
+  "hyperliquid",
+  "impeccable",
+  "inference-sh-cli",
+  "instructor",
+  "ip-as-logo",
+  "jupyter-notebook",
+  "Data-Science",
+  "kanban-video-orchestrator",
+  "lambda-labs",
+  "lbo-model",
+  "live-dashboard",
+  "llama-cpp",
+  "llava",
+  "mcp-oauth-remote-gateway",
+  "mcporter",
+  "meme-generation",
+  "memento-flashcards",
+  "merger-model",
+  "minecraft-modpack-server",
+  "Gaming",
+  "modal",
+  "mono-color",
+  "mpp-agent",
+  "Payments",
+  "nemo-curator",
+  "neuroskill-bci",
+  "obliteratus",
+  "one-three-one-rule",
+  "Communication",
+  "openclaw-migration",
+  "Migration",
+  "openhands",
+  "openhue",
+  "Smart-Home",
+  "osint-investigation",
+  "oss-forensics",
+  "outlines",
+  "page-agent",
+  "parallel-cli",
+  "peft",
+  "pinecone",
+  "pinecone-research",
+  "pinggy-tunnel",
+  "pixel-art",
+  "pokemon-player",
+  "polymarket",
+  "pptx-author",
+  "pr-lens",
+  "pretext",
+  "property-listings",
+  "publish-site",
+  "pytorch-fsdp",
+  "pytorch-lightning",
+  "qdrant",
+  "qmd",
+  "reddit-reading",
+  "research-paper-writing",
+  "rest-graphql-debug",
+  "rss-feeds",
+  "saelens",
+  "scrapling",
+  "scrollcraft",
+  "searxng-search",
+  "segment-anything-model",
+  "serving-llms-vllm",
+  "setup-wizard-generator",
+  "sherlock",
+  "shop",
+  "shopify",
+  "simple-english",
+  "simpo",
+  "siyuan",
+  "sketch",
+  "slime",
+  "social-media-content-calendar",
+  "solana",
+  "stable-diffusion",
+  "stocks",
+  "stripe-link-cli",
+  "stripe-projects",
+  "subagent-driven-development",
+  "system-atlas",
+  "telephony",
+  "tensorrt-llm",
+  "tldraw-offline",
+  "torchtitan",
+  "trl-fine-tuning",
+  "unbroker",
+  "unreal-mcp",
+  "unsloth",
+  "watchers",
+  "web-pentest",
+  "weights-and-biases",
+  "whisper",
+  "yuanbao",
+  "General",
+  "Airtable REST API via curl. Records CRUD, filters, upserts.",
+  "name",
+  "description",
+  "version",
+  "1.1.0",
+  "author",
+  "community",
+  "license",
+  "MIT",
+  "platforms",
+  "[linux, macos, windows]",
+  "prerequisites",
+  "env_vars: [AIRTABLE_API_KEY] commands: [curl]",
+  "metadata",
+  "hermes: tags: [Airtable, Productivity, Database, API] homepage: https://airtable.com/developers/web/api/introduction",
+  "# Airtable — Bases, Tables & Records Work with Airtable's REST API directly via `curl` using the `terminal` tool. No MCP server, no OAuth flow, no Python SDK — ",
+  "Changes apply to new sessions.",
+  "Skills Hub",
+  "Update installed",
+  "Hide the hub browser",
+  "Hit \"+ Add to this Agent\" on any skill — it installs and appears in the list above.",
+  "Backend",
+  "ready",
+  "Smart"
+ ],
+ "controls": [
+  {
+   "tag": "button",
+   "label": "Hide sidebar",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    14,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Open settings",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Layout editor",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1200,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "HUD mode",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1224,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Swap sidebar sides",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1248,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Show right sidebar",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1272,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "SESSIONS",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    0,
+    34,
+    74,
+    28
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "BOTS",
+   "slot": "pane-tab",
+   "box": [
+    74,
+    34,
+    48,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New session Ctrl N",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    68,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Capabilities",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    97,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Messaging",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    126,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Artifacts",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    155,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Scheduled jobs",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    184,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New project",
+   "slot": "button",
+   "box": [
+    79,
+    550,
+    101,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "default",
+   "type": "button",
+   "state": "pressed",
+   "box": [
+    12,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New profile",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    154,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Import profile…",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    176,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage profiles…",
+   "type": "button",
+   "box": [
+    198,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage gateways…",
+   "type": "button",
+   "box": [
+    224,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "input",
+   "label": "Search skills...",
+   "text": "Try “autonomous-ai-agents”",
+   "type": "text",
+   "box": [
+    294,
+    42,
+    148,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Skills 53",
+   "type": "button",
+   "box": [
+    726,
+    43,
+    50,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Tools 23",
+   "type": "button",
+   "box": [
+    784,
+    43,
+    50,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Connectors",
+   "type": "button",
+   "box": [
+    841,
+    43,
+    73,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Plugins",
+   "type": "button",
+   "box": [
+    923,
+    43,
+    51,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "↓ Most used",
+   "type": "button",
+   "box": [
+    276,
+    91,
+    59,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Skills",
+   "type": "button",
+   "slot": "dropdown-menu-trigger",
+   "box": [
+    734,
+    89,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "airtable Productivity",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    115,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "airtable",
+   "title": "airtable",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    129,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "architecture-diagram Creative",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    159,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "architecture-diagram",
+   "title": "architecture-diagram",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    173,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "arxiv Research",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    203,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "arxiv",
+   "title": "arxiv",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    217,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "ascii-video Creative",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    247,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "ascii-video",
+   "title": "ascii-video",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    261,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "baoyu-infographic Creative",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    291,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "baoyu-infographic",
+   "title": "baoyu-infographic",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    305,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "blocked-page-recovery Web",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    335,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "blocked-page-recovery",
+   "title": "blocked-page-recovery",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    349,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "box Productivity",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    379,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "box",
+   "title": "box",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    393,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "claude-code Autonomous-Ai-Agents",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    423,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "claude-code",
+   "title": "claude-code",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    437,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "claude-design Creative",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    467,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "claude-design",
+   "title": "claude-design",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    481,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "codebase-inspection Software-Development",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    511,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "codebase-inspection",
+   "title": "codebase-inspection",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    525,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "codex Autonomous-Ai-Agents",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    555,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "codex",
+   "title": "codex",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    569,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "competitor-news-monitor Research",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    599,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "competitor-news-monitor",
+   "title": "competitor-news-monitor",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    613,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "computer-use Autonomous-Ai-Agents",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    643,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "computer-use",
+   "title": "computer-use",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    657,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "design-md Creative",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    687,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "design-md",
+   "title": "design-md",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    701,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "document-to-action-items Productivity",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    731,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "document-to-action-items",
+   "title": "document-to-action-items",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    745,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "docx Productivity",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    775,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "docx",
+   "title": "docx",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    789,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "dogfood Software-Development",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    819,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "dogfood",
+   "title": "dogfood",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    833,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "email-inbox-triage Email",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    863,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "email-inbox-triage",
+   "title": "email-inbox-triage",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    877,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "gif-search Media",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    907,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "gif-search",
+   "title": "gif-search",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    921,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "github Software-Development",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    951,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "github",
+   "title": "github",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    965,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "google-workspace Productivity",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    995,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "google-workspace",
+   "title": "google-workspace",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1009,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "grounded-citations Research",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1039,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "grounded-citations",
+   "title": "grounded-citations",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1053,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "hermes-agent Autonomous-Ai-Agents",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1083,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "hermes-agent",
+   "title": "hermes-agent",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1097,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "hermes-agent-skill-authoring Software-Development",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1127,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "hermes-agent-skill-authoring",
+   "title": "hermes-agent-skill-authoring",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1141,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "himalaya Email",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1171,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "himalaya",
+   "title": "himalaya",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1185,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "humanizer Creative",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1215,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "humanizer",
+   "title": "humanizer",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1229,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "inspecting-hermes-desktop-dom Software-Development",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1259,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "inspecting-hermes-desktop-dom",
+   "title": "inspecting-hermes-desktop-dom",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1273,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "llm-wiki Research",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1303,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "llm-wiki",
+   "title": "llm-wiki",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1317,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "manim-video Creative",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1347,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "manim-video",
+   "title": "manim-video",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1361,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "maps Productivity",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1391,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "maps",
+   "title": "maps",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1405,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "meeting-action-items Productivity",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1435,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "meeting-action-items",
+   "title": "meeting-action-items",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1449,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "node-inspect-debugger Software-Development",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1479,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "node-inspect-debugger",
+   "title": "node-inspect-debugger",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1493,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "notion Productivity",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1523,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "notion",
+   "title": "notion",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1537,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "obsidian Note-Taking",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1567,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "obsidian",
+   "title": "obsidian",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1581,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "opencode Autonomous-Ai-Agents",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1611,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "opencode",
+   "title": "opencode",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1625,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "p5js Creative",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1655,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "p5js",
+   "title": "p5js",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1669,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "pdf Productivity",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1699,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "pdf",
+   "title": "pdf",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1713,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "popular-web-designs Creative",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1743,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "popular-web-designs",
+   "title": "popular-web-designs",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1757,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1787,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "powerpoint",
+   "title": "powerpoint",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1801,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1831,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "product-price-monitor",
+   "title": "product-price-monitor",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1845,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1875,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "python-debugpy",
+   "title": "python-debugpy",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1889,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1919,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "requesting-code-review",
+   "title": "requesting-code-review",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1933,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    1963,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "simplify-code",
+   "title": "simplify-code",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    1977,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2007,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "songsee",
+   "title": "songsee",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    2021,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2051,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "songwriting-and-ai-music",
+   "title": "songwriting-and-ai-music",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    2065,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2095,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "spike",
+   "title": "spike",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    2109,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2139,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "systematic-debugging",
+   "title": "systematic-debugging",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    2153,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2183,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "teams-meeting-pipeline",
+   "title": "teams-meeting-pipeline",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    2197,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2227,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "test-driven-development",
+   "title": "test-driven-development",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    2241,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2271,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "weekly-review-planning",
+   "title": "weekly-review-planning",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    2285,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2315,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "xlsx",
+   "title": "xlsx",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    2329,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2359,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "xurl",
+   "title": "xurl",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    2373,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2403,
+    448,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "role": "switch",
+   "label": "youtube-content",
+   "title": "youtube-content",
+   "text": "on",
+   "type": "button",
+   "slot": "switch",
+   "state": "checked",
+   "box": [
+    716,
+    2417,
+    28,
+    16
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2475,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2487,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2519,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2531,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2563,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2575,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2607,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2619,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2651,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2663,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2695,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2707,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2739,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2751,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2783,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2795,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2827,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2839,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2871,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2883,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2915,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2927,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    2959,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    2971,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3003,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3015,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3047,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3059,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3091,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3103,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3135,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3147,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3179,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3191,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3223,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3235,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3267,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3279,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3311,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3323,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3355,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3367,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3399,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3411,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3443,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3455,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3487,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3499,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3531,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3543,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3575,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3587,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3619,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3631,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3663,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3675,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3707,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3719,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3751,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3763,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3795,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3807,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3839,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3851,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3883,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3895,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3927,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3939,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    3971,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    3983,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4015,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4027,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4059,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4071,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4103,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4115,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4147,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4159,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4191,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4203,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4235,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4247,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4279,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4291,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4323,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4335,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4367,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4379,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4411,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4423,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4455,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4467,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4499,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4511,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4543,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4555,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4587,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4599,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4631,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4643,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4675,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4687,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4719,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4731,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4763,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4775,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4807,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4819,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4851,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4863,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4895,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4907,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4939,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4951,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    4983,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    4995,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5027,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5039,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5071,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5083,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5115,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5127,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5159,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5171,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5203,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5215,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5247,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5259,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5291,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5303,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5335,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5347,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5379,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5391,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5423,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5435,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5467,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5479,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5511,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5523,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5555,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5567,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5599,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5611,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5643,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5655,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5687,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5699,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5731,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5743,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5775,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5787,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5819,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5831,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5863,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5875,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5907,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5919,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5951,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    5963,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    5995,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6007,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6039,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6051,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6083,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6095,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6127,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6139,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6171,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6183,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6215,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6227,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6259,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6271,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6303,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6315,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6347,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6359,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6391,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6403,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6435,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6447,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6479,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6491,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6523,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6535,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6567,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6579,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6611,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6623,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6655,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6667,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6699,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6711,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6743,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6755,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6787,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6799,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6831,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6843,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6875,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6887,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6919,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6931,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    6963,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    6975,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7007,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7019,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7051,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7063,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7095,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7107,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7139,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7151,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7183,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7195,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7227,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7239,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7271,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7283,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7315,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7327,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7359,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7371,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7403,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7415,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7447,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7459,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7491,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7503,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7535,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7547,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7579,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7591,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7623,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7635,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7667,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7679,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7711,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7723,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7755,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7767,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7799,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7811,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7843,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7855,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7887,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7899,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7931,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7943,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    7975,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    7987,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    8019,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    8031,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    8063,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    8075,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    8107,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    8119,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    8151,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    8163,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    8195,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    8207,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    8239,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    8251,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    8283,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    8295,
+    45,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "row-button",
+   "box": [
+    268,
+    8327,
+    431,
+    44
+   ]
+  },
+  {
+   "tag": "button",
+   "slot": "button",
+   "box": [
+    699,
+    8339,
+    45,
+    20
+   ]
+  }
+ ]
+}

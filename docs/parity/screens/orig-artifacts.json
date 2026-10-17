@@ -1,0 +1,347 @@
+{
+ "hash": "#/artifacts",
+ "title": "Hermes",
+ "w": 1440,
+ "h": 900,
+ "texts": [
+  "Sessions",
+  "Bots",
+  "New session",
+  "Ctrl",
+  "N",
+  "Capabilities",
+  "Messaging",
+  "Artifacts",
+  "Scheduled jobs",
+  "No sessions yet",
+  "New project",
+  "All",
+  "0",
+  "Images",
+  "Files",
+  "Links",
+  "No artifacts found",
+  "Generated images and file outputs will appear here as sessions produce them.",
+  "Backend",
+  "ready",
+  "Smart"
+ ],
+ "controls": [
+  {
+   "tag": "button",
+   "label": "Hide sidebar",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    14,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Open settings",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1176,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Layout editor",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1200,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "HUD mode",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1224,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Swap sidebar sides",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1248,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Show right sidebar",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1272,
+    5,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "SESSIONS",
+   "slot": "pane-tab",
+   "state": "selected",
+   "box": [
+    0,
+    34,
+    74,
+    28
+   ]
+  },
+  {
+   "tag": "div",
+   "role": "tab",
+   "text": "BOTS",
+   "slot": "pane-tab",
+   "box": [
+    74,
+    34,
+    48,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New session Ctrl N",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    68,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Capabilities",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    97,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Messaging",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    126,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Artifacts",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    155,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Scheduled jobs",
+   "type": "button",
+   "slot": "context-menu-trigger",
+   "box": [
+    10,
+    184,
+    240,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "New project",
+   "slot": "button",
+   "box": [
+    79,
+    550,
+    101,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "default",
+   "type": "button",
+   "state": "pressed",
+   "box": [
+    12,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "New profile",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    154,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Import profile…",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    176,
+    854,
+    20,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage profiles…",
+   "type": "button",
+   "box": [
+    198,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Manage gateways…",
+   "type": "button",
+   "box": [
+    224,
+    852,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "All 0",
+   "type": "button",
+   "box": [
+    751,
+    42,
+    30,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Images 0",
+   "type": "button",
+   "box": [
+    790,
+    42,
+    56,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Files 0",
+   "type": "button",
+   "box": [
+    854,
+    42,
+    42,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Links 0",
+   "type": "button",
+   "box": [
+    904,
+    42,
+    45,
+    28
+   ]
+  },
+  {
+   "tag": "button",
+   "label": "Refresh artifacts",
+   "slot": "tooltip-trigger",
+   "box": [
+    1404,
+    44,
+    24,
+    24
+   ]
+  },
+  {
+   "tag": "button",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    4,
+    880,
+    28,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Backend ready",
+   "type": "button",
+   "slot": "dropdown-menu-trigger",
+   "box": [
+    34,
+    880,
+    102,
+    20
+   ]
+  },
+  {
+   "tag": "button",
+   "text": "Smart",
+   "type": "button",
+   "slot": "tooltip-trigger",
+   "box": [
+    1377,
+    880,
+    59,
+    20
+   ]
+  }
+ ]
+}
