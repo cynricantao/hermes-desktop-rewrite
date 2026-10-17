@@ -4,14 +4,227 @@
 //
 // The controller (`crates/hermes-ui/src/widgets/system.rs`) owns every value in
 // `SystemState`; this file only draws them and reports intents as
-// `act("<area>:<verb>[:<arg>]")` — settings.slint forwards those to
+// `act("system:<verb>[:<arg>]")` — settings.slint forwards those to
 // `SettingsState.action`. Rendered full-width inside the settings row for its id.
+//
+// Two-click confirms are drawn from state the module keeps: the first click arms
+// (button relabels to "Confirm …"), the second performs the destructive call.
 
-import { Theme } from "theme.slint";
+import { LineEdit, ScrollView } from "std-widgets.slint";
+import { Theme, Motion, Ease } from "theme.slint";
+import { GhostButton, PrimaryButton, Toggle } from "components.slint";
+import { Icons } from "icons.slint";
+
+// ── Models the controller fills ────────────────────────────────────────────────
+
+/// One archived chat row.
+export struct ArchiveRow {
+    id: string,
+    title: string,
+    preview: string,
+    hint: string,
+    busy: bool,
+    armed: bool,
+}
+
+/// One saved connection kept in `prefs.json` (never a live connection).
+export struct SavedConnRow {
+    id: string,
+    label: string,
+    endpoint: string,
+}
+
+/// One installed desktop plugin row.
+export struct PluginRow {
+    name: string,
+    label: string,
+    description: string,
+    version: string,
+    source: string,
+    tab: string,
+    hidden: bool,
+}
+
+/// One model line of the usage summary.
+export struct UsageModelRow {
+    model: string,
+    tokens: string,
+    cost: string,
+    sessions: string,
+}
+
+/// One portal capability (`/api/portal` → `features[]`).
+export struct FeatureRow {
+    label: string,
+    state: string,
+}
+
+/// One key binding this client actually implements.
+export struct KeyRow {
+    group: string,
+    keys: string,
+    label: string,
+}
+
+/// One filesystem path the uninstall panel reports on.
+export struct PathRow {
+    label: string,
+    path: string,
+    present: bool,
+}
 
 export global SystemState {
     in-out property <bool> busy: false;
+    /// Inline failure text (never a silent empty panel).
     in-out property <string> error;
+
+    // Sessions › Archive & retention
+    in-out property <[ArchiveRow]> archived: [];
+    in-out property <string> sessions-summary;
+    in-out property <int> empty-count: 0;
+    in-out property <bool> empty-armed: false;
+    in-out property <bool> prune-armed: false;
+    /// Result line of the last cleanup ("Pruned 3 sessions", "4 sessions match…").
+    in-out property <string> cleanup-note;
+
+    // Gateways › This window
+    in-out property <string> gw-endpoint;
+    in-out property <string> gw-version;
+    in-out property <string> gw-released;
+    in-out property <string> gw-protocol;
+    in-out property <string> gw-pid;
+    in-out property <string> gw-state;
+    in-out property <bool> gw-armed: false;
+    in-out property <string> gw-note;
+
+    // Gateways › Saved connections
+    in-out property <string> conn-endpoint;
+    in-out property <string> conn-command;
+    in-out property <[SavedConnRow]> saved: [];
+    in-out property <string> conn-label;
+    in-out property <string> conn-note;
+
+    // Plugins › Desktop plugins
+    in-out property <[PluginRow]> plugins: [];
+    in-out property <string> plugins-note;
+
+    // Billing › Overview
+    in-out property <bool> logged-in: false;
+    in-out property <string> account-tier;
+    in-out property <string> free-tier;
+    in-out property <string> portal-url;
+    in-out property <string> subscription-url;
+    in-out property <[FeatureRow]> features: [];
+    in-out property <string> usage-tokens;
+    in-out property <string> usage-cost;
+    in-out property <string> usage-sessions;
+    in-out property <int> usage-days: 0;
+    in-out property <[UsageModelRow]> usage-models: [];
+
+    // Keyboard Shortcuts › Key bindings (this client's own bindings, no backend)
+    in-out property <[KeyRow]> keybinds: [];
+
+    // About › Version & updates
+    in-out property <string> client-version;
+    in-out property <string> backend-version;
+    in-out property <string> backend-released;
+    in-out property <string> install-method;
+    in-out property <string> update-state;
+    in-out property <string> update-command;
+    in-out property <bool> update-available: false;
+    in-out property <bool> can-apply: false;
+    in-out property <bool> update-armed: false;
+    in-out property <bool> checking: false;
+
+    // About › Uninstall
+    in-out property <[PathRow]> install-paths: [];
+    in-out property <string> removal-command;
+}
+
+// ── Small pieces ───────────────────────────────────────────────────────────────
+
+/// A selectable, read-only command/path line (the user can copy it out).
+component MonoLine inherits TextInput {
+    read-only: true;
+    single-line: true;
+    font-family: Theme.mono-font;
+    font-size: Theme.fs-sm;
+    color: Theme.text-2;
+    background: transparent;
+    border-width: 0px;
+    height: 20px;
+    vertical-alignment: center;
+    selection-background-color: Theme.interactive;
+    selection-foreground-color: Theme.on-accent;
+}
+
+component Fact inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    spacing: 10px;
+    Text {
+        text: root.label;
+        width: 128px;
+        color: Theme.text-3;
+        font-size: Theme.fs-sm;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.value;
+        horizontal-stretch: 1;
+        color: Theme.text;
+        font-size: Theme.fs-sm;
+        overflow: elide;
+        vertical-alignment: center;
+    }
+}
+
+component NoteText inherits Text {
+    color: Theme.text-3;
+    font-size: Theme.fs-sm;
+    wrap: word-wrap;
+}
+
+/// A quiet list row: title (+ trailing slot) with an optional caption line.
+component ListRowBox inherits Rectangle {
+    in property <string> title;
+    in property <string> caption;
+    in property <string> meta;
+    height: 46px;
+    border-radius: Theme.r-md;
+    background: rta.has-hover ? Theme.hover : transparent;
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 6px;
+        spacing: 10px;
+        vertical-stretch: 1;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 1px;
+            Text {
+                text: root.title;
+                color: Theme.text;
+                font-size: Theme.fs-md;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+            if root.caption != "": Text {
+                text: root.caption;
+                color: Theme.text-3;
+                font-size: Theme.fs-xs;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+        }
+        if root.meta != "": Text {
+            text: root.meta;
+            color: Theme.text-3;
+            font-size: Theme.fs-xs;
+            vertical-alignment: center;
+        }
+    }
+    rta := TouchArea { }
 }
 
 export component SystemWidget inherits VerticalLayout {
@@ -19,49 +232,354 @@ export component SystemWidget inherits VerticalLayout {
     callback act(string);
     spacing: 8px;
 
-    if id == "sessions.archived-list": Text {
-        text: "Archived chats load from the backend…";
-        color: Theme.text-4;
+    // ── Inline error, common to every panel ───────────────────────────────────
+    if SystemState.error != "": Text {
+        text: "⚠ " + SystemState.error;
+        color: Theme.danger;
         font-size: Theme.fs-sm;
+        wrap: word-wrap;
     }
-    if id == "gateway.mode": Text {
-        text: "This window's connection…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
+
+    // ── Sessions › Archive & retention ────────────────────────────────────────
+    if id == "sessions.archived-list": VerticalLayout {
+        spacing: 8px;
+        if SystemState.sessions-summary != "": Text {
+            text: SystemState.sessions-summary;
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+        }
+        if SystemState.archived.length == 0: Text {
+            text: "No archived chats.";
+            color: Theme.text-4;
+            font-size: Theme.fs-sm;
+        }
+        for r[i] in SystemState.archived: ListRowBox {
+            title: r.title;
+            caption: r.preview;
+            meta: r.hint;
+            HorizontalLayout {
+                x: parent.width - self.width - 8px;
+                y: (parent.height - self.height) / 2;
+                spacing: 4px;
+                GhostButton {
+                    text: "Restore";
+                    clicked => { root.act("system:sessions-restore:" + r.id); }
+                }
+                if !r.armed: GhostButton {
+                    text: "Delete";
+                    clicked => { root.act("system:sessions-delete:" + r.id); }
+                }
+                if r.armed: PrimaryButton {
+                    text: "Confirm delete";
+                    danger: true;
+                    clicked => { root.act("system:sessions-delete:" + r.id); }
+                }
+            }
+        }
+        Rectangle { height: 1px; background: Theme.border; }
+        HorizontalLayout {
+            spacing: 8px;
+            PrimaryButton {
+                text: SystemState.empty-armed ? "Confirm delete" : "Delete empty sessions (" + SystemState.empty-count + ")";
+                danger: SystemState.empty-armed;
+                enabled: SystemState.empty-count > 0 && !SystemState.busy;
+                clicked => { root.act("system:sessions-empty-clean"); }
+            }
+            GhostButton {
+                text: SystemState.prune-armed ? "Confirm prune" : "Prune ended sessions";
+                clicked => { root.act("system:sessions-prune"); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        NoteText {
+            text: SystemState.cleanup-note != "" ? SystemState.cleanup-note
+                : "Cleanup deletes only ended chats: “empty” means a session with no messages yet, prune removes ended chats older than 90 days. Neither touches the chat you have open.";
+        }
     }
-    if id == "gateway.devices": Text {
-        text: "Saved connections…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
+
+    // ── Gateways › This window ────────────────────────────────────────────────
+    if id == "gateway.mode": VerticalLayout {
+        spacing: 6px;
+        Fact { label: "Endpoint"; value: SystemState.gw-endpoint; }
+        Fact { label: "Backend"; value: SystemState.gw-version != "" ? SystemState.gw-version + "  (released " + SystemState.gw-released + ")" : "…"; }
+        Fact { label: "Protocol"; value: SystemState.gw-protocol; }
+        Fact { label: "Backend pid"; value: SystemState.gw-pid; }
+        Fact { label: "Gateway"; value: SystemState.gw-state; }
+        HorizontalLayout {
+            spacing: 8px;
+            height: 36px;
+            GhostButton {
+                text: "Refresh";
+                clicked => { root.act("system:gateway-refresh"); }
+            }
+            PrimaryButton {
+                text: SystemState.gw-armed ? "Confirm restart" : "Restart gateway";
+                danger: SystemState.gw-armed;
+                enabled: !SystemState.busy;
+                clicked => { root.act("system:gateway-restart"); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        if SystemState.gw-note != "": NoteText { text: SystemState.gw-note; }
+        NoteText {
+            text: "This window attaches to the backend over its local HTTP/WebSocket API. Restarting the gateway restarts the messaging gateway (Telegram/Discord/…), not this app or your chats.";
+        }
     }
-    if id == "gateway.updates": Text {
-        text: "Remote updates…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
+
+    // ── Gateways › Saved connections ──────────────────────────────────────────
+    if id == "gateway.devices": VerticalLayout {
+        spacing: 8px;
+        Fact { label: "This window"; value: SystemState.conn-endpoint; }
+        VerticalLayout {
+            spacing: 3px;
+            NoteText { text: "Point the app at another backend by starting it with the port that backend printed (its HERMES_DESKTOP_PORT), instead of letting it discover the local one:"; }
+            MonoLine { text: SystemState.conn-command; }
+        }
+        if SystemState.saved.length > 0: VerticalLayout {
+            spacing: 0px;
+            for s[i] in SystemState.saved: ListRowBox {
+                title: s.label;
+                caption: s.endpoint;
+                HorizontalLayout {
+                    x: parent.width - self.width - 8px;
+                    y: (parent.height - self.height) / 2;
+                    spacing: 4px;
+                    GhostButton {
+                        text: "Command";
+                        clicked => { root.act("system:conn-use:" + s.id); }
+                    }
+                    GhostButton {
+                        text: "Forget";
+                        clicked => { root.act("system:conn-forget:" + s.id); }
+                    }
+                }
+            }
+        }
+        if SystemState.saved.length == 0: NoteText {
+            text: "No saved connections yet. Saving one only records the endpoint and its launch command here in prefs.json — this client has no SSH device manager and never switches a live connection.";
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            height: 36px;
+            label := LineEdit {
+                placeholder-text: "Name for this connection";
+                font-size: Theme.fs-sm;
+                horizontal-stretch: 1;
+                height: 32px;
+                // The module (not the UI) owns the label; `act` is the only path back.
+                text: SystemState.conn-label;
+                edited(t) => { root.act("system:conn-label:" + t); }
+                accepted(t) => { root.act("system:conn-label:" + t); }
+            }
+            PrimaryButton {
+                text: "Save this connection";
+                enabled: !SystemState.busy;
+                clicked => { root.act("system:conn-save"); }
+            }
+        }
+        if SystemState.conn-note != "": NoteText { text: SystemState.conn-note; }
     }
-    if id == "billing.overview": Text {
-        text: "Plan and usage…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
+
+    // ── Gateways › Remote updates ─────────────────────────────────────────────
+    if id == "gateway.updates": VerticalLayout {
+        spacing: 6px;
+        NoteText {
+            text: "Managing updates on a remote Hermes host over SSH is not part of this client — the original's “Remote updates” section drives an SSH install registered in its device manager, which the Rust client does not have. Your own backend's updates live in About › Version & updates.";
+        }
     }
-    if id == "keybinds.list": Text {
-        text: "Keyboard shortcuts…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
+
+    // ── Billing › Overview ────────────────────────────────────────────────────
+    if id == "billing.overview": VerticalLayout {
+        spacing: 8px;
+        Fact { label: "Account"; value: SystemState.logged_in ? (SystemState.account-tier != "" ? SystemState.account-tier : "Signed in") : "Not signed in"; }
+        if SystemState.free-tier != "": Fact { label: "Free tier"; value: SystemState.free-tier; }
+        Fact { label: "Portal"; value: SystemState.portal-url; }
+        if SystemState.logged_in && SystemState.subscription-url != "": VerticalLayout {
+            spacing: 3px;
+            NoteText { text: "Manage your plan and payment details in the portal:"; }
+            MonoLine { text: SystemState.subscription-url; }
+        }
+        if SystemState.features.length > 0: VerticalLayout {
+            spacing: 2px;
+            Text { text: "Features"; color: Theme.text-2; font-size: Theme.fs-sm; font-weight: 500; }
+            for f[i] in SystemState.features: HorizontalLayout {
+                spacing: 10px;
+                Text { text: f.label; width: 176px; color: Theme.text-3; font-size: Theme.fs-sm; }
+                Text { text: f.state; color: Theme.text; font-size: Theme.fs-sm; }
+            }
+        }
+        Rectangle { height: 1px; background: Theme.border; }
+        VerticalLayout {
+            spacing: 4px;
+            Text {
+                text: "Usage · last " + SystemState.usage-days + " days";
+                color: Theme.text-2;
+                font-size: Theme.fs-sm;
+                font-weight: 500;
+            }
+            Fact { label: "Tokens"; value: SystemState.usage-tokens; }
+            Fact { label: "Estimated cost"; value: SystemState.usage-cost; }
+            Fact { label: "Sessions"; value: SystemState.usage-sessions; }
+            for m[i] in SystemState.usage-models: ListRowBox {
+                height: 40px;
+                title: m.model;
+                meta: m.tokens + " · " + m.cost + " · " + m.sessions;
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            height: 36px;
+            GhostButton {
+                text: "Refresh";
+                clicked => { root.act("system:billing-refresh"); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        NoteText {
+            text: "Read-only: the portal owns charges, plan changes and payment methods. Costs are the backend's own estimates from its token accounting.";
+        }
     }
-    if id == "plugins.list": Text {
-        text: "Desktop plugins…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
+
+    // ── Keyboard Shortcuts › Key bindings ─────────────────────────────────────
+    if id == "keybinds.list": VerticalLayout {
+        spacing: 2px;
+        for k[i] in SystemState.keybinds: HorizontalLayout {
+            spacing: 12px;
+            height: 26px;
+            Text {
+                text: k.group;
+                width: 120px;
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            Text {
+                text: k.keys;
+                width: 160px;
+                font-family: Theme.mono-font;
+                color: Theme.text;
+                font-size: Theme.fs-xs + 0.5px;
+                vertical-alignment: center;
+            }
+            Text {
+                text: k.label;
+                horizontal-stretch: 1;
+                color: Theme.text-2;
+                font-size: Theme.fs-sm;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+        Rectangle { height: 6px; }
+        NoteText {
+            text: "These are the bindings this client implements today, read from its own source. Per-user rebinding (the original's click-to-record key map) is not implemented in this client.";
+        }
     }
-    if id == "about.version": Text {
-        text: "Version and updates…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
+
+    // ── Plugins › Desktop plugins ─────────────────────────────────────────────
+    if id == "plugins.list": VerticalLayout {
+        spacing: 6px;
+        if SystemState.plugins.length == 0: NoteText {
+            text: "No desktop plugins are installed on this backend.";
+        }
+        for p[i] in SystemState.plugins: ListRowBox {
+            height: p.description != "" ? 58px : 44px;
+            title: p.label + (p.version != "" ? "  " + p.version : "");
+            caption: p.description;
+            HorizontalLayout {
+                x: parent.width - self.width - 8px;
+                y: (parent.height - self.height) / 2;
+                spacing: 4px;
+                Toggle {
+                    checked: !p.hidden;
+                    accessible-label: "Show " + p.label + " tab";
+                    toggled(v) => { root.act("system:plugin-toggle:" + p.name + ":" + (v ? "enable" : "disable")); }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            height: 36px;
+            GhostButton {
+                text: "Rescan";
+                clicked => { root.act("system:plugins-rescan"); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        if SystemState.plugins-note != "": NoteText { text: SystemState.plugins-note; }
+        NoteText {
+            text: "The toggle hides a plugin's tab (backend config dashboard.hidden_plugins). Plugin-provided settings sub-pages are out of scope: this client renders the settings registry only.";
+        }
     }
-    if id == "about.uninstall": Text {
-        text: "Uninstall…";
-        color: Theme.text-4;
-        font-size: Theme.fs-sm;
+
+    // ── About › Version & updates ─────────────────────────────────────────────
+    if id == "about.version": VerticalLayout {
+        spacing: 6px;
+        Fact { label: "This client"; value: SystemState.client-version; }
+        Fact { label: "Backend"; value: SystemState.backend-version != "" ? SystemState.backend-version + "  (released " + SystemState.backend-released + ")" : "…"; }
+        if SystemState.install-method != "": Fact { label: "Install"; value: SystemState.install-method; }
+        if SystemState.update-state != "": NoteText { text: SystemState.update-state; }
+        if SystemState.update-command != "": VerticalLayout {
+            spacing: 3px;
+            NoteText { text: "Or run the backend's own updater:"; }
+            MonoLine { text: SystemState.update-command; }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            height: 36px;
+            GhostButton {
+                text: SystemState.checking ? "Checking…" : "Check again";
+                clicked => { root.act("system:about-refresh"); }
+            }
+            PrimaryButton {
+                text: SystemState.update-armed ? "Confirm update" : "Apply update";
+                danger: SystemState.update-armed;
+                enabled: SystemState.can-apply && !SystemState.busy;
+                clicked => { root.act("system:update-apply"); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        NoteText {
+            text: "Apply update runs the backend's own updater (POST /api/hermes/update) against the backend this window is attached to; the client binary is updated separately (hermes-desktop-rs is built from this checkout).";
+        }
+    }
+
+    // ── About › Uninstall ─────────────────────────────────────────────────────
+    if id == "about.uninstall": VerticalLayout {
+        spacing: 6px;
+        Text {
+            text: "How this app is installed here";
+            color: Theme.text-2;
+            font-size: Theme.fs-sm;
+            font-weight: 500;
+        }
+        for r[i] in SystemState.install-paths: HorizontalLayout {
+            spacing: 10px;
+            height: 20px;
+            Text {
+                text: r.present ? "✓" : "·";
+                width: 14px;
+                color: r.present ? Theme.success : Theme.text-4;
+                font-size: Theme.fs-sm;
+                vertical-alignment: center;
+            }
+            Text {
+                text: r.label;
+                width: 148px;
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                vertical-alignment: center;
+            }
+            MonoLine { text: r.path; horizontal-stretch: 1; }
+        }
+        VerticalLayout {
+            spacing: 3px;
+            NoteText { text: "To remove the client, run:"; }
+            MonoLine { text: SystemState.removal-command; }
+        }
+        NoteText {
+            text: "This panel takes no destructive action — nothing here deletes anything. It does not remove the Hermes backend (its `hermes` install, ~/.hermes config, sessions and credentials are untouched; that is `hermes uninstall` territory, run by you in a terminal).";
+        }
     }
 }
