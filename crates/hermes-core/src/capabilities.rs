@@ -9,7 +9,8 @@
 use serde_json::{Value, json};
 
 use crate::backend::percent_encode;
-use crate::http::profile_query;
+pub use crate::http::{Method, Request};
+use crate::http::{profile_query, req};
 
 /// The six tabs of the Capabilities screen, in display order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,43 +46,6 @@ impl Tab {
             Tab::Memory => "Memory",
             Tab::Cron => "Scheduled",
         }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Method {
-    Get,
-    Post,
-    Put,
-    Patch,
-    Delete,
-}
-
-impl Method {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Method::Get => "GET",
-            Method::Post => "POST",
-            Method::Put => "PUT",
-            Method::Patch => "PATCH",
-            Method::Delete => "DELETE",
-        }
-    }
-}
-
-/// One REST call: method, path (query included) and optional JSON body.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Request {
-    pub method: Method,
-    pub path: String,
-    pub body: Option<Value>,
-}
-
-fn req(method: Method, path: impl Into<String>, body: Option<Value>) -> Request {
-    Request {
-        method,
-        path: path.into(),
-        body,
     }
 }
 
