@@ -1,0 +1,42 @@
+// Appearance widgets for the settings panel — palette grid (`hermes-desktop-theme-v2`),
+// font pickers (`desktop.font_family`, `terminal.font_family`) and the pet page.
+//
+// The controller (`crates/hermes-ui/src/widgets/appearance.rs`) owns every value in
+// `AppearanceState`; this file only draws them and reports intents as
+// `act("<area>:<verb>[:<arg>]")` — settings.slint forwards those to
+// `SettingsState.action`. Rendered full-width inside the settings row for its id.
+
+import { Theme } from "theme.slint";
+
+export global AppearanceState {
+    /// Inline status for the panel that is currently loading / failed.
+    in-out property <bool> busy: false;
+    in-out property <string> error;
+}
+
+export component AppearanceWidget inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 8px;
+
+    if id == "hermes-desktop-theme-v2": Text {
+        text: "Palettes load from the backend…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "desktop.font_family": Text {
+        text: "Chat font picker…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "terminal.font_family": Text {
+        text: "Terminal font picker…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "pet": Text {
+        text: "Pets…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+}

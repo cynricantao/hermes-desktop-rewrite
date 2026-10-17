@@ -1,0 +1,63 @@
+// Provider / keys / vault widgets for the settings panel — accounts (`providers.accounts`),
+// API keys (`providers.keys`), custom endpoints (`providers.custom`), local models
+// (`providers.local`), toolsets and env keys (`keys.tools`, `keys.settings`) and the vault
+// pages (`vault.credentials`, `vault.sources`).
+//
+// The controller (`crates/hermes-ui/src/widgets/providers.rs`) owns every value in
+// `ProvidersState`; this file only draws them and reports intents as
+// `act("<area>:<verb>[:<arg>]")` — settings.slint forwards those to
+// `SettingsState.action`. Rendered full-width inside the settings row for its id.
+
+import { Theme } from "theme.slint";
+
+export global ProvidersState {
+    in-out property <bool> busy: false;
+    in-out property <string> error;
+}
+
+export component ProvidersWidget inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 8px;
+
+    if id == "providers.accounts": Text {
+        text: "Sign-in state loads from the backend…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "providers.keys": Text {
+        text: "Provider keys…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "providers.custom": Text {
+        text: "Custom endpoints…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "providers.local": Text {
+        text: "Local models…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "keys.tools": Text {
+        text: "Toolsets…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "keys.settings": Text {
+        text: "Environment keys…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "vault.credentials": Text {
+        text: "Saved credentials…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "vault.sources": Text {
+        text: "Password managers…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+}

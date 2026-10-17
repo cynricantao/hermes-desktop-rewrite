@@ -63,6 +63,10 @@ impl Rest {
         self.send("POST", path, Some(body)).await
     }
 
+    pub async fn delete(&self, path: &str) -> Result<Value, HttpError> {
+        self.send("DELETE", path, None).await
+    }
+
     async fn send(&self, method: &str, path: &str, body: Option<&Value>) -> Result<Value, HttpError> {
         let payload = body.map(|b| b.to_string()).unwrap_or_default();
         let mut req = format!(

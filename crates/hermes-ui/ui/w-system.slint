@@ -1,0 +1,67 @@
+// Session / gateway / about / plugin / billing widgets for the settings panel —
+// `sessions.archived-list`, `gateway.mode`, `gateway.devices`, `gateway.updates`,
+// `billing.overview`, `keybinds.list`, `plugins.list`, `about.version`, `about.uninstall`.
+//
+// The controller (`crates/hermes-ui/src/widgets/system.rs`) owns every value in
+// `SystemState`; this file only draws them and reports intents as
+// `act("<area>:<verb>[:<arg>]")` — settings.slint forwards those to
+// `SettingsState.action`. Rendered full-width inside the settings row for its id.
+
+import { Theme } from "theme.slint";
+
+export global SystemState {
+    in-out property <bool> busy: false;
+    in-out property <string> error;
+}
+
+export component SystemWidget inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 8px;
+
+    if id == "sessions.archived-list": Text {
+        text: "Archived chats load from the backend…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "gateway.mode": Text {
+        text: "This window's connection…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "gateway.devices": Text {
+        text: "Saved connections…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "gateway.updates": Text {
+        text: "Remote updates…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "billing.overview": Text {
+        text: "Plan and usage…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "keybinds.list": Text {
+        text: "Keyboard shortcuts…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "plugins.list": Text {
+        text: "Desktop plugins…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "about.version": Text {
+        text: "Version and updates…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "about.uninstall": Text {
+        text: "Uninstall…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+}

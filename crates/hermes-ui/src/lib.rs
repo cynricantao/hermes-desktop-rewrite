@@ -10,5 +10,9 @@ slint::include_modules!();
 pub mod controller;
 pub mod perf;
 pub mod rows;
+/// Settings-page widgets (palette grid, model picker, provider keys, …): one module per
+/// settings area, each owning its own Slint view file. See `widgets/mod.rs` for the
+/// contract.
+pub mod widgets;
 
 pub use controller::{Cmd, start};

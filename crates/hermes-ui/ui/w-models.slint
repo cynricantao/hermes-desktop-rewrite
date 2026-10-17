@@ -1,0 +1,42 @@
+// Model widgets for the settings panel — the default-model picker (`model.main`),
+// per-task auxiliary models (`model.auxiliary`), Mixture of Agents (`model.moa`) and the
+// `fallback_providers` list editor.
+//
+// The controller (`crates/hermes-ui/src/widgets/models.rs`) owns every value in
+// `ModelsState`; this file only draws them and reports intents as
+// `act("<area>:<verb>[:<arg>]")` — settings.slint forwards those to
+// `SettingsState.action`. Rendered full-width inside the settings row for its id.
+
+import { Theme } from "theme.slint";
+
+export global ModelsState {
+    in-out property <bool> busy: false;
+    in-out property <string> error;
+}
+
+export component ModelsWidget inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 8px;
+
+    if id == "model.main": Text {
+        text: "Models load from the backend…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "model.auxiliary": Text {
+        text: "Auxiliary models…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "model.moa": Text {
+        text: "Mixture of Agents…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+    if id == "fallback_providers": Text {
+        text: "Fallback models…";
+        color: Theme.text-4;
+        font-size: Theme.fs-sm;
+    }
+}
