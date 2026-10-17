@@ -11,6 +11,7 @@
 //! * [`attachments`] — clipboard image read (wl-paste/xclip), base64, attach/detach calls.
 //! * [`styled`] — rewrites reply markdown into the subset Slint renders (tables/code as
 //!   aligned monospace, headings as bold) so a reply never falls back to raw text.
+//! * [`markdown_code`] — fence classification (prose-like fences unwrap, as in the original).
 //! * [`diff`] — unified-diff parsing for the diff view (line kinds, numbers, paths).
 //! * [`highlight`] — syntect-backed code highlighting on a background thread, with a
 //!   bounded content-keyed cache and per-stream checkpoint resume.
@@ -38,6 +39,7 @@ pub mod http;
 pub mod input_requests;
 pub mod keybinds;
 pub mod markdown;
+pub mod markdown_code;
 pub mod models;
 pub mod notify;
 pub mod prefs;

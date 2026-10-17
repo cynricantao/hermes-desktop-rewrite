@@ -16,11 +16,46 @@ export struct ToolRow {
     duration: string,
 }
 
+// One code/diff line. `md` is the line as styled text with syntax colours baked in.
+export struct CodeLine {
+    md: styled-text,
+    // diff only: 0 context, 1 added, 2 removed, 3 hunk header, 4 note
+    kind: int,
+    old: string,
+    new: string,
+}
+
+export struct TableCell {
+    md: styled-text,
+    // estimated column width (px); scaled down to fit the column
+    w: length,
+    // 0 left, 1 center, 2 right
+    align: int,
+}
+
+export struct TableRow { cells: [TableCell] }
+
+// A display segment of an assistant reply (rows.rs `segments`).
+export struct Seg {
+    // 0 prose, 1 code, 2 diff, 3 table, 4 prose-like fence (plain wrapped text)
+    kind: int,
+    md: styled-text,
+    // code / diff / prose-fence source, for copy
+    raw: string,
+    lines: [CodeLine],
+    header: TableRow,
+    rows: [TableRow],
+    total-w: length,
+    added: int,
+    removed: int,
+    path: string,
+}
+
 export struct ChatRow {
     // 0 user, 1 assistant, 2 tools, 3 notice
     kind: int,
     text: string,
-    md: styled-text,
+    segs: [Seg],
     reasoning: string,
     streaming: bool,
     error: bool,
@@ -173,10 +208,201 @@ component ThinkingBlock inherits Rectangle {
     }
 }
 
+// Copy button for a code card: 'Copy code', shows a check for a moment after copying.
+component CopyButton inherits Rectangle {
+    in property <string> label: "Copy code";
+    in property <bool> shown;
+    callback clicked();
+    property <bool> done;
+    width: 22px;
+    height: 20px;
+    border-radius: Theme.r-sm;
+    background: ta.has-hover ? Theme.hover : transparent;
+    opacity: root.shown || root.done || ta.has-hover ? 1 : 0;
+    animate opacity { duration: Motion.fast; }
+    Image {
+        width: 12px; height: 12px;
+        source: root.done ? @image-url("../../../assets/icons/check.svg") : @image-url("../../../assets/icons/copy.svg");
+        colorize: ta.has-hover ? Theme.text : Theme.text-3;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); root.done = true; }
+    }
+    Timer { interval: 1500ms; running: root.done; triggered => { root.done = false; } }
+    accessible-role: button;
+    accessible-label: root.done ? "Copied" : root.label;
+    accessible-action-default => { root.clicked(); root.done = true; }
+}
+
+// Fenced code / diff card (shiki-highlighter.tsx + code-card.tsx + expandable-block.tsx):
+// a tinted slab with no border or header, copy button top-right on hover, body capped at
+// 120 px with a bottom fade and an Expand/Collapse chevron when it overflows; expanded it
+// grows to 40 % of the window and scrolls. Lines never wrap; wide code scrolls sideways.
+component CodeBlock inherits Rectangle {
+    in property <Seg> seg;
+    in property <length> window-h: 900px;
+    callback copy(string);
+    property <bool> expanded;
+    property <length> content-h: lines.preferred-height;
+    property <bool> overflowing: root.content-h > 121px;
+    property <length> cap: root.expanded ? max(121px, root.window-h * 0.4) : 120px;
+    border-radius: 10px;
+    background: Theme.code-bg;
+    clip: true;
+    height: min(root.content-h, root.cap);
+    animate height { duration: Motion.base; easing: Ease.out; }
+
+    hover := TouchArea { }
+
+    flick := Flickable {
+        width: root.width;
+        height: root.height;
+        content-width: max(root.width, lines.preferred-width);
+        content-height: root.content-h;
+        lines := VerticalLayout {
+            width: flick.content-width;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            for l in root.seg.lines: Rectangle {
+                background: l.kind == 1 ? Theme.diff-add-bg : l.kind == 2 ? Theme.diff-del-bg : l.kind == 3 ? Theme.hover : transparent;
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    spacing: 8px;
+                    if root.seg.kind == 2: Text {
+                        width: 28px;
+                        text: l.old;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                        font-family: Theme.mono-font;
+                        font-size: Theme.fs-xs;
+                        color: Theme.text-4;
+                    }
+                    if root.seg.kind == 2: Text {
+                        width: 28px;
+                        text: l.new;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                        font-family: Theme.mono-font;
+                        font-size: Theme.fs-xs;
+                        color: Theme.text-4;
+                    }
+                    if root.seg.kind == 2: Text {
+                        width: 10px;
+                        text: l.kind == 1 ? "+" : l.kind == 2 ? "−" : "";
+                        vertical-alignment: center;
+                        font-family: Theme.mono-font;
+                        font-size: Theme.fs-sm;
+                        color: l.kind == 1 ? Theme.diff-add-fg : Theme.diff-del-fg;
+                    }
+                    StyledText {
+                        text: l.md;
+                        default-font-family: Theme.mono-font;
+                        default-font-size: Theme.fs-sm;
+                        default-color: l.kind >= 3 ? Theme.text-3 : Theme.text.with-alpha(0.9);
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+
+    // Overflow cue: bottom fade + the only clickable target, a compact toggle at the right.
+    if root.overflowing: Rectangle {
+        y: root.height - 28px;
+        height: 28px;
+        background: @linear-gradient(0deg, Theme.code-bg 0%, Theme.code-bg.with-alpha(0) 100%);
+        toggle := Rectangle {
+            x: parent.width - 36px;
+            width: 36px;
+            Image {
+                y: parent.height - 18px;
+                width: 14px; height: 14px;
+                source: @image-url("../../../assets/icons/chevron-down.svg");
+                colorize: tta.has-hover ? Theme.text : Theme.text-3;
+                transform-origin: { x: 7px, y: 7px };
+                transform-rotation: root.expanded ? 180deg : 0deg;
+                animate transform-rotation { duration: Motion.base; easing: Ease.out; }
+            }
+            tta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.expanded = !root.expanded; }
+            }
+            accessible-role: button;
+            accessible-label: root.expanded ? "Collapse" : "Expand";
+            accessible-expandable: true;
+            accessible-expanded: root.expanded;
+            accessible-action-default => { root.expanded = !root.expanded; }
+        }
+    }
+
+    CopyButton {
+        x: root.width - self.width - 16px;
+        y: 6px;
+        shown: hover.has-hover;
+        clicked => { root.copy(root.seg.raw); }
+    }
+}
+
+// GFM table: header row + hairline rules; columns sized from their widest cell and scaled
+// to fit the column. (The original's draggable column sashes are not built yet.)
+component TableBlock inherits Rectangle {
+    in property <Seg> seg;
+    property <float> scale: root.seg.total-w > 0 ? min(1, root.width / root.seg.total-w) : 1;
+    height: body.preferred-height;
+    border-radius: Theme.r-md;
+    border-width: 1px;
+    border-color: Theme.border;
+    clip: true;
+    body := VerticalLayout {
+        Rectangle {
+            background: Theme.hover;
+            HorizontalLayout {
+                alignment: start;
+                for c in root.seg.header.cells: Rectangle {
+                    width: c.w * root.scale;
+                    height: ht.preferred-height + 14px;
+                    ht := StyledText {
+                        x: 10px;
+                        width: parent.width - 20px;
+                        text: c.md;
+                        default-font-size: Theme.fs-md;
+                        default-font-family: Theme.ui-font;
+                        default-color: Theme.text;
+                        horizontal-alignment: c.align == 1 ? center : c.align == 2 ? right : left;
+                    }
+                }
+            }
+        }
+        for r in root.seg.rows: VerticalLayout {
+            Rectangle { height: 1px; background: Theme.border; }
+            HorizontalLayout {
+                alignment: start;
+                for c in r.cells: Rectangle {
+                    width: c.w * root.scale;
+                    height: ct.preferred-height + 14px;
+                    ct := StyledText {
+                        x: 10px;
+                        width: parent.width - 20px;
+                        text: c.md;
+                        default-font-size: Theme.fs-md;
+                        default-font-family: Theme.ui-font;
+                        default-color: Theme.text-2;
+                        link-color: Theme.link;
+                        horizontal-alignment: c.align == 1 ? center : c.align == 2 ? right : left;
+                    }
+                }
+            }
+        }
+    }
+}
+
 component MessageRow inherits Rectangle {
     in property <ChatRow> item;
     in property <int> transcript-mode; // 0 normal, 1 thinking, 2 verbose
     in property <length> column-w;
+    in property <length> window-h;
     callback copy(string);
 
     // Fade+rise on insert (list item animate-in).
@@ -220,15 +446,32 @@ component MessageRow inherits Rectangle {
             open: root.transcript-mode == 2;
         }
 
-        if root.item.kind == 1 && root.item.text != "": Rectangle {
-            height: prose.preferred-height;
-            prose := StyledText {
-                width: parent.width;
-                text: root.item.md;
-                default-color: Theme.text;
-                default-font-size: Theme.fs-body;
-                default-font-family: Theme.ui-font;
-                link-color: Theme.link;
+        if root.item.kind == 1: VerticalLayout {
+            spacing: 10px;
+            for s in root.item.segs: VerticalLayout {
+                if s.kind == 0: Rectangle {
+                    height: prose.preferred-height;
+                    prose := StyledText {
+                        width: parent.width;
+                        text: s.md;
+                        default-color: Theme.text;
+                        default-font-size: Theme.fs-body;
+                        default-font-family: Theme.ui-font;
+                        link-color: Theme.link;
+                    }
+                }
+                if s.kind == 1 || s.kind == 2: CodeBlock {
+                    seg: s;
+                    window-h: root.window-h;
+                    copy(t) => { root.copy(t); }
+                }
+                if s.kind == 3: TableBlock { seg: s; }
+                if s.kind == 4: Text {
+                    text: s.raw;
+                    wrap: word-wrap;
+                    color: Theme.text;
+                    font-size: Theme.fs-body;
+                }
             }
         }
 
@@ -262,6 +505,10 @@ export component Transcript inherits Rectangle {
     property <int> sweep-dir: -1;
     callback copy(string);
 
+    // Clipboard writes go through a hidden TextInput (Slint has no clipboard API).
+    clipboard := TextInput { visible: false; width: 0; height: 0; }
+    copy(t) => { clipboard.text = t; clipboard.select-all(); clipboard.copy(); clipboard.clear-selection(); }
+
     property <length> status-h: root.running ? 40px : 0px;
     list := ListView {
         width: root.width;
@@ -273,6 +520,7 @@ export component Transcript inherits Rectangle {
         for row in root.rows: MessageRow {
             item: row;
             column-w: Theme.column-w;
+            window-h: root.height;
             transcript-mode: root.transcript-mode;
             copy(t) => { root.copy(t); }
         }
