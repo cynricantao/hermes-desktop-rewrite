@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use hermes_core::backend::{self, ManagedBackend};
 use hermes_core::http::{Rest, profile_query};
+use hermes_core::models::{self, CatalogProvider};
 use hermes_core::prefs::Prefs;
 use hermes_core::projects::{self, Project, ProjectList};
 use hermes_core::protocol::{
@@ -22,8 +23,8 @@ use tokio::sync::mpsc;
 
 use crate::rows::to_row;
 use crate::{
-    AppState, AppWindow, ApprovalInfo, ChatRow, ModelItem, NavEntry, ProjectItem, ProjectState, ScopeChip, SearchHit,
-    SessionItem, SettingRowUI, SettingsState, Theme,
+    AppState, AppWindow, ApprovalInfo, ChatRow, EditModelRow, ModelItem, NavEntry, ProjectItem, ProjectState,
+    ScopeChip, SearchHit, SessionItem, SettingRowUI, SettingsState, Theme,
 };
 
 /// Commands from the UI thread to the controller.
@@ -47,6 +48,29 @@ pub enum Cmd {
     /// Open the chat this many places away in sidebar order (Ctrl+Tab = 1, Ctrl+Shift+Tab = -1).
     Cycle(i32),
     RefreshModels,
+    /// "Refresh models" in the picker: re-probe providers (`model.options` `refresh`).
+    ReloadModels,
+    ModelQuery(String),
+    ModelEditQuery(String),
+    ToggleModel {
+        provider: String,
+        model: String,
+    },
+    ToggleProviderVisible(String),
+    ToggleProviderCollapse(String),
+    FavoriteModel {
+        provider: String,
+        model: String,
+    },
+    AddCustomModel {
+        provider: String,
+        model: String,
+    },
+    RemoveCustomModel {
+        provider: String,
+        model: String,
+    },
+    ResetModelVisibility,
     SelectEffort(String),
     RefreshProjects,
     SelectProject(String),
@@ -149,11 +173,65 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
         let _ = t.send(Cmd::RefreshModels);
     });
     let t = tx.clone();
+    st.on_reload_models(move || {
+        let _ = t.send(Cmd::ReloadModels);
+    });
+    let t = tx.clone();
     st.on_select_model(move |p, m| {
         let _ = t.send(Cmd::SelectModel {
             provider: p.into(),
             model: m.into(),
         });
+    });
+    // Picker curation. Each is one stored device preference (visibility, favourites,
+    // custom ids, collapsed groups) plus a re-render; the backend is not involved.
+    let t = tx.clone();
+    st.on_model_query_changed(move |q| {
+        let _ = t.send(Cmd::ModelQuery(q.into()));
+    });
+    let t = tx.clone();
+    st.on_model_edit_query_changed(move |q| {
+        let _ = t.send(Cmd::ModelEditQuery(q.into()));
+    });
+    let t = tx.clone();
+    st.on_toggle_model(move |p, m| {
+        let _ = t.send(Cmd::ToggleModel {
+            provider: p.into(),
+            model: m.into(),
+        });
+    });
+    let t = tx.clone();
+    st.on_toggle_provider_visible(move |p| {
+        let _ = t.send(Cmd::ToggleProviderVisible(p.into()));
+    });
+    let t = tx.clone();
+    st.on_toggle_provider_collapse(move |p| {
+        let _ = t.send(Cmd::ToggleProviderCollapse(p.into()));
+    });
+    let t = tx.clone();
+    st.on_favorite_model(move |p, m| {
+        let _ = t.send(Cmd::FavoriteModel {
+            provider: p.into(),
+            model: m.into(),
+        });
+    });
+    let t = tx.clone();
+    st.on_add_custom_model(move |p, m| {
+        let _ = t.send(Cmd::AddCustomModel {
+            provider: p.into(),
+            model: m.into(),
+        });
+    });
+    let t = tx.clone();
+    st.on_remove_custom_model(move |p, m| {
+        let _ = t.send(Cmd::RemoveCustomModel {
+            provider: p.into(),
+            model: m.into(),
+        });
+    });
+    let t = tx.clone();
+    st.on_reset_model_visibility(move || {
+        let _ = t.send(Cmd::ResetModelVisibility);
     });
     let t = tx.clone();
     st.on_select_effort(move |level| {
@@ -327,6 +405,16 @@ struct Controller {
     /// live session and answers 4001 without one.
     draft_model: Option<(String, String)>,
     draft_effort: Option<String>,
+    /// Last `model.options` catalog (backend order), before custom ids are merged.
+    catalog: Vec<CatalogProvider>,
+    /// Per-provider note for the rows ("not signed in"): slug → hint.
+    provider_hints: std::collections::HashMap<String, String>,
+    /// The backend's (or draft's) current pick — the tick in the picker.
+    catalog_provider: String,
+    catalog_model: String,
+    /// Picker and Edit-models search boxes.
+    model_query: String,
+    model_edit_query: String,
     projects: Vec<Project>,
     project: Option<Project>,
     /// REST handle to the backend's web API (settings pages). Built on first use.
@@ -387,6 +475,12 @@ impl Controller {
             stored: None,
             draft_model: None,
             draft_effort: None,
+            catalog: Vec::new(),
+            provider_hints: std::collections::HashMap::new(),
+            catalog_provider: String::new(),
+            catalog_model: String::new(),
+            model_query: String::new(),
+            model_edit_query: String::new(),
             projects: vec![],
             project: None,
             all_sessions: vec![],
@@ -632,7 +726,23 @@ impl Controller {
                     self.open(id).await;
                 }
             }
-            Cmd::RefreshModels => self.refresh_models().await,
+            Cmd::RefreshModels => self.refresh_models(false).await,
+            Cmd::ReloadModels => self.refresh_models(true).await,
+            Cmd::ModelQuery(q) => {
+                self.model_query = q;
+                self.publish_models();
+            }
+            Cmd::ModelEditQuery(q) => {
+                self.model_edit_query = q;
+                self.publish_models();
+            }
+            Cmd::ToggleModel { provider, model } => self.toggle_model(&provider, &model),
+            Cmd::ToggleProviderVisible(provider) => self.set_provider_visible(&provider),
+            Cmd::ToggleProviderCollapse(provider) => self.toggle_provider_collapse(&provider),
+            Cmd::FavoriteModel { provider, model } => self.toggle_favorite(&provider, &model),
+            Cmd::AddCustomModel { provider, model } => self.add_custom(&provider, &model),
+            Cmd::RemoveCustomModel { provider, model } => self.remove_custom(&provider, &model),
+            Cmd::ResetModelVisibility => self.reset_model_visibility(),
             Cmd::SelectEffort(level) => self.select_effort(level).await,
             Cmd::RefreshProjects => self.refresh_projects(false).await,
             Cmd::SelectProject(id) => self.select_project(id).await,
@@ -642,6 +752,7 @@ impl Controller {
                     // New-chat screen: remember the pick; it rides on session.create.
                     let label = short_model(&model);
                     self.draft_model = Some((provider, model));
+                    self.publish_models();
                     ui(&self.weak, move |w| {
                         w.global::<AppState>().set_model_label(label.into())
                     });
@@ -666,6 +777,10 @@ impl Controller {
                         } else if result.get("deferred").and_then(Value::as_bool) == Some(true) {
                             self.banner("Model change queued for the next turn.".into(), false);
                         } else {
+                            // Move the picker's tick at once; the label re-read confirms it.
+                            self.catalog_provider = provider.clone();
+                            self.catalog_model = model.clone();
+                            self.publish_models();
                             self.refresh_model_label().await;
                             self.refresh_effort().await;
                         }
@@ -1302,7 +1417,7 @@ impl Controller {
                 return;
             }
             "model" if arg.is_empty() => {
-                self.refresh_models().await;
+                self.refresh_models(false).await;
                 ui(&self.weak, |w| w.set_picker_open(true));
                 return;
             }
@@ -1683,60 +1798,488 @@ impl Controller {
         });
     }
 
-    async fn refresh_model_label(&self) {
+    async fn refresh_model_label(&mut self) {
         let mut params = json!({});
         if let Some(sid) = &self.session {
             params["session_id"] = json!(sid);
         }
+        // The composer label and the picker's tick come from the same answer.
         if let Ok(r) = self.client.call::<ModelOptionsResult>("model.options", params).await {
             let label = short_model(&r.model);
+            self.catalog_provider = r.provider.clone();
+            self.catalog_model = r.model.clone();
+            if !self.catalog.is_empty() {
+                self.publish_models();
+            }
             ui(&self.weak, move |w| {
                 w.global::<AppState>().set_model_label(label.into())
             });
         }
     }
 
-    async fn refresh_models(&self) {
-        let mut params = json!({});
+    /// Fetch the catalog and re-render the picker. `force` re-probes every provider
+    /// (`model.options` `refresh`), which is what the menu's "Refresh models" asks for;
+    /// merely opening the picker uses the backend's cached answer.
+    ///
+    /// `include_unconfigured` is deliberate: the picker lists every provider the backend
+    /// knows (an unconfigured one carries a "not signed in" note), and the visibility
+    /// shortlist is what keeps the list readable.
+    async fn refresh_models(&mut self, force: bool) {
+        let mut params = json!({ "include_unconfigured": true });
+        if force {
+            params["refresh"] = json!(true);
+        }
         if let Some(sid) = &self.session {
             params["session_id"] = json!(sid);
         }
         match self.client.call::<ModelOptionsResult>("model.options", params).await {
             Ok(r) => {
-                let mut items = Vec::new();
-                for p in &r.providers {
-                    if p.authenticated == Some(false) && !p.is_current.unwrap_or(false) {
-                        continue;
-                    }
-                    let ids = p.model_ids();
-                    if ids.is_empty() {
-                        continue;
-                    }
-                    items.push(ModelItem {
-                        provider: p.slug.as_str().into(),
-                        provider_name: p.name.as_str().into(),
-                        header: true,
-                        ..Default::default()
-                    });
-                    for m in ids {
-                        let current = match (&self.session, &self.draft_model) {
-                            (None, Some((dp, dm))) => &p.slug == dp && &m == dm,
-                            _ => p.slug == r.provider && m == r.model,
-                        };
-                        items.push(ModelItem {
-                            provider: p.slug.as_str().into(),
-                            provider_name: p.name.as_str().into(),
-                            model: m.into(),
-                            current,
-                            header: false,
-                        });
-                    }
+                self.catalog = r.providers.iter().map(|p| p.catalog()).collect();
+                self.catalog_provider = r.provider.clone();
+                self.catalog_model = r.model.clone();
+                self.provider_hints = r
+                    .providers
+                    .iter()
+                    .filter(|p| p.authenticated == Some(false))
+                    .map(|p| (p.slug.clone(), "not signed in".to_owned()))
+                    .collect();
+                // Snapshot the catalog as judged, so a model that shows up later is not
+                // silently hidden by a shortlist chosen before it existed.
+                let rows = self.model_rows();
+                if let Err(e) = models::seed_known(&mut self.prefs, &rows) {
+                    tracing::warn!("could not seed known models: {e}");
                 }
-                ui(&self.weak, move |w| {
-                    w.global::<AppState>().set_models(Rc::new(VecModel::from(items)).into())
-                });
+                self.publish_models();
             }
             Err(e) => self.banner(format!("Could not load models: {e}"), true),
+        }
+    }
+
+    /// Catalog rows with the user's hand-typed ids merged in — the set both the picker
+    /// and the curation logic work on.
+    fn model_rows(&self) -> Vec<CatalogProvider> {
+        models::with_customs(&self.catalog, &models::customs(&self.prefs))
+    }
+
+    /// The pick the tick marks: the new-chat draft before a session exists, else the
+    /// backend's own answer.
+    fn current_pick(&self) -> (String, String) {
+        match (&self.session, &self.draft_model) {
+            (None, Some((p, m))) => (p.clone(), m.clone()),
+            _ => (self.catalog_provider.clone(), self.catalog_model.clone()),
+        }
+    }
+
+    /// Search across the row's id, its `-fast` sibling, and the provider's name + slug —
+    /// the same haystack the original folds.
+    fn family_matches(&self, provider: &CatalogProvider, family: &models::Family, q: &str) -> bool {
+        let hay = format!(
+            "{} {} {} {}",
+            family.id,
+            family.fast_id.clone().unwrap_or_default(),
+            provider.name,
+            provider.slug
+        );
+        models::fold_includes(&hay, q)
+    }
+
+    /// Re-render the picker menu and the Edit models dialog from the cached catalog plus
+    /// the stored curation. No backend call: every list here is local presentation state.
+    fn publish_models(&self) {
+        let rows = self.model_rows();
+        let favorites = models::favorites(&self.prefs);
+        let collapsed = models::collapsed_providers(&self.prefs);
+        let known = models::known_keys(&self.prefs);
+        let stored = models::visible_keys(&self.prefs);
+        let visible = models::effective_visible(stored.as_ref(), &rows, known.as_ref());
+
+        let total: usize = rows.iter().map(|p| models::collapse_families(&p.models).len()).sum();
+        let shown: usize = rows
+            .iter()
+            .map(|p| {
+                models::collapse_families(&p.models)
+                    .iter()
+                    .filter(|f| visible.contains(&models::key(&p.slug, &f.id)))
+                    .count()
+            })
+            .sum();
+
+        let empty = if self.catalog.is_empty() {
+            "No models are available yet. Configure a provider in Hermes, then reopen this menu.".to_owned()
+        } else if !self.model_query.trim().is_empty() || !self.model_edit_query.trim().is_empty() {
+            "No models found".to_owned()
+        } else {
+            "Every model is hidden — open Edit models… to show some.".to_owned()
+        };
+
+        let items = self.picker_rows(&rows, &visible, &favorites, &collapsed);
+        let edit = self.editor_rows(&rows, &visible, &favorites, &collapsed);
+        ui(&self.weak, move |w| {
+            let st = w.global::<AppState>();
+            st.set_models(Rc::new(VecModel::from(items)).into());
+            st.set_model_edit_rows(Rc::new(VecModel::from(edit)).into());
+            st.set_model_hidden_count(total.saturating_sub(shown) as i32);
+            st.set_model_total_count(total as i32);
+            st.set_model_empty_text(empty.into());
+        });
+    }
+
+    fn picker_rows(
+        &self,
+        rows: &[CatalogProvider],
+        visible: &std::collections::BTreeSet<String>,
+        favorites: &[String],
+        collapsed: &[String],
+    ) -> Vec<ModelItem> {
+        let q = models::normalize(&self.model_query);
+        let (cur_p, cur_m) = self.current_pick();
+        let customs = models::customs(&self.prefs);
+        let is_custom =
+            |provider: &str, model: &str| customs.iter().any(|c| c.provider == provider && c.model == model);
+        let mut items: Vec<ModelItem> = Vec::new();
+
+        // Favorites paint above the provider groups — the whole point of starring one.
+        // They ignore the visibility shortlist on purpose: a star IS "always show me this
+        // one". A search turns the section off, because a query means "show me matches".
+        if q.is_empty() {
+            let resolved: Vec<(&CatalogProvider, String)> = favorites
+                .iter()
+                .filter_map(|k| {
+                    let (slug, model) = k.split_once("::")?;
+                    let provider = rows.iter().find(|p| p.slug == slug)?;
+                    let family = models::collapse_families(&provider.models)
+                        .into_iter()
+                        .find(|f| f.id == model || f.fast_id.as_deref() == Some(model))?;
+                    Some((provider, family.id))
+                })
+                .collect();
+            if !resolved.is_empty() {
+                let spans = resolved
+                    .iter()
+                    .map(|(p, _)| p.slug.as_str())
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+                    > 1;
+                items.push(ModelItem {
+                    header: true,
+                    provider_name: "Favorites".into(),
+                    ..Default::default()
+                });
+                for (provider, id) in resolved {
+                    items.push(ModelItem {
+                        provider: provider.slug.as_str().into(),
+                        provider_name: provider.name.as_str().into(),
+                        model: id.as_str().into(),
+                        // Mixed providers name each one once, as a quiet label.
+                        hint: if spans {
+                            provider.name.as_str().into()
+                        } else {
+                            SharedString::new()
+                        },
+                        current: provider.slug == cur_p && id == cur_m,
+                        favorite: true,
+                        custom: is_custom(&provider.slug, &id),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
+
+        // Groups, alphabetical by provider name: the backend floats the current provider
+        // first, which would reshuffle the list on every switch.
+        let mut ordered: Vec<&CatalogProvider> = rows.iter().filter(|p| !p.models.is_empty()).collect();
+        ordered.sort_by_key(|a| a.name.to_lowercase());
+        let fav_keys: std::collections::BTreeSet<&str> = favorites.iter().map(String::as_str).collect();
+
+        for provider in &ordered {
+            let mut families = models::collapse_families(&provider.models);
+            // The catalog row is a hint, not the authority: a model the backend is on but
+            // the row omits must still render, or the picker has no active row at all.
+            if provider.slug == cur_p
+                && !cur_m.is_empty()
+                && !families
+                    .iter()
+                    .any(|f| f.id == cur_m || f.fast_id.as_deref() == Some(cur_m.as_str()))
+            {
+                families.insert(
+                    0,
+                    models::Family {
+                        id: cur_m.clone(),
+                        fast_id: None,
+                    },
+                );
+            }
+            if families.is_empty() {
+                continue;
+            }
+            let mut wanted: std::collections::BTreeSet<String> = if !q.is_empty() {
+                // A search spans every family, regardless of the shortlist.
+                families
+                    .iter()
+                    .filter(|f| self.family_matches(provider, f, &q))
+                    .map(|f| f.id.clone())
+                    .collect()
+            } else {
+                families
+                    .iter()
+                    .filter(|f| visible.contains(&models::key(&provider.slug, &f.id)))
+                    .map(|f| f.id.clone())
+                    .collect()
+            };
+            // Keep the active model reachable — but not while searching (a query means
+            // "show me the matches").
+            if q.is_empty()
+                && provider.slug == cur_p
+                && let Some(f) = families
+                    .iter()
+                    .find(|f| f.id == cur_m || f.fast_id.as_deref() == Some(cur_m.as_str()))
+            {
+                wanted.insert(f.id.clone());
+            }
+            let listed: Vec<&models::Family> = families
+                .iter()
+                .filter(|f| {
+                    wanted.contains(&f.id)
+                        && !(q.is_empty() && fav_keys.contains(models::key(&provider.slug, &f.id).as_str()))
+                })
+                .collect();
+            if listed.is_empty() {
+                continue;
+            }
+            let folded = q.is_empty() && collapsed.iter().any(|c| c == &provider.slug);
+            items.push(ModelItem {
+                provider: provider.slug.as_str().into(),
+                provider_name: provider.name.as_str().into(),
+                hint: self
+                    .provider_hints
+                    .get(&provider.slug)
+                    .cloned()
+                    .unwrap_or_default()
+                    .as_str()
+                    .into(),
+                header: true,
+                collapsed: folded,
+                count: listed.len() as i32,
+                ..Default::default()
+            });
+            if folded {
+                continue;
+            }
+            for family in listed {
+                items.push(ModelItem {
+                    provider: provider.slug.as_str().into(),
+                    provider_name: provider.name.as_str().into(),
+                    model: family.id.as_str().into(),
+                    current: provider.slug == cur_p
+                        && (cur_m == family.id || family.fast_id.as_deref() == Some(cur_m.as_str())),
+                    favorite: favorites.iter().any(|k| k == &models::key(&provider.slug, &family.id)),
+                    custom: is_custom(&provider.slug, &family.id),
+                    ..Default::default()
+                });
+            }
+        }
+
+        // A typed id no provider lists is still a model to the backend: offer it as one
+        // row per provider, so a slug the catalog lacks is a single click away.
+        if items.is_empty()
+            && !q.is_empty()
+            && let Some(slug) = models::custom_candidate(&self.model_query, rows)
+        {
+            items.push(ModelItem {
+                header: true,
+                provider_name: "Custom model".into(),
+                ..Default::default()
+            });
+            for provider in &ordered {
+                items.push(ModelItem {
+                    provider: provider.slug.as_str().into(),
+                    provider_name: provider.name.as_str().into(),
+                    model: slug.as_str().into(),
+                    add: true,
+                    ..Default::default()
+                });
+            }
+        }
+        items
+    }
+
+    fn editor_rows(
+        &self,
+        rows: &[CatalogProvider],
+        visible: &std::collections::BTreeSet<String>,
+        favorites: &[String],
+        collapsed: &[String],
+    ) -> Vec<EditModelRow> {
+        let q = models::normalize(&self.model_edit_query);
+        let customs = models::customs(&self.prefs);
+        let mut out: Vec<EditModelRow> = Vec::new();
+        for provider in rows.iter().filter(|p| !p.models.is_empty()) {
+            let families = models::collapse_families(&provider.models);
+            if families.is_empty() {
+                continue;
+            }
+            let listed: Vec<&models::Family> = families
+                .iter()
+                .filter(|f| q.is_empty() || self.family_matches(provider, f, &q))
+                .collect();
+            if listed.is_empty() {
+                continue;
+            }
+            let on = families
+                .iter()
+                .filter(|f| visible.contains(&models::key(&provider.slug, &f.id)))
+                .count();
+            let folded = q.is_empty() && collapsed.iter().any(|c| c == &provider.slug);
+            out.push(EditModelRow {
+                provider: provider.slug.as_str().into(),
+                provider_name: provider.name.as_str().into(),
+                hint: self
+                    .provider_hints
+                    .get(&provider.slug)
+                    .cloned()
+                    .unwrap_or_default()
+                    .as_str()
+                    .into(),
+                header: true,
+                visible: on == families.len(),
+                collapsed: folded,
+                count: on as i32,
+                total: families.len() as i32,
+                ..Default::default()
+            });
+            if folded {
+                continue;
+            }
+            for family in listed {
+                out.push(EditModelRow {
+                    provider: provider.slug.as_str().into(),
+                    provider_name: provider.name.as_str().into(),
+                    model: family.id.as_str().into(),
+                    visible: visible.contains(&models::key(&provider.slug, &family.id)),
+                    favorite: favorites.iter().any(|k| k == &models::key(&provider.slug, &family.id)),
+                    custom: customs
+                        .iter()
+                        .any(|c| c.provider == provider.slug && c.model == family.id),
+                    ..Default::default()
+                });
+            }
+        }
+        // The dialog offers the same hand-typed id, once the query matches nothing.
+        if out.is_empty()
+            && !q.is_empty()
+            && let Some(slug) = models::custom_candidate(&self.model_edit_query, rows)
+        {
+            out.push(EditModelRow {
+                header: true,
+                provider_name: "Custom model".into(),
+                ..Default::default()
+            });
+            for provider in rows.iter().filter(|p| !p.models.is_empty()) {
+                out.push(EditModelRow {
+                    provider: provider.slug.as_str().into(),
+                    provider_name: provider.name.as_str().into(),
+                    model: slug.as_str().into(),
+                    add: true,
+                    ..Default::default()
+                });
+            }
+        }
+        out
+    }
+
+    /* ------------------------------------------------------- curation handlers */
+
+    /// Persist a new visibility set and re-render both surfaces.
+    fn save_visible(&mut self, keys: &std::collections::BTreeSet<String>) {
+        let rows = self.model_rows();
+        match models::save_visible(&mut self.prefs, keys, &rows) {
+            Ok(()) => self.publish_models(),
+            Err(e) => self.banner(format!("Could not save the model list: {e}"), true),
+        }
+    }
+
+    /// Tick / untick one model.
+    fn toggle_model(&mut self, provider: &str, model: &str) {
+        let rows = self.model_rows();
+        let known = models::known_keys(&self.prefs);
+        let next = models::toggle_model(
+            models::visible_keys(&self.prefs).as_ref(),
+            &rows,
+            provider,
+            model,
+            known.as_ref(),
+        );
+        self.save_visible(&next);
+    }
+
+    /// A provider's master switch: all of its models on, or all off.
+    fn set_provider_visible(&mut self, provider: &str) {
+        let rows = self.model_rows();
+        let known = models::known_keys(&self.prefs);
+        let stored = models::visible_keys(&self.prefs);
+        let families = rows
+            .iter()
+            .find(|p| p.slug == provider)
+            .map(|p| models::collapse_families(&p.models))
+            .unwrap_or_default();
+        let visible = models::effective_visible(stored.as_ref(), &rows, known.as_ref());
+        let on = families
+            .iter()
+            .filter(|f| visible.contains(&models::key(provider, &f.id)))
+            .count();
+        // Partial or empty counts as "turn everything on"; a full row turns everything off.
+        let target = on != families.len();
+        let next = models::set_provider(stored.as_ref(), &rows, provider, target, known.as_ref());
+        self.save_visible(&next);
+    }
+
+    /// Fold / unfold a provider group in both surfaces.
+    fn toggle_provider_collapse(&mut self, provider: &str) {
+        if provider.is_empty() {
+            return;
+        }
+        let mut list = models::collapsed_providers(&self.prefs);
+        match list.iter().position(|p| p == provider) {
+            Some(i) => {
+                list.remove(i);
+            }
+            None => list.push(provider.to_owned()),
+        }
+        match models::save_collapsed(&mut self.prefs, &list) {
+            Ok(()) => self.publish_models(),
+            Err(e) => self.banner(format!("Could not save the picker layout: {e}"), true),
+        }
+    }
+
+    fn toggle_favorite(&mut self, provider: &str, model: &str) {
+        let list = models::toggle_favorite(&models::favorites(&self.prefs), provider, model);
+        match models::save_favorites(&mut self.prefs, &list) {
+            Ok(()) => self.publish_models(),
+            Err(e) => self.banner(format!("Could not save favorites: {e}"), true),
+        }
+    }
+
+    fn add_custom(&mut self, provider: &str, model: &str) {
+        let rows = self.model_rows();
+        match models::add_custom(&mut self.prefs, &rows, provider, model) {
+            Some(Ok(())) => self.publish_models(),
+            Some(Err(e)) => self.banner(format!("Could not add “{model}”: {e}"), true),
+            None => self.banner("A model id cannot contain spaces.".into(), true),
+        }
+    }
+
+    fn remove_custom(&mut self, provider: &str, model: &str) {
+        match models::remove_custom(&mut self.prefs, provider, model) {
+            Ok(()) => self.publish_models(),
+            Err(e) => self.banner(format!("Could not remove “{model}”: {e}"), true),
+        }
+    }
+
+    fn reset_model_visibility(&mut self) {
+        let rows = self.model_rows();
+        match models::reset_visibility_keeping_customs(&mut self.prefs, &rows) {
+            Ok(()) => self.publish_models(),
+            Err(e) => self.banner(format!("Could not reset the model list: {e}"), true),
         }
     }
 

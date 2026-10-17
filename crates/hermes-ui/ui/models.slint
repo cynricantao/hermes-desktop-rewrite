@@ -1,0 +1,668 @@
+// Model picker + "Edit models" — the catalog from the backend's `model.options`, curated
+// on this device.
+//
+// The controller owns every list below (`AppState.models`, `AppState.model-edit-rows`): it
+// fetches the catalog, applies the user's visibility / favourites / custom ids, and pushes
+// ready-to-render rows. This file only draws them and sends intents back — a row click is
+// `select(provider, model)`, a tick is `toggle-model(provider, model)`, and so on.
+//
+// Rows are one flat list with three shapes: a provider group header (`header`), a
+// "add this id" row under the search box (`add`), and a model row (neither). Section
+// titles ("Favorites", "Custom model") are plain headers the controller emits.
+
+import { ScrollView, LineEdit } from "std-widgets.slint";
+import { Theme, Motion, Ease } from "theme.slint";
+import { IconButton } from "components.slint";
+import { Icons } from "icons.slint";
+
+/// One row of the picker menu.
+export struct ModelItem {
+    provider: string,
+    provider-name: string,
+    model: string,
+    /// Right-aligned note: "custom", "not signed in", …
+    hint: string,
+    /// A group label (provider, "Favorites", "Custom model").
+    header: bool,
+    /// An "add this id" row (`provider` receives it, `model` is the typed slug).
+    add: bool,
+    current: bool,
+    favorite: bool,
+    custom: bool,
+    collapsed: bool,
+    count: int,
+}
+
+/// One row of the Edit models dialog. Header rows carry the provider master switch.
+export struct EditModelRow {
+    provider: string,
+    provider-name: string,
+    model: string,
+    hint: string,
+    header: bool,
+    add: bool,
+    /// Model rows: is it shown in the picker. Header rows: are all of its models shown.
+    visible: bool,
+    favorite: bool,
+    custom: bool,
+    /// Header rows: the provider's model rows are folded away.
+    collapsed: bool,
+    count: int,
+    total: int,
+}
+
+/// Five-point star, drawn rather than bundled so the icon set stays as-is.
+component StarIcon inherits Path {
+    in property <bool> on: false;
+    width: 14px;
+    height: 14px;
+    viewbox-width: 24;
+    viewbox-height: 24;
+    commands: "M 12 2.6 L 15 9 L 21.6 9.9 L 16.8 14.4 L 18.1 21 L 12 17.7 L 5.9 21 L 7.2 14.4 L 2.4 9.9 L 9 9 Z";
+    fill: on ? Theme.warning : transparent;
+    stroke: on ? Theme.warning : Theme.text-4;
+    stroke-width: 1.7px;
+}
+
+/// Tick box used by the dialog (and the "visible" affordance of a provider header).
+/// `partial` paints the indeterminate state: some of the provider's models are on.
+component Check inherits Rectangle {
+    in property <bool> checked: false;
+    in property <bool> partial: false;
+    width: 16px;
+    height: 16px;
+    border-radius: Theme.r-xs;
+    border-width: checked ? 0px : 1px;
+    border-color: partial ? Theme.interactive : Theme.border-strong;
+    background: checked ? Theme.interactive : partial ? Theme.interactive.with-alpha(0.15) : transparent;
+    animate background { duration: Motion.fast; }
+    if checked: Image {
+        source: Icons.get("check");
+        width: 12px;
+        height: 12px;
+        colorize: #ffffff;
+    }
+    if partial && !checked: Rectangle {
+        width: 8px;
+        height: 2px;
+        border-radius: 1px;
+        background: Theme.interactive;
+    }
+}
+
+/// Star toggle on a row. Floats above the row's own click area, so starring never picks.
+component StarButton inherits Rectangle {
+    in property <bool> on: false;
+    in property <string> label;
+    callback clicked();
+    width: 22px;
+    height: 22px;
+    border-radius: Theme.r-sm;
+    background: ta.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.fast; }
+    accessible-role: button;
+    accessible-label: label;
+    accessible-action-default => { root.clicked(); }
+    StarIcon { on: root.on; }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+/// One action row at the bottom of the menu ("Refresh models", "Edit models…").
+component MenuAction inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    callback clicked();
+    height: 30px;
+    border-radius: Theme.r-sm;
+    background: ta.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.fast; }
+    accessible-role: button;
+    accessible-label: text;
+    accessible-action-default => { root.clicked(); }
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
+        Image { source: root.icon; width: 14px; height: 14px; colorize: Theme.text-3; }
+        Text {
+            text: root.text;
+            color: Theme.text-3;
+            font-size: Theme.fs-md;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// ── The menu ────────────────────────────────────────────────────────────────────
+
+export component ModelPicker inherits Rectangle {
+    in-out property <bool> open;
+    in-out property <[ModelItem]> items;
+    in-out property <string> query;
+    in-out property <string> empty-text: "No models found";
+    /// Models the curation currently hides behind "Edit models…".
+    in-out property <int> hidden-count: 0;
+    callback query-changed(string);
+    callback select(string, string);
+    callback favorite(string, string);
+    callback toggle-collapse(string);
+    callback add-custom(string, string);
+    callback refresh();
+    callback open-editor();
+
+    property <float> t: open ? 1 : 0;
+    animate t { duration: Motion.base; easing: Ease.out; }
+    visible: t > 0.01;
+    opacity: t;
+    border-radius: Theme.r-lg;
+    background: Theme.raised;
+    border-width: 1px;
+    border-color: Theme.border-strong;
+    drop-shadow-blur: 24px;
+    drop-shadow-offset-y: 8px;
+    drop-shadow-color: #00000066;
+    transform-origin: { x: self.width, y: self.height };
+    transform-scale: 0.96 + 0.04 * t;
+
+    // Typing filters immediately — the field takes focus as the menu opens, and the
+    // query is cleared when it closes so the next open starts from the full catalog.
+    changed open => {
+        if open {
+            search.focus();
+        } else if root.query != "" {
+            root.query = "";
+            root.query-changed("");
+        }
+    }
+
+    VerticalLayout {
+        spacing: 0px;
+
+        // Search
+        Rectangle {
+            height: 36px;
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 4px;
+                spacing: 6px;
+                Image { source: Icons.get("search"); width: 14px; height: 14px; colorize: Theme.text-3; }
+                // The widget's own clear button handles emptying the query.
+                search := LineEdit {
+                    placeholder-text: "Search models";
+                    accessible-label: "Search models";
+                    font-size: Theme.fs-md;
+                    height: 28px;
+                    vertical-stretch: 0;
+                    text <=> root.query;
+                    edited(text) => { root.query-changed(text); }
+                    accepted(text) => { root.query-changed(text); }
+                }
+            }
+        }
+        Rectangle { height: 1px; background: Theme.border; }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                alignment: start;
+                spacing: 1px;
+                padding-top: 3px;
+                padding-bottom: 3px;
+                if root.items.length == 0 && root.query != "": HorizontalLayout {
+                    height: hint.preferred-height + 16px;
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    hint := Text {
+                        text: root.empty-text;
+                        color: Theme.text-3;
+                        font-size: Theme.fs-sm;
+                        wrap: word-wrap;
+                        horizontal-stretch: 1;
+                    }
+                }
+                for item in root.items: Rectangle {
+                    height: item.header ? 26px : item.add ? 30px : 32px;
+                    border-radius: Theme.r-sm;
+                    // Group headers are decorative; model and add rows are interactive.
+                    background: !item.header && ta.has-hover ? Theme.hover : transparent;
+                    animate background { duration: Motion.fast; }
+                    accessible-role: button;
+                    accessible-label: item.header
+                        ? item.provider-name
+                        : item.add ? "Add " + item.model + " to " + item.provider-name
+                        : "Use " + item.model;
+                    accessible-action-default => {
+                        if item.add {
+                            root.add-custom(item.provider, item.model);
+                            root.select(item.provider, item.model);
+                        } else if !item.header {
+                            root.select(item.provider, item.model);
+                        }
+                    }
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        // Model rows keep room for the star, which floats over the right edge.
+                        padding-right: item.header ? 6px : 30px;
+                        spacing: 6px;
+                        // Provider group header: caret + label + count.
+                        if item.header && !item.add: Image {
+                            source: Icons.get(item.collapsed ? "chevron-right" : "chevron-down");
+                            width: 12px;
+                            height: 12px;
+                            colorize: Theme.text-4;
+                        }
+                        if item.add: Image {
+                            source: Icons.get("plus");
+                            width: 13px;
+                            height: 13px;
+                            colorize: Theme.interactive;
+                        }
+                        Text {
+                            text: item.header ? item.provider-name : item.model;
+                            color: item.header ? (item.add ? Theme.text-2 : Theme.text-3) : Theme.text;
+                            font-size: item.header ? Theme.fs-xs : Theme.fs-md;
+                            font-weight: item.header ? 500 : 400;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+                        if item.hint != "": Text {
+                            text: item.hint;
+                            color: Theme.text-4;
+                            font-size: Theme.fs-xs;
+                            vertical-alignment: center;
+                        }
+                        if item.header && item.count > 0 && !item.add: Text {
+                            text: "\{item.count}";
+                            color: Theme.text-4;
+                            font-size: Theme.fs-xs;
+                            vertical-alignment: center;
+                        }
+                        if item.header && item.add: Text {
+                            text: item.provider-name;
+                            color: Theme.text-3;
+                            font-size: Theme.fs-sm;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        if !item.header && item.current: Image {
+                            source: Icons.get("check");
+                            width: 14px;
+                            height: 14px;
+                            colorize: Theme.interactive;
+                        }
+                    }
+                    // The row-wide click area comes first and the star after it: Slint
+                    // sends a click to the topmost element, so a later star still wins.
+                    ta := TouchArea {
+                        enabled: !item.header;
+                        mouse-cursor: item.header && !item.add ? default : pointer;
+                        clicked => {
+                            if item.add {
+                                root.add-custom(item.provider, item.model);
+                                root.select(item.provider, item.model);
+                            } else {
+                                root.select(item.provider, item.model);
+                            }
+                        }
+                    }
+                    if !item.header: StarButton {
+                        x: parent.width - self.width - 6px;
+                        on: item.favorite;
+                        label: item.favorite ? "Remove from favorites" : "Add to favorites";
+                        clicked => { root.favorite(item.provider, item.model); }
+                    }
+                    // Header rows toggle their group instead of selecting.
+                    if item.header && !item.add: TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.toggle-collapse(item.provider); }
+                    }
+                }
+                if root.hidden-count > 0: HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    Text {
+                        text: "\{root.hidden-count} more hidden — Edit models…";
+                        color: Theme.text-4;
+                        font-size: Theme.fs-xs;
+                        horizontal-stretch: 1;
+                    }
+                }
+            }
+        }
+
+        Rectangle { height: 1px; background: Theme.border; }
+        MenuAction {
+            text: "Refresh models";
+            icon: Icons.get("refresh-cw");
+            clicked => { root.refresh(); }
+        }
+        MenuAction {
+            text: "Add custom model…";
+            icon: Icons.get("plus");
+            // The search field drives the offer: an id no provider lists turns into
+            // "Add <id> to <provider>" rows the moment it is typed.
+            clicked => { search.focus(); }
+        }
+        MenuAction {
+            text: "Edit models…";
+            icon: Icons.get("settings-2");
+            clicked => { root.open-editor(); }
+        }
+    }
+}
+
+// ── The Edit models dialog ──────────────────────────────────────────────────────
+
+export component ModelEditorModal inherits Rectangle {
+    in-out property <bool> open;
+    in-out property <[EditModelRow]> rows;
+    in-out property <string> query;
+    in-out property <string> empty-text: "No models found";
+    in-out property <int> hidden-count: 0;
+    in-out property <int> total-count: 0;
+    callback query-changed(string);
+    callback toggle-model(string, string);
+    callback toggle-provider(string);
+    callback favorite(string, string);
+    callback add-custom(string, string);
+    callback remove-custom(string, string);
+    callback reset();
+    callback close();
+
+    property <float> t: open ? 1 : 0;
+    animate t { duration: open ? Motion.base : Motion.exit; easing: Ease.standard; }
+    visible: t > 0.001;
+
+    Rectangle {
+        background: Theme.scrim;
+        opacity: root.t;
+        TouchArea { clicked => { root.close(); } }
+    }
+
+    card := Rectangle {
+        width: min(root.width - 80px, 720px);
+        height: min(root.height - 80px, 640px);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        opacity: root.t;
+        transform-origin: { x: self.width / 2, y: self.height / 2 };
+        transform-scale: 0.98 + 0.02 * root.t;
+        border-radius: Theme.r-lg;
+        background: Theme.bg;
+        border-width: 1px;
+        border-color: Theme.border-strong;
+        drop-shadow-blur: 40px;
+        drop-shadow-offset-y: 12px;
+        drop-shadow-color: #00000080;
+        clip: true;
+        TouchArea {} // swallow clicks so they don't close the dialog
+
+        VerticalLayout {
+            padding: 0px;
+            spacing: 0px;
+
+            HorizontalLayout {
+                height: 46px;
+                padding-left: 18px;
+                padding-right: 10px;
+                spacing: 8px;
+                Text {
+                    text: "Edit models";
+                    color: Theme.text;
+                    font-size: Theme.fs-lg - 2px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                IconButton {
+                    icon: Icons.get("x");
+                    tooltip: "Close";
+                    clicked => { root.close(); }
+                }
+            }
+            HorizontalLayout {
+                padding-left: 18px;
+                padding-right: 18px;
+                padding-bottom: 10px;
+                spacing: 6px;
+                Image { source: Icons.get("search"); width: 14px; height: 14px; colorize: Theme.text-3; }
+                search := LineEdit {
+                    placeholder-text: "Search models";
+                    accessible-label: "Search models";
+                    font-size: Theme.fs-md;
+                    height: 30px;
+                    horizontal-stretch: 1;
+                    text <=> root.query;
+                    edited(text) => { root.query-changed(text); }
+                }
+            }
+            Rectangle { height: 1px; background: Theme.border; }
+
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    alignment: start;
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    padding-top: 6px;
+                    spacing: 1px;
+                    if root.rows.length == 0 && root.query != "": HorizontalLayout {
+                        height: msg.preferred-height + 16px;
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        msg := Text {
+                            text: root.empty-text;
+                            color: Theme.text-3;
+                            font-size: Theme.fs-sm;
+                            wrap: word-wrap;
+                            horizontal-stretch: 1;
+                        }
+                    }
+                    for row in root.rows: Rectangle {
+                        height: row.header ? 28px : 34px;
+                        border-radius: Theme.r-sm;
+                        background: !row.header && row-ta.has-hover ? Theme.hover : transparent;
+                        animate background { duration: Motion.fast; }
+                        accessible-role: checkbox;
+                        accessible-label: row.header ? row.provider-name : row.model;
+                        accessible-checked: row.visible;
+                        accessible-action-default => {
+                            if row.header { root.toggle-provider(row.provider); }
+                            else if row.add { root.add-custom(row.provider, row.model); }
+                            else { root.toggle-model(row.provider, row.model); }
+                        }
+                        if row.header && row.add: Rectangle {
+                            // "Add <slug> to <provider>" offer.
+                            height: parent.height;
+                            HorizontalLayout {
+                                padding-left: 4px;
+                                padding-right: 8px;
+                                spacing: 8px;
+                                Image { source: Icons.get("plus"); width: 13px; height: 13px; colorize: Theme.interactive; }
+                                Text {
+                                    text: "Add “" + row.model + "” to " + row.provider-name;
+                                    color: Theme.text-2;
+                                    font-size: Theme.fs-md;
+                                    vertical-alignment: center;
+                                    horizontal-stretch: 1;
+                                    overflow: elide;
+                                }
+                            }
+                        }
+                        if row.header && !row.add: Rectangle {
+                            height: parent.height;
+                            HorizontalLayout {
+                                padding-left: 4px;
+                                padding-right: 8px;
+                                spacing: 8px;
+                                Check {
+                                    checked: row.visible;
+                                    partial: row.count > 0 && row.count < row.total;
+                                }
+                                Image {
+                                    source: Icons.get(row.collapsed ? "chevron-right" : "chevron-down");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: Theme.text-4;
+                                }
+                                Text {
+                                    text: row.provider-name;
+                                    color: Theme.text-3;
+                                    font-size: Theme.fs-xs;
+                                    font-weight: 500;
+                                    vertical-alignment: center;
+                                    horizontal-stretch: 1;
+                                    overflow: elide;
+                                }
+                                if row.hint != "": Text {
+                                    text: row.hint;
+                                    color: Theme.text-4;
+                                    font-size: Theme.fs-xs;
+                                    vertical-alignment: center;
+                                }
+                                Text {
+                                    text: "\{row.count} of \{row.total}";
+                                    color: Theme.text-4;
+                                    font-size: Theme.fs-xs;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        if !row.header: Rectangle {
+                            height: parent.height;
+                            HorizontalLayout {
+                                padding-left: 34px;
+                                padding-right: 6px;
+                                spacing: 8px;
+                                Check { checked: row.visible; }
+                                Text {
+                                    text: row.model;
+                                    color: row.visible ? Theme.text : Theme.text-3;
+                                    font-size: Theme.fs-md;
+                                    vertical-alignment: center;
+                                    horizontal-stretch: 1;
+                                    overflow: elide;
+                                }
+                                if row.custom: Text {
+                                    text: "custom";
+                                    color: Theme.text-4;
+                                    font-size: Theme.fs-xs;
+                                    vertical-alignment: center;
+                                }
+                                if row.hint != "": Text {
+                                    text: row.hint;
+                                    color: Theme.text-4;
+                                    font-size: Theme.fs-xs;
+                                    vertical-alignment: center;
+                                }
+                                StarButton {
+                                    on: row.favorite;
+                                    label: row.favorite ? "Remove from favorites" : "Add to favorites";
+                                    clicked => { root.favorite(row.provider, row.model); }
+                                }
+                            }
+                        }
+                        // Row-wide toggle first, then the affordances that must win a click.
+                        row-ta := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                if row.header { root.toggle-provider(row.provider); }
+                                else if row.add { root.add-custom(row.provider, row.model); }
+                                else { root.toggle-model(row.provider, row.model); }
+                            }
+                        }
+                        if row.custom: Rectangle {
+                            // Forget a hand-typed id.
+                            width: 22px;
+                            height: 22px;
+                            x: parent.width - 34px;
+                            border-radius: Theme.r-sm;
+                            background: del-ta.has-hover ? Theme.hover : transparent;
+                            accessible-role: button;
+                            accessible-label: "Remove custom model";
+                            accessible-action-default => { root.remove-custom(row.provider, row.model); }
+                            Image {
+                                source: Icons.get("x");
+                                width: 12px;
+                                height: 12px;
+                                colorize: Theme.text-3;
+                            }
+                            del-ta := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.remove-custom(row.provider, row.model); }
+                            }
+                        }
+                    }
+                    Rectangle { height: 8px; }
+                }
+            }
+
+            Rectangle { height: 1px; background: Theme.border; }
+            HorizontalLayout {
+                height: 52px;
+                padding-left: 18px;
+                padding-right: 14px;
+                spacing: 8px;
+                Text {
+                    text: root.hidden-count > 0
+                        ? "\{root.total-count - root.hidden-count} of \{root.total-count} models shown · saved on this device"
+                        : "\{root.total-count} models shown · saved on this device";
+                    color: Theme.text-4;
+                    font-size: Theme.fs-xs;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                }
+                reset-btn := Rectangle {
+                    width: reset-label.preferred-width + 24px;
+                    height: 32px;
+                    border-radius: Theme.r-md;
+                    background: reset-ta.pressed ? Theme.pressed : reset-ta.has-hover ? Theme.hover : transparent;
+                    animate background { duration: Motion.fast; }
+                    accessible-role: button;
+                    accessible-label: "Reset to defaults";
+                    accessible-action-default => { root.reset(); }
+                    reset-label := Text {
+                        text: "Reset to defaults";
+                        color: Theme.text-2;
+                        font-size: Theme.fs-md;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        width: parent.width;
+                    }
+                    reset-ta := TouchArea { mouse-cursor: pointer; clicked => { root.reset(); } }
+                }
+                done-btn := Rectangle {
+                    width: done-label.preferred-width + 28px;
+                    height: 32px;
+                    border-radius: Theme.r-md;
+                    background: done-ta.pressed ? Theme.text.transparentize(25%) : done-ta.has-hover ? Theme.text.transparentize(12%) : Theme.text;
+                    animate background { duration: Motion.fast; }
+                    accessible-role: button;
+                    accessible-label: "Done";
+                    accessible-action-default => { root.close(); }
+                    done-label := Text {
+                        text: "Done";
+                        color: Theme.bg;
+                        font-size: Theme.fs-md;
+                        font-weight: 500;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        width: parent.width;
+                    }
+                    done-ta := TouchArea { mouse-cursor: pointer; clicked => { root.close(); } }
+                }
+            }
+        }
+    }
+}

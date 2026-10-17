@@ -12,12 +12,15 @@
 //! * [`highlight`] — syntect-backed code highlighting on a background thread, with a
 //!   bounded content-keyed cache and per-stream checkpoint resume.
 //! * [`sessions`] — session-list grouping helpers.
+//! * [`models`] — picker curation: which models are visible, favourites, custom ids
+//!   (front-end state in `prefs.json`; the backend stays the catalog authority).
 
 pub mod backend;
 pub mod diff;
 pub mod highlight;
 pub mod http;
 pub mod markdown;
+pub mod models;
 pub mod prefs;
 pub mod projects;
 pub mod protocol;

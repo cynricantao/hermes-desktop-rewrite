@@ -153,6 +153,14 @@ pub struct ModelOptionProvider {
     pub models: Vec<Value>,
     pub is_current: Option<bool>,
     pub authenticated: Option<bool>,
+    /// Configured by the user (a custom endpoint / key), not a built-in catalog row.
+    pub is_user_defined: Option<bool>,
+    /// Other spellings the backend accepts for this provider (`custom:<key>`).
+    pub aliases: Vec<String>,
+    /// Curated shortlist for aggregators: the default visible set for this provider.
+    pub featured_models: Vec<String>,
+    pub total_models: Option<u64>,
+    pub warning: Option<String>,
 }
 
 impl ModelOptionProvider {
@@ -169,6 +177,16 @@ impl ModelOptionProvider {
                 _ => None,
             })
             .collect()
+    }
+
+    /// The row the curation logic works on (see [`crate::models`]).
+    pub fn catalog(&self) -> crate::models::CatalogProvider {
+        crate::models::CatalogProvider {
+            slug: self.slug.clone(),
+            name: self.name.clone(),
+            models: self.model_ids(),
+            featured: self.featured_models.clone(),
+        }
     }
 }
 
