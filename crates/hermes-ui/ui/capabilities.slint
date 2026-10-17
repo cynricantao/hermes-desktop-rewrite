@@ -1,0 +1,227 @@
+// Capabilities: profiles, skills, toolsets, MCP servers, memory and scheduled jobs.
+// One list per tab; rows come from hermes-core::capabilities via the controller.
+import { ScrollView, LineEdit, TextEdit } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { IconButton, NavItem, PrimaryButton, GhostButton, Toggle, Segmented, Chip, Spinner } from "components.slint";
+
+export struct CapAction {
+    id: string,
+    label: string,
+    // Needs a second click (deletes data or starts an agent run).
+    confirm: bool,
+}
+
+export struct CapItem {
+    id: string,
+    title: string,
+    subtitle: string,
+    badge: string,
+    has-toggle: bool,
+    on: bool,
+    actions: [CapAction],
+}
+
+export global CapState {
+    in-out property <bool> open;
+    // Index into Profiles, Skills, Tools, MCP, Memory, Scheduled.
+    in-out property <int> tab;
+    in-out property <bool> loading;
+    in-out property <[CapItem]> items;
+    // Client-side list filter (title, subtitle, badge, id).
+    in-out property <string> query;
+    in-out property <string> notice;
+    in-out property <bool> notice-error;
+    // "<row id>|<action id>" waiting for its confirming second click.
+    in-out property <string> armed;
+    // Profile the Skills/Tools/MCP/Memory tabs read and write ("" = default).
+    in-out property <[string]> scopes;
+    in-out property <string> scope;
+    // Create form (empty button = the tab has no form).
+    in-out property <[string]> form-labels;
+    in-out property <[string]> form-hints;
+    in-out property <string> form-button;
+    in-out property <string> f1;
+    in-out property <string> f2;
+    in-out property <string> f3;
+    // Detail pane: a SOUL.md / SKILL.md / cron prompt editor, or a rename field.
+    in-out property <bool> detail-open;
+    in-out property <string> detail-title;
+    in-out property <string> detail-text;
+    in-out property <bool> detail-single-line;
+    in-out property <bool> detail-busy;
+    callback refresh();
+    callback set-tab(int);
+    callback set-scope(string);
+    callback filter(string);
+    callback toggle(string, bool);
+    callback act(string, string);
+    callback create();
+    callback save-detail();
+}
+
+component CapRow inherits Rectangle {
+    in property <CapItem> item;
+    height: lay.preferred-height;
+    border-radius: Theme.r-md;
+    background: ta.has-hover ? Theme.hover : transparent;
+    ta := TouchArea {}
+    lay := HorizontalLayout {
+        padding: 8px;
+        padding-left: 10px;
+        spacing: 8px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 2px;
+            HorizontalLayout {
+                spacing: 8px;
+                Text { text: root.item.title; color: Theme.text; font-size: Theme.fs-md; overflow: elide; horizontal-stretch: 1; }
+                if root.item.badge != "": Rectangle {
+                    height: 18px;
+                    width: badge.preferred-width + 10px;
+                    border-radius: Theme.r-xs;
+                    background: Theme.surface-2;
+                    badge := Text { text: root.item.badge; font-size: Theme.fs-xs; color: Theme.text-3; }
+                }
+            }
+            if root.item.subtitle != "": Text { text: root.item.subtitle; color: Theme.text-3; font-size: Theme.fs-sm; overflow: elide; }
+        }
+        for a in root.item.actions: GhostButton {
+            y: (parent.height - self.height) / 2;
+            text: CapState.armed == root.item.id + "|" + a.id ? "Confirm " + a.label.to-lowercase() : a.label;
+            accessible-label: a.label + " " + root.item.title;
+            clicked => { CapState.act(root.item.id, a.id); }
+        }
+        if root.item.has-toggle: Toggle {
+            y: (parent.height - self.height) / 2;
+            checked: root.item.on;
+            accessible-label: "Enable " + root.item.title;
+            toggled(on) => { CapState.toggle(root.item.id, on); }
+        }
+    }
+}
+
+export component CapabilitiesModal inherits Rectangle {
+    visible: CapState.open;
+    Rectangle {
+        background: Theme.scrim;
+        TouchArea { clicked => { CapState.open = false; } }
+    }
+    panel := Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(parent.width - 48px, 900px);
+        height: min(parent.height - 48px, 700px);
+        background: Theme.bg;
+        border-radius: Theme.r-lg;
+        border-width: 1px;
+        border-color: Theme.border-strong;
+        TouchArea {}
+        VerticalLayout {
+            padding: 22px;
+            spacing: 12px;
+            HorizontalLayout {
+                spacing: 6px;
+                Text { text: "Capabilities"; font-size: Theme.fs-lg; color: Theme.text; vertical-alignment: center; horizontal-stretch: 1; }
+                if CapState.loading: Spinner { y: 8px; }
+                IconButton {
+                    icon: @image-url("../../../assets/icons/refresh-cw.svg");
+                    tooltip: "Refresh capabilities";
+                    clicked => { CapState.refresh(); }
+                }
+                IconButton {
+                    icon: @image-url("../../../assets/icons/x.svg");
+                    tooltip: "Close capabilities";
+                    clicked => { CapState.open = false; }
+                }
+            }
+            Segmented {
+                options: ["Profiles", "Skills", "Tools", "MCP", "Memory", "Scheduled"];
+                selected <=> CapState.tab;
+                changed(i) => { CapState.set-tab(i); }
+            }
+            // Skills, Tools, MCP and Memory belong to one profile at a time.
+            if CapState.tab >= 1 && CapState.tab <= 4 && CapState.scopes.length > 1: HorizontalLayout {
+                spacing: 4px;
+                Text { text: "Profile"; color: Theme.text-3; font-size: Theme.fs-sm; vertical-alignment: center; }
+                for p in CapState.scopes: Chip {
+                    text: p;
+                    outlined: p == (CapState.scope == "" ? "default" : CapState.scope);
+                    accessible-label: "Use profile " + p;
+                    clicked => { CapState.set-scope(p); }
+                }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            if !CapState.detail-open: LineEdit {
+                vertical-stretch: 0;
+                text <=> CapState.query;
+                placeholder-text: "Filter";
+                accessible-label: "Filter capabilities";
+                edited(t) => { CapState.filter(t); }
+            }
+            if CapState.notice != "": Text {
+                text: CapState.notice;
+                color: CapState.notice-error ? Theme.danger : Theme.text-2;
+                wrap: word-wrap;
+            }
+            if !CapState.detail-open: ScrollView {
+                vertical-stretch: 1;
+                min-height: 120px;
+                VerticalLayout {
+                    spacing: 2px;
+                    for it in CapState.items: CapRow { item: it; }
+                    if CapState.items.length == 0: Text {
+                        text: CapState.loading ? "Loading…" : CapState.query != "" ? "Nothing matches the filter." : "Nothing here yet.";
+                        color: Theme.text-3;
+                        x: 10px;
+                    }
+                }
+            }
+            if CapState.detail-open: VerticalLayout {
+                vertical-stretch: 1;
+                spacing: 8px;
+                Text { text: CapState.detail-title; color: Theme.text; font-size: Theme.fs-md; }
+                if CapState.detail-single-line: LineEdit {
+                    vertical-stretch: 0;
+                    text <=> CapState.detail-text;
+                    accessible-label: "Detail text";
+                }
+                if !CapState.detail-single-line: TextEdit {
+                    vertical-stretch: 1;
+                    font-size: Theme.fs-sm;
+                    text <=> CapState.detail-text;
+                    accessible-label: "Detail text";
+                }
+                if CapState.detail-single-line: Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    GhostButton { text: "Back"; clicked => { CapState.detail-open = false; } }
+                    Rectangle { horizontal-stretch: 1; }
+                    PrimaryButton {
+                        text: CapState.detail-busy ? "Saving…" : "Save";
+                        enabled: !CapState.detail-busy;
+                        clicked => { CapState.save-detail(); }
+                    }
+                }
+            }
+            // Only the list stretches; the form keeps its natural height.
+            if !CapState.detail-open && CapState.form-button != "": VerticalLayout {
+                vertical-stretch: 0;
+                spacing: 8px;
+                Rectangle { height: 1px; background: Theme.border; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    vertical-stretch: 0;
+                    LineEdit { horizontal-stretch: 1; vertical-stretch: 0; text <=> CapState.f1; placeholder-text: CapState.form-labels[0] + " — " + CapState.form-hints[0]; accessible-label: CapState.form-labels[0]; }
+                    LineEdit { horizontal-stretch: 1; vertical-stretch: 0; text <=> CapState.f2; placeholder-text: CapState.form-labels[1] + " — " + CapState.form-hints[1]; accessible-label: CapState.form-labels[1]; }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    vertical-stretch: 0;
+                    LineEdit { horizontal-stretch: 1; vertical-stretch: 0; text <=> CapState.f3; placeholder-text: CapState.form-labels[2] + " — " + CapState.form-hints[2]; accessible-label: CapState.form-labels[2]; }
+                    PrimaryButton { text: CapState.form-button; clicked => { CapState.create(); } }
+                }
+            }
+        }
+    }
+}

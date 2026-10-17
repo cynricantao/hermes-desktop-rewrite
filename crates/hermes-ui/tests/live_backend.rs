@@ -5,7 +5,7 @@
 //! Always allow, by click and by keyboard), a long (600-message) conversation, and the
 //! settings panel (registry nav, "Applies to" profile scope, saving, persistence, search).
 //!
-//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings` runs a subset. The
+//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings,capabilities` runs a subset. The
 //! `long` section
 //! needs a seeded session: `HERMES_HOME=<private home> scripts/seed-long-session.py 600`. The
 //! `sessions` section (open / switch / new chat / Ctrl+Tab, continue an old chat, switch while
@@ -36,7 +36,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use hermes_ui::{AppState, AppWindow, SettingsState};
+use hermes_ui::{AppState, AppWindow, CapState, SettingsState};
 use i_slint_backend_testing::ElementHandle;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, Model, SharedString};
@@ -319,6 +319,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("settings") {
         settings_section(&ui, &log).await;
+    }
+    if want("capabilities") {
+        capabilities_section(&ui, &log).await;
     }
 }
 
@@ -1589,6 +1592,549 @@ async fn settings_section(ui: &AppWindow, log: &Log) {
 
     ui.set_settings_open(false);
     sleep(200).await;
+}
+
+/// An independent REST read/write against the private backend (same endpoint and token
+/// discovery as the app), to verify what the Capabilities screen persisted.
+async fn backend_rest(method: &str, path: &str, body: Option<serde_json::Value>) -> Result<serde_json::Value, String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let (method, path) = (method.to_owned(), path.to_owned());
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(async {
+            let backend = hermes_core::backend::discover_or_spawn(None)
+                .await
+                .map_err(|e| e.to_string())?;
+            let e = &backend.endpoint;
+            hermes_core::http::Rest::new(e.host.clone(), e.port, e.token.clone())
+                .send(&method, &path, body.as_ref())
+                .await
+                .map_err(|e| e.to_string())
+        });
+        let _ = tx.send(result);
+    });
+    rx.await.map_err(|e| e.to_string())?
+}
+
+fn cap_items(ui: &AppWindow) -> Vec<hermes_ui::CapItem> {
+    ui.global::<CapState>().get_items().iter().collect()
+}
+
+fn cap_has(ui: &AppWindow, id: &str) -> bool {
+    cap_items(ui).iter().any(|i| i.id.as_str() == id)
+}
+
+/// Set a LineEdit/TextEdit by its accessible label (as typing would).
+fn set_field(ui: &AppWindow, label: &str, text: &str) -> bool {
+    by_label(ui, label).map(|e| e.set_accessible_value(text)).is_some()
+}
+
+/// Click a Capabilities tab. Tab names also label sidebar rows ("Scheduled") and hidden
+/// settings rows, so only an element with the Tab role counts.
+async fn cap_tab(ui: &AppWindow, label: &str, index: i32) -> bool {
+    let s = ui.global::<CapState>();
+    sleep(150).await;
+    let Some(tab) = ElementHandle::find_by_accessible_label(ui, label)
+        .find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Tab))
+    else {
+        return false;
+    };
+    tab.single_click(PointerEventButton::Left).await;
+    // The tab index flips on the click itself; the controller publishes the tab's form
+    // (and resets its fields) afterwards. Typing before that would land in the old form.
+    let tab_kind = hermes_core::capabilities::Tab::from_index(index);
+    let button = hermes_core::capabilities::form(tab_kind).map_or("", |f| f.button);
+    let first = hermes_core::capabilities::form(tab_kind).map_or("", |f| f.fields[0]);
+    let form_ready = wait_until(20, || {
+        s.get_tab() == index
+            && s.get_form_button().as_str() == button
+            && s.get_form_labels().row_data(0).is_some_and(|l| l.as_str() == first)
+    })
+    .await;
+    sleep(300).await;
+    form_ready && wait_until(20, || !s.get_loading()).await && !s.get_notice_error()
+}
+
+fn json_list<'a>(v: &'a serde_json::Value, key: &str) -> Vec<&'a serde_json::Value> {
+    v.get(key)
+        .and_then(|x| x.as_array())
+        .or_else(|| v.as_array())
+        .map(|a| a.iter().collect())
+        .unwrap_or_default()
+}
+
+fn find_named<'a>(list: &[&'a serde_json::Value], name: &str) -> Option<&'a serde_json::Value> {
+    list.iter()
+        .copied()
+        .find(|x| x.get("name").and_then(|n| n.as_str()) == Some(name))
+}
+
+async fn capabilities_section(ui: &AppWindow, log: &Log) {
+    let s = ui.global::<CapState>();
+    let tag = std::process::id();
+    let home = live_home();
+
+    // ── Sidebar "Scheduled" opens the screen on the Scheduled tab ────────────────
+    let opened =
+        click(ui, "Scheduled").await && wait_until(20, || s.get_open() && s.get_tab() == 5 && !s.get_loading()).await;
+    record(
+        log,
+        "capabilities: sidebar Scheduled opens the Scheduled tab",
+        opened && !s.get_notice_error(),
+        format!("open={} tab={} notice={:?}", s.get_open(), s.get_tab(), s.get_notice()),
+    );
+
+    // ── Profiles: list, create, edit SOUL.md, rename, delete (two clicks) ────────
+    let listed = cap_tab(ui, "Profiles", 0).await
+        && wait_until(10, || cap_has(ui, "default") && cap_has(ui, "swe") && cap_has(ui, "ea")).await;
+    record(
+        log,
+        "capabilities: Profiles lists every profile",
+        listed,
+        format!(
+            "{:?}",
+            cap_items(ui).iter().map(|i| i.id.to_string()).collect::<Vec<_>>()
+        ),
+    );
+
+    let name = format!("rscap{tag}");
+    let renamed = format!("rscapr{tag}");
+    set_field(ui, "Profile name", &name);
+    click(ui, "Create profile").await;
+    let created = wait_until(30, || cap_has(ui, &name)).await;
+    let rest = backend_rest("GET", "/api/profiles", None).await.unwrap_or_default();
+    let on_backend = find_named(&json_list(&rest, "profiles"), &name).is_some();
+    let real_wrapper = std::path::Path::new(&std::env::var("HOME").unwrap_or_default())
+        .join(".local/bin")
+        .join(&name)
+        .exists();
+    record(
+        log,
+        "capabilities: Create profile persists on the backend",
+        created && on_backend && !real_wrapper,
+        format!(
+            "row shown={created}; GET /api/profiles has it={on_backend}; wrapper in real ~/.local/bin={real_wrapper}"
+        ),
+    );
+
+    click(ui, &format!("Soul {name}")).await;
+    let soul_open = wait_until(10, || s.get_detail_open() && !s.get_detail_single_line()).await;
+    set_field(ui, "Detail text", "Throwaway soul written by the live test.");
+    click(ui, "Save").await;
+    let soul_saved = wait_until(10, || !s.get_detail_open()).await;
+    let soul = backend_rest("GET", &format!("/api/profiles/{name}/soul"), None)
+        .await
+        .unwrap_or_default();
+    let soul_ok = soul.get("content").and_then(|c| c.as_str()) == Some("Throwaway soul written by the live test.");
+    record(
+        log,
+        "capabilities: SOUL.md edit saves to the profile",
+        soul_open && soul_saved && soul_ok,
+        format!("editor opened={soul_open}; closed after save={soul_saved}; GET soul matches={soul_ok}"),
+    );
+
+    click(ui, &format!("Rename {name}")).await;
+    let rename_open = wait_until(10, || s.get_detail_open() && s.get_detail_single_line()).await;
+    set_field(ui, "Detail text", &renamed);
+    click(ui, "Save").await;
+    let rename_ok = wait_until(30, || cap_has(ui, &renamed) && !cap_has(ui, &name)).await;
+    record(
+        log,
+        "capabilities: Rename profile",
+        rename_open && rename_ok,
+        format!("rename field opened={rename_open}; list shows {renamed} only={rename_ok}"),
+    );
+
+    click(ui, &format!("Delete {renamed}")).await;
+    let armed = wait_until(5, || s.get_armed().as_str() == format!("{renamed}|delete")).await;
+    let still_there = cap_has(ui, &renamed);
+    click(ui, &format!("Delete {renamed}")).await;
+    let deleted = wait_until(30, || !cap_has(ui, &renamed)).await;
+    let rest = backend_rest("GET", "/api/profiles", None).await.unwrap_or_default();
+    let gone = find_named(&json_list(&rest, "profiles"), &renamed).is_none();
+    record(
+        log,
+        "capabilities: Delete profile needs a second click",
+        armed && still_there && deleted && gone,
+        format!(
+            "first click armed={armed} (row kept={still_there}); second click removed row={deleted}; backend gone={gone}"
+        ),
+    );
+
+    // ── Skills: create + view, switch, then the same in the swe profile ──────────
+    let loaded = cap_tab(ui, "Skills", 1).await;
+    let skill_name = format!("rs-cap-skill-{tag}");
+    let enabled_in = |v: &serde_json::Value, name: &str| {
+        find_named(&json_list(v, "skills"), name)
+            .and_then(|x| x.get("enabled"))
+            .and_then(|e| e.as_bool())
+    };
+    set_field(ui, "Skill name", &skill_name);
+    set_field(ui, "Description", "Throwaway skill created by the live test.");
+    click(ui, "Create skill").await;
+    let made = wait_until(20, || cap_has(ui, &skill_name)).await;
+    // A real skill list is longer than the window; the filter brings the row into view.
+    let typed = set_field(ui, "Filter capabilities", &skill_name);
+    s.invoke_filter(skill_name.as_str().into());
+    let filtered = wait_until(10, || cap_items(ui).len() == 1 && cap_has(ui, &skill_name)).await;
+    click(ui, &format!("View {skill_name}")).await;
+    let viewed = wait_until(10, || {
+        s.get_detail_open() && s.get_detail_text().contains(&format!("name: {skill_name}"))
+    })
+    .await;
+    click(ui, "Back").await;
+    record(
+        log,
+        "capabilities: Create skill, filter to it, then view its SKILL.md",
+        loaded && made && typed && filtered && viewed,
+        format!(
+            "tab loaded={loaded}; row shown={made}; filter left only it={filtered}; \
+             SKILL.md opened with frontmatter={viewed}; notice={:?}",
+            s.get_notice()
+        ),
+    );
+
+    click(ui, &format!("Enable {skill_name}")).await;
+    let off = wait_until(10, || {
+        cap_items(ui).iter().any(|i| i.id.as_str() == skill_name && !i.on)
+    })
+    .await;
+    let rest_off = enabled_in(
+        &backend_rest("GET", "/api/skills", None).await.unwrap_or_default(),
+        &skill_name,
+    );
+    click(ui, &format!("Enable {skill_name}")).await;
+    let on = wait_until(10, || cap_items(ui).iter().any(|i| i.id.as_str() == skill_name && i.on)).await;
+    let rest_on = enabled_in(
+        &backend_rest("GET", "/api/skills", None).await.unwrap_or_default(),
+        &skill_name,
+    );
+    record(
+        log,
+        "capabilities: skill switch writes the backend and reads back",
+        off && rest_off == Some(false) && on && rest_on == Some(true),
+        format!("off row={off} backend={rest_off:?}; on row={on} backend={rest_on:?}"),
+    );
+
+    // The profile pills scope create and switch to that profile only.
+    click(ui, "Use profile swe").await;
+    let scoped = wait_until(20, || s.get_scope().as_str() == "swe" && !s.get_loading()).await;
+    let absent_in_swe = !cap_has(ui, &skill_name);
+    set_field(ui, "Skill name", &skill_name);
+    set_field(ui, "Description", "Throwaway skill created by the live test.");
+    click(ui, "Create skill").await;
+    let made_swe = wait_until(20, || cap_has(ui, &skill_name)).await;
+    click(ui, &format!("Enable {skill_name}")).await;
+    let swe_off = wait_until(10, || {
+        cap_items(ui).iter().any(|i| i.id.as_str() == skill_name && !i.on)
+    })
+    .await;
+    let swe_rest = enabled_in(
+        &backend_rest("GET", "/api/skills?profile=swe", None)
+            .await
+            .unwrap_or_default(),
+        &skill_name,
+    );
+    let default_rest = enabled_in(
+        &backend_rest("GET", "/api/skills", None).await.unwrap_or_default(),
+        &skill_name,
+    );
+    click(ui, "Use profile default").await;
+    let back_default = wait_until(20, || s.get_scope().is_empty() && !s.get_loading()).await;
+    record(
+        log,
+        "capabilities: profile pills scope skill create and switch to that profile",
+        scoped
+            && absent_in_swe
+            && made_swe
+            && swe_off
+            && swe_rest == Some(false)
+            && default_rest == Some(true)
+            && back_default,
+        format!(
+            "scope swe={scoped}; absent before={absent_in_swe}; created in swe={made_swe}; off in swe row={swe_off} \
+             backend swe={swe_rest:?} default={default_rest:?}; back to default={back_default}"
+        ),
+    );
+
+    // ── Tools: toggle a toolset that has no install step ─────────────────────────
+    const INSTALLS: [&str; 8] = [
+        "tts",
+        "stt",
+        "web",
+        "image_gen",
+        "video_gen",
+        "x_search",
+        "browser",
+        "computer_use",
+    ];
+    let tools_loaded = cap_tab(ui, "Tools", 2).await && wait_until(10, || !cap_items(ui).is_empty()).await;
+    let ts = cap_items(ui)
+        .into_iter()
+        .find(|i| i.has_toggle && i.on && !INSTALLS.contains(&i.id.as_str()));
+    if let Some(t) = ts {
+        let tid = t.id.to_string();
+        let enabled = |v: &serde_json::Value| {
+            find_named(&json_list(v, "toolsets"), &tid)
+                .and_then(|x| x.get("enabled"))
+                .and_then(|e| e.as_bool())
+        };
+        click(ui, &format!("Enable {}", t.title)).await;
+        let off = wait_until(10, || cap_items(ui).iter().any(|i| i.id == t.id && !i.on)).await;
+        let rest_off = enabled(
+            &backend_rest("GET", "/api/tools/toolsets", None)
+                .await
+                .unwrap_or_default(),
+        );
+        click(ui, &format!("Enable {}", t.title)).await;
+        let on = wait_until(10, || cap_items(ui).iter().any(|i| i.id == t.id && i.on)).await;
+        let rest_on = enabled(
+            &backend_rest("GET", "/api/tools/toolsets", None)
+                .await
+                .unwrap_or_default(),
+        );
+        record(
+            log,
+            "capabilities: toolset switch writes the backend and reads back",
+            tools_loaded && off && rest_off == Some(false) && on && rest_on == Some(true),
+            format!("{tid}: off row={off} backend={rest_off:?}; on row={on} backend={rest_on:?}"),
+        );
+    } else {
+        record(
+            log,
+            "capabilities: toolset switch writes the backend and reads back",
+            false,
+            "no safe enabled toolset",
+        );
+    }
+
+    // ── MCP: add (no test call: that would spawn the server), disable, remove ────
+    let mcp = format!("rscapmcp{tag}");
+    let mcp_loaded = cap_tab(ui, "MCP", 3).await;
+    set_field(ui, "Server name", &mcp);
+    set_field(ui, "Command or URL", "echo");
+    set_field(ui, "Arguments", "live-test");
+    click(ui, "Add server").await;
+    let added = wait_until(20, || cap_has(ui, &mcp)).await;
+    let servers = backend_rest("GET", "/api/mcp/servers", None).await.unwrap_or_default();
+    let cfg = find_named(&json_list(&servers, "servers"), &mcp).cloned();
+    let shape_ok = cfg.as_ref().is_some_and(|c| {
+        c.get("command").and_then(|x| x.as_str()) == Some("echo")
+            && c.get("args") == Some(&serde_json::json!(["live-test"]))
+    });
+    click(ui, &format!("Enable {mcp}")).await;
+    let disabled = wait_until(10, || cap_items(ui).iter().any(|i| i.id.as_str() == mcp && !i.on)).await;
+    let servers = backend_rest("GET", "/api/mcp/servers", None).await.unwrap_or_default();
+    let rest_disabled = find_named(&json_list(&servers, "servers"), &mcp)
+        .and_then(|c| c.get("enabled"))
+        .and_then(|e| e.as_bool());
+    click(ui, &format!("Remove {mcp}")).await;
+    click(ui, &format!("Remove {mcp}")).await;
+    let removed = wait_until(20, || !cap_has(ui, &mcp)).await;
+    let servers = backend_rest("GET", "/api/mcp/servers", None).await.unwrap_or_default();
+    let rest_gone = find_named(&json_list(&servers, "servers"), &mcp).is_none();
+    record(
+        log,
+        "capabilities: MCP add → disable → remove round-trips the backend",
+        mcp_loaded && added && shape_ok && disabled && rest_disabled == Some(false) && removed && rest_gone,
+        format!(
+            "added={added} saved as echo [live-test]={shape_ok}; disabled row={disabled} backend={rest_disabled:?}; removed={removed} backend gone={rest_gone}"
+        ),
+    );
+
+    // ── Memory: reset a fixture MEMORY.md (two clicks); pause/resume the curator ─
+    let mem_dir = std::path::Path::new(&home).join("memories");
+    let fixture = mem_dir.join("MEMORY.md");
+    let wrote = std::fs::create_dir_all(&mem_dir).is_ok() && std::fs::write(&fixture, "live-test fixture\n").is_ok();
+    let mem_loaded = cap_tab(ui, "Memory", 4).await;
+    let sized = wait_until(10, || {
+        cap_items(ui)
+            .iter()
+            .any(|i| i.id.as_str() == "file:memory" && !i.subtitle.ends_with(" 0 B"))
+    })
+    .await;
+    click(ui, "Reset MEMORY.md").await;
+    let kept_after_first = fixture.exists();
+    click(ui, "Reset MEMORY.md").await;
+    let reset = wait_until(10, || !fixture.exists()).await;
+    record(
+        log,
+        "capabilities: Reset MEMORY.md needs a second click and deletes the file",
+        wrote && mem_loaded && sized && kept_after_first && reset,
+        format!(
+            "fixture written={wrote}; size shown={sized}; kept after first click={kept_after_first}; deleted={reset}"
+        ),
+    );
+
+    let paused = |v: &serde_json::Value| v.get("paused").and_then(|p| p.as_bool());
+    let before = paused(&backend_rest("GET", "/api/curator", None).await.unwrap_or_default());
+    if before.is_some() && cap_has(ui, "curator") {
+        click(ui, "Enable Skill curator").await;
+        let flipped = wait_until(10, || {
+            cap_items(ui)
+                .iter()
+                .any(|i| i.id.as_str() == "curator" && i.on == before.unwrap_or(false))
+        })
+        .await;
+        let mid = paused(&backend_rest("GET", "/api/curator", None).await.unwrap_or_default());
+        click(ui, "Enable Skill curator").await;
+        let restored = wait_until(10, || {
+            cap_items(ui)
+                .iter()
+                .any(|i| i.id.as_str() == "curator" && i.on != before.unwrap_or(false))
+        })
+        .await;
+        let after = paused(&backend_rest("GET", "/api/curator", None).await.unwrap_or_default());
+        record(
+            log,
+            "capabilities: curator switch pauses and resumes",
+            flipped && mid == before.map(|b| !b) && restored && after == before,
+            format!("paused before={before:?} mid={mid:?} after={after:?}"),
+        );
+    } else {
+        record(
+            log,
+            "capabilities: curator switch pauses and resumes",
+            false,
+            format!("curator status {before:?}"),
+        );
+    }
+
+    // ── Scheduled: create (yearly, never due during the test), pause, edit, delete ─
+    let job = format!("rs-cap-job-{tag}");
+    let cron_loaded = cap_tab(ui, "Scheduled", 5).await;
+    set_field(ui, "Job name", &job);
+    set_field(ui, "Schedule", "0 3 1 1 *");
+    set_field(ui, "Prompt", "Say hi.");
+    click(ui, "Schedule job").await;
+    let made = wait_until(20, || cap_items(ui).iter().any(|i| i.title.as_str() == job)).await;
+    let jobs = backend_rest("GET", "/api/cron/jobs?profile=all", None)
+        .await
+        .unwrap_or_default();
+    let rest_job = find_named(&json_list(&jobs, "jobs"), &job).cloned();
+    let id = rest_job
+        .as_ref()
+        .and_then(|j| j.get("id"))
+        .and_then(|x| x.as_str())
+        .unwrap_or_default()
+        .to_owned();
+    record(
+        log,
+        "capabilities: Schedule job creates a cron job",
+        cron_loaded && made && !id.is_empty(),
+        format!("row shown={made}; backend id={id:?}"),
+    );
+
+    click(ui, &format!("Enable {job}")).await;
+    let paused_row = wait_until(10, || cap_items(ui).iter().any(|i| i.title.as_str() == job && !i.on)).await;
+    let state = backend_rest("GET", &format!("/api/cron/jobs/{id}"), None)
+        .await
+        .unwrap_or_default()
+        .get("state")
+        .and_then(|x| x.as_str())
+        .unwrap_or_default()
+        .to_owned();
+    record(
+        log,
+        "capabilities: job switch pauses it",
+        paused_row && state == "paused",
+        format!("row off={paused_row}; backend state={state:?}"),
+    );
+
+    click(ui, &format!("Enable {job}")).await;
+    let resumed_row = wait_until(10, || cap_items(ui).iter().any(|i| i.title.as_str() == job && i.on)).await;
+    let state = backend_rest("GET", &format!("/api/cron/jobs/{id}"), None)
+        .await
+        .unwrap_or_default()
+        .get("state")
+        .and_then(|x| x.as_str())
+        .unwrap_or_default()
+        .to_owned();
+    record(
+        log,
+        "capabilities: job switch resumes it",
+        resumed_row && state == "scheduled",
+        format!("row on={resumed_row}; backend state={state:?}"),
+    );
+
+    click(ui, &format!("Prompt {job}")).await;
+    let prompt_open = wait_until(10, || s.get_detail_open() && s.get_detail_text().as_str() == "Say hi.").await;
+    set_field(ui, "Detail text", "Say hello.");
+    click(ui, "Save").await;
+    let saved = wait_until(10, || !s.get_detail_open()).await;
+    let prompt = backend_rest("GET", &format!("/api/cron/jobs/{id}"), None)
+        .await
+        .unwrap_or_default()
+        .get("prompt")
+        .and_then(|x| x.as_str())
+        .unwrap_or_default()
+        .to_owned();
+    record(
+        log,
+        "capabilities: job prompt edit saves",
+        prompt_open && saved && prompt == "Say hello.",
+        format!("editor showed the prompt={prompt_open}; saved={saved}; backend prompt={prompt:?}"),
+    );
+
+    // "Run now" spends a model call: check only that one click arms it and runs nothing.
+    click(ui, &format!("Run now {job}")).await;
+    let run_armed = wait_until(5, || s.get_notice().contains("uses your model")).await;
+    sleep(500).await;
+    let last_run = backend_rest("GET", &format!("/api/cron/jobs/{id}"), None)
+        .await
+        .unwrap_or_default()
+        .get("last_run_at")
+        .cloned()
+        .unwrap_or_default();
+    record(
+        log,
+        "capabilities: one Run now click only asks for confirmation",
+        run_armed && last_run.is_null(),
+        format!("notice warns about model use={run_armed}; last_run_at={last_run}"),
+    );
+
+    click(ui, &format!("Delete {job}")).await;
+    click(ui, &format!("Delete {job}")).await;
+    let job_gone = wait_until(20, || !cap_items(ui).iter().any(|i| i.title.as_str() == job)).await;
+    let jobs = backend_rest("GET", "/api/cron/jobs?profile=all", None)
+        .await
+        .unwrap_or_default();
+    let rest_gone = find_named(&json_list(&jobs, "jobs"), &job).is_none();
+    record(
+        log,
+        "capabilities: Delete job (two clicks)",
+        !id.is_empty() && job_gone && rest_gone,
+        format!(
+            "job existed={}; row gone={job_gone}; backend gone={rest_gone}",
+            !id.is_empty()
+        ),
+    );
+
+    if std::env::var_os("HERMES_LIVE_SCREENSHOTS").is_some() {
+        cap_tab(ui, "Skills", 1).await;
+        sleep(400).await;
+        let out = format!("{}/capabilities-skills.ppm", tmpdir());
+        if let Ok(buf) = ui.window().take_snapshot() {
+            let mut ppm = format!("P6\n{} {}\n255\n", buf.width(), buf.height()).into_bytes();
+            for px in buf.as_slice() {
+                ppm.extend_from_slice(&[px.r, px.g, px.b]);
+            }
+            let _ = std::fs::write(&out, ppm);
+            println!("[SHOT] {out}");
+        }
+    }
+
+    press(ui, Key::Escape);
+    let closed = wait_until(5, || !s.get_open()).await;
+    record(
+        log,
+        "capabilities: Esc closes the screen",
+        closed,
+        format!("open={}", s.get_open()),
+    );
 }
 
 #[test]

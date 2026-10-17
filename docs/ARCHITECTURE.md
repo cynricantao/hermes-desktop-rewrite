@@ -16,15 +16,20 @@ crates/
     protocol.rs    lenient serde types mirroring gateway-contract.openrpc.json
     transcript.rs  gateway events → transcript blocks, reporting row-level `Change`s
     sessions.rs    sidebar grouping helpers
+    capabilities.rs  Capabilities screen: REST requests + row parsers for profiles, skills,
+                     toolsets, MCP servers, memory/curator and cron jobs (pure, tested)
     examples/probe.rs  live end-to-end probe against a real backend
   hermes-ui/     Slint views (ui/*.slint) + controller bridging core ↔ UI
     ui/theme.slint       design tokens (docs/DESIGN.md) + Motion/Ease globals
     ui/components.slint  buttons, chips, toggle, segmented control, spinner, shimmer, banner
     ui/chat.slint        virtualised transcript, tool groups, thinking block, composer
     ui/settings.slint    settings modal
+    ui/capabilities.slint  Capabilities modal (six tabs, filter, create form, detail editor)
     ui/app-window.slint  window: sidebar, title strip, empty state, overlays
     src/controller.rs    async controller (tokio) — owns client, backend, transcript
     src/rows.rs          Block → Slint row conversion (pure, tested)
+    src/capabilities.rs  Capabilities task: its own tokio task, so a slow MCP test or a
+                         cron "run now" never stalls chat streaming
   hermes-app/    binary `hermes-desktop-rs`: logging, runtime, window
 assets/          bundled fonts (OFL) and icons (ISC) with their licences
 packaging/       PKGBUILD, .desktop file, icon
