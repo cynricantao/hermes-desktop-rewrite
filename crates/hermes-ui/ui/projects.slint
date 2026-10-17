@@ -1,0 +1,114 @@
+// Project selection and editing use the backend's existing project registry.
+import { ScrollView, LineEdit } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { IconButton, NavItem, PrimaryButton, GhostButton } from "components.slint";
+
+export struct ProjectItem {
+    id: string,
+    name: string,
+    path: string,
+}
+
+export global ProjectState {
+    in-out property <bool> open;
+    in-out property <bool> loading;
+    in-out property <[ProjectItem]> items;
+    in-out property <string> active-id;
+    in-out property <string> active-name;
+    in-out property <string> edit-id;
+    in-out property <string> name;
+    in-out property <string> path;
+    in-out property <string> error;
+    callback refresh();
+    callback select(string);
+    callback save(string, string, string);
+}
+
+export component ProjectsModal inherits Rectangle {
+    visible: ProjectState.open;
+    Rectangle {
+        background: Theme.scrim;
+        TouchArea { clicked => { ProjectState.open = false; } }
+    }
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(parent.width - 48px, 660px);
+        height: min(parent.height - 48px, 620px);
+        background: Theme.bg;
+        border-radius: Theme.r-lg;
+        border-width: 1px;
+        border-color: Theme.border-strong;
+        TouchArea {}
+        VerticalLayout {
+            padding: 22px;
+            spacing: 12px;
+            HorizontalLayout {
+                Text { text: "Projects"; font-size: Theme.fs-lg; color: Theme.text; horizontal-stretch: 1; }
+                IconButton {
+                    icon: @image-url("../../../assets/icons/refresh-cw.svg");
+                    tooltip: "Refresh projects";
+                    clicked => { ProjectState.refresh(); }
+                }
+                IconButton {
+                    icon: @image-url("../../../assets/icons/x.svg");
+                    tooltip: "Close projects";
+                    clicked => { ProjectState.open = false; }
+                }
+            }
+            Text { text: "Choose a project to start a chat in its folder. Existing chats keep their own project."; color: Theme.text-3; wrap: word-wrap; }
+            NavItem {
+                icon: @image-url("../../../assets/icons/message-circle.svg");
+                text: "Chat without a project";
+                selected: ProjectState.active-id == "";
+                clicked => { ProjectState.select(""); }
+            }
+            ScrollView {
+                vertical-stretch: 1;
+                min-height: 100px;
+                VerticalLayout {
+                    spacing: 4px;
+                    for p in ProjectState.items: HorizontalLayout {
+                        spacing: 8px;
+                        NavItem {
+                            horizontal-stretch: 1;
+                            icon: @image-url("../../../assets/icons/folder.svg");
+                            text: p.name;
+                            selected: p.id == ProjectState.active-id;
+                            clicked => { ProjectState.select(p.id); }
+                        }
+                        GhostButton {
+                            text: "Edit " + p.name;
+                            clicked => {
+                                ProjectState.edit-id = p.id;
+                                ProjectState.name = p.name;
+                                ProjectState.path = p.path;
+                            }
+                        }
+                    }
+                    if ProjectState.items.length == 0: Text {
+                        text: ProjectState.loading ? "Loading projects…" : "No projects yet. Add an existing folder below.";
+                        color: Theme.text-3;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+            Rectangle { height: 1px; background: Theme.border; }
+            Text { text: ProjectState.edit-id == "" ? "Add an existing folder" : "Edit project"; font-size: Theme.fs-md; color: Theme.text; }
+            name := LineEdit { text <=> ProjectState.name; placeholder-text: "Project name"; accessible-label: "Project name"; }
+            path := LineEdit { enabled: ProjectState.edit-id == ""; text <=> ProjectState.path; placeholder-text: "Full folder path, for example /home/alpha/Projects/my-app"; accessible-label: "Project folder path"; }
+            if ProjectState.error != "": Text { text: ProjectState.error; color: Theme.danger; wrap: word-wrap; }
+            HorizontalLayout {
+                GhostButton {
+                    text: "Clear form";
+                    clicked => { ProjectState.edit-id = ""; ProjectState.name = ""; ProjectState.path = ""; ProjectState.error = ""; }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                PrimaryButton {
+                    text: ProjectState.edit-id == "" ? "Add project" : "Save project";
+                    clicked => { ProjectState.save(ProjectState.edit-id, ProjectState.name, ProjectState.path); }
+                }
+            }
+        }
+    }
+}

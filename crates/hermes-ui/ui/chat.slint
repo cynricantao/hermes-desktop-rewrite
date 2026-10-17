@@ -334,6 +334,7 @@ export component Composer inherits Rectangle {
     callback send(string);
     callback stop();
     callback pick-model();
+    callback pick-effort();
     callback pick-folder();
     callback attach();
     // Focus lands in the text input itself (the FocusScope around it only captures Enter).
@@ -442,8 +443,12 @@ export component Composer inherits Rectangle {
         Rectangle { horizontal-stretch: 1; }
         Chip {
             text: root.model-label;
-            secondary: root.effort-label;
             clicked => { root.pick-model(); }
+        }
+        Chip {
+            text: root.effort-label != "" ? root.effort-label : "Reasoning";
+            has-chevron: true;
+            clicked => { root.pick-effort(); }
         }
     }
 }

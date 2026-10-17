@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**20 done · 36 partial · 736 not started · 1 unsupported** (of 793).
+**22 done · 42 partial · 728 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -99,7 +99,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Soft focus composer (/, Shift+Enter, type-to-focus) — local — src/app/chat/composer/paste-to-focus.ts, src/lib/keybinds/composer-focus-keys.ts
 - [ ] Focus composer from anywhere (⌘/Ctrl+L) — local — src/app/chat/composer/focus-chord.ts
 - [ ] Slash command completion — RPC commands.catalog, complete.slash — src/app/chat/composer/hooks/use-slash-completions.ts
-- [ ] Execute a slash command — RPC slash.exec — src/app/session/hooks/use-prompt-actions/slash.ts
+- [~] Execute a slash command — RPC slash.exec — src/app/session/hooks/use-prompt-actions/slash.ts ⟶ slash.exec/command.dispatch routing plus local model/reasoning/new/stop. Aliases remain unsupported; model-generated skill execution is not part of the no-credentials check.
 - [ ] @-mention path completion — RPC complete.path — src/app/chat/composer/hooks/use-at-completions.ts
 - [ ] Emoji completion (:name) — local — src/app/chat/composer/hooks/use-emoji-completions.ts
 - [ ] Slash help hint (?) — local — src/app/chat/composer/help-hint.tsx
@@ -116,7 +116,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Inline references (/file, @path) in composer — local + RPC complete.path — src/app/chat/composer/inline-refs.ts, path-refs.ts
 - [ ] URL reference chips — local — src/app/chat/composer/url-refs.ts, url-dialog.tsx
 - [x] Model pill (per-composer model switcher) — REST /api/model/set, /api/model/options — src/app/chat/composer/model-pill.tsx ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: mid-session deepseek-v4.1-flash → glm-5.3-flash via `config.set model` (session-scoped); label updates; next reply answered by the new model. Re-verified 2026-10-16 (PR #3): a pick on the **new-chat screen** is kept and sent with `session.create` (`model`/`provider`, as the Electron app does), because `config.set model` answers 4001 without a live session. This was a real bug: the pick was silently ignored. Then switching back mid-session also works
-- [ ] Reasoning-effort pill — RPC config.set (agent.reasoning_effort) — src/app/chat/composer/reasoning-pill.tsx
+- [x] Reasoning-effort pill — RPC config.set (agent.reasoning_effort) — src/app/chat/composer/reasoning-pill.tsx ⟶ live private backend, tests/live_backend.rs daily: actual chip/max clicks, session.create preserves max, live change reads back high, config default remains medium, switching restores low.
 - [ ] Reasoning level up/down hotkeys — local — src/lib/keybinds/actions.ts
 - [ ] Composer scope selector (profile/agent routing) — local — src/app/chat/composer/scope.tsx
 - [ ] Micro-actions row under composer — local — src/app/chat/composer/micro-actions.tsx
@@ -270,12 +270,12 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Projects / workspaces
 
-- [ ] Projects list (groups of folders/repos/worktrees) — RPC projects.list — src/store/projects.ts
-- [ ] Create project — RPC projects.create — src/app/chat/sidebar/project-dialog.tsx
-- [ ] Update project (name/color/icon) — RPC projects.update — src/app/chat/sidebar/projects/project-menu.tsx
+- [~] Projects list (groups of folders/repos/worktrees) — RPC projects.list — src/store/projects.ts ⟶ project dialog lists non-archived projects and its rows are pointer-click tested against the private backend; hierarchical grouping remains unbuilt.
+- [x] Create project — RPC projects.create — src/app/chat/sidebar/project-dialog.tsx ⟶ live private backend, daily: actual Add project click, existing folder validation, missing folder rejection without creation, independent projects.list readback; dialog currently adds one folder.
+- [~] Update project (name/color/icon) — RPC projects.update — src/app/chat/sidebar/projects/project-menu.tsx ⟶ name edit click and independent projects.get readback verified live; color/icon editing is not built.
 - [ ] Delete project — RPC projects.delete — src/app/chat/sidebar/projects/project-menu.tsx
 - [ ] Archive project — RPC projects.archive — src/store/projects.ts
-- [ ] Enter/leave project (sidebar scope) — RPC projects.set_active — src/app/chat/sidebar/projects/workspace-groups.ts
+- [~] Enter/leave project (sidebar scope) — RPC projects.set_active — src/app/chat/sidebar/projects/workspace-groups.ts ⟶ actual selection/leave clicks, pointer readback, correct session.create cwd and restore/new-chat inheritance verified live; Recents remains global, not project-filtered.
 - [ ] Set primary project — RPC projects.set_primary — src/store/projects.ts
 - [ ] Add folder to project — RPC projects.add_folder — src/app/chat/sidebar/projects/project-menu.tsx
 - [ ] Remove folder from project — RPC projects.remove_folder — src/app/chat/sidebar/projects/project-menu.tsx
@@ -289,7 +289,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] New git worktree (⌘⇧B) — local (Electron git-worktree) — electron/git-worktree-ops.ts
 - [ ] Base-branch picker for worktree — local — src/app/chat/sidebar/projects/base-branch-picker.tsx
 - [ ] Worktree dialog — local — src/app/chat/sidebar/projects/worktree-dialog.tsx
-- [ ] Open folder as project (⌘O) — local (Electron select-paths) — electron/select-paths-dialog.ts
+- [~] Open folder as project (⌘O) — local (Electron select-paths) — electron/select-paths-dialog.ts ⟶ the project dialog accepts a full existing-folder path; native file dialog and Ctrl+O are not built.
 - [ ] Change workspace cwd — RPC session.workspace.move, session.cwd.set — src/app/session/hooks/use-cwd-actions.ts
 - [ ] Project appearance (color/icon) — local — src/app/chat/sidebar/projects/project-appearance.tsx
 - [ ] Project filter in sidebar — local — src/app/chat/sidebar/project-filter.ts
@@ -319,7 +319,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Model catalog menu — local — src/app/shell/model-catalog-menu.tsx
 - [ ] Disconnect a model/provider — RPC model.disconnect — src/hermes.ts
 - [ ] Provider wait (in-flight model selection) — local — src/store/provider-wait.ts
-- [ ] Guarded model switch (warn mid-turn) — local — src/lib/guarded-model-switch.ts
+- [~] Guarded model switch (warn mid-turn) — local — src/lib/guarded-model-switch.ts ⟶ deferred model changes and backend confirmation warnings are surfaced. Expensive-model confirmation UI remains unbuilt; no automatic confirmation.
 - [ ] Local models (hardware/runtime/download) — REST /api/local-models/* — src/app/settings/local-models-settings.tsx
 - [ ] Local model quickstart — REST /api/local-models/quickstart — src/app/settings/local-models-quickstart.tsx
 - [ ] Local model runtime install — REST /api/local-models/runtime/install — src/app/settings/local-models-runtime-section.tsx

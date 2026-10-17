@@ -6,7 +6,9 @@ import { Icon, IconButton, NavItem, SectionHeader, Chip, Banner, Spinner, Toggle
 import { Transcript, Composer, ChatRow, ToolRow } from "chat.slint";
 import { SettingsModal, SettingsState } from "settings.slint";
 
-export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState }
+import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
+
+export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState }
 
 export struct SessionItem {
     id: string,
@@ -43,12 +45,14 @@ export global AppState {
     in-out property <string> connection-detail;
     in-out property <[SessionItem]> sessions;
     in-out property <string> active-session;
+    in-out property <string> runtime-session;
     in-out property <string> session-title: "New chat";
     in-out property <[ChatRow]> rows;
     in-out property <bool> running;
     in-out property <string> status;
     in-out property <string> model-label: "Model";
     in-out property <string> effort-label;
+    in-out property <[string]> effort-options: ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"];
     in-out property <string> cwd-label;
     in-out property <[ModelItem]> models;
     in-out property <string> banner;
@@ -59,6 +63,8 @@ export global AppState {
     // Composer draft, shared by the hero and docked composers (Enter on an empty draft
     // answers an open approval card instead of being swallowed).
     in-out property <string> draft;
+    changed draft => { AppState.save-draft(AppState.active-session, AppState.draft); }
+    callback save-draft(string, string);
     in-out property <bool> autoscroll;
 
     callback send(string);
@@ -68,6 +74,7 @@ export global AppState {
     callback delete-session(string);
     callback refresh-models();
     callback select-model(string, string);
+    callback select-effort(string);
     callback approve(string, string);
     callback dismiss-banner();
     callback search-sessions(string);
@@ -125,9 +132,13 @@ component Sidebar inherits Rectangle {
             emphasized: true;
             clicked => { AppState.new-chat(); }
         }
-        NavItem { icon: @image-url("../../../assets/icons/folder.svg"); text: "Projects"; }
-        NavItem { icon: @image-url("../../../assets/icons/box.svg"); text: "Artifacts"; }
-        NavItem { icon: @image-url("../../../assets/icons/clock.svg"); text: "Scheduled"; }
+        NavItem {
+            icon: @image-url("../../../assets/icons/folder.svg");
+            text: ProjectState.active-name != "" ? ProjectState.active-name : "Projects";
+            clicked => { ProjectState.open = true; ProjectState.refresh(); }
+        }
+        NavItem { icon: @image-url("../../../assets/icons/box.svg"); text: "Artifacts"; clicked => { AppState.banner = "Artifact browsing is not available in this preview yet."; AppState.banner-error = false; } }
+        NavItem { icon: @image-url("../../../assets/icons/clock.svg"); text: "Scheduled"; clicked => { AppState.banner = "Scheduled-job management is not available in this preview yet."; AppState.banner-error = false; } }
         NavItem { icon: @image-url("../../../assets/icons/sliders-horizontal.svg"); text: "Customize"; clicked => { root.open-settings(); } }
 
         Rectangle { height: 10px; }
@@ -211,8 +222,15 @@ component ModelPicker inherits Rectangle {
         width: parent.width - 8px;
         height: parent.height - 8px;
         VerticalLayout {
+            if AppState.models.length == 0: Text {
+                text: "No models are available yet. Configure a provider in Hermes, then reopen this menu.";
+                wrap: word-wrap; color: Theme.text-3;
+            }
             for m in AppState.models: Rectangle {
                 height: m.header ? 28px : 30px;
+                accessible-role: button;
+                accessible-label: m.header ? "Provider " + m.provider-name : "Use " + m.model;
+                accessible-action-default => { if !m.header { AppState.select-model(m.provider, m.model); root.open = false; } }
                 border-radius: Theme.r-sm;
                 background: !m.header && ta.has-hover ? Theme.hover : transparent;
                 animate background { duration: Motion.fast; }
@@ -303,6 +321,7 @@ export component AppWindow inherits Window {
         }
     }
     in-out property <bool> picker-open: false;
+    in-out property <bool> effort-open: false;
     property <bool> empty: AppState.rows.length == 0;
     property <length> dock-h: 92px;
 
@@ -323,6 +342,8 @@ export component AppWindow inherits Window {
             if e.modifiers.control && e.text == Key.Backtab { AppState.cycle-session(-1); return accept; }
             if e.modifiers.control && e.text == Key.Tab { AppState.cycle-session(e.modifiers.shift ? -1 : 1); return accept; }
             if e.text == Key.Escape {
+                if ProjectState.open { ProjectState.open = false; return accept; }
+                if root.effort-open { root.effort-open = false; return accept; }
                 if root.settings-open { root.settings-open = false; return accept; }
                 if root.picker-open { root.picker-open = false; return accept; }
             }
@@ -430,7 +451,10 @@ export component AppWindow inherits Window {
                         cwd-label: AppState.cwd-label;
                         send(t) => { AppState.send(t); self.text = ""; }
                         stop => { AppState.stop(); }
-                        pick-model => { root.picker-open = !root.picker-open; AppState.refresh-models(); }
+                        pick-model => { root.effort-open = false; root.picker-open = !root.picker-open; AppState.refresh-models(); }
+                        pick-effort => { root.picker-open = false; root.effort-open = !root.effort-open; }
+                        pick-folder => { ProjectState.open = true; ProjectState.refresh(); }
+                        attach => { AppState.banner = "File attachments are not available in this preview yet. Include a local file path in your message."; AppState.banner-error = false; }
                     }
                 }
             }
@@ -461,7 +485,10 @@ export component AppWindow inherits Window {
                 cwd-label: AppState.cwd-label;
                 send(t) => { AppState.send(t); self.text = ""; }
                 stop => { AppState.stop(); }
-                pick-model => { root.picker-open = !root.picker-open; AppState.refresh-models(); }
+                pick-model => { root.effort-open = false; root.picker-open = !root.picker-open; AppState.refresh-models(); }
+                pick-effort => { root.picker-open = false; root.effort-open = !root.effort-open; }
+                pick-folder => { ProjectState.open = true; ProjectState.refresh(); }
+                attach => { AppState.banner = "File attachments are not available in this preview yet. Include a local file path in your message."; AppState.banner-error = false; }
             }
 
             if AppState.approval.visible: ApprovalCard {
@@ -469,6 +496,21 @@ export component AppWindow inherits Window {
                 // Above the docked composer and the 40 px live status line.
                 y: parent.height - self.height - root.dock-h - 8px - 48px;
                 width: min(parent.width - 48px, Theme.column-w);
+            }
+
+            if root.effort-open: TouchArea { clicked => { root.effort-open = false; } }
+            if root.effort-open: Rectangle {
+                width: 180px; height: 288px;
+                x: parent.width - self.width - max(24px, (parent.width - Theme.column-w) / 2);
+                y: parent.height - self.height - 54px;
+                background: Theme.raised; border-radius: Theme.r-lg; border-width: 1px; border-color: Theme.border-strong;
+                VerticalLayout {
+                    padding: 6px; spacing: 2px;
+                    for level in AppState.effort-options: NavItem {
+                        has-icon: false; text: level; selected: level == AppState.effort-label;
+                        clicked => { AppState.select-effort(level); root.effort-open = false; }
+                    }
+                }
             }
 
             // Click-away for the picker.
@@ -481,6 +523,8 @@ export component AppWindow inherits Window {
                 y: parent.height - self.height - 54px;
             }
         }
+
+        ProjectsModal { width: root.width; height: root.height; }
 
         SettingsModal {
             width: root.width;

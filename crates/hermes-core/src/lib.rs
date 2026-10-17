@@ -19,6 +19,7 @@ pub mod highlight;
 pub mod http;
 pub mod markdown;
 pub mod prefs;
+pub mod projects;
 pub mod protocol;
 pub mod rpc;
 pub mod sessions;

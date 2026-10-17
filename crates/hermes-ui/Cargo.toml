@@ -19,7 +19,7 @@ chrono.workspace = true
 # in tests/live_backend.rs. Pinned to slint's exact version because the IME events use
 # i-slint-core's internal key-event type.
 [dev-dependencies]
-i-slint-backend-testing = "=1.18.1"
+i-slint-backend-testing = { version = "=1.18.1", features = ["renderer-software"] }
 i-slint-core = "=1.18.1"
 
 [build-dependencies]
