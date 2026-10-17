@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch for `hermes update` finishing, then update Hermes Desktop (Rust)
+Documentation=file://%h/.local/share/hermes-desktop-rs/src/docs/UPDATING.md
+
+[Path]
+# `hermes update` writes its exit code here when it completes (hermes_cli/update_completion.py).
+# The service checks for "0" and skips failed updates.
+PathChanged=%h/.hermes/.update_exit_code
+Unit=hermes-desktop-rs-update-after-hermes.service
+
+[Install]
+WantedBy=default.target
