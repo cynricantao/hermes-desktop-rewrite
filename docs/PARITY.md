@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**42 done · 86 partial · 664 not started · 1 unsupported** (of 793).
+**42 done · 99 partial · 651 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -409,7 +409,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] MCP API key — RPC mcp.servers.set_api_key — src/hermes.ts
 - [ ] MCP catalog (Nous-approved) — RPC mcp.catalog, REST /api/mcp/catalog — src/app/capabilities/mcp/install-catalog-entry.ts
 - [ ] Install MCP from catalog — REST /api/mcp/catalog/install — src/app/capabilities/mcp/install-catalog-entry.ts
-- [ ] Reload MCP — RPC reload.mcp — src/app/capabilities/mcp/use-mcp-servers.ts
+- [~] Reload MCP — RPC reload.mcp — src/app/capabilities/mcp/use-mcp-servers.ts ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
 - [ ] MCP logs — local — src/app/capabilities/mcp/mcp-logs.tsx
 - [ ] MCP tool filter — local — src/lib/mcp-tool-filter.ts
 - [ ] MCP deeplink install — local + RPC — src/store/mcp-deeplink-install.ts, src/lib/mcp-deeplink.ts
@@ -419,10 +419,10 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Plugins / connectors
 
-- [ ] Installed plugins list — REST /api/plugins + RPC plugins.list — src/app/capabilities/plugins/plugins-tab.tsx
-- [ ] Plugin catalog (browse/install) — RPC plugins.catalog.lookup — src/lib/plugin-catalog.ts
-- [ ] Install plugin from catalog — local + RPC plugins.manage — src/store/plugin-catalog-install.ts
-- [ ] Enable/disable/uninstall plugin — REST /api/plugins/{id} + RPC plugins.manage — src/store/agent-plugins.ts
+- [~] Installed plugins list — REST /api/plugins + RPC plugins.list — src/app/capabilities/plugins/plugins-tab.tsx ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
+- [~] Plugin catalog (browse/install) — RPC plugins.catalog.lookup — src/lib/plugin-catalog.ts ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
+- [~] Install plugin from catalog — local + RPC plugins.manage — src/store/plugin-catalog-install.ts ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
+- [~] Enable/disable/uninstall plugin — REST /api/plugins/{id} + RPC plugins.manage — src/store/agent-plugins.ts ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
 - [ ] Plugin package/metadata — local — src/app/capabilities/plugins/plugin-packages.ts
 - [ ] Plugin settings pages (per-plugin) — local — src/app/settings/plugin-settings.tsx
 - [ ] Plugin settings form (declarative) — local — src/app/settings/plugin-settings-form.tsx
@@ -434,15 +434,15 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Contributed profile-group header — local — src/app/routes.ts (SIDEBAR_PROFILE_GROUP_HEADER_AREA)
 - [ ] Plugin SDK host bridge (request/state/ui/actions) — local — src/sdk/index.ts
 - [ ] Bundled plugins (hello-runtime, hermes-bots, kanban, radio) — local — src/plugins/*
-- [ ] Connectors catalog + directory — RPC connectors.catalog — src/app/capabilities/connectors/connectors-directory.tsx
-- [ ] Connect a connector (OAuth) — RPC connectors.connect, connectors.operation.* — src/app/capabilities/connectors/data/mutations.ts
-- [ ] Connector accounts list — RPC connectors.accounts (+ remove/rename) — src/app/capabilities/connectors/accounts-section.tsx
-- [ ] Connector tools list + enable — RPC connectors.tools — src/app/capabilities/connectors/tools-list.tsx
-- [ ] Connector policy — RPC connectors.policy.get|set — src/app/capabilities/connectors/use-tools-editor.ts
-- [ ] Connector hosted actions — RPC connectors.accounts + hosted-dialog — src/app/capabilities/connectors/data/hosted-actions.ts
+- [~] Connectors catalog + directory — RPC connectors.catalog — src/app/capabilities/connectors/connectors-directory.tsx ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
+- [~] Connect a connector (OAuth) — RPC connectors.connect, connectors.operation.* — src/app/capabilities/connectors/data/mutations.ts ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
+- [~] Connector accounts list — RPC connectors.accounts (+ remove/rename) — src/app/capabilities/connectors/accounts-section.tsx ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
+- [~] Connector tools list + enable — RPC connectors.tools — src/app/capabilities/connectors/tools-list.tsx ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
+- [~] Connector policy — RPC connectors.policy.get|set — src/app/capabilities/connectors/use-tools-editor.ts ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
+- [~] Connector hosted actions — RPC connectors.accounts + hosted-dialog — src/app/capabilities/connectors/data/hosted-actions.ts ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
 - [ ] Connector local server control — local + RPC — src/app/capabilities/connectors/local-server-control.tsx
 - [ ] Connector deeplinks — local — src/app/capabilities/connectors/data/deep-link.ts
-- [ ] Connector suggestions in composer — RPC connectors.list — src/store/connector-catalog.ts
+- [~] Connector suggestions in composer — RPC connectors.list — src/store/connector-catalog.ts ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
 
 ## Memory
 
@@ -883,7 +883,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 - [ ] Per-plugin settings pages — local — src/app/settings/plugin-settings.tsx
 - [ ] Plugin settings form (declarative fields) — local — src/app/settings/plugin-settings-form.tsx
-- [ ] Plugin install from catalog — RPC plugins.catalog.lookup — src/app/settings/plugin-install-modal.tsx
+- [~] Plugin install from catalog — RPC plugins.catalog.lookup — src/app/settings/plugin-install-modal.tsx ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
 
 ## Settings — Billing page
 
