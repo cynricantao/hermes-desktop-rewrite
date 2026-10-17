@@ -5,7 +5,7 @@
 //! Always allow, by click and by keyboard), a long (600-message) conversation, and the
 //! settings panel (registry nav, "Applies to" profile scope, saving, persistence, search).
 //!
-//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings,capabilities` runs a subset. The
+//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings,settings_pages,capabilities` runs a subset. The
 //! `long` section
 //! needs a seeded session: `HERMES_HOME=<private home> scripts/seed-long-session.py 600`. The
 //! `sessions` section (open / switch / new chat / Ctrl+Tab, continue an old chat, switch while
@@ -325,6 +325,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("widgets") {
         settings_widgets_section(&ui, &log).await;
+    }
+    if want("settings_pages") {
+        settings_pages_section(&ui, &log).await;
     }
 }
 
@@ -1592,6 +1595,192 @@ async fn settings_section(ui: &AppWindow, log: &Log) {
             row_value(ui, "display.language")
         ),
     );
+
+    ui.set_settings_open(false);
+    sleep(200).await;
+}
+
+/// Rows of the open page whose control is missing from the accessibility tree or shows a
+/// different value there than the row model holds. Every row is instantiated (plain `for`
+/// in a ScrollView, no virtualisation), so an absent control means it was not built.
+/// Each control kind is matched on what it exposes: text inputs their value, toggles their
+/// checked state, selects their current label, segmented controls their selected tab.
+fn unrendered_controls(ui: &AppWindow, rows: &[hermes_ui::SettingRowUI]) -> Vec<String> {
+    let labelled = |label: &str| ElementHandle::find_by_accessible_label(ui, label).collect::<Vec<_>>();
+    let selected_label = |r: &hermes_ui::SettingRowUI| {
+        usize::try_from(r.selected)
+            .ok()
+            .and_then(|i| r.option_labels.row_data(i))
+            .map(|l| l.to_string())
+    };
+    rows.iter()
+        .filter(|r| {
+            let found = match r.kind.as_str() {
+                "text" | "mono" | "number" | "list" => labelled(&r.label)
+                    .iter()
+                    .any(|e| e.accessible_value().as_deref() == Some(r.value.as_str())),
+                "toggle" => labelled(&r.label)
+                    .iter()
+                    .any(|e| e.accessible_checked() == Some(r.value == "true")),
+                "select" if r.option_labels.row_count() > 0 => {
+                    let current = selected_label(r).unwrap_or_else(|| r.value.to_string());
+                    labelled(&r.label)
+                        .iter()
+                        .any(|e| e.accessible_value().as_deref() == Some(current.as_str()))
+                }
+                "select" => labelled(&r.label)
+                    .iter()
+                    .any(|e| e.accessible_value().as_deref() == Some(r.value.as_str())),
+                "segmented" => selected_label(r)
+                    .is_some_and(|l| labelled(&l).iter().any(|e| e.accessible_item_selected() == Some(true))),
+                "slider" => !labelled(&r.label).is_empty(),
+                // Secret, widget, action and info rows are outside these six pages.
+                _ => false,
+            };
+            !found
+        })
+        .map(|r| format!("{} ({})", r.id, r.kind))
+        .collect()
+}
+
+/// The plain registry pages (Workspace, Safety, Browser, Memory & Context, Voice, Advanced),
+/// against the default profile of the private backend. For every page, with the panel open
+/// and no search query: the page model holds exactly the registry rows visible for the
+/// loaded config, each config row holds the backend's value, and each row's control is in
+/// the accessibility tree showing that value. Then one row per group is edited through the
+/// panel, read back over REST (never the UI's own model), and put back, and the put-back is
+/// confirmed over REST too. A row with no restorable baseline is never written.
+async fn settings_pages_section(ui: &AppWindow, log: &Log) {
+    use hermes_core::settings::{self, Store};
+
+    let s = ui.global::<SettingsState>();
+    let probe = match Probe::new() {
+        Ok(p) => p,
+        Err(e) => return record(log, "settings pages: REST read-back setup", false, e),
+    };
+    if !s.get_open() {
+        chord(ui, &[Key::Control], ",");
+    }
+    if !wait_until(20, || s.get_open()).await {
+        return record(
+            log,
+            "settings pages: Ctrl+, opens the panel",
+            false,
+            "panel stayed closed",
+        );
+    }
+    // A leftover query shows search hits instead of the page. `search` only refreshes the
+    // hits; the query itself is the field's two-way binding, so clear both like typing would.
+    s.set_query("".into());
+    s.invoke_search("".into());
+    s.invoke_scope("default".into());
+    sleep(600).await;
+    let config = match probe.get("/api/config") {
+        Ok(c) => c,
+        Err(e) => return record(log, "settings pages: GET /api/config", false, e),
+    };
+
+    for group in ["workspace", "safety", "browser", "memory", "voice", "advanced"] {
+        let pages = settings::group(group).map(|g| g.pages).unwrap_or_default();
+        for page in pages {
+            let expected: Vec<&settings::Setting> = settings::settings_for(group, page.id)
+                .filter(|r| settings::visible(r, &config))
+                .collect();
+            s.invoke_goto(group.into(), page.id.into());
+            let shown = wait_until(10, || {
+                s.get_open()
+                    && s.get_query().is_empty()
+                    && s.get_group().as_str() == group
+                    && s.get_page().as_str() == page.id
+                    && settings_rows(ui).len() == expected.len()
+            })
+            .await;
+            let rows = settings_rows(ui);
+            let unrendered = unrendered_controls(ui, &rows);
+            let ids: Vec<String> = rows.iter().map(|r| r.id.to_string()).collect();
+            let want_ids: Vec<&str> = expected.iter().map(|r| r.id).collect();
+            let mismatched: Vec<String> = expected
+                .iter()
+                .filter(|r| matches!(r.store, Store::Config(_)))
+                .filter_map(|r| {
+                    let want = settings::row_value(r, &config, &serde_json::Map::new());
+                    let got = rows.iter().find(|x| x.id.as_str() == r.id)?.value.to_string();
+                    (got != want).then(|| format!("{}: panel {got:?} vs backend {want:?}", r.id))
+                })
+                .collect();
+            record(
+                log,
+                &format!("settings pages: {group} › {} renders its registry rows", page.id),
+                shown && ids == want_ids && mismatched.is_empty() && unrendered.is_empty(),
+                format!(
+                    "{} rows {ids:?} (expected {}); value mismatches {mismatched:?}; \
+                     controls missing from the accessibility tree {unrendered:?}",
+                    ids.len(),
+                    want_ids.len()
+                ),
+            );
+        }
+    }
+
+    // One write per group: a numeric or toggle row that changes no safety behaviour of the
+    // private backend (approvals.mode stays manual).
+    let writes = [
+        ("workspace", "files", "file_read_max_chars", "123457", "123458"),
+        ("safety", "approvals", "approvals.timeout", "61", "62"),
+        (
+            "browser",
+            "network",
+            "browser.auto_local_for_private_urls",
+            "true",
+            "false",
+        ),
+        ("memory", "persistent", "memory.memory_char_limit", "2201", "2202"),
+        ("voice", "conversation", "voice.max_recording_seconds", "121", "122"),
+        ("advanced", "runtime", "agent.max_turns", "91", "92"),
+    ];
+    for (group, page, key, a, b) in writes {
+        s.invoke_goto(group.into(), page.into());
+        let name = format!("settings pages: {group} › {page} saves {key} (REST read-back)");
+        let backend_value = || {
+            probe
+                .get("/api/config")
+                .ok()
+                .and_then(|c| settings::get(&c, key).map(settings::value_to_string))
+        };
+        let _ = wait_until(10, || row_value(ui, key).is_some()).await;
+        let before = row_value(ui, key).unwrap_or_default();
+        // An absent key cannot be put back through the panel (it would leave a value
+        // behind), so the row is not written at all.
+        if before.is_empty() || backend_value().as_deref() != Some(before.as_str()) {
+            record(
+                log,
+                &name,
+                false,
+                format!(
+                    "no restorable baseline: panel {before:?}, backend {:?}; not written",
+                    backend_value()
+                ),
+            );
+            continue;
+        }
+        let new = if before == a { b } else { a };
+        s.invoke_edit(key.into(), new.into());
+        let shown = wait_until(10, || row_value(ui, key).as_deref() == Some(new)).await;
+        sleep(300).await;
+        let stored = backend_value();
+        s.invoke_edit(key.into(), before.clone().into());
+        let _ = wait_until(10, || row_value(ui, key).as_deref() == Some(before.as_str())).await;
+        sleep(300).await;
+        let restored = backend_value();
+        record(
+            log,
+            &name,
+            shown && stored.as_deref() == Some(new) && restored.as_deref() == Some(before.as_str()),
+            format!(
+                "{before:?} → {new:?}: panel={shown}, backend config={stored:?}, backend after put-back={restored:?}"
+            ),
+        );
+    }
 
     ui.set_settings_open(false);
     sleep(200).await;
