@@ -1669,7 +1669,9 @@ async fn settings_pages_section(ui: &AppWindow, log: &Log) {
             "panel stayed closed",
         );
     }
-    // A leftover query shows search hits instead of the page.
+    // A leftover query shows search hits instead of the page. `search` only refreshes the
+    // hits; the query itself is the field's two-way binding, so clear both like typing would.
+    s.set_query("".into());
     s.invoke_search("".into());
     s.invoke_scope("default".into());
     sleep(600).await;
