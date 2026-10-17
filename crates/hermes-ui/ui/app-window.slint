@@ -80,6 +80,10 @@ export global AppState {
     callback dismiss-banner();
     callback search-sessions(string);
     callback cycle-session(int);
+    // Images queued for the next message (labels), pasted with Ctrl+V in the composer.
+    in-out property <[string]> attachments;
+    callback paste-image();
+    callback remove-attachment(int);
 }
 
 component Sidebar inherits Rectangle {
@@ -461,7 +465,10 @@ export component AppWindow inherits Window {
                         pick-model => { root.effort-open = false; root.picker-open = !root.picker-open; AppState.refresh-models(); }
                         pick-effort => { root.picker-open = false; root.effort-open = !root.effort-open; }
                         pick-folder => { ProjectState.open = true; ProjectState.refresh(); }
-                        attach => { AppState.banner = "File attachments are not available in this preview yet. Include a local file path in your message."; AppState.banner-error = false; }
+                        attach => { AppState.banner = "Paste an image with Ctrl+V. A file picker is not available in this preview yet; include a local file path in your message."; AppState.banner-error = false; }
+                        attachments: AppState.attachments;
+                        paste-image => { AppState.paste-image(); }
+                        remove-attachment(i) => { AppState.remove-attachment(i); }
                     }
                 }
             }
@@ -495,7 +502,10 @@ export component AppWindow inherits Window {
                 pick-model => { root.effort-open = false; root.picker-open = !root.picker-open; AppState.refresh-models(); }
                 pick-effort => { root.picker-open = false; root.effort-open = !root.effort-open; }
                 pick-folder => { ProjectState.open = true; ProjectState.refresh(); }
-                attach => { AppState.banner = "File attachments are not available in this preview yet. Include a local file path in your message."; AppState.banner-error = false; }
+                attach => { AppState.banner = "Paste an image with Ctrl+V. A file picker is not available in this preview yet; include a local file path in your message."; AppState.banner-error = false; }
+                        attachments: AppState.attachments;
+                        paste-image => { AppState.paste-image(); }
+                        remove-attachment(i) => { AppState.remove-attachment(i); }
             }
 
             if AppState.approval.visible: ApprovalCard {

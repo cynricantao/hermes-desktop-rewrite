@@ -337,6 +337,11 @@ export component Composer inherits Rectangle {
     callback pick-effort();
     callback pick-folder();
     callback attach();
+    // Ctrl+V: the controller checks the clipboard for an image (text paste still happens).
+    callback paste-image();
+    // Images queued for the next message (chip labels); clicking a chip removes it.
+    in property <[string]> attachments;
+    callback remove-attachment(int);
     // Focus lands in the text input itself (the FocusScope around it only captures Enter).
     forward-focus: input;
 
@@ -356,12 +361,18 @@ export component Composer inherits Rectangle {
         drop-shadow-color: Theme.dark ? #00000055 : #0000001a;
 
         // Bare multi-line input inside the card. Enter sends, Shift+Enter inserts a newline.
+        // In a conversation the card is one row: + on the left, send on the right, so the
+        // text starts after the + button instead of underneath it.
         keys := FocusScope {
-            x: 16px;
+            x: root.centered ? 16px : 48px;
             y: 14px;
-            width: parent.width - 32px - (root.centered ? 0px : 44px);
+            width: parent.width - 32px - (root.centered ? 0px : 76px);
             height: parent.height - (root.centered ? 58px : 22px);
             capture-key-pressed(e) => {
+                if e.modifiers.control && (e.text == "v" || e.text == "V") {
+                    root.paste-image();
+                    reject
+                }
                 if e.text == Key.Return && !e.modifiers.shift {
                     if root.running { return accept; }
                     if root.text != "" { root.send(root.text); }
@@ -439,6 +450,12 @@ export component Composer inherits Rectangle {
             text: root.cwd-label != "" ? root.cwd-label : "Project or folder";
             has-chevron: true;
             clicked => { root.pick-folder(); }
+        }
+        // Images queued for the next message; clicking one removes it.
+        for name[i] in root.attachments: Chip {
+            text: "📎 " + name + "  ✕";
+            outlined: true;
+            clicked => { root.remove-attachment(i); }
         }
         Rectangle { horizontal-stretch: 1; }
         Chip {
