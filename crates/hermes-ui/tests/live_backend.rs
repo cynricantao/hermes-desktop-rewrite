@@ -5,7 +5,7 @@
 //! Always allow, by click and by keyboard), a long (600-message) conversation, and the
 //! settings panel (registry nav, "Applies to" profile scope, saving, persistence, search).
 //!
-//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings,capabilities` runs a subset. The
+//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings,settings_pages,capabilities` runs a subset. The
 //! `long` section
 //! needs a seeded session: `HERMES_HOME=<private home> scripts/seed-long-session.py 600`. The
 //! `sessions` section (open / switch / new chat / Ctrl+Tab, continue an old chat, switch while
@@ -325,6 +325,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("widgets") {
         settings_widgets_section(&ui, &log).await;
+    }
+    if want("settings_pages") {
+        settings_pages_section(&ui, &log).await;
     }
 }
 
@@ -1592,6 +1595,111 @@ async fn settings_section(ui: &AppWindow, log: &Log) {
             row_value(ui, "display.language")
         ),
     );
+
+    ui.set_settings_open(false);
+    sleep(200).await;
+}
+
+/// The plain registry pages (Workspace, Safety, Browser, Memory & Context, Voice, Advanced),
+/// against the default profile of the private backend. For every page: the panel shows
+/// exactly the registry rows visible for the loaded config, and each config row shows the
+/// backend's value. Then one row per group is edited through the panel, read back over REST
+/// (never the UI's own model) and put back.
+async fn settings_pages_section(ui: &AppWindow, log: &Log) {
+    use hermes_core::settings::{self, Store};
+
+    let s = ui.global::<SettingsState>();
+    let probe = match Probe::new() {
+        Ok(p) => p,
+        Err(e) => return record(log, "settings pages: REST read-back setup", false, e),
+    };
+    if !s.get_open() {
+        chord(ui, &[Key::Control], ",");
+        let _ = wait_until(20, || s.get_open()).await;
+    }
+    s.invoke_scope("default".into());
+    sleep(600).await;
+    let config = match probe.get("/api/config") {
+        Ok(c) => c,
+        Err(e) => return record(log, "settings pages: GET /api/config", false, e),
+    };
+
+    for group in ["workspace", "safety", "browser", "memory", "voice", "advanced"] {
+        let pages = settings::group(group).map(|g| g.pages).unwrap_or_default();
+        for page in pages {
+            let expected: Vec<&settings::Setting> = settings::settings_for(group, page.id)
+                .filter(|r| settings::visible(r, &config))
+                .collect();
+            s.invoke_goto(group.into(), page.id.into());
+            let shown = wait_until(10, || {
+                s.get_page().as_str() == page.id && settings_rows(ui).len() == expected.len()
+            })
+            .await;
+            let rows = settings_rows(ui);
+            let ids: Vec<String> = rows.iter().map(|r| r.id.to_string()).collect();
+            let want_ids: Vec<&str> = expected.iter().map(|r| r.id).collect();
+            let mismatched: Vec<String> = expected
+                .iter()
+                .filter(|r| matches!(r.store, Store::Config(_)))
+                .filter_map(|r| {
+                    let want = settings::row_value(r, &config, &serde_json::Map::new());
+                    let got = rows.iter().find(|x| x.id.as_str() == r.id)?.value.to_string();
+                    (got != want).then(|| format!("{}: panel {got:?} vs backend {want:?}", r.id))
+                })
+                .collect();
+            record(
+                log,
+                &format!("settings pages: {group} › {} renders its registry rows", page.id),
+                shown && ids == want_ids && mismatched.is_empty(),
+                format!(
+                    "{} rows {ids:?} (expected {}); value mismatches {mismatched:?}",
+                    ids.len(),
+                    want_ids.len()
+                ),
+            );
+        }
+    }
+
+    // One write per group: a numeric or toggle row that changes no safety behaviour of the
+    // private backend (approvals.mode stays manual).
+    let writes = [
+        ("workspace", "files", "file_read_max_chars", "123457", "123458"),
+        ("safety", "approvals", "approvals.timeout", "61", "62"),
+        (
+            "browser",
+            "network",
+            "browser.auto_local_for_private_urls",
+            "true",
+            "false",
+        ),
+        ("memory", "persistent", "memory.memory_char_limit", "2201", "2202"),
+        ("voice", "conversation", "voice.max_recording_seconds", "121", "122"),
+        ("advanced", "runtime", "agent.max_turns", "91", "92"),
+    ];
+    for (group, page, key, a, b) in writes {
+        s.invoke_goto(group.into(), page.into());
+        let _ = wait_until(10, || row_value(ui, key).is_some()).await;
+        let before = row_value(ui, key).unwrap_or_default();
+        let new = if before == a { b } else { a };
+        s.invoke_edit(key.into(), new.into());
+        let shown = wait_until(10, || row_value(ui, key).as_deref() == Some(new)).await;
+        sleep(300).await;
+        let stored = probe
+            .get("/api/config")
+            .ok()
+            .and_then(|c| settings::get(&c, key).map(settings::value_to_string));
+        let mut restored = before.is_empty();
+        if !before.is_empty() {
+            s.invoke_edit(key.into(), before.clone().into());
+            restored = wait_until(10, || row_value(ui, key).as_deref() == Some(before.as_str())).await;
+        }
+        record(
+            log,
+            &format!("settings pages: {group} › {page} saves {key} (REST read-back)"),
+            shown && stored.as_deref() == Some(new) && restored,
+            format!("{before:?} → {new:?}: panel={shown}, backend config={stored:?}, put back={restored}"),
+        );
+    }
 
     ui.set_settings_open(false);
     sleep(200).await;

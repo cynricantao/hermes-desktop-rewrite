@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**56 done · 225 partial · 507 not started · 6 unsupported** (of 794).
+**62 done · 282 partial · 444 not started · 6 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -748,91 +748,161 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Settings — Workspace page
 
-- [ ] Working directory — config terminal.cwd — src/app/settings/constants.ts
-- [ ] Automatic repository discovery — config desktop.repo_scan_enabled — src/app/settings/constants.ts
-- [ ] Repository discovery roots — config desktop.repo_scan_roots — src/app/settings/constants.ts
-- [ ] Excluded repository paths — config desktop.repo_scan_exclude_paths — src/app/settings/constants.ts
-- [ ] Code execution mode — config code_execution.mode — src/app/settings/constants.ts
-- [ ] Persistent shell (SSH) — config terminal.persistent_shell — src/app/settings/constants.ts
-- [ ] Environment passthrough — config terminal.env_passthrough — src/app/settings/constants.ts
-- [ ] File read limit — config file_read_max_chars — src/app/settings/constants.ts
-- [ ] Data-URL read limit — local — src/store/data-url-read-max.ts
+- [~] Working directory — config terminal.cwd — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Automatic repository discovery — config desktop.repo_scan_enabled — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; the client does not scan for repositories itself
+- [~] Repository discovery roots — config desktop.repo_scan_roots — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; the client does not scan for repositories itself
+- [~] Excluded repository paths — config desktop.repo_scan_exclude_paths — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; the client does not scan for repositories itself
+- [~] Code execution mode — config code_execution.mode — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Persistent shell (SSH) — config terminal.persistent_shell — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Environment passthrough — config terminal.env_passthrough — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [x] File read limit — config file_read_max_chars — src/app/settings/constants.ts
+  ⟶ renders on its registry page and saves `file_read_max_chars` through the panel, read back over REST and put back (live 2026-10-17, tests/live_backend.rs `settings_pages`)
+- [~] Data-URL read limit — local — src/store/data-url-read-max.ts
+  ⟶ device row `data-url-read-max` lives on Chat › Attachments and saves through the live-verified prefs.json path (`settings` section) — not individually exercised; the client does not enforce the cap
 
 ## Settings — Safety page
 
-- [ ] Approval mode — config approvals.mode — src/app/settings/constants.ts
-- [ ] Approval timeout — config approvals.timeout — src/app/settings/constants.ts
-- [ ] Confirm MCP reloads — config approvals.mcp_reload_confirm — src/app/settings/constants.ts
-- [ ] Command allowlist — config command_allowlist — src/app/settings/constants.ts
-- [ ] Redact secrets — config security.redact_secrets — src/app/settings/constants.ts
-- [ ] Allow private URLs — config security.allow_private_urls — src/app/settings/constants.ts
-- [ ] File checkpoints — config checkpoints.enabled — src/app/settings/constants.ts
+- [~] Approval mode — config approvals.mode — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [x] Approval timeout — config approvals.timeout — src/app/settings/constants.ts
+  ⟶ renders on its registry page and saves `approvals.timeout` through the panel, read back over REST and put back (live 2026-10-17, tests/live_backend.rs `settings_pages`)
+- [~] Confirm MCP reloads — config approvals.mcp_reload_confirm — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Command allowlist — config command_allowlist — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Redact secrets — config security.redact_secrets — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Allow private URLs — config security.allow_private_urls — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] File checkpoints — config checkpoints.enabled — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
 - [ ] Shared metrics / telemetry consent — local — src/app/settings/shared-metrics-settings.tsx
+  ⟶ no row in the settings registry yet (re-audited 2026-10-17)
 
 ## Settings — Browser page
 
-- [ ] Use real browser profile — config browser.use_real_profile — src/app/settings/browser-real-profile-panel.tsx
-- [ ] Browser private URLs — config browser.allow_private_urls — src/app/settings/constants.ts
-- [ ] Local browser for private URLs — config browser.auto_local_for_private_urls — src/app/settings/constants.ts
+- [~] Use real browser profile — config browser.use_real_profile — src/app/settings/browser-real-profile-panel.tsx
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; the Electron real-profile panel (profile picker) is a plain toggle here
+- [~] Browser private URLs — config browser.allow_private_urls — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [x] Local browser for private URLs — config browser.auto_local_for_private_urls — src/app/settings/constants.ts
+  ⟶ renders on its registry page and saves `browser.auto_local_for_private_urls` through the panel, read back over REST and put back (live 2026-10-17, tests/live_backend.rs `settings_pages`)
 
 ## Settings — Memory & Context page
 
-- [ ] Persistent memory — config memory.memory_enabled — src/app/settings/constants.ts
-- [ ] User profile — config memory.user_profile_enabled — src/app/settings/constants.ts
-- [ ] Memory budget — config memory.memory_char_limit — src/app/settings/constants.ts
-- [ ] Profile budget — config memory.user_char_limit — src/app/settings/constants.ts
-- [ ] Memory provider — config memory.provider — src/app/settings/constants.ts
-- [ ] Context engine — config context.engine — src/app/settings/constants.ts
-- [ ] Auto-compression — config compression.enabled — src/app/settings/constants.ts
-- [ ] Compression threshold — config compression.threshold — src/app/settings/constants.ts
-- [ ] Codex compression auto-raise — config compression.codex_gpt55_autoraise — src/app/settings/constants.ts
-- [ ] Compression target ratio — config compression.target_ratio — src/app/settings/constants.ts
-- [ ] Protected recent messages — config compression.protect_last_n — src/app/settings/constants.ts
-- [ ] Compression aux timeout — config auxiliary.compression.timeout — src/app/settings/constants.ts
+- [~] Persistent memory — config memory.memory_enabled — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] User profile — config memory.user_profile_enabled — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [x] Memory budget — config memory.memory_char_limit — src/app/settings/constants.ts
+  ⟶ renders on its registry page and saves `memory.memory_char_limit` through the panel, read back over REST and put back (live 2026-10-17, tests/live_backend.rs `settings_pages`)
+- [~] Profile budget — config memory.user_char_limit — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Memory provider — config memory.provider — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Context engine — config context.engine — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Auto-compression — config compression.enabled — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Compression threshold — config compression.threshold — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Codex compression auto-raise — config compression.codex_gpt55_autoraise — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Compression target ratio — config compression.target_ratio — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Protected recent messages — config compression.protect_last_n — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Compression aux timeout — config auxiliary.compression.timeout — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
 
 ## Settings — Voice page
 
-- [ ] Voice chat mode — config voice.voice_chat_mode — src/app/settings/constants.ts
-- [ ] GPT-Live voice — config voice.gpt_live.voice — src/app/settings/constants.ts
-- [ ] GPT-Live persona — config voice.gpt_live.instructions — src/app/settings/constants.ts
-- [ ] TTS provider — config tts.provider — src/app/settings/constants.ts
-- [ ] STT enabled — config stt.enabled — src/app/settings/constants.ts
-- [ ] Echo transcripts — config stt.echo_transcripts — src/app/settings/constants.ts
-- [ ] STT provider — config stt.provider — src/app/settings/constants.ts
-- [ ] Live transcription — config stt.streaming — src/app/settings/constants.ts
-- [ ] Read responses aloud — config voice.auto_tts — src/app/settings/constants.ts
-- [ ] Edge voice — config tts.edge.voice — src/app/settings/constants.ts
-- [ ] OpenAI TTS model/voice — config tts.openai.* — src/app/settings/constants.ts
-- [ ] ElevenLabs voice/model — config tts.elevenlabs.* — src/app/settings/constants.ts
-- [ ] xAI TTS voice/language/speed/tags/latency/sample/bitrate — config tts.xai.* — src/app/settings/constants.ts
-- [ ] MiniMax/Mistral/Gemini/NeuTTS/KittenTTS/Piper/DeepInfra TTS — config tts.* — src/app/settings/constants.ts
-- [ ] Local STT model/language — config stt.local.* — src/app/settings/constants.ts
-- [ ] Provider STT models — config stt.{openai,groq,mistral,xai,deepinfra,elevenlabs}.* — src/app/settings/constants.ts
-- [ ] Max recording length — config voice.max_recording_seconds — src/app/settings/constants.ts
-- [ ] Client-direct voice — config voice.client_direct — src/app/settings/constants.ts
+- [~] Voice chat mode — config voice.voice_chat_mode — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
+- [~] GPT-Live voice — config voice.gpt_live.voice — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
+- [~] GPT-Live persona — config voice.gpt_live.instructions — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
+- [~] TTS provider — config tts.provider — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
+- [~] STT enabled — config stt.enabled — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
+- [~] Echo transcripts — config stt.echo_transcripts — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
+- [~] STT provider — config stt.provider — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
+- [~] Live transcription — config stt.streaming — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
+- [~] Read responses aloud — config voice.auto_tts — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
+- [~] Edge voice — config tts.edge.voice — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
+- [~] OpenAI TTS model/voice — config tts.openai.* — src/app/settings/constants.ts
+  ⟶ registry rows exist but only show for the selected TTS provider; the private backend's selection hid them, so they were not rendered live — saves through the same config path; this client has no voice runtime yet, so nothing uses the value
+- [~] ElevenLabs voice/model — config tts.elevenlabs.* — src/app/settings/constants.ts
+  ⟶ registry rows exist but only show for the selected TTS provider; the private backend's selection hid them, so they were not rendered live — saves through the same config path; this client has no voice runtime yet, so nothing uses the value
+- [~] xAI TTS voice/language/speed/tags/latency/sample/bitrate — config tts.xai.* — src/app/settings/constants.ts
+  ⟶ registry rows exist but only show for the selected TTS provider; the private backend's selection hid them, so they were not rendered live — saves through the same config path; this client has no voice runtime yet, so nothing uses the value
+- [~] MiniMax/Mistral/Gemini/NeuTTS/KittenTTS/Piper/DeepInfra TTS — config tts.* — src/app/settings/constants.ts
+  ⟶ registry rows exist but only show for the selected TTS provider; the private backend's selection hid them, so they were not rendered live — saves through the same config path; this client has no voice runtime yet, so nothing uses the value
+- [~] Local STT model/language — config stt.local.* — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
+- [~] Provider STT models — config stt.{openai,groq,mistral,xai,deepinfra,elevenlabs}.* — src/app/settings/constants.ts
+  ⟶ registry rows exist but only show for the selected STT provider; the private backend's selection hid them, so they were not rendered live — saves through the same config path; this client has no voice runtime yet, so nothing uses the value
+- [x] Max recording length — config voice.max_recording_seconds — src/app/settings/constants.ts
+  ⟶ renders on its registry page and saves `voice.max_recording_seconds` through the panel, read back over REST and put back (live 2026-10-17, tests/live_backend.rs `settings_pages`); this client has no voice runtime yet, so nothing uses the value
+- [~] Client-direct voice — config voice.client_direct — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; this client has no voice runtime yet, so nothing uses the value
 
 ## Settings — Advanced page
 
-- [ ] Enabled toolsets — config toolsets — src/app/settings/constants.ts
-- [ ] Execution backend — config terminal.backend — src/app/settings/terminal-backend-panel.tsx
-- [ ] Command timeout — config terminal.timeout — src/app/settings/constants.ts
-- [ ] Container images (docker/singularity/modal/daytona) — config terminal.*_image — src/app/settings/constants.ts
-- [ ] Terminal output limit / file page limit / line length — config tool_output.* — src/app/settings/constants.ts
-- [ ] Checkpoint limit — config checkpoints.max_snapshots — src/app/settings/constants.ts
-- [ ] Max agent steps — config agent.max_turns — src/app/settings/constants.ts
-- [ ] API retries — config agent.api_max_retries — src/app/settings/constants.ts
-- [ ] Service tier — config agent.service_tier — src/app/settings/constants.ts
-- [ ] Tool-use enforcement — config agent.tool_use_enforcement — src/app/settings/constants.ts
-- [ ] Subagent model/provider/turn limit/concurrency/timeout/reasoning — config delegation.* — src/app/settings/constants.ts
-- [ ] In-app update local changes (stash/discard) — config updates.non_interactive_local_changes — src/app/settings/constants.ts
-- [ ] Keep awake (off/while-working/always) — local (Electron power) — src/store/keep-awake.ts
-- [ ] Disable F12 devtools — local (Electron) — src/store/disable-f12.ts
+- [~] Enabled toolsets — config toolsets — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written (comma list; Tools & Keys › Tools has the per-toolset toggles)
+- [~] Execution backend — config terminal.backend — src/app/settings/terminal-backend-panel.tsx
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; a plain select, not the Electron backend panel
+- [~] Command timeout — config terminal.timeout — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Container images (docker/singularity/modal/daytona) — config terminal.*_image — src/app/settings/constants.ts
+  ⟶ registry rows exist but only show for the selected execution backend; the private backend's selection hid them, so they were not rendered live — saves through the same config path
+- [~] Terminal output limit / file page limit / line length — config tool_output.* — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Checkpoint limit — config checkpoints.max_snapshots — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [x] Max agent steps — config agent.max_turns — src/app/settings/constants.ts
+  ⟶ renders on its registry page and saves `agent.max_turns` through the panel, read back over REST and put back (live 2026-10-17, tests/live_backend.rs `settings_pages`)
+- [~] API retries — config agent.api_max_retries — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Service tier — config agent.service_tier — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; same registry row as Model › Service tier (it lives on Advanced › Agent limits)
+- [~] Tool-use enforcement — config agent.tool_use_enforcement — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Subagent model/provider/turn limit/concurrency/timeout/reasoning — config delegation.* — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] In-app update local changes (stash/discard) — config updates.non_interactive_local_changes — src/app/settings/constants.ts
+  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
+- [~] Keep awake (off/while-working/always) — local (Electron power) — src/store/keep-awake.ts
+  ⟶ device row renders on Advanced › Desktop & startup (live 2026-10-17, tests/live_backend.rs `settings_pages`) and saves through the live-verified prefs.json path — not individually exercised; no power inhibition is taken
+- [~] Disable F12 devtools — local (Electron) — src/store/disable-f12.ts
+  ⟶ device row renders on Advanced › Desktop & startup (live 2026-10-17, tests/live_backend.rs `settings_pages`) and saves through the live-verified prefs.json path — not individually exercised; the native client has no DevTools, so there is nothing to block
 - [ ] Always open links externally — local — src/store/external-links.ts
+  ⟶ no row in the settings registry yet (re-audited 2026-10-17)
 - [ ] Warm bot backends (pool) — local — src/app/settings/pool-limits-setting.tsx
+  ⟶ no row in the settings registry yet (re-audited 2026-10-17)
 - [ ] Backend idle timeout (pool) — local — src/app/settings/pool-limits-setting.tsx
+  ⟶ no row in the settings registry yet (re-audited 2026-10-17)
 - [ ] Quick entry enable — local (Electron quick-entry) — src/app/settings/quick-entry-settings.tsx
+  ⟶ no row in the settings registry yet (re-audited 2026-10-17)
 - [ ] Quick entry shortcut — local (Electron) — src/app/settings/quick-entry-settings.tsx
+  ⟶ no row in the settings registry yet (re-audited 2026-10-17)
 - [ ] Reset onboarding (developer) — local + RPC onboarding.reset_setup_profile — src/app/settings/developer-settings.tsx
+  ⟶ no row in the settings registry yet (re-audited 2026-10-17)
 
 ## Settings — Gateway / Connections page
 
