@@ -128,6 +128,11 @@ fn main() -> Result<(), slint::PlatformError> {
 
     ui.show()?;
     perf::mark("window shown (surface created)");
+    // TRIAL: open a browser window when asked; nothing GTK/WebKit runs otherwise.
+    #[cfg(target_os = "linux")]
+    let _browser = std::env::var("HERMES_TRIAL_BROWSER_URL")
+        .ok()
+        .map(|url| browser_trial::open(&url).expect("browser trial"));
     let r = slint::run_event_loop();
     let _ = ui.hide();
     // Dropping the runtime drops the controller, which kills the owned backend.
@@ -169,4 +174,41 @@ fn select_renderer() -> &'static str {
         }
     }
     "default"
+}
+
+/// TRIAL: a wry webview in a GTK top-level window, alongside the Slint (winit) window.
+#[cfg(target_os = "linux")]
+mod browser_trial {
+    use std::cell::RefCell;
+
+    use gtk::prelude::*;
+    use wry::{WebViewBuilder, WebViewBuilderExtUnix};
+
+    thread_local! {
+        static HOLD: RefCell<Option<(gtk::Window, wry::WebView)>> = const { RefCell::new(None) };
+    }
+
+    /// Must run on the main thread (the Slint event loop thread). Returns the timer that
+    /// pumps GTK; dropping it stops the pump.
+    pub fn open(url: &str) -> Result<slint::Timer, String> {
+        let t0 = std::time::Instant::now();
+        gtk::init().map_err(|e| e.to_string())?;
+        let win = gtk::Window::new(gtk::WindowType::Toplevel);
+        win.set_title("Hermes browser (trial)");
+        win.set_default_size(1024, 720);
+        let webview = WebViewBuilder::new()
+            .with_url(url)
+            .build_gtk(&win)
+            .map_err(|e| e.to_string())?;
+        win.show_all();
+        eprintln!("TRIAL browser window created in {:.1} ms", t0.elapsed().as_secs_f64() * 1000.0);
+        HOLD.with(|h| *h.borrow_mut() = Some((win, webview)));
+        let timer = slint::Timer::default();
+        timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(16), || {
+            while gtk::events_pending() {
+                gtk::main_iteration_do(false);
+            }
+        });
+        Ok(timer)
+    }
 }

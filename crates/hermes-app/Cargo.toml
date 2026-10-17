@@ -16,3 +16,10 @@ slint.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+# THROWAWAY TRIAL (experiment/webview-wry, never merged): measure what an in-app browser
+# costs. On Linux wry needs GTK: a winit child webview is X11-only, so on Wayland the
+# browser is a GTK top-level window pumped from a Slint timer.
+[target.'cfg(target_os = "linux")'.dependencies]
+wry = "0.57"
+gtk = "0.18"
