@@ -1,0 +1,840 @@
+{
+ "_unmapped": [
+  {
+   "screen": "orig-home",
+   "element": "'Waking up \u2026' spinner",
+   "description": "Centered spinning-braille glyph pair with 'Waking up \u2026' text on empty session view; no row covers a backend-waking indicator."
+  },
+  {
+   "screen": "orig-command-center",
+   "element": "Command Center nav 'System' and 'Usage'",
+   "description": "System and Usage nav sections of the command-center modal have no matching rows (EXTR-019/020 cover dispatch+maintenance only)."
+  },
+  {
+   "screen": "orig-chat-reply,orig-chat-tool-row,orig-home,orig-session-import",
+   "element": "'Waking up default\u2026' / 'Waking up \u2026' + braille spin glyphs",
+   "description": "Two stacked tiny spinner glyph rows at right edge y~118/264 paired with 'Scroll to bottom' dash; no row covers a backend-waking/reviving indicator."
+  },
+  {
+   "screen": "orig-chat-reply,orig-chat-tool-row",
+   "element": "Status bar gateway id 'hermes-parity-parity-IboJbm' and version chip 'v0.22.1+683'",
+   "description": "Status bar showing active connection id and app version; WIN-004 covers Backend ready/Smart only."
+  },
+  {
+   "screen": "orig-chat-reply,orig-chat-tool-row",
+   "element": "'Give Hermes a task' composer placeholder",
+   "description": "Visible above; not represented by any composer row (CHAT-030/031 pills exist)."
+  },
+  {
+   "screen": "orig-settings-tab-config-workspace-page-shell",
+   "element": "code execution mode",
+   "description": "items.json SWRK-005 expects a code-execution-mode control on Workspace pages; Shell environment page shows only Persistent Shell + Environment Passthrough \u2014 no execution-mode control visible (unsure where it lives)."
+  },
+  {
+   "screen": "orig-settings-tab-config-workspace-page-files",
+   "element": "Data-URL read limit",
+   "description": "items.json SWRK-009 expects a Data-URL read limit control; Files & execution page shows only Code Execution Mode + File Read Limit \u2014 none visible."
+  },
+  {
+   "screen": "orig-settings-tab-config-safety-page-privacy",
+   "element": "Checkpoints sub-item greyed while on Privacy & network",
+   "description": "In sidebar, Checkpoints renders gray/disabled-looking while Privacy & network is active (unsure if disabled state or just inactive styling)."
+  }
+ ],
+ "ONB-001": {
+  "screens": "orig-home",
+  "visual": "Setup splash card 'Let's get you setup with Hermes Agent' + 'Connect a model provider to start chatting'; no chrome during splash."
+ },
+ "ONB-002": {
+  "screens": "orig-home",
+  "visual": "'Starting Hermes\u2026' status line with full-width blue progress bar over white card; footer 'Hermes Desktop is ready' + '100%' right-aligned."
+ },
+ "CHAT-038": {
+  "screens": "orig-home",
+  "visual": "Empty-session intro: 'HERMES AGENT' headline + helper 'Describe the task in your own words. I'll pick the right tools, explain my plan, and check in before risky steps.'"
+ },
+ "CHAT-030": {
+  "screens": "orig-home",
+  "visual": "Composer right pills: model pill 'Mock Model' at ~[1177,837], plus send/mic/send-adjacent icon buttons at ~[1341..1399,837]."
+ },
+ "CHAT-031": {
+  "screens": "orig-home",
+  "visual": "Reasoning pill 'Med' at ~[1280,837,57,24] right of model pill."
+ },
+ "SESS-001": {
+  "screens": "orig-home,orig-chat-reply,orig-chat-tool-row",
+  "visual": "Sidebar list with PINNED and SESSIONS uppercase section headers, one session row 'Hello from the parity capture' selected (light blue-grey fill) with 'now' timestamp chip at right."
+ },
+ "SESS-004": {
+  "screens": "orig-home",
+  "visual": "'New session' row with Ctrl/N keycaps as unselected control at ~[10,68]."
+ },
+ "PROJ-002": {
+  "screens": "orig-home",
+  "visual": "'+ New project' button in lower sidebar (~79,550) with 'No sessions yet' above."
+ },
+ "PROJ-025": {
+  "screens": "orig-home",
+  "visual": "Sidebar workspace nav rows Capabilities/Messaging/Artifacts/Scheduled jobs under New session."
+ },
+ "WIN-002": {
+  "screens": "orig-home",
+  "visual": "Control-less titlebar: icon buttons top-left [14,5] and cluster top-right ~[1176..1272,5]."
+ },
+ "WIN-004": {
+  "screens": "orig-home,orig-chat-reply,orig-chat-tool-row",
+  "visual": "Status bar: \u2318 icon, 'Backend ready', gateway/terminal name 'hermes-parity-parity-IboJbm', right 'Smart' + version chip 'v0.22.1+683'."
+ },
+ "EXTR-019": {
+  "screens": "orig-command-center",
+  "visual": "Modal (~48,48..1392,852) over dimmed app: breadcrumb 'Command Center \u203a Sessions', search 'Search sessions, views, and actions', left nav Sessions/System/Usage/Maintenance, main pane empty 'No sessions yet.'"
+ },
+ "EXTR-020": {
+  "screens": "orig-command-center",
+  "visual": "Maintenance is a selected-round-capable nav item (wrench icon) at ~[59,149,188,28] in command-center modal."
+ },
+ "SKIL-001": {
+  "screens": "orig-capabilities",
+  "visual": "Skills list under Capabilities > Skills tab (count 53): rows airtable, architecture-diagram, arxiv, ascii-video, baoyu-infographic, blocked-page-recovery, box, each with category caption and blue ON toggle; 'Most used' grouping label."
+ },
+ "SKIL-002": {
+  "screens": "orig-capabilities",
+  "visual": "Detail panel for airtable skill: name, description, version 1.1.0, author community, license MIT, platforms [linux,macos,windows], prerequisite AIRTABLE_API_KEY/curl, metadata tags + homepage link; footnote 'Changes apply to new sessions.'"
+ },
+ "SKIL-003": {
+  "screens": "orig-capabilities",
+  "visual": "All 7 visible skill rows have blue toggles in ON position (~x715-745)."
+ },
+ "SKIL-004": {
+  "screens": "orig-capabilities",
+  "visual": "Embedded 'Skills Hub' browser section below list: nav Skills orange-active, hero pill, 'Update installed' + 'Hide the hub browser' buttons, '0 registries' copy, Terms/Privacy links, category legend BUILT-IN/OPTIONAL/COMMUNITY/CATEGORIES."
+ },
+ "TSET-001": {
+  "screens": "orig-capabilities",
+  "visual": "Content tabs 'Skills 53 / Tools 23 / Connectors / Plugins' on Capabilities page; Tools tab shows count badge 23."
+ },
+ "TSET-009": {
+  "screens": "orig-capabilities",
+  "visual": "Tools tab exists with count 23 (not opened in this screenshot); Connectors and Plugins tabs present unselected."
+ },
+ "MSG-001": {
+  "screens": "orig-messaging",
+  "visual": "Platform list column (~260-470): Telegram, Discord, Slack, Mattermost, Matrix, WhatsApp, Signal, BlueBubbles, Email, SMS (Twilio), DingTalk, Feishu/Lark, Google Chat, WeCom x2, Weixin, QQ Bot, Yuanbao, API server, Webhooks, A2A...; brand tile + grey status dot per row; Telegram selected."
+ },
+ "MSG-002": {
+  "screens": "orig-messaging",
+  "visual": "Telegram detail pane: header pills 'Disabled' and 'Needs setup'; Bot token input, Allowed Telegram user IDs list rows, Webhook secret field, disabled 'Save changes'; scrollable (rows extend past y300 in list)."
+ },
+ "MSG-004": {
+  "screens": "orig-messaging",
+  "visual": "QUICK SETUP card with green 'Recommended' badge, copy about QR + auto-detect of Telegram user ID, blue 'Create with QR' button."
+ },
+ "MSG-008": {
+  "screens": "orig-messaging",
+  "visual": "'Allowed Telegram user IDs' field: empty ID rows with remove x (one disabled), 'Add another' link; helper text about @userinfobot."
+ },
+ "EXTR-001": {
+  "screens": "orig-webhooks",
+  "visual": "Webhooks page: empty list 'No webhook subscriptions yet.'; 'New subscription' button disabled at ~[656,538]."
+ },
+ "EXTR-002": {
+  "screens": "orig-webhooks",
+  "visual": "'Webhook receiver disabled' notice banner with long explainer; 'Enable webhooks' button at ~[114,150]."
+ },
+ "ART-001": {
+  "screens": "orig-artifacts",
+  "visual": "Artifacts page: filter tabs 'All 0 / Images 0 / Files 0 / Links 0' (~755-949,42, counts as small badges), refresh icon far right; centered empty state 'No artifacts found' + helper 'Generated images and file outputs will appear here as sessions produce them.'"
+ },
+ "CRON-001": {
+  "screens": "orig-cron",
+  "visual": "Scheduled-jobs modal (48,48..1392,852): header 'Scheduled jobs' + '0 jobs', search field, top-left empty 'No scheduled jobs yet' with + glyph, central empty state (stopwatch icon + explainer)."
+ },
+ "CRON-002": {
+  "screens": "orig-cron",
+  "visual": "Blue 'New cron' button (~799,515) in central empty state; '+' affordance near top-left empty text."
+ },
+ "CRON-008": {
+  "screens": "orig-cron",
+  "visual": "'BLUEPRINTS' section (~y230): 16 named rows at 28px pitch \u2014 Morning briefing, Important-mail monitor, Weekly review, Workday start reminder, Custom reminder, Evening wind-down, Topic news digest, Bills & renewals, Price & availability watch, Competitor news watch, Habit check-in\u2026 (16 total incl. ..."
+ },
+ "CRON-010": {
+  "screens": "orig-cron",
+  "visual": "Sidebar nav row 'Scheduled jobs' (stopwatch icon) is one click away; this modal opens over dimmed app backdrop."
+ },
+ "PROF-001": {
+  "screens": "orig-profiles",
+  "visual": "Profiles modal: title 'Profiles', '1 profile' count, search field, list with 'default' row selected (light-blue fill)."
+ },
+ "PROF-002": {
+  "screens": "orig-profiles",
+  "visual": "'+' create-profile button below profile list (~173,182)."
+ },
+ "PROF-005": {
+  "screens": "orig-profiles",
+  "visual": "Detail pane rows: path line (monospace), Model row, Skills row; badges 'Default' (blue pill) and 'Env' (grey outline) in title row."
+ },
+ "PROF-006": {
+  "screens": "orig-profiles",
+  "visual": "SOUL.MD section: caption, populated multi-line editor with caret, blue 'Save SOUL.md' button (1243,455)."
+ },
+ "PROF-020": {
+  "screens": "orig-profiles",
+  "visual": "'Default' pill badge on the default profile's title row."
+ },
+ "EXTR-006": {
+  "screens": "orig-agents",
+  "visual": "Agents modal: empty state, bot icon above 'No live subagents' + caption 'When a turn delegates work, child agents stream their progress here.' (~535-905,408-483)."
+ },
+ "EXTR-017": {
+  "screens": "orig-starmap",
+  "visual": "Starmap modal: pure empty state - lightbulb icon, 'Nothing learned yet', caption 'As Hermes builds skills and memories for your work, they appear here.'; no nodes/legend rendered, only x close."
+ },
+ "EXTR-005": {
+  "screens": "orig-session-import",
+  "visual": "'Continue from another app' modal (48,48..1392,852): 'Reading from cynric-omarchy' + 'Import into default'; segmented All(selected)/Claude Code/Codex; left list empty 'No conversations found' + explainer; right preview empty 'A conversation worth continuing'; no Import button visible."
+ },
+ "SSAF-008": {
+  "screens": "orig-session-import,orig-chat-reply,orig-chat-tool-row,orig-settings-tab-config-safety-page-privacy",
+  "visual": "Privacy & network: 'Collect usage stats' toggle OFF ('Counts only, kept on this computer...'), 'Share usage stats with Nous' toggle OFF+disabled ('Needs collection on') with 'What is counted' link."
+ },
+ "TRNS-001": {
+  "screens": "orig-chat-reply",
+  "visual": "Assistant reply as plain left-aligned unstyled text at x~295 y~97: 'Hello from the mock inference server! The full boot chain is working.' No avatar/bubble."
+ },
+ "TRNS-002": {
+  "screens": "orig-chat-reply,orig-chat-tool-row",
+  "visual": "User message rendered as a full-width bordered rounded card (285,44,1131x38), left-aligned text, no avatar/bubble: 'Hello from the parity capture'."
+ },
+ "SESS-013": {
+  "screens": "orig-chat-reply,orig-chat-tool-row",
+  "visual": "Session titled 'Hello from the parity capture' - auto-title used for sidebar row and active tab (uppercase truncated 'HELLO FROM THE PARITY CAP', bullet prefix)."
+ },
+ "SESS-012": {
+  "screens": "orig-chat-reply,orig-chat-tool-row",
+  "visual": "PINNED header with hint 'Shift-click a chat to pin' (pin affordance); no pinned items."
+ },
+ "SESS-016": {
+  "screens": "orig-chat-reply,orig-chat-tool-row",
+  "visual": "Sidebar session search input [40,224,100,28] with magnifier icon + placeholder 'Search sessions\u2026'."
+ },
+ "SESS-021": {
+  "screens": "orig-chat-reply,orig-chat-tool-row",
+  "visual": "Small filter icon at right of SESSIONS section header [218,329]."
+ },
+ "SESS-005": {
+  "screens": "orig-chat-reply,orig-chat-tool-row",
+  "visual": "Active-session tab 'HELLO FROM THE PARITY CAP\u2026' with blue underline; '+' new-tab button next to it [441..476,0] implies per-session tabs."
+ },
+ "TOOL-001": {
+  "screens": "orig-chat-tool-row",
+  "visual": "Tool row: expanded full-width bordered card with mono raw invocation E2E_CALL(terminal)[{\"command\":\"echo parity-tool-row\"}]; collapsed result line below."
+ },
+ "TOOL-002": {
+  "screens": "orig-chat-tool-row",
+  "visual": "Result summarised to one inline row: small grey terminal-glyph icon + muted 'Ran echo parity-tool-row'; full output hidden/collapsed."
+ },
+ "TOOL-004": {
+  "screens": "orig-chat-tool-row",
+  "visual": "Terminal tool call: command echo parity-tool-row rendered inside tool card; follow-up E2E_CALL_RESULT: {...} shown as ordinary body text (not mono, not boxed)."
+ },
+ "TOOL-021": {
+  "screens": "orig-chat-tool-row",
+  "visual": "Disclosure states visible: invocation card expanded (raw args), result row collapsed; no chevron on card."
+ },
+ "SMOD-001": {
+  "screens": "orig-settings-tab-config-model-page-main",
+  "visual": "Main-model page: full-width selects 'custom' then 'mock-model', blue 'Apply'; note 'Applies to new sessions. Use the model picker in the composer to hot-swap the active chat.'"
+ },
+ "SMOD-002": {
+  "screens": "orig-settings-tab-config-model-page-main",
+  "visual": "'Main model context window (override)' heading + two-line note; right input filled 64000 (~1156,318)."
+ },
+ "SMOD-003": {
+  "screens": "orig-settings-tab-config-model-page-main",
+  "visual": "'Reasoning' label + 'Medium' dropdown (~447,239)."
+ },
+ "MODL-001": {
+  "screens": "orig-settings-tab-config-model-page-main",
+  "visual": "Same main-model settings page (custom/mock-model + Apply) doubles as the model settings UI."
+ },
+ "SMOD-005": {
+  "screens": "orig-settings-tab-config-model-page-fallbacks",
+  "visual": "Fallback Models page: heading, explainer 'Backup provider:model entries to try if the default model fails.', empty 'No fallback models \u2014 the default model is used unless it fails.', '+ Add fallback' link"
+ },
+ "SMOD-006": {
+  "screens": "orig-settings-tab-config-model-page-auxiliary",
+  "visual": "Auxiliary models: 'Reset all to main' top-right; 10 task rows (Vision, Compression, Skills hub, Approval, MCP, Title gen, Review, Voice chat, Triage specifier, Kanban decomposer) w/ badge pills, mono 'auto \u00b7 use main model', Set to main/Change links."
+ },
+ "SMOD-007": {
+  "screens": "orig-settings-tab-config-model-page-moa",
+  "visual": "MoA: preset 'default'; Enabled ON + Set default + disabled Delete + 'new preset' + disabled Add preset; Ref 1 openai-codex\u00b7gpt-5.5 ON+Remove; Ref 2 openrouter\u00b7deepseek-v4-pro; 'Add reference model'; Aggregator openrouter\u00b7claude-opus-4.8 ('acting model \u00b7 billed for the run')."
+ },
+ "SCHT-001": {
+  "screens": "orig-settings-tab-config-chat-page-behavior",
+  "visual": "Behavior page row: 'Personality' + subtext; right select 'None'."
+ },
+ "SCHT-002": {
+  "screens": "orig-settings-tab-config-chat-page-behavior",
+  "visual": "'Timezone' row with IANA explainer; right wide combobox placeholder 'Search...'."
+ },
+ "SCHT-003": {
+  "screens": "orig-settings-tab-config-chat-page-behavior",
+  "visual": "'Reasoning Blocks' row, toggle ON (blue pill, knob right)."
+ },
+ "SCHT-004": {
+  "screens": "orig-settings-tab-config-chat-page-attachments",
+  "visual": "Attachments page: 'Image Attachments' row ('Controls how image attachments are sent to the model.') with select 'Auto'."
+ },
+ "SCHT-005": {
+  "screens": "orig-settings-tab-config-chat-page-attachments",
+  "visual": "'Max preview / image load size' row with long caveat + numeric input '16' and 'MB' unit outside field."
+ },
+ "SAPP-001": {
+  "screens": "orig-settings-tab-config-appearance-page-general",
+  "visual": "Language row: select with language icon 'English'."
+ },
+ "SAPP-002": {
+  "screens": "orig-settings-tab-config-appearance-page-general",
+  "visual": "'Intro Splash' row (wordmark/prompt on empty chat), toggle ON."
+ },
+ "SAPP-003": {
+  "screens": "orig-settings-tab-config-appearance-page-general",
+  "visual": "'Model Pricing' row (prices per million tokens in model picker), toggle OFF."
+ },
+ "SAPP-004": {
+  "screens": "orig-settings-tab-config-appearance-page-general",
+  "visual": "'Reopen Last Chat on Launch' row, toggle ON."
+ },
+ "SAPP-005": {
+  "screens": "orig-settings-tab-config-appearance-page-general",
+  "visual": "'In-App Tips' row + once-per-tip/30-day auto-off explainer, toggle ON (~[1298,383])."
+ },
+ "SAPP-006": {
+  "screens": "orig-settings-tab-config-appearance-page-general",
+  "visual": "'Guided Tours' row + spotlight-step explainer, toggle ON."
+ },
+ "SAPP-007": {
+  "screens": "orig-settings-tab-config-appearance-page-theme",
+  "visual": "Theme page: Light/Dark/System segmented, selected='System'.orig-settings-tab-config-appearance-page-general: part of Appearance settings shell."
+ },
+ "SAPP-008": {
+  "screens": "orig-settings-tab-config-appearance-page-theme",
+  "visual": "Light/Dark/System segmented control [~1098-1325,113]; System segment pressed (white pill + border)."
+ },
+ "THEM-001": {
+  "screens": "orig-settings-tab-config-appearance-page-theme",
+  "visual": "Theme grid 3x4 (cards ~329x148): Nous, GitHub, Catppuccin, Everforest, Solarized, Nous Alt, Classic Hermes, Midnight, Ember, Mono, Slate, Cyberpunk; mini previews (band+bars+pill); 'Nous' selected (blue border), Classic Hermes amber outline; 'Desktop palettes only.' explainer."
+ },
+ "THEM-002": {
+  "screens": "orig-settings-tab-config-appearance-page-theme",
+  "visual": "Theme search field placeholder 'Search your themes or the VS Code Marketplace\u2026' [315,168,987,28]."
+ },
+ "SAPP-009": {
+  "screens": "orig-settings-tab-config-appearance-page-typography",
+  "visual": "UI Scale segmented 90/100/110/125/150/175%; '100%' pressed; helper 'Current: 100%.', mentions Cmd/Ctrl +/-/0."
+ },
+ "SAPP-010": {
+  "screens": "orig-settings-tab-config-appearance-page-typography",
+  "visual": "Chat Text Size segmented same 6 stops; '110%' pressed."
+ },
+ "SAPP-011": {
+  "screens": "orig-settings-tab-config-appearance-page-typography",
+  "visual": "Chat Font: empty combo 'OpenDyslexic or a CSS font stack', disabled 'Use theme font', preview 'The quick brown fox jumps over the lazy dog. 0123456789'."
+ },
+ "SAPP-012": {
+  "screens": "orig-settings-tab-config-appearance-page-typography",
+  "visual": "Terminal Font: empty combo 'MesloLGS NF or a CSS font stack', disabled 'Use default', mono glyph preview '~/project git:main \u276f' (image shows ~\\project git:main)."
+ },
+ "SAPP-013": {
+  "screens": "orig-settings-tab-config-appearance-page-window-layout",
+  "visual": "Interface mode segmented Simple/Advanced \u2014 'Advanced' selected; explainer 'Changes what is shown, not what Hermes can do.'"
+ },
+ "SAPP-014": {
+  "screens": "orig-settings-tab-config-appearance-page-window-layout",
+  "visual": "Session List Density segmented Compact/Comfortable/Detailed \u2014 'Compact' selected."
+ },
+ "SAPP-015": {
+  "screens": "orig-settings-tab-config-appearance-page-window-layout",
+  "visual": "Tab Strip segmented Auto/Always/Never \u2014 'Auto' selected; explainer about auto-hiding for single pane."
+ },
+ "SAPP-016": {
+  "screens": "orig-settings-tab-config-appearance-page-window-layout",
+  "visual": "App Actions segmented Right/Left \u2014 'Right' selected; explainer mentions Settings/Layout/HUD placement."
+ },
+ "SAPP-017": {
+  "screens": "orig-settings-tab-config-appearance-page-window-layout",
+  "visual": "'Minimize to tray' toggle OFF (knob left) + tray/Quit explainer."
+ },
+ "SAPP-019": {
+  "screens": "orig-settings-tab-config-appearance-page-window-layout",
+  "visual": "'Chat Backdrop' row with icon; 'The faint statue image behind the conversation.', toggle OFF."
+ },
+ "SAPP-020": {
+  "screens": "orig-settings-tab-config-appearance-page-window-layout",
+  "visual": "'File Browser' toggle OFF (+ titlebar toggle mention)."
+ },
+ "SAPP-021": {
+  "screens": "orig-settings-tab-config-appearance-page-window-layout",
+  "visual": "'Floating Composer' toggle OFF."
+ },
+ "SAPP-022": {
+  "screens": "orig-settings-tab-config-appearance-page-chat-display",
+  "visual": "Message Bubble slider at 0% (blue thumb far left) \u2014 see-through own messages."
+ },
+ "SAPP-023": {
+  "screens": "orig-settings-tab-config-appearance-page-chat-display",
+  "visual": "Text direction segmented Auto/Right-to-left/Left-to-right \u2014 Auto selected."
+ },
+ "SAPP-024": {
+  "screens": "orig-settings-tab-config-appearance-page-chat-display",
+  "visual": "'Hide thread timeline bars' toggle OFF."
+ },
+ "SAPP-025": {
+  "screens": "orig-settings-tab-config-appearance-page-chat-display",
+  "visual": "'Message Reactions' (iMessage-style tapbacks) toggle OFF."
+ },
+ "SAPP-026": {
+  "screens": "orig-settings-tab-config-appearance-page-chat-display",
+  "visual": "'Vibe Hearts' row (floating hearts wording incl. 'ily','good bot') toggle ON."
+ },
+ "SAPP-027": {
+  "screens": "orig-settings-tab-config-appearance-page-chat-display",
+  "visual": "Tool Call Display segmented Product/Technical \u2014 Product selected."
+ },
+ "SAPP-028": {
+  "screens": "orig-settings-tab-config-appearance-page-chat-display",
+  "visual": "'Hide code diffs' toggle OFF (inline tool rows w/ added/removed counts)."
+ },
+ "SAPP-029": {
+  "screens": "orig-settings-tab-config-appearance-page-chat-display",
+  "visual": "'Collapse thinking by default' toggle OFF."
+ },
+ "SAPP-030": {
+  "screens": "orig-settings-tab-config-appearance-page-chat-display",
+  "visual": "Inline Embeds segmented Ask/Always/Off \u2014 'Ask' selected."
+ },
+ "SAPP-031": {
+  "screens": "orig-settings-tab-config-appearance-page-pet",
+  "visual": "Pet page: explainer about petdex mascot reacting to Hermes; 'Choose a pet' header with toggle OFF right ([~1296,151]); 'Search pets\u2026' input."
+ },
+ "WIN-018": {
+  "screens": "orig-settings-tab-config-appearance-page-pet",
+  "visual": "Pet gallery: error line 'Couldn't reach the petdex gallery. Check your connection and reopen this page.' + empty gallery area + '0 pets.' count."
+ },
+ "SWRK-001": {
+  "screens": "orig-settings-tab-config-workspace-page-projects",
+  "visual": "Working Directory text input value '.'."
+ },
+ "SWRK-002": {
+  "screens": "orig-settings-tab-config-workspace-page-projects",
+  "visual": "Automatic Repository Discovery toggle ON."
+ },
+ "SWRK-003": {
+  "screens": "orig-settings-tab-config-workspace-page-projects",
+  "visual": "Repository Discovery Roots text input, empty, placeholder 'comma-separated values', explainer 'Leave empty to scan your home directory.'"
+ },
+ "SWRK-004": {
+  "screens": "orig-settings-tab-config-workspace-page-projects",
+  "visual": "Excluded Repository Paths text input, empty, placeholder 'comma-separated values'."
+ },
+ "SWRK-006": {
+  "screens": "orig-settings-tab-config-workspace-page-shell",
+  "visual": "Persistent Shell toggle ON + SSH-variables explainer."
+ },
+ "SWRK-007": {
+  "screens": "orig-settings-tab-config-workspace-page-shell",
+  "visual": "Environment Passthrough text input, empty, placeholder 'comma-separated values'."
+ },
+ "SWRK-005": {
+  "screens": "orig-settings-tab-config-workspace-page-files",
+  "visual": "Code Execution Mode select value 'Project' (helper 'How strictly code execution is scoped to the current project.')."
+ },
+ "SWRK-008": {
+  "screens": "orig-settings-tab-config-workspace-page-files",
+  "visual": "File Read Limit text input value '100000'."
+ },
+ "SSAF-001": {
+  "screens": "orig-settings-tab-config-safety-page-approvals",
+  "visual": "Approval Mode select showing 'Off'."
+ },
+ "SSAF-002": {
+  "screens": "orig-settings-tab-config-safety-page-approvals",
+  "visual": "Approval Timeout text input value '300'."
+ },
+ "SSAF-003": {
+  "screens": "orig-settings-tab-config-safety-page-approvals",
+  "visual": "Confirm MCP Reloads toggle ON."
+ },
+ "SSAF-004": {
+  "screens": "orig-settings-tab-config-safety-page-approvals",
+  "visual": "Command Allowlist text input empty, placeholder 'comma-separated values'."
+ },
+ "SSAF-005": {
+  "screens": "orig-settings-tab-config-safety-page-privacy",
+  "visual": "Redact Secrets toggle ON."
+ },
+ "SSAF-006": {
+  "screens": "orig-settings-tab-config-safety-page-privacy",
+  "visual": "Allow Private URLs toggle OFF (no description)."
+ },
+ "SSAF-007": {
+  "screens": "orig-settings-tab-config-safety-page-checkpoints",
+  "visual": "File Checkpoints toggle OFF; caption 'Create rollback snapshots before file edits.' No snapshot-limit row visible."
+ },
+ "EXTR-021": {
+  "screens": "orig-settings-tab-config-safety-page-privacy",
+  "visual": "'Collect usage stats' toggle (telemetry collection consent) OFF on Safety > Privacy & network."
+ },
+ "SBRW-001": {
+  "screens": "orig-settings-tab-config-browser-page-profile",
+  "visual": "'Use My Real Browser Profile' row with 6-line explainer (managed Chromium snapshot, Chromium-only, Off by default), toggle OFF."
+ },
+ "SBRW-002": {
+  "screens": "orig-settings-tab-config-browser-page-network",
+  "visual": "'Browser Private URLs' toggle OFF."
+ },
+ "SBRW-003": {
+  "screens": "orig-settings-tab-config-browser-page-network",
+  "visual": "'Local Browser For Private URLs' toggle ON."
+ },
+ "SMEM-001": {
+  "screens": "orig-settings-tab-config-memory-page-persistent",
+  "visual": "Persistent Memory toggle ON ('Save durable memories that can help future sessions.')."
+ },
+ "SMEM-002": {
+  "screens": "orig-settings-tab-config-memory-page-persistent",
+  "visual": "User Profile toggle ON ('Maintain a compact profile of user preferences.')."
+ },
+ "SMEM-003": {
+  "screens": "orig-settings-tab-config-memory-page-persistent",
+  "visual": "Memory Budget text input value '2200'."
+ },
+ "SMEM-004": {
+  "screens": "orig-settings-tab-config-memory-page-persistent",
+  "visual": "Profile Budget text input value '1375'."
+ },
+ "SMEM-005": {
+  "screens": "orig-settings-tab-config-memory-page-persistent",
+  "visual": "Memory Provider dropdown 'Built-in only'."
+ },
+ "SMEM-006": {
+  "screens": "orig-settings-tab-config-memory-page-context",
+  "visual": "Context Engine dropdown 'Compressor'."
+ },
+ "SMEM-007": {
+  "screens": "orig-settings-tab-config-memory-page-context",
+  "visual": "Auto-Compression toggle ON."
+ },
+ "SMEM-008": {
+  "screens": "orig-settings-tab-config-memory-page-context",
+  "visual": "Compression Threshold input '0.5'."
+ },
+ "SMEM-009": {
+  "screens": "orig-settings-tab-config-memory-page-context",
+  "visual": "Codex Compression Auto-Raise toggle ON ('Raise compression to 85%...')."
+ },
+ "SMEM-010": {
+  "screens": "orig-settings-tab-config-memory-page-context",
+  "visual": "Compression Target input '0.2'."
+ },
+ "SMEM-011": {
+  "screens": "orig-settings-tab-config-memory-page-context",
+  "visual": "Protected Recent Messages input '20'."
+ },
+ "SMEM-012": {
+  "screens": "orig-settings-tab-config-memory-page-context",
+  "visual": "'Compression model timeout (s)' input '120' + explainer about auxiliary compression model."
+ },
+ "SVOI-001": {
+  "screens": "orig-settings-tab-config-voice-page-conversation",
+  "visual": "Voice Chat Mode dropdown 'Chained'; long explainer contrasting chained vs gpt-live ($0.05/min, needs OpenAI key)."
+ },
+ "SVOI-002": {
+  "screens": "orig-settings-tab-config-voice-page-conversation",
+  "visual": "GPT-Live Voice dropdown 'marin'; 'Custom voice IDs are accepted.'"
+ },
+ "SVOI-003": {
+  "screens": "orig-settings-tab-config-voice-page-conversation",
+  "visual": "GPT-Live Persona text input placeholder 'Not set'."
+ },
+ "SVOI-004": {
+  "screens": "orig-settings-tab-config-voice-page-speech",
+  "visual": "Text-To-Speech Provider dropdown 'Edge'."
+ },
+ "SVOI-005": {
+  "screens": "orig-settings-tab-config-voice-page-transcription",
+  "visual": "Speech To Text toggle ON ('Enable local or provider-backed speech transcription.')."
+ },
+ "SVOI-006": {
+  "screens": "orig-settings-tab-config-voice-page-transcription",
+  "visual": "Echo Transcripts toggle ON ('Post the raw \ud83c\udf99 transcript of voice messages back to the chat.')."
+ },
+ "SVOI-008": {
+  "screens": "orig-settings-tab-config-voice-page-transcription",
+  "visual": "Live Transcription toggle OFF; providers only named in description (OpenAI, xAI, ElevenLabs; fallback to recording)."
+ },
+ "SVOI-015": {
+  "screens": "orig-settings-tab-config-voice-page-transcription",
+  "visual": "Local Transcription Model dropdown 'Base' ('Local faster-whisper model size'); Transcription Language input placeholder 'Not set'."
+ },
+ "SVOI-009": {
+  "screens": "orig-settings-tab-config-voice-page-speech",
+  "visual": "Read Responses Aloud toggle OFF ('Automatically speak assistant responses.')."
+ },
+ "SVOI-010": {
+  "screens": "orig-settings-tab-config-voice-page-speech",
+  "visual": "Edge Voice dropdown 'en-US-AriaNeural'."
+ },
+ "SVOI-017": {
+  "screens": "orig-settings-tab-config-voice-page-conversation",
+  "visual": "Max Recording Length input '120'."
+ },
+ "SVOI-018": {
+  "screens": "orig-settings-tab-config-voice-page-conversation",
+  "visual": "Client Direct toggle ON."
+ },
+ "SADV-013": {
+  "screens": "orig-settings-tab-config-advanced-page-desktop",
+  "visual": "Keep computer awake: 3-way segmented Off/While working/Always \u2014 'Off' active; explainer re 'While working' turn-scoped hold."
+ },
+ "SADV-014": {
+  "screens": "orig-settings-tab-config-advanced-page-desktop",
+  "visual": "Disable F12 DevTools toggle OFF (Ctrl+Shift+I still works)."
+ },
+ "SADV-015": {
+  "screens": "orig-settings-tab-config-advanced-page-desktop",
+  "visual": "'Always open links in external browser' toggle OFF (right-click 'Open in in-app browser' still works)."
+ },
+ "SADV-018": {
+  "screens": "orig-settings-tab-config-advanced-page-desktop",
+  "visual": "Quick Entry toggle ON ('Summon a small composer from anywhere...')."
+ },
+ "SADV-019": {
+  "screens": "orig-settings-tab-config-advanced-page-desktop",
+  "visual": "Quick Entry shortcut text input 'CommandOrControl+Shift+S' with caret; 'Shortcut is active.' + modifier helper."
+ },
+ "SADV-020": {
+  "screens": "orig-settings-tab-config-advanced-page-desktop",
+  "visual": "'Run onboarding again' section with bordered 'Run again' button ('Open a new setup chat...')."
+ },
+ "SADV-012": {
+  "screens": "orig-settings-tab-config-advanced-page-desktop",
+  "visual": "'In-App Update Local Changes' dropdown 'Stash' (keep local source edits vs discard; terminal updates always ask)."
+ },
+ "SKEY-002": {
+  "screens": "orig-settings-tab-config-voice-page-conversation,orig-settings-tab-config-voice-page-transcription,orig-settings-tab-config-voice-page-speech,orig-settings-tab-keybinds-page-hud-gesture",
+  "visual": "HUD gesture page: 'Tap to summon HUD' heading + explainer (tap \u2318+Option / Ctrl+Alt; Off by default; device-only); toggle OFF."
+ },
+ "SADV-007": {
+  "screens": "orig-settings-tab-config-advanced-page-runtime",
+  "visual": "Max Agent Steps text input placeholder 'Not set' ('Upper bound for tool-calling turns before Hermes stops a run.')."
+ },
+ "SADV-008": {
+  "screens": "orig-settings-tab-config-advanced-page-runtime",
+  "visual": "API Retries text input value '3'."
+ },
+ "SADV-009": {
+  "screens": "orig-settings-tab-config-advanced-page-runtime",
+  "visual": "Service Tier dropdown '(none)' + helper 'fast = always, auto = first N seconds of each turn, cold = first turn only'."
+ },
+ "SADV-010": {
+  "screens": "orig-settings-tab-config-advanced-page-tools",
+  "visual": "Tool-Use Enforcement input 'auto'."
+ },
+ "SADV-001": {
+  "screens": "orig-settings-tab-config-advanced-page-tools",
+  "visual": "Enabled Toolsets input 'hermes-cli' (single-line combo, no chips list rendered)."
+ },
+ "SADV-002": {
+  "screens": "orig-settings-tab-config-advanced-page-terminal",
+  "visual": "Execution Backend dropdown 'Local'."
+ },
+ "SADV-003": {
+  "screens": "orig-settings-tab-config-advanced-page-terminal",
+  "visual": "Command Timeout input '180'."
+ },
+ "SADV-004": {
+  "screens": "orig-settings-tab-config-advanced-page-terminal",
+  "visual": "Four container-image rows (Docker/Singularity/Modal/Daytona) each with mono-ish truncated image text 'nousresearch/hermes-sandb\u2026' / 'docker://nousresearch/herme\u2026'."
+ },
+ "SADV-011": {
+  "screens": "orig-settings-tab-config-advanced-page-delegation",
+  "visual": "Subagents page: Model 'Not set', Provider 'Not set', Turn Limit '250', Parallel Subagents '10', Timeout '0', Reasoning Effort '(none)' dropdown."
+ },
+ "SADV-005": {
+  "screens": "orig-settings-tab-config-advanced-page-output",
+  "visual": "Terminal Output Limit 50000, File Page Limit 2000, Line Length Limit 2000 numeric inputs."
+ },
+ "SADV-006": {
+  "screens": "orig-settings-tab-config-advanced-page-output",
+  "visual": "Checkpoint Limit input '20'."
+ },
+ "SPRV-006": {
+  "screens": "orig-settings-tab-providers",
+  "visual": "Providers > Accounts page: 'Connect an account' heading (key icon), 'Have an API key instead?' link, Nous Portal card w/ blue RECOMMENDED badge ('One subscription, 300+ frontier models'), 'Run models locally' row, collapsed 'Other providers \u2304'."
+ },
+ "MODL-023": {
+  "screens": "orig-settings-tab-providers",
+  "visual": "'Run models locally' row (No account needed \u2014 download a model and run it on this machine) + Local Models sub-item in Providers nav."
+ },
+ "SPRV-001": {
+  "screens": "orig-settings-tab-providers",
+  "visual": "Providers > Accounts selected; other provider groups hidden behind 'Other providers' collapse \u2014 no sign-in buttons rendered, full-width clickable card rows."
+ },
+ "SPRV-002": {
+  "screens": "orig-settings-tab-providers",
+  "visual": "'API keys' sub-item present under Providers (not opened); 'Have an API key instead?' link on Accounts page."
+ },
+ "SPRV-003": {
+  "screens": "orig-settings-tab-providers",
+  "visual": "'Custom Endpoints' sub-item present under Providers (not opened)."
+ },
+ "SGTW-001": {
+  "screens": "orig-settings-tab-gateway-page-connection",
+  "visual": "Connection mode: 4 selectable cards - Local gateway (selected: blue border+check), Hermes Cloud, Remote gateway (plug icon+\u24d8), Connect via SSH (terminal icon+\u24d8); buttons 'Save for next restart' (ghost) + 'Save and reconnect' (blue primary)."
+ },
+ "SGTW-006": {
+  "screens": "orig-settings-tab-gateway-page-connection",
+  "visual": "'Encrypt saved secrets with the OS keychain' section + long explainer; toggle OFF."
+ },
+ "SGTW-012": {
+  "screens": "orig-settings-tab-gateway-page-connection",
+  "visual": "Diagnostics section: 'Reveal desktop.log in your file manager' + 'Open logs' link with document icon."
+ },
+ "RMT-013": {
+  "screens": "orig-settings-tab-gateway-page-devices",
+  "visual": "Gateways > Saved connections: 'This device' row (monitor icon) with pills Current (blue)/Primary/App-managed + 'Test' button; '+ Add connection' button; toggle 'At startup, return to Sessions on the last-used gateway' OFF."
+ },
+ "RMT-015": {
+  "screens": "orig-settings-tab-gateway-page-devices",
+  "visual": "'Current' health-style badge on This device row; disclosure text that profiles/chats/messaging/cron stay with their gateway."
+ },
+ "SGTW-007": {
+  "screens": "orig-settings-tab-gateway-page-devices",
+  "visual": "Saved connections registry page with Devices-style device row and Add connection flow."
+ },
+ "UPD-006": {
+  "screens": "orig-settings-tab-gateway-page-managed-updates",
+  "visual": "Remote updates page empty state: 'Managed updates' + helper 'Add an SSH connection in Saved connections to manage its updates here.'"
+ },
+ "SKEY-003": {
+  "screens": "orig-settings-tab-keybinds-page-screen-capture",
+  "visual": "Screen-capture page: breadcrumb only, content pane completely empty (no shortcut control rendered \u2014 unsure if intentionally blank or load issue)."
+ },
+ "SVLT-001": {
+  "screens": "orig-settings-tab-vault-page-credentials",
+  "visual": "Passwords & Logins > Saved credentials: '+ Add' button top-right; explainer about agent sign-ins (passwords encrypted on machine, model never sees them); empty state 'Nothing saved yet' + helper."
+ },
+ "SVLT-002": {
+  "screens": "orig-settings-tab-vault-page-credentials",
+  "visual": "'+ Add' button (~1277,108) to enter a credential ahead of time."
+ },
+ "SPRV-005": {
+  "screens": "orig-settings-tab-vault-page-sources,orig-settings-tab-keys",
+  "visual": "Tools & Keys > Tools: flat alphabetized uppercase tool-key rows (AGENT BROWSER ENGINE, BRAVE SEARCH, BROWSER USE, BROWSERBASE, BROWSERBASE PROJECT ID, BRV, CAMOFOX, ... ELEVENLABS, EXA, FAL...) w/ periwinkle dot + right 'Paste X key'/'Optional'/'https://\u2026' placeholders; borderless inputs, no eye ..."
+ },
+ "SVLT-005": {
+  "screens": "orig-settings-tab-vault-page-sources",
+  "visual": "Vault sources = Password managers page: detection status rows without toggles/inputs."
+ },
+ "SNOT-001": {
+  "screens": "orig-settings-tab-notifications-page-alerts",
+  "visual": "'Enable notifications' toggle ON (/Off silences every notification below)."
+ },
+ "SNOT-002": {
+  "screens": "orig-settings-tab-notifications-page-alerts",
+  "visual": "'Approval needed' toggle ON."
+ },
+ "SNOT-003": {
+  "screens": "orig-settings-tab-notifications-page-alerts",
+  "visual": "'Input needed' toggle ON."
+ },
+ "SNOT-004": {
+  "screens": "orig-settings-tab-notifications-page-alerts",
+  "visual": "'Response ready' toggle ON ('A turn finished while Hermes was in the background.'), footnote about background-only alerts."
+ },
+ "SNOT-005": {
+  "screens": "orig-settings-tab-notifications-page-alerts",
+  "visual": "'Turn failed' toggle ON."
+ },
+ "SNOT-006": {
+  "screens": "orig-settings-tab-notifications-page-alerts",
+  "visual": "'Background task finished' toggle ON."
+ },
+ "SNOT-007": {
+  "screens": "orig-settings-tab-notifications-page-alerts",
+  "visual": "'Credit alerts' toggle ON."
+ },
+ "SNOT-008": {
+  "screens": "orig-settings-tab-notifications-page-alerts",
+  "visual": "'Plugin notifications' toggle ON."
+ },
+ "NOTI-011": {
+  "screens": "orig-settings-tab-notifications-page-alerts",
+  "visual": "Notifications > Desktop alerts page: 8 toggle rows all ON + 'Send test notification' outlined button."
+ },
+ "SNOT-009": {
+  "screens": "orig-settings-tab-notifications-page-sounds",
+  "visual": "Completion Sound select 'Two-note comfort' + 'Preview' play button."
+ },
+ "NOTI-010": {
+  "screens": "orig-settings-tab-notifications-page-sounds",
+  "visual": "Completion sound preset picker with preview affordance."
+ },
+ "SBIL-001": {
+  "screens": "orig-settings-tab-billing",
+  "visual": "Billing > Overview signed-out: 'Connect your Nous account' info banner w/ 'Sign in' button; stat row Balance/Plan/Auto-refill each '\u2014'."
+ },
+ "SBIL-003": {
+  "screens": "orig-settings-tab-billing",
+  "visual": "Auto-refill stat placeholder (control only after sign-in; no rendered control)."
+ },
+ "SSES-003": {
+  "screens": "orig-settings-tab-sessions-page-archived",
+  "visual": "Sessions > Archive & retention: Archived sessions list empty state 'Nothing archived' + 'Archive a chat to hide it here.'"
+ },
+ "SSES-001": {
+  "screens": "orig-settings-tab-sessions-page-archived",
+  "visual": "'Auto-archive stale chats' toggle OFF ('Pinned chats are never archived...'); archived-section explainer mentions Alt/\u2325+Shift-click to archive."
+ },
+ "SSES-002": {
+  "screens": "orig-settings-tab-sessions-page-default-directory",
+  "visual": "Sessions > Default project folder: 'Not set' + helper path to hermes-parity-parity-lboJbm scratch; right-aligned 'Choose' button w/ folder-open icon ('New sessions start in this folder...')."
+ },
+ "SPLG-001": {
+  "screens": "orig-settings-tab-plugins",
+  "visual": "Plugins page: single 'No plugin has settings yet.' empty-state line; helper describes per-plugin pages."
+ },
+ "SPLG-003": {
+  "screens": "orig-settings-tab-plugins",
+  "visual": "'Manage plugins \u2192' outlined button top-right (install/manage affordance); no inline install buttons."
+ },
+ "SABT-001": {
+  "screens": "orig-settings-tab-about-page-updates",
+  "visual": "About > Version & updates: updates card with error 'We couldn't reach the update server.' (pink/red), 'Check now' underlined button + 'Last checked 2 min ago', 'Release notes' link."
+ },
+ "UPD-005": {
+  "screens": "orig-settings-tab-about-page-updates",
+  "visual": "Update check failing against backend: red error card explains source-update completion failed / 'hermes pm repair'."
+ },
+ "SABT-003": {
+  "screens": "orig-settings-tab-about-page-updates",
+  "visual": "Identity block: app name 'Hermes' + 'Version 0.22.1+683'; details table Version/Commit(848fc0ad8be766)/Build Origin 'Local'/Distribution 'Source + hermes desktop'/Install ID."
+ },
+ "SABT-002": {
+  "screens": "orig-settings-tab-about-page-updates",
+  "visual": "No update-channel selector visible on Version & updates page (unsure where channel control lives)."
+ },
+ "SABT-004": {
+  "screens": "orig-settings-tab-about-page-uninstall",
+  "visual": "About > Uninstall: pale-pink danger card 'Uninstall Hermes' + 'Choose how much to remove...'; single clickable row trash icon 'Uninstall Chat GUI only' ('Remove this desktop app. The Hermes agent, your config, and chats all stay.'); no other options rendered."
+ },
+ "SABT-005": {
+  "screens": "orig-settings-tab-about-page-updates,orig-settings-tab-about-page-uninstall",
+  "visual": "unsure: no credits/open-source-licenses control visible on Version & updates or Uninstall pages."
+ },
+ "SKEY-001": {
+  "screens": "orig-settings-tab-keybinds-page-shortcuts",
+  "visual": "Key bindings: rebind hint + Ctrl+/, '\u21ba Reset all', 'Search shortcuts\u2026'; sections COMPOSER (17 rows: /\u23ce, Ctrl Shift M, Alt V, dictation+reasoning 'set' chips, \u23ce, Shift\u23ce, Ctrl\u23ce, Ctrl Shift K, @, /, ?, \u2191\u2193, Esc, Ctrl L as keycap chips) and PROFILES (Ctrl D, Ctrl 1/2)."
+ }
+}
