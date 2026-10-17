@@ -5,8 +5,8 @@
 //! Always allow, by click and by keyboard), a long (600-message) conversation, and the
 //! settings panel (registry nav, "Applies to" profile scope, saving, persistence, search).
 //!
-//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings` runs a subset. The
-//! `long` section
+//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings,scheduled` runs a subset.
+//! The `long` section
 //! needs a seeded session: `HERMES_HOME=<private home> scripts/seed-long-session.py 600`. The
 //! `sessions` section (open / switch / new chat / Ctrl+Tab, continue an old chat, switch while
 //! streaming) needs three small labelled ones:
@@ -36,7 +36,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use hermes_ui::{AppState, AppWindow, SettingsState};
+use hermes_core::cron::{self, CronJob, CronJobCreate, CronRun};
+use hermes_core::http::Rest;
+use hermes_ui::{AppState, AppWindow, ScheduledState, SettingsState};
 use i_slint_backend_testing::ElementHandle;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, Model, SharedString};
@@ -279,7 +281,7 @@ async fn approval_case(ui: &AppWindow, dir: &str, act: Option<Act>) -> Case {
     c
 }
 
-async fn script(ui: slint::Weak<AppWindow>, log: Log) {
+async fn script(ui: slint::Weak<AppWindow>, log: Log, handle: tokio::runtime::Handle) {
     let ui = ui.upgrade().expect("window");
     let st = ui.global::<AppState>();
 
@@ -319,6 +321,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("settings") {
         settings_section(&ui, &log).await;
+    }
+    if want("scheduled") {
+        scheduled_section(&ui, &log, &handle).await;
     }
 }
 
@@ -1591,6 +1596,256 @@ async fn settings_section(ui: &AppWindow, log: &Log) {
     sleep(200).await;
 }
 
+// ── Scheduled panel (cron) ───────────────────────────────────────────────────────────────
+
+/// One REST round trip against the private backend, run on the app's tokio runtime (the Slint
+/// event-loop thread has no reactor of its own). The panel talks to exactly these routes, so
+/// the checks below verify the UI's actions independently of the UI.
+async fn rest_do<T, F>(handle: &tokio::runtime::Handle, op: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce(Rest) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, String>> + Send>> + Send + 'static,
+{
+    let port: u16 = std::env::var("HERMES_DESKTOP_PORT")
+        .map_err(|e| e.to_string())?
+        .parse()
+        .map_err(|e: std::num::ParseIntError| e.to_string())?;
+    handle
+        .spawn(async move {
+            let token = hermes_core::backend::fetch_token("127.0.0.1", port)
+                .await
+                .map_err(|e| e.to_string())?;
+            op(Rest::new("127.0.0.1", port, token)).await
+        })
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+async fn cron_jobs_via_rest(handle: &tokio::runtime::Handle) -> Result<Vec<CronJob>, String> {
+    rest_do(handle, |rest| {
+        Box::pin(async move { cron::list_jobs(&rest, "all").await.map_err(|e| e.to_string()) })
+    })
+    .await
+}
+
+async fn cron_runs_via_rest(handle: &tokio::runtime::Handle, job_id: &str) -> Result<Vec<CronRun>, String> {
+    let job_id = job_id.to_owned();
+    rest_do(handle, move |rest| {
+        Box::pin(async move { cron::list_runs(&rest, &job_id, 20).await.map_err(|e| e.to_string()) })
+    })
+    .await
+}
+
+async fn cron_create_via_rest(handle: &tokio::runtime::Handle, body: CronJobCreate) -> Result<CronJob, String> {
+    rest_do(handle, move |rest| {
+        Box::pin(async move { cron::create_job(&rest, "all", &body).await.map_err(|e| e.to_string()) })
+    })
+    .await
+}
+
+async fn cron_delete_via_rest(handle: &tokio::runtime::Handle, job_id: &str) -> Result<(), String> {
+    let job_id = job_id.to_owned();
+    rest_do(handle, move |rest| {
+        Box::pin(async move { cron::delete_job(&rest, &job_id).await.map_err(|e| e.to_string()) })
+    })
+    .await
+}
+
+/// The Scheduled panel end to end against the private backend: the list *is* the backend's
+/// `/api/cron/jobs`, run history comes from `/runs`, and create / run-now / pause / resume /
+/// delete all round-trip through the scheduler's own store (verified over REST afterwards).
+///
+/// The run-now check uses a script-only job (`no_agent`) whose script lives in the private
+/// home's `scripts/` sandbox: it exercises a real run without spending a model call.
+async fn scheduled_section(ui: &AppWindow, log: &Log, handle: &tokio::runtime::Handle) {
+    let s = ui.global::<ScheduledState>();
+    let home = live_home();
+    let scripts = std::path::Path::new(&home).join("scripts");
+    std::fs::create_dir_all(&scripts).expect("private scripts dir");
+    let script_path = scripts.join("live-cron-ok.sh");
+    std::fs::write(&script_path, "#!/bin/sh\necho live-cron-ok\n").expect("write script");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    }
+
+    // A script-only job the panel must find and run (never an agent run: no model call).
+    let scripted = match cron_create_via_rest(
+        handle,
+        CronJobCreate {
+            name: Some("live-cron-script".into()),
+            schedule: "0 4 * * *".into(),
+            deliver: Some("local".into()),
+            no_agent: true,
+            script: Some("live-cron-ok.sh".into()),
+            ..Default::default()
+        },
+    )
+    .await
+    {
+        Ok(job) => job,
+        Err(e) => {
+            record(log, "scheduled: REST fixture (script-only job)", false, e);
+            return;
+        }
+    };
+    let rest_list = cron_jobs_via_rest(handle).await.unwrap_or_default();
+
+    // ── Opening the panel lists the backend's jobs ───────────────────────────────
+    s.set_open(true);
+    let listed = wait_until(20, || {
+        s.get_jobs().iter().any(|j| j.title.as_str() == "live-cron-script")
+    })
+    .await;
+    let rows: Vec<hermes_ui::CronItem> = s.get_jobs().iter().collect();
+    record(
+        log,
+        "scheduled: panel lists the backend's jobs",
+        listed && s.get_job_count() as usize == rest_list.len(),
+        format!(
+            "opened={}; panel rows={:?}; REST count={} (panel header {})",
+            s.get_open(),
+            rows.iter().map(|r| r.title.to_string()).collect::<Vec<_>>(),
+            rest_list.len(),
+            s.get_job_count()
+        ),
+    );
+
+    // ── Selecting a job shows its schedule, delivery and state ───────────────────
+    s.invoke_select(scripted.id.clone().into());
+    let detailed = wait_until(20, || {
+        s.get_title().as_str() == "live-cron-script" && !s.get_frequency().is_empty()
+    })
+    .await;
+    record(
+        log,
+        "scheduled: detail shows schedule, delivery and state",
+        detailed && s.get_deliver().as_str() == "This desktop" && s.get_state().as_str() == "scheduled",
+        format!(
+            "title={:?} frequency={:?} state={:?} deliver={:?} next={:?} ({}) last={:?}",
+            s.get_title(),
+            s.get_frequency(),
+            s.get_state(),
+            s.get_deliver(),
+            s.get_next_run(),
+            s.get_next_label(),
+            s.get_last_run()
+        ),
+    );
+
+    // ── Run now: the scheduler really runs it and the run lands in the history ───
+    s.invoke_trigger();
+    let ran = wait_until(60, || !s.get_runs().iter().collect::<Vec<_>>().is_empty()).await;
+    let runs: Vec<hermes_ui::CronRunItem> = s.get_runs().iter().collect();
+    let rest_runs = cron_runs_via_rest(handle, &scripted.id).await.unwrap_or_default();
+    record(
+        log,
+        "scheduled: Run now produces a run in the history",
+        ran && !rest_runs.is_empty() && !s.get_busy(),
+        format!(
+            "panel rows={:?}; backend runs={:?}",
+            runs.iter()
+                .map(|r| (r.title.to_string(), r.when.to_string(), r.openable))
+                .collect::<Vec<_>>(),
+            rest_runs
+                .iter()
+                .map(|r| (
+                    r.title.clone().unwrap_or_default(),
+                    r.source.clone().unwrap_or_default()
+                ))
+                .collect::<Vec<_>>()
+        ),
+    );
+
+    // ── Pause / resume round-trip through the scheduler ─────────────────────────
+    s.invoke_toggle_pause();
+    let paused = wait_until(20, || s.get_state().as_str() == "paused").await;
+    let state_after_pause = match cron_jobs_via_rest(handle).await {
+        Ok(jobs) => jobs
+            .iter()
+            .find(|j| j.id == scripted.id)
+            .map(cron::job_state)
+            .unwrap_or_default(),
+        Err(e) => format!("<{e}>"),
+    };
+    s.invoke_toggle_pause();
+    let resumed = wait_until(20, || s.get_state().as_str() == "scheduled").await;
+    record(
+        log,
+        "scheduled: Pause and Resume change the backend's job",
+        paused && resumed && state_after_pause == "paused",
+        format!("panel paused={paused} → resumed={resumed}; backend state while paused={state_after_pause:?}"),
+    );
+
+    // ── The editor creates a job the backend (and so any other machine) sees ─────
+    s.invoke_start_new();
+    let editor = wait_until(10, || s.get_editor_open()).await;
+    s.set_editor_name("live-cron-editor".into());
+    s.set_editor_schedule("30 6 * * *".into());
+    s.set_editor_prompt("Say hello from the Rust Scheduled panel.".into());
+    s.invoke_editor_save();
+    let created = wait_until(20, || {
+        !s.get_editor_open() && s.get_jobs().iter().any(|j| j.title.as_str() == "live-cron-editor")
+    })
+    .await;
+    let stored = cron_jobs_via_rest(handle)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .find(|j| j.name.as_deref() == Some("live-cron-editor"));
+    let stored_ok = stored.as_ref().is_some_and(|j| {
+        j.schedule.as_ref().and_then(|s| s.expr.as_deref()) == Some("30 6 * * *")
+            && j.prompt.as_deref().unwrap_or("").contains("Rust Scheduled panel")
+            && j.deliver.as_deref() == Some("local")
+    });
+    let stored_detail = stored.as_ref().map(|j| {
+        (
+            j.id.clone(),
+            j.name.clone(),
+            j.schedule_display.clone(),
+            j.prompt.clone(),
+            j.deliver.clone(),
+        )
+    });
+    record(
+        log,
+        "scheduled: editor creates a job on the backend",
+        editor && created && stored_ok,
+        format!("editor opened={editor}; row appeared={created}; backend job={stored_detail:?}"),
+    );
+    let editor_job_id = stored.map(|j| j.id).unwrap_or_default();
+
+    // ── Delete removes it from the backend ──────────────────────────────────────
+    s.invoke_select(scripted.id.clone().into());
+    sleep(200).await;
+    s.invoke_delete_requested();
+    let armed = s.get_delete_armed();
+    s.invoke_delete_confirm();
+    let deleted = wait_until(20, || {
+        s.get_jobs().iter().all(|j| j.title.as_str() != "live-cron-script")
+    })
+    .await;
+    let gone = cron_jobs_via_rest(handle)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .all(|j| j.id != scripted.id);
+    record(
+        log,
+        "scheduled: delete removes the job",
+        armed && deleted && gone,
+        format!("first click armed={armed}; row gone={deleted}; gone from the backend={gone}"),
+    );
+
+    // Clean up the editor-created job (the private backend only).
+    if !editor_job_id.is_empty() {
+        let _ = cron_delete_via_rest(handle, &editor_job_id).await;
+    }
+    s.set_open(false);
+    sleep(200).await;
+}
+
 #[test]
 #[ignore = "needs a running Hermes backend (HERMES_DESKTOP_PORT); see module docs"]
 fn live_backend() {
@@ -1627,8 +1882,9 @@ fn live_backend() {
 
     let log: Log = Rc::default();
     let (w, l) = (ui.as_weak(), log.clone());
+    let handle = rt.handle().clone();
     slint::spawn_local(async move {
-        script(w, l).await;
+        script(w, l, handle).await;
         let _ = slint::quit_event_loop();
     })
     .unwrap();

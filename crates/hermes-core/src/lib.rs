@@ -12,8 +12,11 @@
 //! * [`highlight`] — syntect-backed code highlighting on a background thread, with a
 //!   bounded content-keyed cache and per-stream checkpoint resume.
 //! * [`sessions`] — session-list grouping helpers.
+//! * [`cron`] — scheduled jobs: the `/api/cron/*` REST surface plus the pure label logic
+//!   the Scheduled panel renders (title, state, delivery, error summary).
 
 pub mod backend;
+pub mod cron;
 pub mod diff;
 pub mod highlight;
 pub mod http;

@@ -10,5 +10,7 @@ slint::include_modules!();
 pub mod controller;
 pub mod perf;
 pub mod rows;
+/// Time/label glue for the Scheduled panel (chrono stays out of `hermes-core`).
+pub mod scheduled;
 
 pub use controller::{Cmd, start};

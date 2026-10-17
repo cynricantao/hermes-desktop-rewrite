@@ -63,7 +63,28 @@ impl Rest {
         self.send("POST", path, Some(body)).await
     }
 
+    pub async fn delete(&self, path: &str) -> Result<Value, HttpError> {
+        self.send("DELETE", path, None).await
+    }
+
+    /// `post` with an explicit timeout. The cron trigger endpoint intentionally waits for the
+    /// whole job (minutes for an agent job), so it cannot use the client's default 10 s.
+    pub async fn post_slow(&self, path: &str, body: &Value, timeout: Duration) -> Result<Value, HttpError> {
+        self.send_with_timeout("POST", path, Some(body), timeout).await
+    }
+
     async fn send(&self, method: &str, path: &str, body: Option<&Value>) -> Result<Value, HttpError> {
+        self.send_with_timeout(method, path, body, Duration::from_secs(10))
+            .await
+    }
+
+    async fn send_with_timeout(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&Value>,
+        timeout: Duration,
+    ) -> Result<Value, HttpError> {
         let payload = body.map(|b| b.to_string()).unwrap_or_default();
         let mut req = format!(
             "{method} {path} HTTP/1.1\r\nHost: {}:{}\r\nConnection: close\r\nAccept: application/json\r\nX-Hermes-Session-Token: {}\r\n",
@@ -90,7 +111,7 @@ impl Rest {
                 .map_err(|e| HttpError::Io(e.to_string()))?;
             Ok::<_, HttpError>(buf)
         };
-        let raw = tokio::time::timeout(Duration::from_secs(10), fut)
+        let raw = tokio::time::timeout(timeout, fut)
             .await
             .map_err(|_| HttpError::Timeout)??;
         let (status, body) = parse_response(&raw)?;

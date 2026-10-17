@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use hermes_core::backend::{self, ManagedBackend};
+use hermes_core::cron::{self, CronDeliveryTarget, CronJob, CronJobCreate, CronRun};
 use hermes_core::http::{Rest, profile_query};
 use hermes_core::prefs::Prefs;
 use hermes_core::projects::{self, Project, ProjectList};
@@ -21,9 +22,11 @@ use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
 use tokio::sync::mpsc;
 
 use crate::rows::to_row;
+use crate::scheduled as cron_time;
 use crate::{
-    AppState, AppWindow, ApprovalInfo, ChatRow, ModelItem, NavEntry, ProjectItem, ProjectState, ScopeChip, SearchHit,
-    SessionItem, SettingRowUI, SettingsState, Theme,
+    AppState, AppWindow, ApprovalInfo, ChatRow, CronDeliverItem, CronItem, CronModelItem, CronRunItem, ModelItem,
+    NavEntry, ProjectItem, ProjectState, ScheduledState, ScopeChip, SearchHit, SessionItem, SettingRowUI,
+    SettingsState, Theme,
 };
 
 /// Commands from the UI thread to the controller.
@@ -64,6 +67,8 @@ pub enum Cmd {
         choice: String,
     },
     Settings(SettingsCmd),
+    /// Scheduled panel (cron jobs): one intent per UI interaction.
+    Scheduled(ScheduledCmd),
 }
 
 /// Settings-panel intents from the UI (see `ui/settings.slint`).
@@ -96,6 +101,56 @@ pub enum SettingsCmd {
     Export,
     Import,
     Reset,
+}
+
+/// Scheduled-panel intents from the UI (see `ui/scheduled.slint`). Everything here is a
+/// REST conversation with the backend (`hermes_core::cron`), never a local store.
+#[derive(Debug, Clone)]
+pub enum ScheduledCmd {
+    /// The panel opened (sidebar row or the dev hook): load jobs, targets, blueprints.
+    Opened,
+    Closed,
+    Select(String),
+    Search(String),
+    Refresh,
+    /// Pause ⇄ resume the selected job.
+    TogglePause,
+    /// "Run now": fires the job and refreshes, without blocking the UI.
+    Trigger,
+    /// A completed trigger, sent by its spawned task.
+    TriggerDone {
+        error: Option<String>,
+    },
+    /// First click on Delete arms the confirmation.
+    DeleteArmed,
+    DeleteConfirm,
+    StartNew,
+    StartEdit,
+    /// Open a run's transcript (Claude-style: the run is a session).
+    OpenRun(String),
+    DismissError,
+    EditorClose,
+    EditorSave,
+    /// A schedule preset chip ("0 9 * * *" …).
+    Preset(String),
+    ToggleDeliver {
+        id: String,
+        checked: bool,
+    },
+    ChooseModel(String),
+}
+
+/// Scheduled-panel editor state (create when `id` is empty). `hermes_core::cron::CronJob` is
+/// the source for everything else; this holds only what the form needs.
+#[derive(Debug, Clone, Default)]
+struct CronEditor {
+    id: String,
+    /// Script-only job: the prompt field edits the stored script, no model override.
+    script_only: bool,
+    /// Checked delivery target ids.
+    delivers: Vec<String>,
+    /// `provider\u{1f}model`; empty = follow the main model.
+    model_key: String,
 }
 
 /// Minimum interval between UI patches while streaming (≈ one 120 Hz frame). Deltas
@@ -250,6 +305,82 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
         let _ = t.send(Cmd::Settings(SettingsCmd::Reset));
     });
 
+    // Scheduled panel (cron jobs). Every callback is one intent; the controller does the
+    // REST work and republishes the panel.
+    let c = ui.global::<ScheduledState>();
+    let t = tx.clone();
+    c.on_opened(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::Opened));
+    });
+    let t = tx.clone();
+    c.on_closed(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::Closed));
+    });
+    let t = tx.clone();
+    c.on_select(move |id| {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::Select(id.into())));
+    });
+    let t = tx.clone();
+    c.on_search(move |q| {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::Search(q.into())));
+    });
+    let t = tx.clone();
+    c.on_refresh(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::Refresh));
+    });
+    let t = tx.clone();
+    c.on_toggle_pause(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::TogglePause));
+    });
+    let t = tx.clone();
+    c.on_trigger(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::Trigger));
+    });
+    let t = tx.clone();
+    c.on_delete_requested(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::DeleteArmed));
+    });
+    let t = tx.clone();
+    c.on_delete_confirm(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::DeleteConfirm));
+    });
+    let t = tx.clone();
+    c.on_start_new(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::StartNew));
+    });
+    let t = tx.clone();
+    c.on_start_edit(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::StartEdit));
+    });
+    let t = tx.clone();
+    c.on_open_run(move |id| {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::OpenRun(id.into())));
+    });
+    let t = tx.clone();
+    c.on_dismiss_error(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::DismissError));
+    });
+    let t = tx.clone();
+    c.on_editor_close(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::EditorClose));
+    });
+    let t = tx.clone();
+    c.on_editor_save(move || {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::EditorSave));
+    });
+    let t = tx.clone();
+    c.on_preset(move |expr| {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::Preset(expr.into())));
+    });
+    let t = tx.clone();
+    c.on_toggle_deliver(move |id, checked| {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::ToggleDeliver { id: id.into(), checked }));
+    });
+    let t = tx.clone();
+    c.on_choose_model(move |key| {
+        let _ = t.send(Cmd::Scheduled(ScheduledCmd::ChooseModel(key.into())));
+    });
+
     ui.global::<AppState>()
         .set_greeting(greeting_for_hour(local_hour()).into());
     ui.global::<AppState>().set_user_name(user_name().into());
@@ -347,6 +478,22 @@ struct Controller {
     settings_hit: String,
     /// Set while a Reset click is waiting for its confirmation click.
     reset_armed: bool,
+    // ── Scheduled panel (cron) ────────────────────────────────────────────────────────────
+    /// Jobs exactly as the backend last returned them; the list shows a filtered view.
+    cron_jobs: Vec<CronJob>,
+    /// Runs of `cron_runs_job` (the selected job).
+    cron_runs: Vec<CronRun>,
+    cron_runs_job: String,
+    cron_selected: String,
+    cron_query: String,
+    /// Panel open: drives the poll timer and the `cron.changed` reaction.
+    cron_open: bool,
+    /// A trigger is in flight (its spawned task reports back with `TriggerDone`).
+    cron_busy: bool,
+    cron_targets: Vec<CronDeliveryTarget>,
+    cron_blueprints: Vec<CronItem>,
+    cron_editor: Option<CronEditor>,
+    cron_editor_error: String,
 }
 
 impl Controller {
@@ -405,6 +552,17 @@ impl Controller {
             settings_page: ("appearance".into(), "general".into()),
             settings_hit: String::new(),
             reset_armed: false,
+            cron_jobs: Vec::new(),
+            cron_runs: Vec::new(),
+            cron_runs_job: String::new(),
+            cron_selected: String::new(),
+            cron_query: String::new(),
+            cron_open: false,
+            cron_busy: false,
+            cron_targets: Vec::new(),
+            cron_blueprints: Vec::new(),
+            cron_editor: None,
+            cron_editor_error: String::new(),
         };
         ui(&weak, |w| {
             let st = w.global::<AppState>();
@@ -462,9 +620,26 @@ impl Controller {
         {
             c.send(p).await;
         }
+        // Dev/screenshot hook: open the Scheduled panel once connected. "new" opens the
+        // create editor instead of a job's detail.
+        if let Ok(v) = std::env::var("HERMES_DESKTOP_OPEN_SCHEDULED")
+            && !v.trim().is_empty()
+        {
+            ui(&weak, |w| w.global::<ScheduledState>().set_open(true));
+            c.scheduled_open().await;
+            if v.trim() == "new" {
+                c.scheduled_new();
+            }
+        }
 
         let mut tick = tokio::time::interval(FRAME);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        // Scheduled panel backstop: the backend broadcasts `cron.changed` for job edits and
+        // every scheduler tick, so this is a slow reconciliation while the panel is open —
+        // and fully stopped while it is closed (idle CPU stays 0 %).
+        let mut cron_tick = tokio::time::interval(Duration::from_secs(15));
+        cron_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        let mut cron_ticks: u64 = 0;
         loop {
             tokio::select! {
                 cmd = cmds.recv() => match cmd {
@@ -478,6 +653,15 @@ impl Controller {
                         break;
                     }
                 },
+                _ = cron_tick.tick(), if c.cron_open => {
+                    cron_ticks += 1;
+                    // Runs refresh every tick; the job list every fourth (a minute).
+                    if cron_ticks % 4 == 1 {
+                        c.scheduled_refresh(false).await;
+                    } else {
+                        c.scheduled_reload_runs().await;
+                    }
+                }
                 _ = tick.tick(), if c.reset || !c.dirty.is_empty() => c.flush(),
             }
         }
@@ -690,6 +874,7 @@ impl Controller {
                 });
             }
             Cmd::Settings(cmd) => self.settings_cmd(cmd).await,
+            Cmd::Scheduled(cmd) => self.scheduled_cmd(cmd).await,
         }
     }
 
@@ -1549,6 +1734,13 @@ impl Controller {
                     self.refresh_projects(false).await;
                     return;
                 }
+                // The scheduler moved jobs.json (CRUD or a tick): reload the panel if open.
+                if e.kind == "cron.changed" {
+                    if self.cron_open {
+                        self.scheduled_refresh(true).await;
+                    }
+                    return;
+                }
                 // Only the open session's events touch the transcript.
                 if e.session_id.is_some() && e.session_id != self.session {
                     return;
@@ -1756,6 +1948,701 @@ impl Controller {
             s.set_home(home.into());
         });
     }
+
+    // ── Scheduled panel (cron) ────────────────────────────────────────────────────────────
+    //
+    // The backend's own `/api/cron/*` routes (hermes_core::cron) are the only source: the list,
+    // the run history, the actions and the editor read and write the same jobs.json the CLI and
+    // the scheduler use, so this build shows the truth against any backend it can reach.
+
+    async fn scheduled_cmd(&mut self, cmd: ScheduledCmd) {
+        match cmd {
+            ScheduledCmd::Opened => self.scheduled_open().await,
+            ScheduledCmd::Closed => {
+                self.cron_open = false;
+                self.cron_busy = false;
+                // The panel owns the editor: closing the panel closes the form with it.
+                if self.cron_editor.take().is_some() {
+                    ui(&self.weak, |w| {
+                        let s = w.global::<ScheduledState>();
+                        s.set_editor_open(false);
+                        s.set_editor_error(SharedString::new());
+                    });
+                }
+            }
+            ScheduledCmd::Select(id) => self.scheduled_select(id).await,
+            ScheduledCmd::Search(q) => {
+                self.cron_query = q;
+                self.publish_scheduled_list(false);
+                // A filtered list can drop the selected row; keep the detail in sync.
+                self.publish_scheduled_detail();
+            }
+            ScheduledCmd::Refresh => self.scheduled_refresh(true).await,
+            ScheduledCmd::TogglePause => self.scheduled_toggle_pause().await,
+            ScheduledCmd::Trigger => self.scheduled_trigger().await,
+            ScheduledCmd::TriggerDone { error } => {
+                self.cron_busy = false;
+                if let Some(e) = error {
+                    self.scheduled_error(format!("The job did not run: {e}"));
+                }
+                self.scheduled_refresh(true).await;
+            }
+            ScheduledCmd::DeleteArmed => {
+                ui(&self.weak, |w| w.global::<ScheduledState>().set_delete_armed(true));
+            }
+            ScheduledCmd::DeleteConfirm => self.scheduled_delete().await,
+            ScheduledCmd::StartNew => self.scheduled_new(),
+            ScheduledCmd::StartEdit => self.scheduled_edit(),
+            ScheduledCmd::OpenRun(id) => {
+                let openable = self.cron_runs.iter().any(|r| r.id == id && cron::run_is_openable(r));
+                if openable {
+                    self.cron_open = false;
+                    ui(&self.weak, |w| w.global::<ScheduledState>().set_open(false));
+                    self.open(id).await;
+                }
+            }
+            ScheduledCmd::DismissError => {
+                ui(&self.weak, |w| {
+                    w.global::<ScheduledState>().set_action_error(SharedString::new())
+                });
+            }
+            ScheduledCmd::EditorClose => {
+                self.cron_editor = None;
+                self.cron_editor_error.clear();
+                ui(&self.weak, |w| {
+                    let s = w.global::<ScheduledState>();
+                    s.set_editor_open(false);
+                    s.set_editor_error(SharedString::new());
+                });
+            }
+            ScheduledCmd::EditorSave => self.scheduled_save().await,
+            ScheduledCmd::Preset(expr) => {
+                ui(&self.weak, move |w| {
+                    w.global::<ScheduledState>().set_editor_schedule(expr.into())
+                });
+            }
+            ScheduledCmd::ToggleDeliver { id, checked } => {
+                if let Some(editor) = self.cron_editor.as_mut() {
+                    editor.delivers.retain(|t| t != &id);
+                    if checked {
+                        editor.delivers.push(id);
+                    }
+                    // The scheduler always delivers somewhere; an empty set means "local".
+                    if editor.delivers.is_empty() {
+                        editor.delivers.push(cron::DEFAULT_DELIVER.to_owned());
+                    }
+                }
+                self.publish_scheduled_editor();
+            }
+            ScheduledCmd::ChooseModel(key) => {
+                if let Some(editor) = self.cron_editor.as_mut() {
+                    editor.model_key = key;
+                }
+                self.publish_scheduled_editor();
+            }
+        }
+    }
+
+    /// Open (or re-open) the panel: refresh the list, then the selected job's detail.
+    async fn scheduled_open(&mut self) {
+        self.cron_open = true;
+        self.publish_scheduled_list(true);
+        self.scheduled_refresh(true).await;
+    }
+
+    /// Reload the job list, targets and blueprints from the backend; optionally reload the
+    /// selected job's runs. Selection survives a refresh when the job still exists.
+    async fn scheduled_refresh(&mut self, reload_runs: bool) {
+        let Some(rest) = self.rest() else {
+            return self.scheduled_error("The backend's REST API is unavailable.".into());
+        };
+        self.publish_scheduled_list(true);
+        match cron::list_jobs(&rest, "all").await {
+            Ok(jobs) => self.cron_jobs = jobs,
+            Err(e) => {
+                self.publish_scheduled_list(false);
+                return self.scheduled_error(format!("Could not load scheduled jobs: {e}"));
+            }
+        }
+        if self.cron_targets.is_empty()
+            && let Ok(targets) = cron::delivery_targets(&rest).await
+        {
+            self.cron_targets = targets;
+        }
+        if self.cron_blueprints.is_empty()
+            && let Ok(blueprints) = cron::blueprints(&rest, "default").await
+        {
+            self.cron_blueprints = blueprints
+                .iter()
+                .map(|b| CronItem {
+                    id: b.key.clone().into(),
+                    title: b.title.clone().into(),
+                    state: b.category.clone().into(),
+                    tone: 2,
+                    schedule: b.description.clone().into(),
+                })
+                .collect();
+        }
+        // Keep the selection when that job survives the reload; otherwise start at the top.
+        let selected_survives = self.cron_jobs.iter().any(|j| j.id == self.cron_selected);
+        if !selected_survives {
+            self.cron_selected = self.cron_jobs.first().map(|j| j.id.clone()).unwrap_or_default();
+            self.cron_runs.clear();
+            self.cron_runs_job.clear();
+            ui(&self.weak, |w| w.global::<ScheduledState>().set_delete_armed(false));
+        }
+        self.publish_scheduled_list(false);
+        self.publish_scheduled_detail();
+        if reload_runs {
+            self.scheduled_reload_runs().await;
+        } else {
+            self.publish_scheduled_runs(false);
+        }
+    }
+
+    async fn scheduled_select(&mut self, id: String) {
+        if id == self.cron_selected {
+            return;
+        }
+        self.cron_selected = id;
+        self.cron_runs.clear();
+        self.cron_runs_job.clear();
+        ui(&self.weak, |w| w.global::<ScheduledState>().set_delete_armed(false));
+        self.publish_scheduled_list(false);
+        self.publish_scheduled_detail();
+        self.scheduled_reload_runs().await;
+    }
+
+    /// Load the selected job's run history (the same rows the Electron panel lists).
+    async fn scheduled_reload_runs(&mut self) {
+        let id = self.cron_selected.clone();
+        if id.is_empty() {
+            self.cron_runs.clear();
+            self.publish_scheduled_runs(false);
+            return;
+        }
+        let Some(rest) = self.rest() else { return };
+        self.cron_runs_job = id.clone();
+        self.publish_scheduled_runs(true);
+        match cron::list_runs(&rest, &id, 20).await {
+            Ok(runs) => {
+                if self.cron_selected == id {
+                    self.cron_runs = runs;
+                }
+            }
+            Err(e) => tracing::warn!("cron runs for {id}: {e}"),
+        }
+        self.publish_scheduled_runs(false);
+    }
+
+    /// "Run now": the trigger endpoint waits for the whole job, so it runs in its own task and
+    /// reports back through the command channel. A timeout is not a failure — the scheduler may
+    /// still be running the job and the run shows up in the history.
+    async fn scheduled_trigger(&mut self) {
+        let id = self.cron_selected.clone();
+        if id.is_empty() || self.cron_busy {
+            return;
+        }
+        let Some(rest) = self.rest() else {
+            return self.scheduled_error("The backend's REST API is unavailable.".into());
+        };
+        self.cron_busy = true;
+        self.publish_scheduled_busy();
+        let tx = self.commands.clone();
+        tokio::spawn(async move {
+            let error = match cron::trigger_job(&rest, &id, Duration::from_secs(600)).await {
+                Ok(_) => None,
+                // The run is queued/running; the history below shows what happened.
+                Err(hermes_core::http::HttpError::Timeout) => None,
+                Err(e) => Some(e.to_string()),
+            };
+            let _ = tx.send(Cmd::Scheduled(ScheduledCmd::TriggerDone { error }));
+        });
+    }
+
+    async fn scheduled_toggle_pause(&mut self) {
+        let Some(job) = self.cron_jobs.iter().find(|j| j.id == self.cron_selected).cloned() else {
+            return;
+        };
+        let paused = cron::job_state(&job) == "paused";
+        let Some(rest) = self.rest() else { return };
+        self.cron_busy = true;
+        self.publish_scheduled_busy();
+        match cron::set_paused(&rest, &job.id, !paused).await {
+            Ok(_) => {
+                self.cron_busy = false;
+                self.scheduled_refresh(true).await;
+            }
+            Err(e) => {
+                self.cron_busy = false;
+                self.publish_scheduled_busy();
+                self.scheduled_error(format!(
+                    "Could not {} the job: {e}",
+                    if paused { "resume" } else { "pause" }
+                ));
+            }
+        }
+    }
+
+    async fn scheduled_delete(&mut self) {
+        let id = self.cron_selected.clone();
+        if id.is_empty() {
+            return;
+        }
+        let Some(rest) = self.rest() else { return };
+        self.cron_busy = true;
+        self.publish_scheduled_busy();
+        match cron::delete_job(&rest, &id).await {
+            Ok(()) => {
+                self.cron_busy = false;
+                self.cron_selected.clear();
+                self.cron_runs.clear();
+                self.cron_runs_job.clear();
+                ui(&self.weak, |w| w.global::<ScheduledState>().set_delete_armed(false));
+                self.scheduled_refresh(true).await;
+            }
+            Err(e) => {
+                self.cron_busy = false;
+                self.publish_scheduled_busy();
+                self.scheduled_error(format!("Could not delete the job: {e}"));
+            }
+        }
+    }
+
+    /// Open the editor for a brand-new job (the manual form, not a blueprint).
+    fn scheduled_new(&mut self) {
+        self.cron_editor = Some(CronEditor {
+            delivers: vec![cron::DEFAULT_DELIVER.to_owned()],
+            ..Default::default()
+        });
+        self.cron_editor_error.clear();
+        ui(&self.weak, |w| {
+            let s = w.global::<ScheduledState>();
+            s.set_editor_name(SharedString::new());
+            s.set_editor_schedule("0 9 * * *".into());
+            s.set_editor_prompt(SharedString::new());
+            s.set_editor_error(SharedString::new());
+        });
+        self.publish_scheduled_editor();
+    }
+
+    /// Open the editor on the selected job (script-only jobs edit their script).
+    fn scheduled_edit(&mut self) {
+        let Some(job) = self.cron_jobs.iter().find(|j| j.id == self.cron_selected).cloned() else {
+            return;
+        };
+        let script_only = cron::is_script_only(&job);
+        let model_key = match (&job.provider, &job.model) {
+            (Some(p), Some(m)) if !p.is_empty() && !m.is_empty() => model_key(p, m),
+            _ => match &job.model {
+                Some(m) if !m.is_empty() => model_key("", m),
+                _ => String::new(),
+            },
+        };
+        self.cron_editor = Some(CronEditor {
+            id: job.id.clone(),
+            script_only,
+            delivers: cron::deliver_targets(job.deliver.as_deref()),
+            model_key,
+        });
+        self.cron_editor_error.clear();
+        let name = job.name.clone().unwrap_or_default();
+        let schedule = cron::schedule_expr(&job);
+        let text = if script_only {
+            job.script.clone().unwrap_or_default()
+        } else {
+            job.prompt.clone().unwrap_or_default()
+        };
+        ui(&self.weak, move |w| {
+            let s = w.global::<ScheduledState>();
+            s.set_editor_name(name.into());
+            s.set_editor_schedule(schedule.into());
+            s.set_editor_prompt(text.into());
+            s.set_editor_error(SharedString::new());
+        });
+        self.publish_scheduled_editor();
+    }
+
+    async fn scheduled_save(&mut self) {
+        let Some(editor) = self.cron_editor.clone() else { return };
+        let Some((name, schedule, prompt)) = self.read_editor_text().await else {
+            return;
+        };
+        let (name, schedule, prompt) = (
+            name.trim().to_owned(),
+            schedule.trim().to_owned(),
+            prompt.trim().to_owned(),
+        );
+        let invalid = if schedule.is_empty() {
+            Some("A cron expression is required, for example 0 9 * * *.")
+        } else if !editor.script_only && prompt.is_empty() {
+            Some("A prompt is required for an agent job.")
+        } else {
+            None
+        };
+        if let Some(message) = invalid {
+            self.cron_editor_error = message.into();
+            return self.publish_scheduled_editor();
+        }
+        let Some(rest) = self.rest() else { return };
+        let deliver = editor.delivers.join(",");
+        let (provider, model) = split_model_key(&editor.model_key);
+        self.cron_busy = true;
+        self.publish_scheduled_editor();
+        let result = if editor.id.is_empty() {
+            let body = CronJobCreate {
+                name: (!name.is_empty()).then(|| name.clone()),
+                prompt: (!prompt.is_empty()).then(|| prompt.clone()),
+                schedule: schedule.clone(),
+                deliver: Some(deliver.clone()),
+                model: model.clone(),
+                provider: provider.clone(),
+                // The editor only ever creates agent jobs; script-only jobs stay script-only
+                // when edited, but are created from the CLI/blueprints.
+                no_agent: false,
+                script: None,
+            };
+            cron::create_job(&rest, "all", &body).await.map(|_| ())
+        } else if editor.script_only {
+            let mut updates = json!({ "name": name, "schedule": schedule, "deliver": deliver });
+            if !prompt.is_empty() {
+                updates["script"] = json!(prompt);
+            }
+            cron::update_job(&rest, &editor.id, updates).await.map(|_| ())
+        } else {
+            // Always write both model axes so resetting to "default" clears a previous pin.
+            let updates = json!({
+                "name": name,
+                "schedule": schedule,
+                "deliver": deliver,
+                "prompt": prompt,
+                "model": model,
+                "provider": provider,
+            });
+            cron::update_job(&rest, &editor.id, updates).await.map(|_| ())
+        };
+        self.cron_busy = false;
+        match result {
+            Ok(()) => {
+                self.cron_editor = None;
+                self.cron_editor_error.clear();
+                ui(&self.weak, |w| {
+                    let s = w.global::<ScheduledState>();
+                    s.set_editor_open(false);
+                    s.set_editor_error(SharedString::new());
+                });
+                // A freshly created job becomes the selection, so the detail shows what was
+                // just saved (and the list has it without waiting for the next poll).
+                if !editor.id.is_empty() {
+                    self.cron_selected = editor.id.clone();
+                }
+                let previous: Vec<String> = self.cron_jobs.iter().map(|j| j.id.clone()).collect();
+                self.scheduled_refresh(true).await;
+                if editor.id.is_empty() {
+                    if let Some(new_id) = self
+                        .cron_jobs
+                        .iter()
+                        .map(|j| j.id.clone())
+                        .find(|id| !previous.contains(id))
+                    {
+                        self.cron_selected = new_id;
+                        self.publish_scheduled_list(false);
+                        self.publish_scheduled_detail();
+                        self.scheduled_reload_runs().await;
+                    }
+                }
+            }
+            Err(e) => {
+                self.cron_editor_error = format!("Could not save the job: {e}");
+                self.publish_scheduled_editor();
+            }
+        }
+    }
+
+    /// Read the editor's text fields on the UI thread (they are the user's live typing).
+    async fn read_editor_text(&self) -> Option<(String, String, String)> {
+        let weak = self.weak.clone();
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        weak.upgrade_in_event_loop(move |w| {
+            let s = w.global::<ScheduledState>();
+            let _ = tx.send((
+                s.get_editor_name().to_string(),
+                s.get_editor_schedule().to_string(),
+                s.get_editor_prompt().to_string(),
+            ));
+        })
+        .ok()?;
+        rx.await.ok()
+    }
+
+    fn scheduled_error(&mut self, text: String) {
+        ui(&self.weak, move |w| {
+            w.global::<ScheduledState>().set_action_error(text.into())
+        });
+    }
+
+    fn publish_scheduled_list(&self, loading: bool) {
+        let query = self.cron_query.to_lowercase();
+        let jobs: Vec<CronItem> = self
+            .cron_jobs
+            .iter()
+            .filter(|j| query.is_empty() || job_matches(j, &query))
+            .map(|j| {
+                let state = cron::job_state(j);
+                CronItem {
+                    id: j.id.clone().into(),
+                    title: cron::job_title(j).into(),
+                    tone: tone_index(cron::state_tone(&state)),
+                    state: state.into(),
+                    schedule: cron::schedule_display(j).into(),
+                }
+            })
+            .collect();
+        let count = self.cron_jobs.len() as i32;
+        let blueprints = self.cron_blueprints.clone();
+        let selected = self.cron_selected.clone();
+        let busy = self.cron_busy;
+        ui(&self.weak, move |w| {
+            let s = w.global::<ScheduledState>();
+            s.set_jobs(ModelRc::new(VecModel::from(jobs)));
+            s.set_job_count(count);
+            s.set_blueprints(ModelRc::new(VecModel::from(blueprints)));
+            s.set_selected(selected.into());
+            s.set_loading(loading);
+            s.set_busy(busy);
+        });
+    }
+
+    fn publish_scheduled_detail(&self) {
+        let now = chrono::Local::now().timestamp_millis();
+        let job = self.cron_jobs.iter().find(|j| j.id == self.cron_selected);
+        let deliver = match job {
+            Some(j) => self.deliver_line(&cron::deliver_targets(j.deliver.as_deref())),
+            None => String::new(),
+        };
+        let (
+            title,
+            state,
+            tone,
+            frequency,
+            last_run,
+            next_label,
+            next_run,
+            model_label,
+            script_only,
+            has_prompt,
+            description,
+            error_summary,
+            paused,
+        ) = match job {
+            Some(j) => {
+                let state = cron::job_state(j);
+                (
+                    cron::job_title(j),
+                    state.clone(),
+                    tone_index(cron::state_tone(&state)),
+                    cron::schedule_display(j),
+                    cron_time::format_iso(j.last_run_at.as_deref()),
+                    cron_time::next_run_label(j.next_run_at.as_deref(), now).to_owned(),
+                    cron_time::format_iso(j.next_run_at.as_deref()),
+                    j.model.clone().unwrap_or_default(),
+                    cron::is_script_only(j),
+                    !j.prompt.as_deref().unwrap_or("").trim().is_empty(),
+                    cron::job_description(j),
+                    j.last_error
+                        .as_deref()
+                        .map(cron::last_error_summary)
+                        .unwrap_or_default(),
+                    state == "paused",
+                )
+            }
+            None => (
+                String::new(),
+                String::new(),
+                2,
+                String::new(),
+                String::new(),
+                "Next run".into(),
+                String::new(),
+                String::new(),
+                false,
+                false,
+                String::new(),
+                String::new(),
+                false,
+            ),
+        };
+        ui(&self.weak, move |w| {
+            let s = w.global::<ScheduledState>();
+            s.set_title(title.into());
+            s.set_state(state.into());
+            s.set_state_tone(tone);
+            s.set_frequency(frequency.into());
+            s.set_last_run(last_run.into());
+            s.set_next_label(next_label.into());
+            s.set_next_run(next_run.into());
+            s.set_deliver(deliver.into());
+            s.set_model_label(model_label.into());
+            s.set_script_only(script_only);
+            s.set_has_prompt(has_prompt);
+            s.set_description(description.into());
+            s.set_error_summary(error_summary.into());
+            s.set_paused(paused);
+        });
+    }
+
+    fn publish_scheduled_runs(&self, loading: bool) {
+        let runs: Vec<CronRunItem> = self
+            .cron_runs
+            .iter()
+            .map(|r| CronRunItem {
+                id: r.id.clone().into(),
+                title: cron::run_label(r).into(),
+                when: cron_time::format_unix(r.last_active.or(r.started_at)).into(),
+                model: r.model.clone().unwrap_or_default().into(),
+                openable: cron::run_is_openable(r),
+                running: cron::run_is_running(r),
+            })
+            .collect();
+        ui(&self.weak, move |w| {
+            let s = w.global::<ScheduledState>();
+            s.set_runs(ModelRc::new(VecModel::from(runs)));
+            s.set_runs_loading(loading);
+        });
+    }
+
+    fn publish_scheduled_busy(&self) {
+        let busy = self.cron_busy;
+        ui(&self.weak, move |w| {
+            let s = w.global::<ScheduledState>();
+            s.set_busy(busy);
+            s.set_editor_busy(busy);
+        });
+    }
+
+    fn publish_scheduled_editor(&self) {
+        let Some(editor) = self.cron_editor.clone() else {
+            ui(&self.weak, |w| {
+                let s = w.global::<ScheduledState>();
+                s.set_editor_open(false);
+                s.set_editor_busy(false);
+            });
+            return;
+        };
+        let targets = self.cron_targets.clone();
+        let error = self.cron_editor_error.clone();
+        let busy = self.cron_busy;
+        ui(&self.weak, move |w| {
+            let s = w.global::<ScheduledState>();
+            s.set_editor_open(true);
+            s.set_editor_busy(busy);
+            s.set_editor_edit(!editor.id.is_empty());
+            s.set_editor_id(editor.id.clone().into());
+            s.set_editor_script_only(editor.script_only);
+            s.set_editor_error(error.into());
+            s.set_editor_model_key(editor.model_key.clone().into());
+            // Delivery targets: everything the backend advertises, plus a selected target the
+            // discovery does not know (never silently drops a saved route).
+            let mut items: Vec<CronDeliverItem> = targets
+                .iter()
+                .map(|t| CronDeliverItem {
+                    id: t.id.clone().into(),
+                    label: deliver_label(&t.id, &t.name).into(),
+                    checked: editor.delivers.iter().any(|d| d == &t.id),
+                    needs_home: !t.home_target_set && t.id != cron::DEFAULT_DELIVER,
+                })
+                .collect();
+            for id in editor.delivers.iter() {
+                if !targets.iter().any(|t| &t.id == id) {
+                    items.push(CronDeliverItem {
+                        id: id.clone().into(),
+                        label: id.clone().into(),
+                        checked: true,
+                        needs_home: false,
+                    });
+                }
+            }
+            s.set_delivers(ModelRc::new(VecModel::from(items)));
+            // Per-job model override: the same catalog the model picker uses, plus "default".
+            let mut models: Vec<CronModelItem> = vec![CronModelItem {
+                key: SharedString::new(),
+                label: "Default (follow the main model)".into(),
+            }];
+            for m in w.global::<AppState>().get_models().iter() {
+                if m.header {
+                    continue;
+                }
+                models.push(CronModelItem {
+                    key: model_key(&m.provider, &m.model).into(),
+                    label: format!("{} · {}", m.provider_name, m.model).into(),
+                });
+            }
+            s.set_models(ModelRc::new(VecModel::from(models)));
+        });
+    }
+
+    /// Delivery targets as one label line, preferring the backend's own name for the target.
+    fn deliver_line(&self, ids: &[String]) -> String {
+        ids.iter()
+            .map(|id| match self.cron_targets.iter().find(|t| &t.id == id) {
+                Some(t) => deliver_label(id, &t.name),
+                None => cron::deliver_label(id).unwrap_or(id.as_str()).to_owned(),
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
+/// The label of one delivery target: the platform's known name, else the backend's own.
+fn deliver_label(id: &str, backend_name: &str) -> String {
+    cron::deliver_label(id)
+        .map(str::to_owned)
+        .unwrap_or_else(|| backend_name.to_owned())
+}
+
+/// `provider<US>model` — the editor's opaque model choice (empty = follow the main model).
+const MODEL_KEY_SEP: char = '\u{1f}';
+
+fn model_key(provider: &str, model: &str) -> String {
+    if provider.is_empty() {
+        model.to_owned()
+    } else {
+        format!("{provider}{MODEL_KEY_SEP}{model}")
+    }
+}
+
+fn split_model_key(key: &str) -> (Option<String>, Option<String>) {
+    let key = key.trim();
+    if key.is_empty() {
+        return (None, None);
+    }
+    match key.split_once(MODEL_KEY_SEP) {
+        Some((provider, model)) => (Some(provider.to_owned()), Some(model.to_owned())),
+        None => (None, Some(key.to_owned())),
+    }
+}
+
+fn tone_index(tone: cron::Tone) -> i32 {
+    match tone {
+        cron::Tone::Good => 0,
+        cron::Tone::Warn => 1,
+        cron::Tone::Muted => 2,
+        cron::Tone::Bad => 3,
+    }
+}
+
+/// Whether a job matches the panel's search box (title, prompt, script, delivery, id).
+fn job_matches(job: &CronJob, lowercase_query: &str) -> bool {
+    let haystack = [
+        job.name.as_deref().unwrap_or(""),
+        job.prompt.as_deref().unwrap_or(""),
+        job.script.as_deref().unwrap_or(""),
+        job.deliver.as_deref().unwrap_or(""),
+        job.id.as_str(),
+    ]
+    .join(" ")
+    .to_lowercase();
+    haystack.contains(lowercase_query)
 }
 
 /// Resolve a (group, page) pair from the UI: an empty page means the group's first page,

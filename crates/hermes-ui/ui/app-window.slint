@@ -7,8 +7,9 @@ import { Transcript, Composer, ChatRow, ToolRow } from "chat.slint";
 import { SettingsModal, SettingsState } from "settings.slint";
 
 import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
+import { ScheduledModal, ScheduledState, CronItem, CronRunItem, CronDeliverItem, CronModelItem } from "scheduled.slint";
 
-export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState }
+export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, ScheduledState, CronItem, CronRunItem, CronDeliverItem, CronModelItem }
 
 export struct SessionItem {
     id: string,
@@ -138,7 +139,7 @@ component Sidebar inherits Rectangle {
             clicked => { ProjectState.open = true; ProjectState.refresh(); }
         }
         NavItem { icon: @image-url("../../../assets/icons/box.svg"); text: "Artifacts"; clicked => { AppState.banner = "Artifact browsing is not available in this preview yet."; AppState.banner-error = false; } }
-        NavItem { icon: @image-url("../../../assets/icons/clock.svg"); text: "Scheduled"; clicked => { AppState.banner = "Scheduled-job management is not available in this preview yet."; AppState.banner-error = false; } }
+        NavItem { icon: @image-url("../../../assets/icons/clock.svg"); text: "Scheduled"; selected: ScheduledState.open; clicked => { ScheduledState.open = true; } }
         NavItem { icon: @image-url("../../../assets/icons/sliders-horizontal.svg"); text: "Customize"; clicked => { root.open-settings(); } }
 
         Rectangle { height: 10px; }
@@ -313,6 +314,15 @@ export component AppWindow inherits Window {
     // SettingsState so the controller can drive it (dev hooks, tests) and load data
     // exactly when it opens.
     in-out property <bool> settings-open <=> SettingsState.open;
+    // The Scheduled panel is loaded from the backend on open, exactly like settings.
+    in-out property <bool> scheduled-open <=> ScheduledState.open;
+    changed scheduled-open => {
+        if scheduled-open {
+            ScheduledState.opened();
+        } else {
+            ScheduledState.closed();
+        }
+    }
     changed settings-open => {
         if settings-open {
             SettingsState.opened();
@@ -344,6 +354,9 @@ export component AppWindow inherits Window {
             if e.text == Key.Escape {
                 if ProjectState.open { ProjectState.open = false; return accept; }
                 if root.effort-open { root.effort-open = false; return accept; }
+                // Scheduled: the editor sits above the panel, so it closes first.
+                if ScheduledState.editor-open { ScheduledState.editor-close(); return accept; }
+                if ScheduledState.open { ScheduledState.open = false; return accept; }
                 if root.settings-open { root.settings-open = false; return accept; }
                 if root.picker-open { root.picker-open = false; return accept; }
             }
@@ -523,6 +536,8 @@ export component AppWindow inherits Window {
                 y: parent.height - self.height - 54px;
             }
         }
+
+        ScheduledModal { width: root.width; height: root.height; }
 
         ProjectsModal { width: root.width; height: root.height; }
 

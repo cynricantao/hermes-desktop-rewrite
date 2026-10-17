@@ -1,0 +1,743 @@
+// "Scheduled" panel: the backend's cron jobs, their run history and the editor.
+// Every value comes from the backend's REST routes (hermes_core::cron), so the same build
+// shows the same jobs on any machine; nothing here reads a local file.
+
+import { ScrollView, LineEdit } from "std-widgets.slint";
+import { Theme, Motion, Ease } from "theme.slint";
+import { Icon, IconButton, NavItem, SectionHeader, Chip, Spinner, PrimaryButton, GhostButton } from "components.slint";
+
+export struct CronItem {
+    id: string,
+    title: string,
+    state: string,
+    // Tone index (0 good, 1 warn, 2 muted, 3 bad) from hermes_core::cron::state_tone.
+    tone: int,
+    schedule: string,
+}
+
+export struct CronRunItem {
+    id: string,
+    title: string,
+    when: string,
+    model: string,
+    // Output-document rows have no transcript to open.
+    openable: bool,
+    running: bool,
+}
+
+export struct CronDeliverItem {
+    id: string,
+    label: string,
+    checked: bool,
+    // Configured platform without a home channel yet.
+    needs-home: bool,
+}
+
+export struct CronModelItem {
+    // `provider` + model encoded for the callback; empty key = follow the global default.
+    key: string,
+    label: string,
+}
+
+export struct CronPreset {
+    label: string,
+    expr: string,
+}
+
+export global ScheduledState {
+    in-out property <bool> open;
+    in-out property <bool> loading;
+    in-out property <bool> busy;
+    in-out property <[CronItem]> jobs;
+    in-out property <int> job-count: 0;
+    in-out property <string> query;
+    in-out property <string> selected;
+    in-out property <string> action-error;
+    in-out property <[CronItem]> blueprints;
+
+    // Detail of `selected` (empty `selected` = nothing chosen).
+    in-out property <string> title;
+    in-out property <string> state;
+    in-out property <int> state-tone: 2;
+    in-out property <string> frequency;
+    in-out property <string> last-run;
+    in-out property <string> next-label: "Next run";
+    in-out property <string> next-run;
+    in-out property <string> deliver;
+    in-out property <string> model-label;
+    in-out property <bool> script-only;
+    in-out property <bool> has-prompt;
+    in-out property <string> description;
+    in-out property <string> error-summary;
+    in-out property <bool> paused: false;
+    // Two-click delete confirmation, armed by the first click.
+    in-out property <bool> delete-armed: false;
+
+    in-out property <[CronRunItem]> runs;
+    in-out property <bool> runs-loading;
+
+    // Editor (create / edit).
+    in-out property <bool> editor-open;
+    in-out property <bool> editor-edit;
+    in-out property <string> editor-id;
+    in-out property <string> editor-name;
+    in-out property <string> editor-schedule;
+    in-out property <string> editor-prompt;
+    in-out property <[CronDeliverItem]> delivers;
+    in-out property <[CronModelItem]> models;
+    in-out property <string> editor-model-key;
+    in-out property <string> editor-error;
+    in-out property <bool> editor-script-only;
+    in-out property <bool> editor-busy;
+    in-out property <[CronPreset]> presets: [
+        { label: "Daily", expr: "0 9 * * *" },
+        { label: "Weekdays", expr: "0 9 * * 1-5" },
+        { label: "Weekly", expr: "0 9 * * 1" },
+        { label: "Monthly", expr: "0 9 1 * *" },
+        { label: "Hourly", expr: "0 * * * *" },
+        { label: "Every 15 min", expr: "*/15 * * * *" },
+    ];
+
+    callback opened();
+    callback closed();
+    callback select(string);
+    callback search(string);
+    callback refresh();
+    callback toggle-pause();
+    callback trigger();
+    callback delete-requested();
+    callback delete-confirm();
+    callback start-new();
+    callback start-edit();
+    callback open-run(string);
+    callback dismiss-error();
+    callback editor-close();
+    callback editor-save();
+    callback preset(string);
+    callback toggle-deliver(string, bool);
+    callback choose-model(string);
+}
+
+// Status dot colour, mirroring apps/desktop/src/app/cron/job-state.ts STATE_DOT.
+component StateDot inherits Rectangle {
+    in property <int> tone: 2;
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background: tone == 0 ? Theme.interactive : tone == 1 ? Theme.warning : tone == 3 ? Theme.danger : Theme.text-4;
+}
+
+component MetaRow inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    height: 22px;
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: root.label;
+            color: Theme.text-3;
+            font-size: Theme.fs-md;
+            width: 110px;
+            vertical-alignment: center;
+        }
+        Text {
+            text: root.value;
+            color: Theme.text;
+            font-size: Theme.fs-md;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+    }
+}
+
+// One run row: title, model, timestamp. Clickable when a transcript exists.
+component RunRow inherits Rectangle {
+    in property <CronRunItem> item;
+    callback activate();
+    height: 26px;
+    border-radius: Theme.r-sm;
+    background: ta.has-hover && item.openable ? Theme.hover : transparent;
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 8px;
+        if item.running: Spinner { size: 12px; cross-axis-self-alignment: center; }
+        Text {
+            text: item.title;
+            color: Theme.text-2;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+        if item.model != "": Text {
+            text: item.model;
+            color: Theme.text-4;
+            font-size: Theme.fs-xs;
+            vertical-alignment: center;
+        }
+        Text {
+            text: item.when;
+            color: Theme.text-4;
+            font-size: Theme.fs-xs;
+            vertical-alignment: center;
+        }
+    }
+    ta := TouchArea {
+        enabled: root.item.openable;
+        mouse-cursor: root.item.openable ? pointer : default;
+        clicked => { root.activate(); }
+    }
+}
+
+component ScheduledEditor inherits Rectangle {
+    background: Theme.raised;
+    border-radius: Theme.r-lg;
+    border-width: 1px;
+    border-color: Theme.border-strong;
+    clip: true;
+
+    ScrollView {
+        VerticalLayout {
+            padding: 18px;
+            spacing: 10px;
+            HorizontalLayout {
+                Text {
+                    text: ScheduledState.editor-edit ? "Edit scheduled job" : "New scheduled job";
+                    color: Theme.text;
+                    font-size: Theme.fs-lg;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                IconButton {
+                    icon: @image-url("../../../assets/icons/x.svg");
+                    tooltip: "Close editor";
+                    clicked => { ScheduledState.editor-close(); }
+                }
+            }
+            Text {
+                text: ScheduledState.editor-script-only
+                    ? "Script-only job: it runs the stored script on schedule, with no model call."
+                    : "The prompt is sent to the agent on every run.";
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                wrap: word-wrap;
+            }
+            Text { text: "Name"; color: Theme.text-3; font-size: Theme.fs-sm; }
+            LineEdit {
+                text <=> ScheduledState.editor-name;
+                placeholder-text: "Optional label";
+                accessible-label: "Job name";
+            }
+            Text { text: "Schedule (cron expression)"; color: Theme.text-3; font-size: Theme.fs-sm; }
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                for p in ScheduledState.presets: GhostButton {
+                    text: p.label;
+                    clicked => { ScheduledState.preset(p.expr); }
+                }
+            }
+            LineEdit {
+                text <=> ScheduledState.editor-schedule;
+                placeholder-text: "0 9 * * *";
+                accessible-label: "Cron expression";
+            }
+            Text {
+                text: ScheduledState.editor-script-only ? "Script" : "Prompt";
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+            }
+            Rectangle {
+                height: 96px;
+                border-radius: Theme.r-md;
+                border-width: 1px;
+                border-color: Theme.border-strong;
+                background: Theme.bg;
+                Flickable {
+                    x: 8px;
+                    y: 6px;
+                    width: parent.width - 16px;
+                    height: parent.height - 12px;
+                    content-height: max(self.height, body.preferred-height);
+                    body := TextInput {
+                        width: parent.width;
+                        height: max(self.preferred-height, 40px);
+                        text <=> ScheduledState.editor-prompt;
+                        single-line: false;
+                        wrap: word-wrap;
+                        font-size: Theme.fs-md;
+                        color: Theme.text;
+                        accessible-label: "Job prompt";
+                    }
+                }
+            }
+            Text { text: "Deliver to"; color: Theme.text-3; font-size: Theme.fs-sm; }
+            VerticalLayout {
+                spacing: 2px;
+                for d in ScheduledState.delivers: Rectangle {
+                    height: 24px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Rectangle {
+                            width: 16px;
+                            height: 16px;
+                            cross-axis-self-alignment: center;
+                            border-radius: Theme.r-xs;
+                            border-width: 1px;
+                            border-color: d.checked ? Theme.interactive : Theme.border-strong;
+                            background: d.checked ? Theme.interactive : transparent;
+                            if d.checked: Image {
+                                source: @image-url("../../../assets/icons/check.svg");
+                                width: 10px;
+                                height: 10px;
+                                colorize: Theme.on-accent;
+                            }
+                        }
+                        Text {
+                            text: d.needs-home ? d.label + " — set a home channel first" : d.label;
+                            color: Theme.text-2;
+                            font-size: Theme.fs-md;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                        }
+                    }
+                    TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { ScheduledState.toggle-deliver(d.id, !d.checked); }
+                    }
+                }
+            }
+            Text { text: "Model (per-job override)"; color: Theme.text-3; font-size: Theme.fs-sm; }
+            Rectangle {
+                height: 84px;
+                border-radius: Theme.r-md;
+                border-width: 1px;
+                border-color: Theme.border;
+                ScrollView {
+                    VerticalLayout {
+                        padding: 2px;
+                        for m in ScheduledState.models: Rectangle {
+                            height: 24px;
+                            border-radius: Theme.r-sm;
+                            background: m.key == ScheduledState.editor-model-key ? Theme.selected : mta.has-hover ? Theme.hover : transparent;
+                            Text {
+                                x: 6px;
+                                text: m.label;
+                                color: Theme.text-2;
+                                font-size: Theme.fs-md;
+                                vertical-alignment: center;
+                                height: parent.height;
+                                overflow: elide;
+                            }
+                            mta := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { ScheduledState.choose-model(m.key); }
+                            }
+                        }
+                    }
+                }
+            }
+            if ScheduledState.editor-error != "": Text {
+                text: ScheduledState.editor-error;
+                color: Theme.danger;
+                font-size: Theme.fs-sm;
+                wrap: word-wrap;
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle { horizontal-stretch: 1; }
+                GhostButton { text: "Cancel"; clicked => { ScheduledState.editor-close(); } }
+                PrimaryButton {
+                    text: ScheduledState.editor-busy
+                        ? "Saving…"
+                        : (ScheduledState.editor-edit ? "Save job" : "Create job");
+                    enabled: !ScheduledState.editor-busy;
+                    clicked => { ScheduledState.editor-save(); }
+                }
+            }
+        }
+    }
+}
+
+export component ScheduledModal inherits Rectangle {
+    visible: ScheduledState.open;
+    Rectangle {
+        background: Theme.scrim;
+        TouchArea { clicked => { ScheduledState.closed(); } }
+    }
+
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(parent.width - 40px, 980px);
+        height: min(parent.height - 40px, 620px);
+        background: Theme.bg;
+        border-radius: Theme.r-lg;
+        border-width: 1px;
+        border-color: Theme.border-strong;
+        clip: true;
+        TouchArea {}
+        opacity: ScheduledState.open ? 1 : 0;
+        animate opacity { duration: Motion.base; easing: Ease.out; }
+
+        HorizontalLayout {
+            // ── Left: job list ────────────────────────────────────────────────
+            Rectangle {
+                width: 320px;
+                background: Theme.sidebar-bg;
+                VerticalLayout {
+                    padding: 12px;
+                    padding-bottom: 8px;
+                    spacing: 8px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Text {
+                            text: "Scheduled jobs";
+                            color: Theme.text;
+                            font-size: Theme.fs-lg;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                        }
+                        Text {
+                            text: ScheduledState.job-count + (ScheduledState.job-count == 1 ? " job" : " jobs");
+                            color: Theme.text-3;
+                            font-size: Theme.fs-sm;
+                            vertical-alignment: center;
+                        }
+                        IconButton {
+                            icon: @image-url("../../../assets/icons/refresh-cw.svg");
+                            tooltip: "Refresh";
+                            active: ScheduledState.loading;
+                            clicked => { ScheduledState.refresh(); }
+                        }
+                    }
+                    Rectangle {
+                        height: 30px;
+                        border-radius: Theme.r-md;
+                        border-width: 1px;
+                        border-color: Theme.border;
+                        background: Theme.bg.with-alpha(0.4);
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            spacing: 6px;
+                            Image {
+                                source: @image-url("../../../assets/icons/search.svg");
+                                width: 13px;
+                                height: 13px;
+                                cross-axis-self-alignment: center;
+                                colorize: Theme.text-3;
+                            }
+                            TextInput {
+                                text <=> ScheduledState.query;
+                                font-size: Theme.fs-md;
+                                color: Theme.text;
+                                vertical-alignment: center;
+                                single-line: true;
+                                accessible-label: "Search scheduled jobs";
+                                edited => { ScheduledState.search(self.text); }
+                                Text {
+                                    visible: parent.text == "";
+                                    text: "Search jobs";
+                                    color: Theme.text-4;
+                                    font-size: Theme.fs-md;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+                            }
+                        }
+                    }
+                    ScrollView {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            spacing: 2px;
+                            for j in ScheduledState.jobs: Rectangle {
+                                height: 30px;
+                                border-radius: Theme.r-md;
+                                background: j.id == ScheduledState.selected ? Theme.selected : jta.has-hover ? Theme.hover : transparent;
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    spacing: 8px;
+                                    StateDot { tone: j.tone; cross-axis-self-alignment: center; }
+                                    Text {
+                                        text: j.title;
+                                        color: Theme.text;
+                                        font-size: Theme.fs-md;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+                                }
+                                jta := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { ScheduledState.select(j.id); }
+                                }
+                            }
+                            if ScheduledState.jobs.length == 0: Text {
+                                text: ScheduledState.loading ? "Loading jobs…" : "No scheduled jobs yet.";
+                                color: Theme.text-3;
+                                font-size: Theme.fs-sm;
+                                wrap: word-wrap;
+                            }
+                            NavItem {
+                                icon: @image-url("../../../assets/icons/plus.svg");
+                                text: "New job";
+                                dim: true;
+                                clicked => { ScheduledState.start-new(); }
+                            }
+                            if ScheduledState.blueprints.length > 0: VerticalLayout {
+                                SectionHeader { text: "Blueprints"; }
+                                for b in ScheduledState.blueprints: Rectangle {
+                                    height: 26px;
+                                    border-radius: Theme.r-md;
+                                    background: bta.has-hover ? Theme.hover : transparent;
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        spacing: 8px;
+                                        Image {
+                                            source: @image-url("../../../assets/icons/sparkles.svg");
+                                            width: 14px;
+                                            height: 14px;
+                                            cross-axis-self-alignment: center;
+                                            colorize: Theme.text-3;
+                                        }
+                                        Text {
+                                            text: b.title;
+                                            color: Theme.text-3;
+                                            font-size: Theme.fs-sm;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+                                    }
+                                    bta := TouchArea { mouse-cursor: pointer; }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Rectangle { width: 1px; background: Theme.border; }
+
+            // ── Right: detail ─────────────────────────────────────────────────
+            Rectangle {
+                horizontal-stretch: 1;
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 10px;
+                    if ScheduledState.action-error != "": Rectangle {
+                        height: 36px;
+                        border-radius: Theme.r-md;
+                        border-width: 1px;
+                        border-color: Theme.danger.with-alpha(0.45);
+                        background: Theme.danger.with-alpha(0.10);
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 6px;
+                            spacing: 8px;
+                            Image {
+                                source: @image-url("../../../assets/icons/triangle-alert.svg");
+                                width: 14px;
+                                height: 14px;
+                                cross-axis-self-alignment: center;
+                                colorize: Theme.danger;
+                            }
+                            Text {
+                                text: ScheduledState.action-error;
+                                color: Theme.text-2;
+                                font-size: Theme.fs-sm;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                            IconButton {
+                                width: 24px;
+                                height: 24px;
+                                icon-size: 13px;
+                                cross-axis-self-alignment: center;
+                                icon: @image-url("../../../assets/icons/x.svg");
+                                tooltip: "Dismiss";
+                                clicked => { ScheduledState.dismiss-error(); }
+                            }
+                        }
+                    }
+                    if ScheduledState.selected == "": VerticalLayout {
+                        vertical-stretch: 1;
+                        alignment: center;
+                        spacing: 8px;
+                        Image {
+                            source: @image-url("../../../assets/icons/clock.svg");
+                            width: 28px;
+                            height: 28px;
+                            colorize: Theme.text-4;
+                        }
+                        Text {
+                            text: ScheduledState.jobs.length == 0
+                                ? "No jobs on this backend yet. Create one with \"New job\"."
+                                : "Select a job to see its schedule, prompt and run history.";
+                            color: Theme.text-3;
+                            font-size: Theme.fs-md;
+                            wrap: word-wrap;
+                            horizontal-alignment: center;
+                        }
+                    }
+                    if ScheduledState.selected != "": VerticalLayout {
+                        spacing: 10px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            StateDot {
+                                tone: ScheduledState.state-tone;
+                                cross-axis-self-alignment: center;
+                            }
+                            Text {
+                                text: ScheduledState.title;
+                                color: Theme.text;
+                                font-size: Theme.fs-lg;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                            if ScheduledState.script-only: Chip {
+                                cross-axis-self-alignment: center;
+                                text: "Script";
+                                interactive: false;
+                                outlined: true;
+                            }
+                            Chip {
+                                cross-axis-self-alignment: center;
+                                text: ScheduledState.state;
+                                interactive: false;
+                                outlined: true;
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            GhostButton {
+                                text: ScheduledState.paused ? "Resume" : "Pause";
+                                clicked => { ScheduledState.toggle-pause(); }
+                            }
+                            PrimaryButton {
+                                text: ScheduledState.busy ? "Running…" : "Run now";
+                                enabled: !ScheduledState.busy;
+                                clicked => { ScheduledState.trigger(); }
+                            }
+                            GhostButton { text: "Edit"; clicked => { ScheduledState.start-edit(); } }
+                            // Two-click delete: the first click arms, the second removes.
+                            GhostButton {
+                                text: ScheduledState.delete-armed ? "Confirm delete" : "Delete";
+                                clicked => {
+                                    if ScheduledState.delete-armed {
+                                        ScheduledState.delete-confirm();
+                                    } else {
+                                        ScheduledState.delete-requested();
+                                    }
+                                }
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+                        MetaRow { label: "Frequency"; value: ScheduledState.frequency; }
+                        MetaRow { label: "Last run"; value: ScheduledState.last-run; }
+                        MetaRow { label: ScheduledState.next-label; value: ScheduledState.next-run; }
+                        MetaRow { label: "Deliver to"; value: ScheduledState.deliver; }
+                        if ScheduledState.model-label != "": MetaRow { label: "Model"; value: ScheduledState.model-label; }
+                        if ScheduledState.error-summary != "": Rectangle {
+                            height: failure-body.preferred-height;
+                            border-radius: Theme.r-md;
+                            background: Theme.danger.with-alpha(0.10);
+                            failure-body := HorizontalLayout {
+                                padding: 8px;
+                                spacing: 6px;
+                                Image {
+                                    source: @image-url("../../../assets/icons/triangle-alert.svg");
+                                    width: 13px;
+                                    height: 13px;
+                                    cross-axis-self-alignment: center;
+                                    colorize: Theme.danger;
+                                }
+                                Text {
+                                    text: "Last run failed: " + ScheduledState.error-summary;
+                                    color: Theme.danger;
+                                    font-size: Theme.fs-sm;
+                                    wrap: word-wrap;
+                                    horizontal-stretch: 1;
+                                }
+                            }
+                        }
+                        ScrollView {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                spacing: 6px;
+                                if ScheduledState.description != "": Text {
+                                    text: (ScheduledState.script-only && !ScheduledState.has-prompt) ? "Script" : "Prompt";
+                                    color: Theme.text-3;
+                                    font-size: Theme.fs-xs;
+                                }
+                                if ScheduledState.description != "": Rectangle {
+                                    height: min(description-text.preferred-height + 16px, 180px);
+                                    border-radius: Theme.r-md;
+                                    border-width: 1px;
+                                    border-color: Theme.border;
+                                    background: Theme.code-bg;
+                                    description-text := Text {
+                                        x: 8px;
+                                        y: 8px;
+                                        width: parent.width - 16px;
+                                        text: ScheduledState.description;
+                                        color: Theme.text-2;
+                                        font-size: Theme.fs-md;
+                                        wrap: word-wrap;
+                                    }
+                                }
+                                Text {
+                                    text: "Run history" + (ScheduledState.runs.length > 0 ? " · " + ScheduledState.runs.length : "");
+                                    color: Theme.text-3;
+                                    font-size: Theme.fs-xs;
+                                }
+                                if ScheduledState.runs-loading && ScheduledState.runs.length == 0: Rectangle {
+                                    height: 22px;
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        Spinner { size: 12px; cross-axis-self-alignment: center; }
+                                        Text {
+                                            text: "Loading runs…";
+                                            color: Theme.text-3;
+                                            font-size: Theme.fs-sm;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                                if !ScheduledState.runs-loading && ScheduledState.runs.length == 0: Text {
+                                    text: "No runs yet.";
+                                    color: Theme.text-3;
+                                    font-size: Theme.fs-sm;
+                                }
+                                for r in ScheduledState.runs: RunRow {
+                                    item: r;
+                                    activate => { ScheduledState.open-run(r.id); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Editor overlay (create / edit) ────────────────────────────────────
+        if ScheduledState.editor-open: Rectangle {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: parent.height;
+            background: #00000066;
+            TouchArea { clicked => { ScheduledState.editor-close(); } }
+            ScheduledEditor {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: min(parent.width - 48px, 560px);
+                height: min(parent.height - 24px, 560px);
+            }
+        }
+    }
+}
