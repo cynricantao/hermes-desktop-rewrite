@@ -1,14 +1,15 @@
 // Main window: titlebar strip, sidebar, conversation column, optional right panel, overlays.
 
-import { ScrollView, LineEdit } from "std-widgets.slint";
+import { ScrollView } from "std-widgets.slint";
 import { Theme, Motion, Ease, ThemeMode } from "theme.slint";
 import { Icon, IconButton, NavItem, SectionHeader, Chip, Banner, Spinner, Toggle, Segmented, PrimaryButton, GhostButton } from "components.slint";
 import { Transcript, Composer, ChatRow, ToolRow } from "chat.slint";
 import { SettingsModal, SettingsState } from "settings.slint";
+import { ModelPicker, ModelEditorModal, ModelItem, EditModelRow } from "models.slint";
 
 import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
 
-export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState }
+export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, ModelItem, EditModelRow }
 
 export struct SessionItem {
     id: string,
@@ -17,14 +18,6 @@ export struct SessionItem {
     first-in-group: bool,
     pinned: bool,
     running: bool,
-}
-
-export struct ModelItem {
-    provider: string,
-    provider-name: string,
-    model: string,
-    current: bool,
-    header: bool,
 }
 
 export struct ApprovalInfo {
@@ -54,7 +47,16 @@ export global AppState {
     in-out property <string> effort-label;
     in-out property <[string]> effort-options: ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"];
     in-out property <string> cwd-label;
+    // Model picker: the catalog from the backend's `model.options`, curated on this
+    // device (visibility, favourites, hand-added ids). The controller fills these.
     in-out property <[ModelItem]> models;
+    in-out property <[EditModelRow]> model-edit-rows;
+    in-out property <string> model-query;
+    in-out property <string> model-edit-query;
+    in-out property <bool> model-editor-open: false;
+    in-out property <string> model-empty-text: "No models found";
+    in-out property <int> model-hidden-count: 0;
+    in-out property <int> model-total-count: 0;
     in-out property <string> banner;
     in-out property <bool> banner-error;
     in-out property <int> transcript-mode: 0;
@@ -73,7 +75,17 @@ export global AppState {
     callback open-session(string);
     callback delete-session(string);
     callback refresh-models();
+    callback reload-models();
     callback select-model(string, string);
+    callback model-query-changed(string);
+    callback model-edit-query-changed(string);
+    callback toggle-model(string, string);
+    callback toggle-provider-visible(string);
+    callback toggle-provider-collapse(string);
+    callback favorite-model(string, string);
+    callback add-custom-model(string, string);
+    callback remove-custom-model(string, string);
+    callback reset-model-visibility();
     callback select-effort(string);
     callback approve(string, string);
     callback dismiss-banner();
@@ -202,62 +214,6 @@ component Sidebar inherits Rectangle {
     }
 }
 
-component ModelPicker inherits Rectangle {
-    in-out property <bool> open;
-    property <float> t: open ? 1 : 0;
-    animate t { duration: Motion.base; easing: Ease.out; }
-    visible: t > 0.01;
-    opacity: t;
-    border-radius: Theme.r-lg;
-    background: Theme.raised;
-    border-width: 1px;
-    border-color: Theme.border-strong;
-    drop-shadow-blur: 24px;
-    drop-shadow-offset-y: 8px;
-    drop-shadow-color: #00000066;
-    transform-origin: { x: self.width, y: self.height };
-    transform-scale: 0.96 + 0.04 * t;
-    ScrollView {
-        x: 4px; y: 4px;
-        width: parent.width - 8px;
-        height: parent.height - 8px;
-        VerticalLayout {
-            if AppState.models.length == 0: Text {
-                text: "No models are available yet. Configure a provider in Hermes, then reopen this menu.";
-                wrap: word-wrap; color: Theme.text-3;
-            }
-            for m in AppState.models: Rectangle {
-                height: m.header ? 28px : 30px;
-                accessible-role: button;
-                accessible-label: m.header ? "Provider " + m.provider-name : "Use " + m.model;
-                accessible-action-default => { if !m.header { AppState.select-model(m.provider, m.model); root.open = false; } }
-                border-radius: Theme.r-sm;
-                background: !m.header && ta.has-hover ? Theme.hover : transparent;
-                animate background { duration: Motion.fast; }
-                HorizontalLayout {
-                    padding-left: 10px;
-                    padding-right: 10px;
-                    Text {
-                        text: m.header ? m.provider-name : m.model;
-                        color: m.header ? Theme.text-3 : Theme.text;
-                        font-size: m.header ? Theme.fs-xs : Theme.fs-md;
-                        font-weight: m.header ? 500 : 400;
-                        vertical-alignment: center;
-                        overflow: elide;
-                        horizontal-stretch: 1;
-                    }
-                    if m.current: Image { source: @image-url("../../../assets/icons/check.svg"); width: 14px; height: 14px; y: 8px; colorize: Theme.interactive; }
-                }
-                ta := TouchArea {
-                    enabled: !m.header;
-                    mouse-cursor: pointer;
-                    clicked => { AppState.select-model(m.provider, m.model); root.open = false; }
-                }
-            }
-        }
-    }
-}
-
 component ApprovalCard inherits Rectangle {
     border-radius: Theme.r-lg;
     background: Theme.raised;
@@ -345,6 +301,7 @@ export component AppWindow inherits Window {
                 if ProjectState.open { ProjectState.open = false; return accept; }
                 if root.effort-open { root.effort-open = false; return accept; }
                 if root.settings-open { root.settings-open = false; return accept; }
+                if AppState.model-editor-open { AppState.model-editor-open = false; return accept; }
                 if root.picker-open { root.picker-open = false; return accept; }
             }
             // Approval card keys (same as the Electron app's approval-keys.ts): Esc denies,
@@ -517,11 +474,45 @@ export component AppWindow inherits Window {
             if root.picker-open: TouchArea { clicked => { root.picker-open = false; } }
             ModelPicker {
                 open <=> root.picker-open;
-                width: 320px;
-                height: min(420px, parent.height - 120px);
+                items: AppState.models;
+                query: AppState.model-query;
+                empty-text: AppState.model-empty-text;
+                hidden-count: AppState.model-hidden-count;
+                width: 360px;
+                height: min(460px, parent.height - 120px);
                 x: parent.width - self.width - max(24px, (parent.width - Theme.column-w) / 2);
                 y: parent.height - self.height - 54px;
+                query-changed(q) => { AppState.model-query = q; AppState.model-query-changed(q); }
+                select(provider, model) => { AppState.select-model(provider, model); root.picker-open = false; }
+                favorite(provider, model) => { AppState.favorite-model(provider, model); }
+                toggle-collapse(provider) => { AppState.toggle-provider-collapse(provider); }
+                add-custom(provider, model) => { AppState.add-custom-model(provider, model); }
+                refresh => { AppState.reload-models(); }
+                open-editor => {
+                    root.picker-open = false;
+                    AppState.model-editor-open = true;
+                    AppState.refresh-models();
+                }
             }
+        }
+
+        ModelEditorModal {
+            width: root.width;
+            height: root.height;
+            open <=> AppState.model-editor-open;
+            rows: AppState.model-edit-rows;
+            query: AppState.model-edit-query;
+            empty-text: AppState.model-empty-text;
+            hidden-count: AppState.model-hidden-count;
+            total-count: AppState.model-total-count;
+            query-changed(q) => { AppState.model-edit-query = q; AppState.model-edit-query-changed(q); }
+            toggle-model(provider, model) => { AppState.toggle-model(provider, model); }
+            toggle-provider(provider) => { AppState.toggle-provider-visible(provider); }
+            favorite(provider, model) => { AppState.favorite-model(provider, model); }
+            add-custom(provider, model) => { AppState.add-custom-model(provider, model); }
+            remove-custom(provider, model) => { AppState.remove-custom-model(provider, model); }
+            reset => { AppState.reset-model-visibility(); }
+            close => { AppState.model-editor-open = false; }
         }
 
         ProjectsModal { width: root.width; height: root.height; }
