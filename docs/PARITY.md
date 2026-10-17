@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**43 done · 193 partial · 556 not started · 1 unsupported** (of 793).
+**43 done · 200 partial · 549 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -824,9 +824,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Settings — Gateway / Connections page
 
-- [ ] Connection mode (local/remote/cloud) — local (Electron connection-config) — src/app/settings/gateway-settings.tsx
-- [ ] Remote URL + token — local (Electron) — src/app/settings/gateway-settings.tsx
-- [ ] Extra gateway headers — local (Electron connection.json) (platform) — src/app/settings/gateway-settings.tsx
+- [~] Connection mode (local/remote/cloud) — local (Electron connection-config) — src/app/settings/gateway-settings.tsx ⟶ logic in `hermes-core::remote` (URL rules, HTTP + WebSocket auth probe, saved profile; token auth only, no TLS/OAuth login/ssh/cloud) — live probe vs private backend 2026-10-17 (`tests/live_remote.rs`: ok / wrong token / unreachable / wrong service); no connection screen yet
+- [~] Remote URL + token — local (Electron) — src/app/settings/gateway-settings.tsx ⟶ logic in `hermes-core::remote` (URL rules, HTTP + WebSocket auth probe, saved profile; token auth only, no TLS/OAuth login/ssh/cloud) — live probe vs private backend 2026-10-17 (`tests/live_remote.rs`: ok / wrong token / unreachable / wrong service); no connection screen yet
+- [~] Extra gateway headers — local (Electron connection.json) (platform) — src/app/settings/gateway-settings.tsx ⟶ logic in `hermes-core::remote` (URL rules, HTTP + WebSocket auth probe, saved profile; token auth only, no TLS/OAuth login/ssh/cloud) — live probe vs private backend 2026-10-17 (`tests/live_remote.rs`: ok / wrong token / unreachable / wrong service); no connection screen yet
 - [ ] SSH connection host — local (Electron ssh-config) — src/app/settings/ssh-host-selection.ts
 - [ ] Cloud connection (sign-in, org/agent picker) — local + REST — src/app/settings/gateway-settings.tsx
 - [ ] Keychain encryption of secrets — local (Electron secret-storage-policy) — src/app/settings/settings-manifest.ts (gateway.keychainEncryption)
@@ -995,9 +995,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Remote connections
 
-- [ ] Connect to existing Hermes gateway (URL) — local (Electron connection-config) — src/app/settings/gateway-settings.tsx
-- [ ] Gateway probe (HTTP+WS reachability) — local (Electron gateway-ws-probe) — electron/gateway-ws-probe.ts
-- [ ] Remote auth modes (token/OAuth) — local (Electron native-auth-decisions) — electron/native-auth-decisions.ts
+- [~] Connect to existing Hermes gateway (URL) — local (Electron connection-config) — src/app/settings/gateway-settings.tsx ⟶ logic in `hermes-core::remote` (URL rules, HTTP + WebSocket auth probe, saved profile; token auth only, no TLS/OAuth login/ssh/cloud) — live probe vs private backend 2026-10-17 (`tests/live_remote.rs`: ok / wrong token / unreachable / wrong service); no connection screen yet
+- [~] Gateway probe (HTTP+WS reachability) — local (Electron gateway-ws-probe) — electron/gateway-ws-probe.ts ⟶ logic in `hermes-core::remote` (URL rules, HTTP + WebSocket auth probe, saved profile; token auth only, no TLS/OAuth login/ssh/cloud) — live probe vs private backend 2026-10-17 (`tests/live_remote.rs`: ok / wrong token / unreachable / wrong service); no connection screen yet
+- [~] Remote auth modes (token/OAuth) — local (Electron native-auth-decisions) — electron/native-auth-decisions.ts ⟶ logic in `hermes-core::remote` (URL rules, HTTP + WebSocket auth probe, saved profile; token auth only, no TLS/OAuth login/ssh/cloud) — live probe vs private backend 2026-10-17 (`tests/live_remote.rs`: ok / wrong token / unreachable / wrong service); no connection screen yet
 - [ ] SSH remote lifecycle (spawn gateway over ssh) — local (Electron ssh-*) (platform) — electron/remote-lifecycle.ts, electron/ssh-connection.ts
 - [ ] SSH control-master reuse — local (Electron) (platform) — electron/ssh-control-master-holders.ts
 - [ ] SSH isolated keepalive — local (Electron) (platform) — electron/ssh-isolated-keepalive.ts
@@ -1013,7 +1013,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Per-connection window state — local (Electron) — electron/connection-window-state.ts
 - [ ] Remote file picker / path bridging — local (Electron wsl-path-bridge) — src/app/right-sidebar/files/remote-picker.tsx
 - [ ] Managed SSH update — local (Electron) — electron/managed-ssh-update.ts
-- [ ] Extra gateway headers (proxy auth) — local (Electron) (platform) — src/app/settings/gateway-settings.tsx
+- [~] Extra gateway headers (proxy auth) — local (Electron) (platform) — src/app/settings/gateway-settings.tsx ⟶ logic in `hermes-core::remote` (URL rules, HTTP + WebSocket auth probe, saved profile; token auth only, no TLS/OAuth login/ssh/cloud) — live probe vs private backend 2026-10-17 (`tests/live_remote.rs`: ok / wrong token / unreachable / wrong service); no connection screen yet
 - [ ] WSL/WSLg support (clipboard, launch) — local (Electron) (platform) — electron/wslg-launch.ts, electron/wsl-clipboard-image.ts
 
 ## Extras: webhooks, imports, subagents, learning, telemetry
