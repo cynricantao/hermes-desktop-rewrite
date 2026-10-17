@@ -1,0 +1,370 @@
+// Appearance widgets for the settings panel — palette grid (`hermes-desktop-theme-v2`),
+// font pickers (`desktop.font_family`, `terminal.font_family`) and the pet page.
+//
+// The controller (`crates/hermes-ui/src/widgets/appearance.rs`) owns every value in
+// `AppearanceState`; this file only draws them and reports intents as
+// `act("<area>:<verb>[:<arg>]")` — settings.slint forwards those to
+// `SettingsState.action`. Rendered full-width inside the settings row for its id.
+
+import { ScrollView, LineEdit } from "std-widgets.slint";
+import { Theme, Motion } from "theme.slint";
+import { Icons } from "icons.slint";
+
+/// One dashboard theme offered by `GET /api/dashboard/themes`. `local` is set when this
+/// client can render the theme's palette locally (otherwise only the backend switches).
+export struct PaletteCard {
+    name: string,
+    label: string,
+    description: string,
+    local: bool,
+    active: bool,
+    row: int,
+    col: int,
+}
+
+/// One installed font family for the pickers (from `fc-list`).
+export struct FontFamily {
+    family: string,
+}
+
+export global AppearanceState {
+    /// Inline status for the panel that is currently loading / failed.
+    in-out property <bool> busy: false;
+    in-out property <string> error;
+    // Palette grid.
+    in-out property <[PaletteCard]> palettes: [];
+    /// Rows the grid needs (set by the module; the cell maths live in Slint).
+    in-out property <int> palette-rows: 1;
+    in-out property <string> palette-error;
+    // Font pickers. The two lists are filtered + capped in Rust from the `fc-list` cache;
+    // the query is two-way so the module can reset it on load.
+    in-out property <[FontFamily]> chat-fonts: [];
+    in-out property <[FontFamily]> terminal-fonts: [];
+    in-out property <string> chat-query;
+    in-out property <string> terminal-query;
+    in-out property <string> chat-current;
+    in-out property <string> terminal-current;
+    in-out property <string> fonts-error;
+}
+
+// ── Palette grid ────────────────────────────────────────────────────────────────
+
+/// A tiny colour chip for one palette: the theme's background with its accent in the
+/// middle. Colours mirror `theme.slint` (the values the palette actually applies).
+component PaletteSwatch inherits Rectangle {
+    in property <string> name;
+    width: 34px;
+    height: 34px;
+    border-radius: Theme.r-sm;
+    border-width: 1px;
+    border-color: Theme.border;
+    background: name == "midnight" ? #0d0d28
+        : name == "ember" ? #1e0e04
+        : name == "mono" ? #141414
+        : name == "cyberpunk" ? #001200
+        : Theme.surface-2;
+    Rectangle {
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        background: name == "midnight" ? #8b80e8
+            : name == "ember" ? #d97316
+            : name == "mono" ? #9a9a9a
+            : name == "cyberpunk" ? #00ff41
+            : Theme.text-4;
+    }
+}
+
+/// One theme card. The card is the whole click target; the hint line tells the truth for
+/// themes this client has no local palette for (no fake re-skin).
+component PaletteCardView inherits Rectangle {
+    in property <PaletteCard> card;
+    callback picked();
+    height: 100px;
+    border-radius: Theme.r-md;
+    border-width: 1px;
+    border-color: card.active ? Theme.accent : ta.has-hover ? Theme.border-strong : Theme.border;
+    background: card.active ? Theme.accent-soft : ta.has-hover ? Theme.hover : Theme.surface;
+    animate background { duration: Motion.fast; }
+    accessible-role: button;
+    accessible-label: card.label;
+    accessible-item-selected: card.active;
+    accessible-action-default => { root.picked(); }
+    HorizontalLayout {
+        padding: 10px;
+        spacing: 10px;
+        VerticalLayout {
+            width: 34px;
+            alignment: center;
+            PaletteSwatch { name: card.name; }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 3px;
+            horizontal-stretch: 1;
+            Text {
+                text: card.label;
+                color: Theme.text;
+                font-size: Theme.fs-md;
+                font-weight: 500;
+                overflow: elide;
+            }
+            Text {
+                text: card.description;
+                color: Theme.text-3;
+                font-size: Theme.fs-xs;
+                wrap: word-wrap;
+            }
+            if !card.local: Text {
+                text: "Backend theme only — this window keeps its own palette.";
+                color: Theme.text-4;
+                font-size: Theme.fs-xs;
+                wrap: word-wrap;
+            }
+        }
+        if card.active: VerticalLayout {
+            width: 16px;
+            alignment: center;
+            Image {
+                source: Icons.get("check");
+                width: 14px;
+                height: 14px;
+                colorize: Theme.accent;
+            }
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.picked(); }
+    }
+}
+
+/// The card grid: absolutely positioned so Slint does no integer division; positions come
+/// from the module (`PaletteCard.row` / `.col`).
+component PaletteGrid inherits Rectangle {
+    in property <[PaletteCard]> cards;
+    in property <int> rows: 1;
+    callback picked(string);
+    property <length> gap: 10px;
+    property <length> card-h: 100px;
+    property <length> cell: (self.width - 2 * gap) / 3;
+    height: rows * (card-h + gap) - gap;
+    for c[i] in cards: PaletteCardView {
+        x: c.col * (cell + gap);
+        y: c.row * (card-h + gap);
+        width: cell;
+        card: c;
+        picked => { root.picked(c.name); }
+    }
+}
+
+// ── Font pickers ────────────────────────────────────────────────────────────────
+
+/// One family row; `family == ""` is the "theme font" reset option.
+component FontRow inherits Rectangle {
+    in property <string> family;
+    in property <bool> selected: false;
+    callback picked();
+    height: 28px;
+    border-radius: Theme.r-sm;
+    background: ta.has-hover ? Theme.hover : selected ? Theme.selected : transparent;
+    animate background { duration: Motion.fast; }
+    accessible-role: button;
+    accessible-label: family == "" ? "Theme font" : family;
+    accessible-item-selected: selected;
+    accessible-action-default => { root.picked(); }
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 8px;
+        Text {
+            text: family == "" ? "Theme font (default)" : family;
+            font-family: family == "" ? Theme.ui-font : family;
+            color: selected ? Theme.text : Theme.text-2;
+            font-size: Theme.fs-md;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+        if selected: Image {
+            source: Icons.get("check");
+            width: 13px;
+            height: 13px;
+            colorize: Theme.accent;
+            vertical-alignment: center;
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.picked(); }
+    }
+}
+
+/// Searchable family picker. `query` is two-way bound to the module's per-id global so a
+/// reload can clear the filter; filtering + capping happen in the module.
+component FontPicker inherits VerticalLayout {
+    in property <[FontFamily]> fonts;
+    in-out property <string> query;
+    in property <string> current;
+    in property <string> sample;
+    in property <bool> mono: false;
+    callback pick(string);
+    callback filter(string);
+    spacing: 8px;
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            vertical-alignment: center;
+            text: current == "" ? "Current: theme font" : "Current: " + current;
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+        Text {
+            vertical-alignment: center;
+            text: "\{fonts.length} shown";
+            color: Theme.text-4;
+            font-size: Theme.fs-xs;
+        }
+    }
+    LineEdit {
+        height: 30px;
+        font-size: Theme.fs-md;
+        placeholder-text: "Filter installed fonts";
+        accessible-label: "Filter installed fonts";
+        text <=> query;
+        edited(t) => { root.filter(t); }
+    }
+    ScrollView {
+        height: 198px;
+        VerticalLayout {
+            alignment: start;
+            spacing: 1px;
+            FontRow {
+                family: "";
+                selected: current == "";
+                picked => { root.pick(""); }
+            }
+            for f[i] in fonts: FontRow {
+                family: f.family;
+                selected: f.family == current;
+                picked => { root.pick(f.family); }
+            }
+        }
+    }
+    Rectangle {
+        height: 34px;
+        border-radius: Theme.r-sm;
+        background: Theme.surface-2;
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 8px;
+            Text {
+                text: mono ? "~/project git:main ❯ ls" : sample;
+                font-family: mono ? Theme.mono-font : Theme.ui-font;
+                color: Theme.text-2;
+                font-size: Theme.fs-md;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+    }
+}
+
+// ── The panel ───────────────────────────────────────────────────────────────────
+
+export component AppearanceWidget inherits VerticalLayout {
+    in property <string> id;
+    callback act(string);
+    spacing: 8px;
+
+    // ── Appearance › Theme — the palette grid ─────────────────────────────────────
+    if id == "hermes-desktop-theme-v2": VerticalLayout {
+        spacing: 8px;
+        if AppearanceState.palette-error != "": Text {
+            text: AppearanceState.palette-error;
+            color: Theme.danger;
+            font-size: Theme.fs-sm;
+            wrap: word-wrap;
+        }
+        if AppearanceState.palettes.length == 0 && AppearanceState.palette-error == "": Text {
+            text: "Loading palettes…";
+            color: Theme.text-4;
+            font-size: Theme.fs-sm;
+        }
+        PaletteGrid {
+            cards: AppearanceState.palettes;
+            rows: AppearanceState.palette-rows;
+            picked(n) => { root.act("appearance:palette:" + n); }
+        }
+        Text {
+            text: "Themes marked “backend theme only” switch the dashboard theme; this window has no local copy of their colours yet, so it keeps its own palette.";
+            color: Theme.text-4;
+            font-size: Theme.fs-xs;
+            wrap: word-wrap;
+        }
+    }
+
+    // ── Appearance › Typography — chat font ───────────────────────────────────────
+    if id == "desktop.font_family": VerticalLayout {
+        spacing: 8px;
+        if AppearanceState.fonts-error != "": Text {
+            text: AppearanceState.fonts-error;
+            color: Theme.danger;
+            font-size: Theme.fs-sm;
+            wrap: word-wrap;
+        }
+        FontPicker {
+            fonts: AppearanceState.chat-fonts;
+            query <=> AppearanceState.chat-query;
+            current: AppearanceState.chat-current;
+            sample: "The quick brown fox jumps over the lazy dog.";
+            pick(v) => { root.act("appearance:font:chat:" + v); }
+            filter(t) => { root.act("appearance:font-q:chat:" + t); }
+        }
+    }
+
+    // ── Appearance › Typography — terminal font ───────────────────────────────────
+    if id == "terminal.font_family": VerticalLayout {
+        spacing: 8px;
+        if AppearanceState.fonts-error != "": Text {
+            text: AppearanceState.fonts-error;
+            color: Theme.danger;
+            font-size: Theme.fs-sm;
+            wrap: word-wrap;
+        }
+        FontPicker {
+            fonts: AppearanceState.terminal-fonts;
+            query <=> AppearanceState.terminal-query;
+            current: AppearanceState.terminal-current;
+            sample: "~/project git:main ❯";
+            mono: true;
+            pick(v) => { root.act("appearance:font:terminal:" + v); }
+            filter(t) => { root.act("appearance:font-q:terminal:" + t); }
+        }
+    }
+
+    // ── Appearance › Pet — no petdex runtime in this client ───────────────────────
+    if id == "pet": HorizontalLayout {
+        spacing: 8px;
+        Image {
+            source: Icons.get("paw-print");
+            width: 16px;
+            height: 16px;
+            colorize: Theme.text-4;
+            vertical-alignment: top;
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            Text {
+                text: "Pets need the Electron petdex runtime (a spritesheet renderer plus the pet dex RPC), which this client does not have yet, so there is nothing to pick or install here. Hermes Desktop (Rust) shows the same chat without the floating mascot — use the Electron app if you want a pet.";
+                color: Theme.text-2;
+                font-size: Theme.fs-sm;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

@@ -108,6 +108,15 @@ impl Rest {
         self.send(r.method.as_str(), &r.path, r.body.as_ref()).await
     }
 
+    pub async fn delete(&self, path: &str) -> Result<Value, HttpError> {
+        self.send("DELETE", path, None).await
+    }
+
+    /// `PATCH` with a JSON body (the session mutation routes require it; `PUT` answers 405).
+    pub async fn patch(&self, path: &str, body: &Value) -> Result<Value, HttpError> {
+        self.send("PATCH", path, Some(body)).await
+    }
+
     /// Any method, with the default 10 s timeout.
     pub async fn send(&self, method: &str, path: &str, body: Option<&Value>) -> Result<Value, HttpError> {
         self.send_with_timeout(method, path, body, DEFAULT_TIMEOUT).await

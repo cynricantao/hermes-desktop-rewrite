@@ -24,6 +24,7 @@ use tokio::sync::mpsc;
 use crate::browser::BrowserCmd;
 use crate::capabilities::CapCmd;
 use crate::rows::to_row;
+use crate::widgets::{self, Ctx, Outcome};
 use crate::{
     AppState, AppWindow, ApprovalInfo, CapState, ChatRow, ModelItem, NavEntry, ProjectItem, ProjectState, ScopeChip,
     SearchHit, SessionItem, SettingRowUI, SettingsState, Theme,
@@ -335,6 +336,9 @@ pub fn apply_device_pref(ui: &AppWindow, key: &str, value: &str) {
         };
         ui.global::<Theme>().set_mode(mode);
     }
+    // Widget panels own the rest of the visual prefs (the palette and cached fonts); they
+    // are applied here so an edit and a fresh start look the same.
+    crate::widgets::apply_pref(ui, key, value);
 }
 
 pub fn greeting_for_hour(h: u32) -> &'static str {
@@ -362,7 +366,7 @@ fn user_name() -> String {
 }
 
 /// Run `f` on the UI thread with the window, if it still exists.
-fn ui(weak: &Weak<AppWindow>, f: impl FnOnce(&AppWindow) + Send + 'static) {
+pub(crate) fn ui(weak: &Weak<AppWindow>, f: impl FnOnce(&AppWindow) + Send + 'static) {
     let _ = weak.upgrade_in_event_loop(move |w| f(&w));
 }
 
@@ -996,6 +1000,7 @@ impl Controller {
         }
         self.load_scoped_config().await;
         self.publish_settings();
+        self.load_widgets().await;
         self.set_loading(false);
         // Open time = keypress → the page's rows handed to the UI (docs/PERF.md).
         tracing::info!(
@@ -1029,6 +1034,7 @@ impl Controller {
                 self.settings_page = (g, p);
                 self.settings_hit.clear();
                 self.publish_settings();
+                self.load_widgets().await;
             }
             SettingsCmd::Search(q) => self.publish_hits(&q),
             SettingsCmd::Jump { group, page, setting } => {
@@ -1036,12 +1042,14 @@ impl Controller {
                 self.settings_page = (g, p);
                 self.settings_hit = setting;
                 self.publish_settings();
+                self.load_widgets().await;
             }
             SettingsCmd::Scope(name) => {
                 if name != self.scope {
                     self.scope = name;
                     self.load_scoped_config().await;
                     self.publish_settings();
+                    self.load_widgets().await;
                 }
             }
             SettingsCmd::Edit { id, value } => self.edit_setting(&id, &value).await,
@@ -1125,19 +1133,70 @@ impl Controller {
             Store::None => {}
         }
         self.publish_settings();
+        self.load_widgets().await;
     }
 
-    /// `Send test notification`-style rows.
-    async fn settings_action(&mut self, id: &str) {
-        match id {
-            "test-notification" => {
-                let Some(rest) = self.rest() else { return };
-                let body = json!({"title": "Hermes", "body": "Test notification"});
-                match rest.post("/api/desktop/notify", &body).await {
-                    Ok(_) => self.settings_notice("Test notification sent", false),
-                    Err(e) => self.settings_error(format!("Could not send a notification: {e}")),
-                }
+    /// Everything a widget module needs (see [`crate::widgets`]).
+    fn widget_ctx(&mut self) -> Option<Ctx> {
+        let rest = self.rest()?;
+        Some(Ctx {
+            rest,
+            weak: self.weak.clone(),
+            scope: self.scope.clone(),
+        })
+    }
+
+    /// Load the widget panels of the open page. Runs after every publish, so a widget
+    /// always reflects the same profile and config state as the rows around it.
+    async fn load_widgets(&mut self) {
+        let (group, page) = self.settings_page.clone();
+        let ids: Vec<&'static str> = settings::settings_for(&group, &page)
+            .filter(|s| widgets::owns(s.id))
+            .map(|s| s.id)
+            .collect();
+        if ids.is_empty() {
+            return;
+        }
+        let Some(ctx) = self.widget_ctx() else { return };
+        for id in ids {
+            widgets::load(id, &ctx).await;
+        }
+    }
+
+    /// Apply what a widget action asked the panel to do.
+    async fn apply_widget_outcome(&mut self, outcome: Outcome) {
+        match outcome {
+            Outcome::None => {}
+            Outcome::Notice(text) => self.settings_notice(text, false),
+            Outcome::Error(text) => self.settings_error(text),
+            Outcome::Edit(id, value) => self.edit_setting(&id, &value).await,
+            Outcome::Reload => {
+                self.load_scoped_config().await;
+                self.publish_settings();
+                self.load_widgets().await;
             }
+        }
+    }
+
+    /// Row actions: widget panels first (`<area>:<verb>[:<arg>]`, see [`crate::widgets`]),
+    /// then the singleton registry actions.
+    async fn settings_action(&mut self, id: &str) {
+        if let Some(area) = id.split(':').next()
+            && widgets::AREAS.contains(&area)
+        {
+            let Some(ctx) = self.widget_ctx() else { return };
+            let outcome = widgets::action(id, &ctx).await;
+            return self.apply_widget_outcome(outcome).await;
+        }
+        match id {
+            // The original raises a *native* notification here; this client has no OS
+            // notification path yet, and the gateway API exposes no notify route (the old
+            // code posted to /api/desktop/notify, which answers 405) — so say that plainly
+            // instead of claiming a delivery.
+            "notifications.test" | "test-notification" => self.settings_error(
+                "This client cannot raise desktop notifications yet — the switches below are stored, but nothing notifies."
+                    .to_owned(),
+            ),
             other => self.settings_error(format!("No handler for the “{other}” action yet")),
         }
     }
@@ -2076,15 +2135,6 @@ fn dyn_options(schema: Option<&Value>, key: &str) -> Option<Vec<String>> {
         .map(|a| a.iter().filter_map(Value::as_str).map(str::to_owned).collect())
 }
 
-/// Widget rows carry a short note for the control that is not built yet, so the page shows
-/// an honest placeholder instead of a dead control.
-fn widget_note(id: &str) -> &'static str {
-    match id {
-        "hermes-desktop-theme-v2" => "Palette picker not built yet",
-        _ => "",
-    }
-}
-
 /// One page's rows, ready for the UI model.
 fn build_rows(
     group: &str,
@@ -2119,7 +2169,9 @@ fn build_rows(
             max: r.max,
             unit: r.unit.into(),
             highlight: !hit.is_empty() && r.id == hit,
-            note: widget_note(r.id).into(),
+            note: String::new().into(),
+            full: matches!(r.kind, "widget" | "fallback") && !widgets::area(r.id).is_empty(),
+            area: widgets::area(r.id).into(),
         })
         .collect()
 }

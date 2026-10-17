@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**43 done · 219 partial · 530 not started · 1 unsupported** (of 793).
+**56 done · 225 partial · 507 not started · 6 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -72,7 +72,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 | Settings — Sessions page | 3 |
 | Settings — Vault page | 5 |
 | Settings — Providers & Keys page | 6 |
-| Settings — Plugins page | 3 |
+| Settings — Plugins page | 4 |
 | Settings — Billing page | 6 |
 | Settings — About page | 5 |
 | Appearance / themes | 12 |
@@ -82,7 +82,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 | Onboarding / auth / billing | 17 |
 | Remote connections | 20 |
 | Extras: webhooks, imports, subagents, learning, telemetry | 31 |
-| **Total** | **793** |
+| **Total** | **794** |
 
 ## Chat & composer
 
@@ -642,27 +642,39 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Settings deep-link (tab/page/field) — local — src/app/settings/use-setting-deep-link.ts
   ⟶ a search hit jumps to its page and highlights the row (live-tested); the Electron URL/tab deep-link has no native analogue — `HERMES_DESKTOP_OPEN_SETTINGS=<group>/<page>` opens a page for scripted screenshots
 - [x] Settings manifest (searchable row registry) — local — src/app/settings/settings-manifest.ts
-  ⟶ crates/hermes-core/src/settings.rs: every page and control in one table (labels, descriptions and option lists from the original; backend-config rows derived from /api/config/schema), ranked search, per-profile vs device store, conditional rows — 8 unit tests
+  ⟶ crates/hermes-core/src/settings.rs: every page and control in one table (labels, descriptions and option lists from the original; backend-config rows derived from /api/config/schema), ranked search, per-profile vs device store, conditional rows — 8 unit tests. Rows that need a panel of their own (palette grid, model pickers, provider keys, archived chats, …) render full-width through crates/hermes-ui/src/widgets/ (one module + one Slint view per area: appearance / models / providers / system), loaded after every publish and driven by `<area>:<verb>` actions; tests/live_backend.rs `widgets` covers 20 checks incl. a write + REST read-back per area
 - [-] Legacy tab redirects (connections→gateway, mcp→capabilities) — local — src/app/settings/moved-tabs.ts
   ⟶ unsupported: the native app has no URL-based settings tabs; each page carries one registry id, so there is nothing to redirect
 
 ## Settings — Model page
 
-- [ ] Default model — config model / REST /api/model/set — src/app/settings/constants.ts
-- [ ] Main model context override — config model_context_length — src/app/settings/constants.ts
-- [ ] Reasoning effort — config agent.reasoning_effort — src/app/settings/config-subpages.ts
-- [ ] Service tier — config agent.service_tier — src/app/settings/constants.ts
-- [ ] Fallback models — config fallback_providers — src/app/settings/fallback-models-field.tsx
-- [ ] Auxiliary (task) models — REST /api/model/auxiliary — src/app/settings/aux-task-rows.tsx
-- [ ] MoA models — REST /api/model/moa — src/app/settings/model-settings.tsx
+- [x] Default model — config model / REST /api/model/set — src/app/settings/constants.ts
+  ⟶ `model.main` panel: `/api/model/options` grouped by provider with search + current marker, picked via POST /api/model/set — widgets live test: "4 providers · 130 models", a pick moved the backend's current provider and the panel followed (docs/screenshots/rs-widget-model-main.png)
+- [~] Main model context override — config model_context_length — src/app/settings/constants.ts
+  ⟶ registry row from the settings table; writes go through the same live-verified config path (PUT /api/config, exercised by the settings section) — not individually exercised
+- [~] Reasoning effort — config agent.reasoning_effort — src/app/settings/config-subpages.ts
+  ⟶ registry row from the settings table; writes go through the same live-verified config path (PUT /api/config, exercised by the settings section) — not individually exercised
+- [~] Service tier — config agent.service_tier — src/app/settings/constants.ts
+  ⟶ registry row from the settings table; writes go through the same live-verified config path (PUT /api/config, exercised by the settings section) — not individually exercised
+- [x] Fallback models — config fallback_providers — src/app/settings/fallback-models-field.tsx
+  ⟶ `fallback_providers` renders as a list editor (add via provider/model pickers, remove, move up/down) writing the config key — widgets live test: editor rows == config `fallback_providers` (docs/screenshots/rs-widget-model-fallbacks.png)
+- [x] Auxiliary (task) models — REST /api/model/auxiliary — src/app/settings/aux-task-rows.tsx
+  ⟶ one row per backend task with a model picker writing `auxiliary.<task>.*` — widgets live test: 12 rows == the backend's 12 tasks (docs/screenshots/rs-widget-model-auxiliary.png)
+- [x] MoA models — REST /api/model/moa — src/app/settings/model-settings.tsx
+  ⟶ enable toggle, reference-model list (add/remove/per-row enable), aggregator picker, fan-out and degraded policy, PUT back whole — widgets live test: loaded 1 preset / 2 reference models / aggregator openrouter · anthropic/claude-opus-4.8 (docs/screenshots/rs-widget-model-moa.png)
 
 ## Settings — Chat page
 
-- [ ] Personality — config display.personality — src/app/settings/constants.ts
-- [ ] Timezone — config timezone — src/app/settings/constants.ts
-- [ ] Reasoning blocks — config display.show_reasoning — src/app/settings/constants.ts
-- [ ] Image attachments mode — config agent.image_input_mode — src/app/settings/constants.ts
-- [ ] Attachment size limit — local chat.attachmentSize — src/app/settings/settings-manifest.ts
+- [~] Personality — config display.personality — src/app/settings/constants.ts
+  ⟶ registry row from the settings table; writes go through the same live-verified config path (PUT /api/config, exercised by the settings section) — not individually exercised
+- [~] Timezone — config timezone — src/app/settings/constants.ts
+  ⟶ registry row from the settings table; writes go through the same live-verified config path (PUT /api/config, exercised by the settings section) — not individually exercised
+- [~] Reasoning blocks — config display.show_reasoning — src/app/settings/constants.ts
+  ⟶ registry row from the settings table; writes go through the same live-verified config path (PUT /api/config, exercised by the settings section) — not individually exercised
+- [~] Image attachments mode — config agent.image_input_mode — src/app/settings/constants.ts
+  ⟶ registry row from the settings table; writes go through the same live-verified config path (PUT /api/config, exercised by the settings section) — not individually exercised
+- [~] Attachment size limit — local chat.attachmentSize — src/app/settings/settings-manifest.ts
+  ⟶ the device row renders and persists; attachment preview caps are not enforced in this client
 
 ## Settings — Appearance page
 
@@ -680,18 +692,18 @@ Performance work is tracked separately in [PERF.md](PERF.md).
   ⟶ row renders and persists; no tips system
 - [~] Tours — local — src/app/settings/settings-manifest.ts (appearance.tours)
   ⟶ row renders and persists; no tours
-- [~] Theme / skin — local — src/app/settings/settings-manifest.ts (appearance.theme)
-  ⟶ row renders and persists; the palette grid and palette application are not built (the row shows a labelled placeholder)
+- [x] Theme / skin — local — src/app/settings/settings-manifest.ts (appearance.theme)
+  ⟶ `hermes-desktop-theme-v2` renders a palette grid from GET /api/dashboard/themes (label + description + colour swatch, active marked); picking PUTs /api/dashboard/theme and persists the device pref, and the four palettes this window carries a local copy of (Midnight, Ember, Mono, Cyberpunk) re-skin it live — widgets live test: 8 grid rows == the backend's 8 themes, a pick switched the backend theme; themes without a local copy say so in the panel (docs/screenshots/rs-widget-appearance-theme.png)
 - [x] Dark/light/system mode — local — src/app/settings/constants.ts (MODE_OPTIONS)
   ⟶ applied live to the app's Theme global (mode switch is immediate); shot in light and dark (docs/screenshots/rs-settings-*.png)
 - [~] UI scale — local — src/app/settings/settings-manifest.ts (appearance.uiScale)
   ⟶ row renders and persists; the layout does not scale yet
 - [~] Chat text scale — local — src/app/settings/settings-manifest.ts (appearance.chatTextScale)
   ⟶ row renders and persists; conversation text does not scale yet
-- [~] Chat font — local — src/app/settings/settings-manifest.ts (appearance.chatFont)
-  ⟶ a plain text input writes the config key; the installed-font picker is not built
-- [~] Terminal font — local — src/app/settings/settings-manifest.ts (appearance.terminalFont)
-  ⟶ a plain text input writes the config key; there is no terminal panel yet
+- [x] Chat font — local — src/app/settings/settings-manifest.ts (appearance.chatFont)
+  ⟶ searchable picker over the installed families (`fc-list`, 240 here) with a "theme font" option; writes `desktop.font_family`, applied live and at startup — widgets live test: both pickers listed 240 families (docs/screenshots/rs-widget-appearance-typography.png)
+- [x] Terminal font — local — src/app/settings/settings-manifest.ts (appearance.terminalFont)
+  ⟶ same installed-font picker for `terminal.font_family`; applied to the app's mono face (there is still no terminal panel in this client)
 - [~] Interface mode (Simple/Advanced) — local — src/store/interface-mode.ts
   ⟶ row renders and persists; the shell always shows the advanced layout
 - [~] Session list density — local — src/store/session-list-density.ts
@@ -727,8 +739,8 @@ Performance work is tracked separately in [PERF.md](PERF.md).
   ⟶ row renders and persists; reasoning blocks are not rendered yet
 - [~] Embeds mode (ask/always/off) — local — src/store/embed-consent.ts
   ⟶ row renders and persists; no embed handling
-- [~] Pet appearance — local — src/app/settings/pet-settings.tsx
-  ⟶ row renders and persists; no pet
+- [-] Pet appearance — local — src/app/settings/pet-settings.tsx
+  ⟶ unsupported: the petdex runtime (spritesheet renderer + pet dex RPC) is not part of this client; the panel says exactly that instead of offering a dead picker
 - [~] Video playback speed — local — src/store/video-playback-speed.ts
   ⟶ row renders and persists; no in-app video
 - [~] Appearance plugin seam (appearance.extra) — local — src/app/settings/appearance-contrib.tsx
@@ -824,70 +836,100 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Settings — Gateway / Connections page
 
-- [~] Connection mode (local/remote/cloud) — local (Electron connection-config) — src/app/settings/gateway-settings.tsx ⟶ logic in `hermes-core::remote` (URL rules, HTTP + WebSocket auth probe, saved profile; token auth only, no TLS/OAuth login/ssh/cloud) — live probe vs private backend 2026-10-17 (`tests/live_remote.rs`: ok / wrong token / unreachable / wrong service); no connection screen yet
+- [~] Connection mode (local/remote/cloud) — local (Electron connection-config) — src/app/settings/gateway-settings.tsx
+  ⟶ `gateway.mode` shows this window's live connection instead: host:port, backend version/release, protocol version, pid, gateway state, with a two-click gateway restart — widgets live test: endpoint 127.0.0.1:<private port>, version, pid and state read from /api/status + /api/host/identity (docs/screenshots/rs-widget-gateway-connection.png); local/remote/cloud *selection* is not part of the native client (attach is HERMES_DESKTOP_PORT / discovery)
 - [~] Remote URL + token — local (Electron) — src/app/settings/gateway-settings.tsx ⟶ logic in `hermes-core::remote` (URL rules, HTTP + WebSocket auth probe, saved profile; token auth only, no TLS/OAuth login/ssh/cloud) — live probe vs private backend 2026-10-17 (`tests/live_remote.rs`: ok / wrong token / unreachable / wrong service); no connection screen yet
 - [~] Extra gateway headers — local (Electron connection.json) (platform) — src/app/settings/gateway-settings.tsx ⟶ logic in `hermes-core::remote` (URL rules, HTTP + WebSocket auth probe, saved profile; token auth only, no TLS/OAuth login/ssh/cloud) — live probe vs private backend 2026-10-17 (`tests/live_remote.rs`: ok / wrong token / unreachable / wrong service); no connection screen yet
 - [ ] SSH connection host — local (Electron ssh-config) — src/app/settings/ssh-host-selection.ts
 - [ ] Cloud connection (sign-in, org/agent picker) — local + REST — src/app/settings/gateway-settings.tsx
 - [ ] Keychain encryption of secrets — local (Electron secret-storage-policy) — src/app/settings/settings-manifest.ts (gateway.keychainEncryption)
-- [ ] Connections registry — local — src/app/settings/connections-registry.tsx
+- [~] Connections registry — local — src/app/settings/connections-registry.tsx
+  ⟶ `gateway.devices` keeps a saved-connection list in prefs.json (label + endpoint), and copying the exact attach command (`HERMES_DESKTOP_PORT=… hermes-desktop-rs`); switching the live window to a saved backend without a relaunch is not implemented (docs/screenshots/rs-widget-gateway-devices.png)
 - [~] Diagnostics (share logs) — RPC diagnostics.share_nous + REST /api/ops/debug-share — src/app/settings/settings-manifest.ts (gateway.diagnostics) ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
-- [~] Gateway restart — REST /api/gateway/restart — src/lib/shared-gateway-restart.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
-- [~] Managed updates — local + REST /api/hermes/update — src/app/settings/managed-updates-section.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
+- [~] Gateway restart — REST /api/gateway/restart — src/lib/shared-gateway-restart.ts
+  ⟶ wired behind a two-click confirm in `gateway.mode`; not triggered against the private test backend
+- [-] Managed updates — local + REST /api/hermes/update — src/app/settings/managed-updates-section.tsx
+  ⟶ unsupported: remote SSH-managed updates are not part of this client; the panel says so and points at About › Version & updates (docs/screenshots/rs-widget-gateway-managed-updates.png)
 - [~] Doctor / security audit / backup — REST /api/ops/doctor|security-audit|backup — src/api/system.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Open logs — local (Electron) — src/app/settings/gateway-settings.tsx
 - [ ] Environment override (HERMES_*) — local — src/app/settings/env-credentials.tsx
 
 ## Settings — Keybinds page
 
-- [~] Shortcuts list + capture/rebind — local — src/app/settings/keybind-settings.tsx ⟶ registry in `hermes-core::keybinds` (92 actions with Linux defaults, parse/format/match, overrides, conflicts; 27 unit tests); no shortcuts screen or dispatch yet
+- [~] Shortcuts list + capture/rebind — local — src/app/settings/keybind-settings.tsx
+  ⟶ `keybinds.list` renders this app's real bindings (12 rows: Ctrl+N, Ctrl+,, Esc, Ctrl+Q, …) read from the source, not an invented list — widgets live test confirms the rows; per-user rebinding is not implemented (docs/screenshots/rs-widget-keybinds-shortcuts.png)
 - [ ] HUD modifier gesture — local (Electron hud-modifier) — src/app/settings/hud-modifier-settings.tsx
 - [ ] Screenshot shortcut — local (Electron screenshot) — src/app/settings/screenshot-settings.tsx
 
 ## Settings — Notifications page
 
-- [~] Enable all notifications — local — src/app/settings/notifications-settings.tsx ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
-- [~] Approval notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
-- [~] Input notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
-- [~] Turn-done notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
-- [~] Turn-error notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
-- [~] Background-done notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
-- [~] Credits notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
-- [~] Plugin notifications — local — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
-- [ ] Completion sound — local — src/store/completion-sound.ts
+- [~] Enable all notifications — local — src/app/settings/notifications-settings.tsx
+  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+- [~] Approval notifications — local — src/store/native-notifications.ts
+  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+- [~] Input notifications — local — src/store/native-notifications.ts
+  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+- [~] Turn-done notifications — local — src/store/native-notifications.ts
+  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+- [~] Turn-error notifications — local — src/store/native-notifications.ts
+  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+- [~] Background-done notifications — local — src/store/native-notifications.ts
+  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+- [~] Credits notifications — local — src/store/native-notifications.ts
+  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+- [~] Plugin notifications — local — src/store/native-notifications.ts
+  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+- [~] Completion sound — local — src/store/completion-sound.ts
+  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
 
 ## Settings — Sessions page
 
-- [ ] Auto-archive stale sessions — local — src/app/settings/sessions-settings.tsx
-- [ ] Default directory — local — src/app/settings/sessions-settings.tsx
-- [~] Archived sessions list — REST /api/profiles/sessions — src/app/settings/sessions-settings.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Auto-archive stale sessions — local — src/app/settings/sessions-settings.tsx
+  ⟶ `sessions.auto_archive` / `sessions.auto_archive_days` are registry row from the settings table; writes go through the same live-verified config path (PUT /api/config, exercised by the settings section) — not individually exercised
+- [~] Default directory — local — src/app/settings/sessions-settings.tsx
+  ⟶ device pref `project-dir` renders and persists; new chats still open in the project/home default
+- [x] Archived sessions list — REST /api/profiles/sessions — src/app/settings/sessions-settings.tsx
+  ⟶ `sessions.archived-list` reads /api/sessions/stats + ?archived=only, lists archived chats and restores/deletes them with the backend's fenced PATCH/DELETE contract — widgets live test: stats/empty-count matched the backend, and a chat archived by REST appeared in the panel and came back through the panel's restore (docs/screenshots/rs-widget-sessions-archived.png)
 
 ## Settings — Vault page
 
-- [~] Vault credentials list — RPC vault.list — src/app/settings/vault-settings.tsx ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
+- [x] Vault credentials list — RPC vault.list — src/app/settings/vault-settings.tsx
+  ⟶ `vault.credentials` shows the agent's credential pool (GET /api/credentials/pool): per provider, each entry's label, auth type, source, last status and request count — widgets live test: 7 groups == the backend's 7 providers (docs/screenshots/rs-widget-vault-credentials.png)
 - [~] Add credential — RPC vault.add — src/app/settings/vault-settings.tsx ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
-- [~] Remove credential — RPC vault.remove — src/app/settings/vault-settings.tsx ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
-- [~] Lock/unlock vault — RPC vault.lock, vault.unlock — src/app/settings/vault-settings.tsx ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
-- [~] Vault sources — RPC vault.sources, vault.source.set — src/app/settings/vault-settings.tsx ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
+- [~] Remove credential — RPC vault.remove — src/app/settings/vault-settings.tsx
+  ⟶ wired to DELETE /api/credentials/pool/{provider}/{index} behind a two-click confirm; not exercised live (removing an entry would leave the private test backend short)
+- [-] Lock/unlock vault — RPC vault.lock, vault.unlock — src/app/settings/vault-settings.tsx
+  ⟶ unsupported: the vault lock/unlock RPC belongs to the agent's browser-vault; this client speaks REST only
+- [-] Vault sources — RPC vault.sources, vault.source.set — src/app/settings/vault-settings.tsx
+  ⟶ unsupported: no REST route for password-manager sources; the panel says so and points at Saved credentials (docs/screenshots/rs-widget-vault-sources.png)
 
 ## Settings — Providers & Keys page
 
-- [ ] Provider accounts (OAuth) — REST /api/providers/oauth/* — src/app/settings/providers-settings.tsx
-- [~] API keys (env vars) — REST /api/env, /api/env/reveal — src/app/settings/keys-settings.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
-- [ ] Custom endpoints — REST /api/providers/custom-endpoints — src/app/settings/custom-endpoints-settings.tsx
-- [ ] Local models — REST /api/local-models/* — src/app/settings/local-models-settings.tsx
-- [ ] Tool keys (per-provider tool credentials) — local — src/app/settings/keys-settings.tsx (view 'tools')
+- [x] Provider accounts (OAuth) — REST /api/providers/oauth/* — src/app/settings/providers-settings.tsx
+  ⟶ `providers.accounts` lists every provider with sign-in state, source, expiry and token preview from GET /api/providers/oauth; device-code flows (start → code + URL → poll → submit/cancel) and disconnect are wired — widgets live test: 8 rows == the backend's 8 providers, including the expired-token hint the backend reports (docs/screenshots/rs-widget-providers-accounts.png)
+- [x] API keys (env vars) — REST /api/env, /api/env/reveal — src/app/settings/keys-settings.tsx
+  ⟶ `providers.keys` groups the provider credential rows of /api/env with masked values, reveal (POST /api/env/reveal), set (PUT /api/env) and delete (DELETE /api/env) — widgets live test: 46 groups from the backend's env catalogue (docs/screenshots/rs-widget-providers-keys.png)
+- [~] Custom endpoints — REST /api/providers/custom-endpoints — src/app/settings/custom-endpoints-settings.tsx
+  ⟶ `providers.custom` lists endpoints + the current route and wires add / validate / activate / delete; the private backend has no custom endpoints, so only the empty state + form were exercised (docs/screenshots/rs-widget-providers-custom-endpoints.png)
+- [~] Local models — REST /api/local-models/* — src/app/settings/local-models-settings.tsx
+  ⟶ `providers.local` shows runtime/model state + hardware (GPU, VRAM, RAM) and wires server start/stop, activate and eject; the download/runtime-install flows are out of scope this round, and this machine's runtime is not installed, so the not-installed state is what was exercised (docs/screenshots/rs-widget-providers-local-models.png)
+- [~] Tool keys (per-provider tool credentials) — local — src/app/settings/keys-settings.tsx (view 'tools')
+  ⟶ Keys › Tools lists the backend's toolsets with enable toggles (GET/PUT /api/tools/toolsets) — widgets live test: 27 rows, a toggle flipped the backend and was put back; the Electron per-provider tool-credential view is the env list on Keys › Settings, which is wired to /api/env (docs/screenshots/rs-widget-keys-tools.png, rs-widget-keys-settings.png)
 - [ ] Provider groups (Nous/Fireworks/OpenRouter/Anthropic/xAI/Google/DeepSeek/…) — local — src/app/settings/constants.ts (PROVIDER_GROUPS)
 
 ## Settings — Plugins page
 
+- [x] Installed desktop plugins (list + enable/disable + rescan) — REST /api/dashboard/plugins — src/app/settings/plugin-settings.tsx
+  ⟶ `plugins.list` lists the backend's plugins with state and wires enable/disable + rescan — widgets live test: 2 rows == the backend's 2 plugins (docs/screenshots/rs-widget-plugins-installed.png)
 - [ ] Per-plugin settings pages — local — src/app/settings/plugin-settings.tsx
+  ⟶ not built: plugin-contributed settings sub-pages are out of scope (the panel says so)
 - [ ] Plugin settings form (declarative fields) — local — src/app/settings/plugin-settings-form.tsx
 - [~] Plugin install from catalog — RPC plugins.catalog.lookup — src/app/settings/plugin-install-modal.tsx ⟶ backend client ready in `api::plugins` (live-verified calls listed in docs/api/plugins.md); UI not wired
 
 ## Settings — Billing page
 
-- [ ] Billing overview (plan/credits) — RPC billing.state — src/app/settings/billing/index.tsx
+- [~] Billing overview (plan/credits) — RPC billing.state — src/app/settings/billing/index.tsx
+  ⟶ `billing.overview` is read-only and reads what the REST API has: account/plan state from GET /api/portal (incl. the feature list and the portal/subscription URLs) and usage totals from GET /api/analytics/usage — widgets live test: 30-day window, token/cost/session totals (docs/screenshots/rs-widget-billing-overview.png); the credit purchase/charge RPCs are not part of this client
 - [ ] Plans view (upgrade/change) — RPC subscription.* — src/app/settings/billing/plans-view.tsx
 - [ ] Auto-reload credits — RPC billing.auto_reload — src/app/settings/billing/auto-reload-row.tsx
 - [ ] Charge / charge status — RPC billing.charge, billing.charge_status — src/app/settings/billing/use-charge-poller.ts
@@ -896,10 +938,13 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Settings — About page
 
-- [~] App updates (check/download) — REST /api/hermes/update + Electron updater — src/app/settings/about-settings.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
+- [x] App updates (check/download) — REST /api/hermes/update + Electron updater — src/app/settings/about-settings.tsx
+  ⟶ `about.version` shows the client and backend versions from /api/status and the update check (GET /api/hermes/update/check: install method, behind-count, can-apply, message), with “Apply update” (POST /api/hermes/update) behind a two-click confirm — widgets live test: client 0.1.0 / backend 0.22.1 / install git matched /api/status exactly (docs/screenshots/rs-widget-about-updates.png)
 - [ ] Update channel — local — src/app/settings/update-channel-row.tsx, src/store/updates-channel.ts
-- [ ] Version label + distribution — local — src/lib/version-label.ts, distribution-label.ts
-- [ ] Uninstall Hermes — local (Electron desktop-uninstall) — src/app/settings/uninstall-section.tsx
+- [~] Version label + distribution — local — src/lib/version-label.ts, distribution-label.ts
+  ⟶ client version, backend version/release date and install method are shown (live-verified); update channels / distribution labels are not part of this client
+- [-] Uninstall Hermes — local (Electron desktop-uninstall) — src/app/settings/uninstall-section.tsx
+  ⟶ unsupported: the Electron uninstaller has no native analogue; the panel lists this install's real paths (launcher, desktop entry, checkout binary) and the exact removal command, with no destructive action (docs/screenshots/rs-widget-about-uninstall.png)
 - [ ] Credits / open-source licenses — local — src/app/settings/about-settings.tsx
 
 ## Appearance / themes

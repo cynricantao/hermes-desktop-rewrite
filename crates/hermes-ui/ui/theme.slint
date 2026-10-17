@@ -12,20 +12,66 @@ export global Theme {
     in-out property <bool> system-dark: true;
     out property <bool> dark: mode == ThemeMode.dark || (mode == ThemeMode.system && system-dark);
 
+    // Palette. "" / "nous" is the default look (the values below, unchanged); the four
+    // names below are the desktop presets this client can render locally (midnight, ember,
+    // mono, cyberpunk — the ones shared with the Electron desktop). Any other name keeps the
+    // default tokens: the backend still switches the dashboard theme, this window just has no
+    // local palette for it. Set by `widgets::appearance::apply_pref` from the device pref.
+    in-out property <string> palette: "nous";
+    property <bool> pal-midnight: palette == "midnight";
+    property <bool> pal-ember: palette == "ember";
+    property <bool> pal-mono: palette == "mono";
+    property <bool> pal-cyberpunk: palette == "cyberpunk";
+
     // Surfaces
-    out property <color> bg:            dark ? #151515 : #fcfcfb;
-    out property <color> sidebar-bg:    dark ? #111111 : #fbfbf9;
-    out property <color> surface:       dark ? #20201f : #ffffff;
-    out property <color> surface-2:     dark ? #2c2c2a : #f0efec;
-    out property <color> raised:        dark ? #20201f : #ffffff;
+    out property <color> bg:
+        pal-midnight ? (dark ? #08081c : #f6f5fc)
+      : pal-ember ? (dark ? #160800 : #fdf7f0)
+      : pal-mono ? (dark ? #0e0e0e : #fafafa)
+      : pal-cyberpunk ? (dark ? #000a00 : #eef7ec)
+      : (dark ? #151515 : #fcfcfb);
+    out property <color> sidebar-bg:
+        pal-midnight ? (dark ? #06061a : #f1f0fa)
+      : pal-ember ? (dark ? #100600 : #fbf1e7)
+      : pal-mono ? (dark ? #0a0a0a : #f6f6f6)
+      : pal-cyberpunk ? (dark ? #000600 : #e7f2e4)
+      : (dark ? #111111 : #fbfbf9);
+    out property <color> surface:
+        pal-midnight ? (dark ? #0d0d28 : #ffffff)
+      : pal-ember ? (dark ? #1e0e04 : #ffffff)
+      : pal-mono ? (dark ? #141414 : #ffffff)
+      : pal-cyberpunk ? (dark ? #001200 : #ffffff)
+      : (dark ? #20201f : #ffffff);
+    out property <color> surface-2:
+        pal-midnight ? (dark ? #13133a : #eceaf7)
+      : pal-ember ? (dark ? #2a1408 : #f7ece0)
+      : pal-mono ? (dark ? #1e1e1e : #f0f0f0)
+      : pal-cyberpunk ? (dark ? #001a00 : #dcefda)
+      : (dark ? #2c2c2a : #f0efec);
+    out property <color> raised:
+        pal-midnight ? (dark ? #0d0d28 : #ffffff)
+      : pal-ember ? (dark ? #1e0e04 : #ffffff)
+      : pal-mono ? (dark ? #141414 : #ffffff)
+      : pal-cyberpunk ? (dark ? #001200 : #ffffff)
+      : (dark ? #20201f : #ffffff);
     out property <color> hover:         dark ? #ffffff0d : #0b0b0b0d;
     out property <color> pressed:       dark ? #ffffff1a : #0b0b0b1a;
     out property <color> selected:      dark ? #ffffff1a : #0b0b0b1a;
     out property <color> scrim:         dark ? #00000080 : #00000066;
 
     // Borders
-    out property <color> border:        dark ? #ffffff1a : #0b0b0b1a;
-    out property <color> border-strong: dark ? #ffffff33 : #0b0b0b33;
+    out property <color> border:
+        pal-midnight ? (dark ? #1e1e52 : #ddd9ef)
+      : pal-ember ? (dark ? #3a1c08 : #ecdcc9)
+      : pal-mono ? (dark ? #2a2a2a : #e3e3e3)
+      : pal-cyberpunk ? (dark ? #003000 : #c9e2c6)
+      : (dark ? #ffffff1a : #0b0b0b1a);
+    out property <color> border-strong:
+        pal-midnight ? (dark ? #2b2b6e : #c6c0e4)
+      : pal-ember ? (dark ? #552a10 : #dcc4a6)
+      : pal-mono ? (dark ? #3d3d3d : #c9c9c9)
+      : pal-cyberpunk ? (dark ? #005000 : #a9d2a4)
+      : (dark ? #ffffff33 : #0b0b0b33);
 
     // Text
     out property <color> text:          dark ? #f0efec : #0b0b0b;
@@ -34,12 +80,32 @@ export global Theme {
     out property <color> text-4:        dark ? #6d6b67 : #a5a49a;
 
     // Accent & semantic
-    out property <color> accent:        dark ? #d97757 : #d97757;
-    out property <color> accent-soft:   dark ? #d977572e : #d9775724;
+    out property <color> accent:
+        pal-midnight ? (dark ? #8b80e8 : #6d5fd0)
+      : pal-ember ? (dark ? #d97316 : #c1502a)
+      : pal-mono ? (dark ? #9a9a9a : #5f5f5f)
+      : pal-cyberpunk ? (dark ? #00ff41 : #0f8f2f)
+      : (dark ? #d97757 : #d97757);
+    out property <color> accent-soft:
+        pal-midnight ? (dark ? #8b80e82e : #6d5fd024)
+      : pal-ember ? (dark ? #d973162e : #c1502a24)
+      : pal-mono ? (dark ? #9a9a9a2e : #5f5f5f24)
+      : pal-cyberpunk ? (dark ? #00ff412e : #0f8f2f24)
+      : (dark ? #d977572e : #d9775724);
     out property <color> on-accent:     #ffffff;
     // Interactive blue (toggles, focus, primary buttons); clay above is brand-only.
-    out property <color> interactive:   #2a78d6;
-    out property <color> toggle-on:     dark ? #2a78d6 : #2a78d6;
+    out property <color> interactive:
+        pal-midnight ? (dark ? #8b80e8 : #6d5fd0)
+      : pal-ember ? (dark ? #d97316 : #c1502a)
+      : pal-mono ? (dark ? #9a9a9a : #5f5f5f)
+      : pal-cyberpunk ? (dark ? #00ff41 : #0f8f2f)
+      : #2a78d6;
+    out property <color> toggle-on:
+        pal-midnight ? (dark ? #8b80e8 : #6d5fd0)
+      : pal-ember ? (dark ? #d97316 : #c1502a)
+      : pal-mono ? (dark ? #9a9a9a : #5f5f5f)
+      : pal-cyberpunk ? (dark ? #00ff41 : #0f8f2f)
+      : (dark ? #2a78d6 : #2a78d6);
     out property <color> link:          dark ? #74abe2 : #1b67b2;
     out property <color> success:       dark ? #55bf50 : #1e9e3c;
     out property <color> danger:        dark ? #ec7e7e : #cd2054;
@@ -48,7 +114,12 @@ export global Theme {
     out property <color> diff-del-bg:   dark ? #ff2c5633 : #cd205433;
     out property <color> diff-add-fg:   dark ? #32d74b : #1e9e3c;
     out property <color> diff-del-fg:   dark ? #ff2c56 : #cd2054;
-    out property <color> code-bg:       dark ? #1a1a19 : #f9f9f7;
+    out property <color> code-bg:
+        pal-midnight ? (dark ? #0b0b22 : #f4f2fb)
+      : pal-ember ? (dark ? #1a0b02 : #fbf3ea)
+      : pal-mono ? (dark ? #111111 : #f5f5f5)
+      : pal-cyberpunk ? (dark ? #000d00 : #eaf5e7)
+      : (dark ? #1a1a19 : #f9f9f7);
 
     // Typography
     in-out property <string> ui-font: "Inter";
