@@ -204,10 +204,15 @@ component Sidebar inherits Rectangle {
 
 component ModelPicker inherits Rectangle {
     in-out property <bool> open;
+    // Room the usage site allows (the space above the chip row); the panel hugs its rows up to it
+    // so a short catalog does not sit in a mostly-empty panel far from its chip. (`max-height` is
+    // taken: it is a builtin layout constraint.)
+    in property <length> available: 420px;
     property <float> t: open ? 1 : 0;
     animate t { duration: Motion.base; easing: Ease.out; }
     visible: t > 0.01;
     opacity: t;
+    height: min(catalog.preferred-height + 8px, available);
     border-radius: Theme.r-lg;
     background: Theme.raised;
     border-width: 1px;
@@ -221,7 +226,7 @@ component ModelPicker inherits Rectangle {
         x: 4px; y: 4px;
         width: parent.width - 8px;
         height: parent.height - 8px;
-        VerticalLayout {
+        catalog := VerticalLayout {
             if AppState.models.length == 0: Text {
                 text: "No models are available yet. Configure a provider in Hermes, then reopen this menu.";
                 wrap: word-wrap; color: Theme.text-3;
@@ -324,6 +329,21 @@ export component AppWindow inherits Window {
     in-out property <bool> effort-open: false;
     property <bool> empty: AppState.rows.length == 0;
     property <length> dock-h: 92px;
+    // Window-space chip-row anchors, published by the two composer instances: an id declared
+    // inside an `if` block is not visible here, so the composers push their geometry instead.
+    property <Point> hero-chip-anchor: { x: 0px, y: 0px };
+    property <Point> dock-chip-anchor: { x: 0px, y: 0px };
+    // The popups (model picker, reasoning menu) hang off the chip row of whichever composer is
+    // live — the hero composer while the conversation is empty, the docked one afterwards — so
+    // they follow it instead of sitting at a fixed distance from the content area's bottom.
+    property <Point> chip-anchor: root.empty ? root.hero-chip-anchor : root.dock-chip-anchor;
+    // The same point in `main`'s coordinates: the popups are children of `main`.
+    property <Point> chip-anchor-local: {
+        x: root.chip-anchor.x - main.absolute-position.x,
+        y: root.chip-anchor.y - main.absolute-position.y,
+    };
+    // Breathing room between a popup's edge and the chip row it belongs to.
+    property <length> popup-gap: 8px;
 
     callback quit();
 
@@ -441,7 +461,8 @@ export component AppWindow inherits Window {
                 HorizontalLayout {
                     alignment: center;
                     hero := Composer {
-                        init => { self.focus(); }
+                        init => { self.focus(); root.hero-chip-anchor = self.chip-anchor; }
+                        changed chip-anchor => { root.hero-chip-anchor = self.chip-anchor; }
                         width: min(main.width - 64px, 672px);
                         centered: true;
                         text <=> AppState.draft;
@@ -473,8 +494,9 @@ export component AppWindow inherits Window {
                 x: (parent.width - self.width) / 2;
                 y: parent.height - self.height - 8px;
                 // The hero composer is destroyed when the first row appears; keep typing focus.
-                init => { root.dock-h = self.height; self.focus(); }
+                init => { root.dock-h = self.height; self.focus(); root.dock-chip-anchor = self.chip-anchor; }
                 changed height => { root.dock-h = self.height; }
+                changed chip-anchor => { root.dock-chip-anchor = self.chip-anchor; }
                 width: min(parent.width - 48px, Theme.column-w);
                 centered: false;
                 placeholder: "Reply to Hermes…";
@@ -500,15 +522,24 @@ export component AppWindow inherits Window {
 
             if root.effort-open: TouchArea { clicked => { root.effort-open = false; } }
             if root.effort-open: Rectangle {
-                width: 180px; height: 288px;
-                x: parent.width - self.width - max(24px, (parent.width - Theme.column-w) / 2);
-                y: parent.height - self.height - 54px;
+                width: 180px;
+                // Right edge on the composer's, bottom edge just above the chip row. A window too
+                // short to fit all eight levels shrinks the panel and scrolls instead of letting
+                // the list cover the chips.
+                x: root.chip-anchor-local.x - self.width;
+                y: max(8px, root.chip-anchor-local.y - self.height - root.popup-gap);
+                height: min(effort-levels.preferred-height + 2px, max(120px, root.chip-anchor-local.y - 16px));
                 background: Theme.raised; border-radius: Theme.r-lg; border-width: 1px; border-color: Theme.border-strong;
-                VerticalLayout {
-                    padding: 6px; spacing: 2px;
-                    for level in AppState.effort-options: NavItem {
-                        has-icon: false; text: level; selected: level == AppState.effort-label;
-                        clicked => { AppState.select-effort(level); root.effort-open = false; }
+                ScrollView {
+                    x: 1px; y: 1px;
+                    width: parent.width - 2px;
+                    height: parent.height - 2px;
+                    effort-levels := VerticalLayout {
+                        padding: 6px; spacing: 2px;
+                        for level in AppState.effort-options: NavItem {
+                            has-icon: false; text: level; selected: level == AppState.effort-label;
+                            clicked => { AppState.select-effort(level); root.effort-open = false; }
+                        }
                     }
                 }
             }
@@ -518,9 +549,9 @@ export component AppWindow inherits Window {
             ModelPicker {
                 open <=> root.picker-open;
                 width: 320px;
-                height: min(420px, parent.height - 120px);
-                x: parent.width - self.width - max(24px, (parent.width - Theme.column-w) / 2);
-                y: parent.height - self.height - 54px;
+                available: min(420px, root.chip-anchor-local.y - 16px);
+                x: root.chip-anchor-local.x - self.width;
+                y: max(8px, root.chip-anchor-local.y - self.height - root.popup-gap);
             }
         }
 

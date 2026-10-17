@@ -340,6 +340,15 @@ export component Composer inherits Rectangle {
     // Focus lands in the text input itself (the FocusScope around it only captures Enter).
     forward-focus: input;
 
+    // Window-space top-right corner of the chip row. The composer is vertically centred while
+    // the conversation is empty and docked to the bottom once it has rows, so the popups that
+    // belong to the chips (model picker, reasoning menu) anchor here: a fixed offset from the
+    // content area's bottom is what kept the reasoning menu detached from its chip.
+    out property <Point> chip-anchor: {
+        x: self.absolute-position.x + self.width,
+        y: self.absolute-position.y + card.height + 6px,
+    };
+
     height: card.height + (centered ? 40px : 36px);
 
     card := Rectangle {
