@@ -158,6 +158,9 @@ impl Transcript {
     pub fn load_history(&mut self, messages: &[TranscriptMessage]) -> Change {
         self.blocks.clear();
         for m in messages {
+            if m.display_kind.as_deref() == Some("hidden") {
+                continue;
+            }
             match m.role.as_str() {
                 "user" => self.blocks.push(Block::Text {
                     role: Role::User,
@@ -451,6 +454,19 @@ impl Transcript {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hidden_command_payloads_are_not_rendered_on_resume() {
+        let messages: Vec<TranscriptMessage> = serde_json::from_value(serde_json::json!([
+            {"role":"user", "text":"private expanded skill body", "display_kind":"hidden"},
+            {"role":"assistant", "text":"Visible reply"}
+        ]))
+        .unwrap();
+        let mut transcript = Transcript::new();
+        transcript.load_history(&messages);
+        assert_eq!(transcript.blocks.len(), 1);
+        assert!(matches!(&transcript.blocks[0], Block::Text { text, .. } if text == "Visible reply"));
+    }
     use serde_json::json;
 
     fn ev(kind: &str, payload: Value) -> GatewayEvent {

@@ -290,6 +290,12 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
         return;
     }
 
+    if want("failure_recovery") {
+        failure_recovery_section(&ui, &log).await;
+    }
+    if want("model_controls") {
+        model_controls_section(&ui, &log).await;
+    }
     if want("keys") {
         keys_section(&ui, &log).await;
     }
@@ -308,9 +314,445 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     if want("sessions") {
         sessions_section(&ui, &log).await;
     }
+    if want("daily") {
+        daily_section(&ui, &log).await;
+    }
     if want("settings") {
         settings_section(&ui, &log).await;
     }
+}
+
+/// An independent RPC read verifies that UI selections reached the real private backend.
+async fn backend_request(method: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let method = method.to_owned();
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(async {
+            let backend = hermes_core::backend::discover_or_spawn(None)
+                .await
+                .map_err(|e| e.to_string())?;
+            let (client, _events) = hermes_core::Client::connect(&backend.endpoint.ws_url())
+                .await
+                .map_err(|e| e.to_string())?;
+            client.request(&method, params).await.map_err(|e| e.to_string())
+        });
+        let _ = tx.send(result);
+    });
+    rx.await.map_err(|e| e.to_string())?
+}
+
+async fn click(ui: &AppWindow, label: &str) -> bool {
+    // Headless snapshots do not present frames automatically. Drain layout/property changes
+    // before computing a new menu/row's pointer target, as a visible frame would.
+    sleep(150).await;
+    if let Some(element) = by_label(ui, label) {
+        println!(
+            "[CLICK] {label:?} position={:?} size={:?}",
+            element.absolute_position(),
+            element.size()
+        );
+        element.single_click(PointerEventButton::Left).await;
+        true
+    } else {
+        false
+    }
+}
+
+async fn failure_recovery_section(ui: &AppWindow, log: &Log) {
+    use serde_json::json;
+    let st = ui.global::<AppState>();
+    st.invoke_new_chat();
+    sleep(200).await;
+    st.invoke_send("/help".into());
+    let ready = wait_until(15, || !st.get_runtime_session().is_empty()).await;
+    let ready = ready && wait_until(15, || st.get_rows().row_count() > 0).await;
+    let sid = st.get_runtime_session().to_string();
+    let closed = if ready {
+        backend_request("session.close", json!({"session_id":sid})).await.ok()
+    } else {
+        None
+    };
+    if closed
+        .as_ref()
+        .and_then(|r| r.get("closed"))
+        .and_then(serde_json::Value::as_bool)
+        != Some(true)
+    {
+        record(
+            log,
+            "failure recovery: close isolated fixture before probing",
+            false,
+            format!("ready={ready}, closed={closed:?}"),
+        );
+        return; // Never send a normal prompt unless the runtime is confirmed absent.
+    }
+    let text = "Unsent text recovered after a rejected submission";
+    st.set_draft("".into());
+    st.invoke_send(text.into());
+    let failed = wait_until(10, || {
+        st.get_banner().starts_with("Message failed:") && !st.get_running() && st.get_draft() == text
+    })
+    .await;
+    record(
+        log,
+        "failure recovery: rejected send shows an error, clears busy state and restores typed text",
+        failed && st.get_banner_error(),
+        format!(
+            "banner={}, running={}, restored={}",
+            st.get_banner(),
+            st.get_running(),
+            st.get_draft() == text
+        ),
+    );
+    screenshot(ui, "daily-send-failure");
+    st.invoke_stop();
+    let failed = wait_until(10, || st.get_banner().starts_with("Could not stop chat:")).await;
+    record(
+        log,
+        "failure recovery: rejected Stop is visible rather than ignored",
+        failed && st.get_banner_error(),
+        st.get_banner().to_string(),
+    );
+    st.invoke_dismiss_banner();
+    let dismissed = wait_until(5, || st.get_banner().is_empty()).await;
+    st.invoke_new_chat();
+    let clean = wait_until(5, || {
+        st.get_runtime_session().is_empty() && st.get_draft().is_empty() && !st.get_running()
+    })
+    .await;
+    record(
+        log,
+        "failure recovery: dismiss and new chat recover cleanly",
+        dismissed && clean,
+        format!("dismissed={dismissed}, clean={clean}"),
+    );
+}
+
+async fn model_controls_section(ui: &AppWindow, log: &Log) {
+    let st = ui.global::<AppState>();
+    st.invoke_new_chat();
+    wait_until(10, || {
+        !st.get_model_label().is_empty() && st.get_model_label() != "Model"
+    })
+    .await;
+    let label = format!("{} ", st.get_model_label());
+    let clicked = click(ui, &label).await;
+    let loaded = wait_until(10, || ui.get_picker_open() && st.get_models().iter().any(|m| !m.header)).await;
+    record(
+        log,
+        "model controls: clicking the model chip opens the backend catalog",
+        clicked && loaded,
+        format!(
+            "clicked={clicked}, open={}, rows={}",
+            ui.get_picker_open(),
+            st.get_models().row_count()
+        ),
+    );
+    let model = st.get_models().iter().find(|m| !m.header && !m.current);
+    if let Some(model) = model {
+        let clicked = click(ui, &format!("Use {}", model.model)).await;
+        let expected = model
+            .model
+            .rsplit('/')
+            .next()
+            .unwrap_or(model.model.as_str())
+            .to_owned();
+        let applied = wait_until(5, || !ui.get_picker_open() && st.get_model_label() == expected).await;
+        record(
+            log,
+            "model controls: clicking a model changes the draft selection",
+            clicked && applied && st.get_runtime_session().is_empty(),
+            format!(
+                "clicked={clicked}, model={}, no inference/session started={}",
+                st.get_model_label(),
+                st.get_runtime_session().is_empty()
+            ),
+        );
+    } else {
+        record(
+            log,
+            "model controls: alternate configured-provider model available",
+            false,
+            "catalog did not offer an alternate model",
+        );
+    }
+    st.invoke_new_chat();
+    wait_until(5, || st.get_model_label().as_str() == label.trim_end()).await;
+    st.invoke_send("/model".into());
+    let opened = wait_until(5, || ui.get_picker_open()).await;
+    record(
+        log,
+        "model controls: /model opens the same menu without calling a model",
+        opened && st.get_runtime_session().is_empty(),
+        format!("open={opened}, runtime={}", st.get_runtime_session()),
+    );
+    ui.set_picker_open(false);
+}
+
+fn screenshot(ui: &AppWindow, name: &str) {
+    let Some(dir) = std::env::var_os("HERMES_LIVE_SCREENSHOTS") else {
+        return;
+    };
+    use std::io::Write;
+    let buffer = ui.window().take_snapshot().expect("headless software snapshot");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = std::path::PathBuf::from(dir).join(format!("{name}.ppm"));
+    let mut file = std::fs::File::create(&path).unwrap();
+    writeln!(file, "P6\n{} {}\n255", buffer.width(), buffer.height()).unwrap();
+    for pixel in buffer.as_bytes().as_chunks::<4>().0 {
+        file.write_all(&pixel[..3]).unwrap();
+    }
+    println!("[SCREENSHOT] {}", path.display());
+}
+
+async fn daily_section(ui: &AppWindow, log: &Log) {
+    use hermes_ui::ProjectState;
+    use serde_json::json;
+    let st = ui.global::<AppState>();
+    st.invoke_new_chat();
+    wait_until(5, || st.get_runtime_session().is_empty()).await;
+    let clicked = click(ui, "Projects").await;
+    let ps = ui.global::<ProjectState>();
+    let opened = wait_until(5, || ps.get_open() && !ps.get_loading()).await;
+    record(
+        log,
+        "daily: Projects button opens the project dialog",
+        clicked && opened,
+        format!("clicked={clicked}, open={}", ps.get_open()),
+    );
+
+    ps.set_name("Invalid folder".into());
+    ps.set_path("/does-not-exist/hermes-project".into());
+    let clicked = click(ui, "Add project").await;
+    let rejected = wait_until(5, || ps.get_error().contains("does not exist")).await;
+    record(
+        log,
+        "daily: missing project folder is rejected without creating it",
+        clicked && rejected && !std::path::Path::new("/does-not-exist/hermes-project").exists(),
+        ps.get_error().to_string(),
+    );
+
+    let folder = std::env::temp_dir().join(format!("hermes-daily-project-{}", std::process::id()));
+    std::fs::create_dir_all(&folder).unwrap();
+    let label = format!("Daily project {}", std::process::id());
+    ps.set_name(label.clone().into());
+    ps.set_path(folder.to_string_lossy().to_string().into());
+    click(ui, "Add project").await;
+    let saved = wait_until(10, || {
+        ps.get_items().iter().any(|p| p.name == label) && ps.get_name().is_empty() && ps.get_error().is_empty()
+    })
+    .await;
+    let project = ps.get_items().iter().find(|p| p.name == label);
+    let listed = backend_request("projects.list", json!({})).await.unwrap();
+    let persisted = listed["projects"]
+        .as_array()
+        .is_some_and(|ps| ps.iter().any(|p| p["name"] == label));
+    record(
+        log,
+        "daily: Add project persists in the backend registry",
+        saved && persisted && ps.get_error().is_empty() && ps.get_name().is_empty(),
+        format!("UI={saved}, independent read={persisted}"),
+    );
+    let Some(project) = project else {
+        return;
+    };
+
+    screenshot(ui, "daily-projects");
+    let clicked = click(ui, &label).await;
+    let selected = wait_until(10, || ps.get_active_id() == project.id && !ps.get_open()).await;
+    let listed = backend_request("projects.list", json!({})).await.unwrap();
+    record(
+        log,
+        "daily: clicking a project selects its folder and starts a clean draft",
+        clicked && selected && listed["active_id"] == project.id.as_str() && st.get_rows().row_count() == 0,
+        format!("cwd label={}, active_id={}", st.get_cwd_label(), listed["active_id"]),
+    );
+
+    // Click the actual reasoning control and one option, not just the global callback.
+    let effort_label = format!("{} ", st.get_effort_label());
+    let clicked = click(ui, &effort_label).await;
+    wait_until(5, || ui.get_effort_open()).await;
+    sleep(100).await;
+    screenshot(ui, "daily-reasoning");
+    let option = click(ui, "max").await;
+    let selected = wait_until(5, || st.get_effort_label() == "max").await;
+    record(
+        log,
+        "daily: reasoning pill opens and max is selectable before chat",
+        clicked && option && selected,
+        format!("pill={clicked}, option={option}, effort={}", st.get_effort_label()),
+    );
+
+    st.invoke_select_model("openai".into(), "gpt-4o-mini".into());
+    wait_until(5, || st.get_model_label() == "gpt-4o-mini").await;
+    // /help creates the actual session but does not ask a model anything.
+    st.invoke_send("/help".into());
+    let created = wait_until(15, || !st.get_runtime_session().is_empty()).await;
+    let sid = st.get_runtime_session().to_string();
+    let reasoning = backend_request("config.get", json!({"key":"reasoning", "session_id":sid}))
+        .await
+        .unwrap();
+    let models = backend_request("model.options", json!({"session_id":sid}))
+        .await
+        .unwrap();
+    record(
+        log,
+        "daily: draft model and reasoning reach session.create",
+        created && reasoning["value"] == "max" && models["model"] == "gpt-4o-mini",
+        format!("reasoning={}, model={}", reasoning["value"], models["model"]),
+    );
+    let project_info = backend_request("projects.for_cwd", json!({"cwd":folder}))
+        .await
+        .unwrap();
+    record(
+        log,
+        "daily: selected project is associated with its execution folder",
+        created
+            && st
+                .get_cwd_label()
+                .ends_with(folder.file_name().unwrap().to_string_lossy().as_ref())
+            && project_info["project"]["id"] == project.id.as_str(),
+        format!("cwd={}", st.get_cwd_label()),
+    );
+
+    st.invoke_select_effort("high".into());
+    let updated = wait_until(10, || st.get_effort_label() == "high").await;
+    let reasoning = backend_request("config.get", json!({"key":"reasoning", "session_id":sid}))
+        .await
+        .unwrap();
+    record(
+        log,
+        "daily: reasoning change updates the live session",
+        updated && reasoning["value"] == "high",
+        format!("backend={}", reasoning["value"]),
+    );
+    let config_path = std::path::PathBuf::from(std::env::var("HERMES_HOME").unwrap()).join("config.yaml");
+    let config = std::fs::read_to_string(config_path).unwrap();
+    record(
+        log,
+        "daily: per-chat reasoning does not change the global default",
+        config.contains("reasoning_effort: medium"),
+        "private config still has reasoning_effort: medium",
+    );
+
+    ps.set_open(true);
+    ps.invoke_refresh();
+    wait_until(5, || !ps.get_loading()).await;
+    click(ui, &format!("Edit {label}")).await;
+    let renamed = format!("{label} renamed");
+    ps.set_name(renamed.clone().into());
+    click(ui, "Save project").await;
+    let saved = wait_until(10, || ps.get_items().iter().any(|p| p.name == renamed)).await;
+    let read = backend_request("projects.get", json!({"id":project.id.as_str()}))
+        .await
+        .unwrap();
+    record(
+        log,
+        "daily: rename is persisted and read back",
+        saved && read["project"]["name"] == renamed,
+        read["project"]["name"].to_string(),
+    );
+    // A seeded, clearly labelled fixture exercises project + draft restoration without inference.
+    let fixture = backend_request("session.create", json!({
+        "source":"desktop", "cwd":folder, "cwd_explicit":true,
+        "title":"Daily project restore fixture",
+        "messages":[{"role":"user","content":"Seeded project question"}, {"role":"assistant","content":"Seeded fixture answer, not a model response."}]
+    })).await.unwrap();
+    let fixture_id = fixture["stored_session_id"].as_str().unwrap().to_owned();
+    ps.set_open(false);
+    st.invoke_open_session(fixture_id.clone().into());
+    let resumed = wait_until(10, || {
+        st.get_active_session() == fixture_id && ps.get_active_id() == project.id
+    })
+    .await;
+    record(
+        log,
+        "daily: resuming a project chat restores its project scope",
+        resumed,
+        format!("project={}, cwd={}", ps.get_active_id(), st.get_cwd_label()),
+    );
+    st.set_draft("Unsent text belonging to the project chat".into());
+    sleep(150).await;
+    if let Some(other) = st.get_sessions().iter().find(|s| s.title.contains("SessA")) {
+        st.invoke_open_session(other.id.clone());
+        let switched = wait_until(10, || st.get_active_session() == other.id && st.get_draft().is_empty()).await;
+        st.invoke_open_session(fixture_id.clone().into());
+        let restored = wait_until(10, || {
+            st.get_active_session() == fixture_id && st.get_draft() == "Unsent text belonging to the project chat"
+        })
+        .await;
+        record(
+            log,
+            "daily: unsent text stays with its own chat across switching",
+            switched && restored,
+            format!("switched={switched}, restored={restored}"),
+        );
+    } else {
+        record(log, "daily: unsent text fixture available", false, "SessA missing");
+    }
+    st.invoke_new_chat();
+    let inherited = wait_until(10, || {
+        st.get_active_session().is_empty()
+            && ps.get_active_id() == project.id
+            && st
+                .get_cwd_label()
+                .ends_with(folder.file_name().unwrap().to_string_lossy().as_ref())
+    })
+    .await;
+    record(
+        log,
+        "daily: new chat after project resume keeps the project folder",
+        inherited,
+        format!("project={}, cwd={}", ps.get_active_id(), st.get_cwd_label()),
+    );
+    ps.set_open(true);
+    click(ui, "Chat without a project").await;
+    let cleared = wait_until(10, || {
+        ps.get_active_id().is_empty() && st.get_runtime_session().is_empty()
+    })
+    .await;
+    wait_until(5, || st.get_effort_label() == "medium").await;
+    record(
+        log,
+        "daily: leaving the project resets draft model/reasoning to defaults",
+        cleared && st.get_effort_label() == "medium",
+        format!("active={}, reasoning={}", ps.get_active_id(), st.get_effort_label()),
+    );
+
+    // The seeded fixtures let us check real resume/switch without a model call.
+    let sessions: Vec<_> = st.get_sessions().iter().filter(|s| s.title.contains("Sess")).collect();
+    if sessions.len() >= 2 {
+        st.invoke_open_session(sessions[0].id.clone());
+        wait_until(10, || st.get_active_session() == sessions[0].id).await;
+        st.invoke_select_effort("low".into());
+        wait_until(5, || st.get_effort_label() == "low").await;
+        st.invoke_open_session(sessions[1].id.clone());
+        wait_until(10, || st.get_active_session() == sessions[1].id).await;
+        st.invoke_open_session(sessions[0].id.clone());
+        let restored = wait_until(10, || {
+            st.get_active_session() == sessions[0].id && st.get_effort_label() == "low"
+        })
+        .await;
+        record(
+            log,
+            "daily: reopening a chat restores its reasoning rather than the other chat's",
+            restored,
+            format!("reasoning={}", st.get_effort_label()),
+        );
+    } else {
+        record(
+            log,
+            "daily: seeded chats available for restoration",
+            false,
+            format!("seeded={}", sessions.len()),
+        );
+    }
+    st.invoke_new_chat();
+    wait_until(5, || st.get_active_session().is_empty()).await;
 }
 
 async fn keys_section(ui: &AppWindow, log: &Log) {
@@ -1156,7 +1598,14 @@ fn live_backend() {
         std::env::var_os("HERMES_DESKTOP_PORT").is_some(),
         "set HERMES_DESKTOP_PORT to a private test backend"
     );
-    i_slint_backend_testing::init_integration_test_with_system_time();
+    slint::platform::set_platform(Box::new(i_slint_backend_testing::TestingBackend::new(
+        i_slint_backend_testing::TestingBackendOptions {
+            mock_time: false,
+            threading: true,
+            renderer_name: std::env::var_os("HERMES_LIVE_SCREENSHOTS").map(|_| "software".into()),
+        },
+    )))
+    .unwrap();
     // The panel's own files (device prefs, config export/import) go to a scratch directory
     // so a live run never writes the user's prefs.json or ~/.local/share.
     let scratch = std::env::temp_dir().join(format!("hermes-live-settings-{}", std::process::id()));

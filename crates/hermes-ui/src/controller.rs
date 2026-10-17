@@ -8,6 +8,7 @@ use std::time::Duration;
 use hermes_core::backend::{self, ManagedBackend};
 use hermes_core::http::{Rest, profile_query};
 use hermes_core::prefs::Prefs;
+use hermes_core::projects::{self, Project, ProjectList};
 use hermes_core::protocol::{
     ModelOptionsResult, SessionCreateResult, SessionListResult, SessionListRow, SessionResumeResult,
 };
@@ -21,14 +22,23 @@ use tokio::sync::mpsc;
 
 use crate::rows::to_row;
 use crate::{
-    AppState, AppWindow, ApprovalInfo, ChatRow, ModelItem, NavEntry, ScopeChip, SearchHit, SessionItem, SettingRowUI,
-    SettingsState, Theme,
+    AppState, AppWindow, ApprovalInfo, ChatRow, ModelItem, NavEntry, ProjectItem, ProjectState, ScopeChip, SearchHit,
+    SessionItem, SettingRowUI, SettingsState, Theme,
 };
 
 /// Commands from the UI thread to the controller.
 #[derive(Debug, Clone)]
 pub enum Cmd {
     Send(String),
+    SaveDraft {
+        session: String,
+        text: String,
+    },
+    SubmissionFailed {
+        session_id: String,
+        text: String,
+        message: String,
+    },
     Stop,
     NewChat,
     Open(String),
@@ -37,6 +47,14 @@ pub enum Cmd {
     /// Open the chat this many places away in sidebar order (Ctrl+Tab = 1, Ctrl+Shift+Tab = -1).
     Cycle(i32),
     RefreshModels,
+    SelectEffort(String),
+    RefreshProjects,
+    SelectProject(String),
+    SaveProject {
+        id: String,
+        name: String,
+        path: String,
+    },
     SelectModel {
         provider: String,
         model: String,
@@ -89,6 +107,13 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
     let (tx, rx) = mpsc::unbounded_channel::<Cmd>();
     let st = ui.global::<AppState>();
     let t = tx.clone();
+    st.on_save_draft(move |session, text| {
+        let _ = t.send(Cmd::SaveDraft {
+            session: session.into(),
+            text: text.into(),
+        });
+    });
+    let t = tx.clone();
     st.on_send(move |s| {
         let s = s.trim().to_owned();
         if !s.is_empty() {
@@ -128,6 +153,26 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
         let _ = t.send(Cmd::SelectModel {
             provider: p.into(),
             model: m.into(),
+        });
+    });
+    let t = tx.clone();
+    st.on_select_effort(move |level| {
+        let _ = t.send(Cmd::SelectEffort(level.into()));
+    });
+    let t = tx.clone();
+    ui.global::<ProjectState>().on_refresh(move || {
+        let _ = t.send(Cmd::RefreshProjects);
+    });
+    let t = tx.clone();
+    ui.global::<ProjectState>().on_select(move |id| {
+        let _ = t.send(Cmd::SelectProject(id.into()));
+    });
+    let t = tx.clone();
+    ui.global::<ProjectState>().on_save(move |id, name, path| {
+        let _ = t.send(Cmd::SaveProject {
+            id: id.into(),
+            name: name.into(),
+            path: path.into(),
         });
     });
     let t = tx.clone();
@@ -211,7 +256,7 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
 
     let weak = ui.as_weak();
     rt.spawn(async move {
-        Controller::run(weak, rx).await;
+        Controller::run(weak, rx, tx).await;
     });
 }
 
@@ -261,6 +306,7 @@ fn ui(weak: &Weak<AppWindow>, f: impl FnOnce(&AppWindow) + Send + 'static) {
 
 struct Controller {
     weak: Weak<AppWindow>,
+    commands: mpsc::UnboundedSender<Cmd>,
     client: Client,
     _backend: Arc<ManagedBackend>,
     transcript: Transcript,
@@ -272,6 +318,7 @@ struct Controller {
     /// Stored ids in the order the sidebar shows them (after search + grouping).
     visible_ids: Vec<String>,
     query: String,
+    drafts: std::collections::HashMap<String, String>,
     dirty: Vec<usize>,
     reset: bool,
     pending_approval: Option<String>,
@@ -279,6 +326,9 @@ struct Controller {
     /// Sent with `session.create` (as the Electron app does); `config.set model` needs a
     /// live session and answers 4001 without one.
     draft_model: Option<(String, String)>,
+    draft_effort: Option<String>,
+    projects: Vec<Project>,
+    project: Option<Project>,
     /// REST handle to the backend's web API (settings pages). Built on first use.
     rest: Option<Rest>,
     /// `GET /api/profiles` roster: (name, label) in backend order.
@@ -300,7 +350,7 @@ struct Controller {
 }
 
 impl Controller {
-    async fn run(weak: Weak<AppWindow>, mut cmds: mpsc::UnboundedReceiver<Cmd>) {
+    async fn run(weak: Weak<AppWindow>, mut cmds: mpsc::UnboundedReceiver<Cmd>, commands: mpsc::UnboundedSender<Cmd>) {
         ui(&weak, |w| w.global::<AppState>().set_connection("connecting".into()));
         crate::perf::mark("controller: backend discovery start");
         let backend = match backend::discover_or_spawn(None).await {
@@ -329,15 +379,20 @@ impl Controller {
         }
         let mut c = Controller {
             weak: weak.clone(),
+            commands,
             client,
             _backend: backend,
             transcript: Transcript::new(),
             session: None,
             stored: None,
             draft_model: None,
+            draft_effort: None,
+            projects: vec![],
+            project: None,
             all_sessions: vec![],
             visible_ids: vec![],
             query: String::new(),
+            drafts: std::collections::HashMap::new(),
             dirty: vec![],
             reset: false,
             pending_approval: None,
@@ -356,11 +411,45 @@ impl Controller {
             st.set_connection("open".into());
             st.set_rows(ModelRc::new(VecModel::<ChatRow>::default()));
         });
+        let saved_prefs: Vec<(String, String)> = c
+            .prefs
+            .all()
+            .keys()
+            .map(|k| (k.clone(), c.prefs.get_str(k, "")))
+            .collect();
+        ui(&weak, move |w| {
+            for (key, value) in saved_prefs {
+                apply_device_pref(w, &key, &value);
+            }
+        });
+        c.refresh_projects(true).await;
         c.refresh_sessions().await;
         crate::perf::mark("controller: session list fetched");
         c.refresh_model_label().await;
+        c.refresh_effort().await;
         crate::perf::mark("controller: model label fetched");
         c.load_about().await;
+        if let Some(rest) = c.rest()
+            && let Ok(config) = rest.get("/api/config").await
+        {
+            let font = settings::get(&config, "desktop.font_family")
+                .and_then(Value::as_str)
+                .unwrap_or("Inter")
+                .to_owned();
+            let mono = settings::get(&config, "terminal.font_family")
+                .and_then(Value::as_str)
+                .unwrap_or("JetBrains Mono")
+                .to_owned();
+            ui(&weak, move |w| {
+                w.global::<Theme>()
+                    .set_ui_font(if font.is_empty() { "Inter".into() } else { font.into() });
+                w.global::<Theme>().set_mono_font(if mono.is_empty() {
+                    "JetBrains Mono".into()
+                } else {
+                    mono.into()
+                });
+            });
+        }
         // Dev/measurement hook: open a stored session once connected.
         if let Ok(id) = std::env::var("HERMES_DESKTOP_OPEN_SESSION")
             && !id.trim().is_empty()
@@ -472,16 +561,40 @@ impl Controller {
     async fn handle_cmd(&mut self, cmd: Cmd) {
         match cmd {
             Cmd::Send(text) => self.send(text).await,
+            Cmd::SaveDraft { session, text } => {
+                self.drafts.insert(session, text);
+            }
+            Cmd::SubmissionFailed {
+                session_id,
+                text,
+                message,
+            } => {
+                if self.session.as_deref() == Some(&session_id) {
+                    self.banner(format!("Message failed: {message}"), true);
+                    self.transcript.running = false;
+                    self.transcript.status.clear();
+                    self.flush_state();
+                    ui(&self.weak, move |w| {
+                        let st = w.global::<AppState>();
+                        if st.get_draft().is_empty() {
+                            st.set_draft(text.into());
+                        }
+                    });
+                }
+            }
             Cmd::Stop => {
-                if let Some(sid) = self.session.clone() {
-                    let _ = self
+                if let Some(sid) = self.session.clone()
+                    && let Err(e) = self
                         .client
                         .request("session.interrupt", json!({"session_id": sid}))
-                        .await;
+                        .await
+                {
+                    self.banner(format!("Could not stop chat: {e}"), true);
                 }
             }
             Cmd::NewChat => {
                 self.draft_model = None;
+                self.draft_effort = None;
                 self.session = None;
                 self.stored = None;
                 self.transcript = Transcript::new();
@@ -490,8 +603,14 @@ impl Controller {
                 ui(&self.weak, |w| {
                     let st = w.global::<AppState>();
                     st.set_active_session(SharedString::new());
+                    st.set_runtime_session(SharedString::new());
                     st.set_session_title("New chat".into());
+                    st.set_draft(SharedString::new());
+                    st.set_approval(ApprovalInfo::default());
                 });
+                self.publish_project();
+                self.refresh_model_label().await;
+                self.refresh_effort().await;
             }
             Cmd::Open(id) => self.open(id).await,
             Cmd::Delete(id) => match self.client.request("session.delete", json!({"session_id": id})).await {
@@ -514,6 +633,10 @@ impl Controller {
                 }
             }
             Cmd::RefreshModels => self.refresh_models().await,
+            Cmd::SelectEffort(level) => self.select_effort(level).await,
+            Cmd::RefreshProjects => self.refresh_projects(false).await,
+            Cmd::SelectProject(id) => self.select_project(id).await,
+            Cmd::SaveProject { id, name, path } => self.save_project(id, name, path).await,
             Cmd::SelectModel { provider, model } => {
                 let Some(sid) = self.session.clone() else {
                     // New-chat screen: remember the pick; it rides on session.create.
@@ -526,11 +649,27 @@ impl Controller {
                 };
                 let params = json!({
                     "key": "model",
-                    "value": format!("{model} --provider {provider}"),
+                    "value": format!("{model} --provider {provider} --session"),
                     "session_id": sid,
                 });
                 match self.client.request("config.set", params).await {
-                    Ok(_) => self.refresh_model_label().await,
+                    Ok(result) => {
+                        if result.get("confirm_required").and_then(Value::as_bool) == Some(true) {
+                            self.banner(
+                                result
+                                    .get("confirm_message")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("This model requires confirmation in Hermes before switching.")
+                                    .to_owned(),
+                                true,
+                            );
+                        } else if result.get("deferred").and_then(Value::as_bool) == Some(true) {
+                            self.banner("Model change queued for the next turn.".into(), false);
+                        } else {
+                            self.refresh_model_label().await;
+                            self.refresh_effort().await;
+                        }
+                    }
                     Err(e) => self.banner(format!("Could not switch model: {e}"), true),
                 }
             }
@@ -551,6 +690,194 @@ impl Controller {
                 });
             }
             Cmd::Settings(cmd) => self.settings_cmd(cmd).await,
+        }
+    }
+
+    // ── Project scope and per-chat reasoning ──────────────────────────────────
+
+    async fn refresh_projects(&mut self, restore_active: bool) {
+        ui(&self.weak, |w| w.global::<ProjectState>().set_loading(true));
+        match self.client.call::<ProjectList>("projects.list", json!({})).await {
+            Ok(list) => {
+                self.projects = list.projects.into_iter().filter(|p| !p.archived).collect();
+                if restore_active {
+                    self.project = list
+                        .active_id
+                        .and_then(|id| self.projects.iter().find(|p| p.id == id).cloned());
+                } else if let Some(id) = self.project.as_ref().map(|p| p.id.clone()) {
+                    self.project = self.projects.iter().find(|p| p.id == id).cloned();
+                }
+                let items: Vec<ProjectItem> = self
+                    .projects
+                    .iter()
+                    .map(|p| ProjectItem {
+                        id: p.id.as_str().into(),
+                        name: p.name.as_str().into(),
+                        path: p.root().into(),
+                    })
+                    .collect();
+                ui(&self.weak, move |w| {
+                    let st = w.global::<ProjectState>();
+                    st.set_items(Rc::new(VecModel::from(items)).into());
+                    st.set_error(SharedString::new());
+                });
+                self.publish_project();
+            }
+            Err(e) => self.project_error(format!("Could not load projects: {e}")),
+        }
+        ui(&self.weak, |w| w.global::<ProjectState>().set_loading(false));
+    }
+
+    fn publish_project(&self) {
+        let id = self.project.as_ref().map(|p| p.id.clone()).unwrap_or_default();
+        let name = self.project.as_ref().map(|p| p.name.clone()).unwrap_or_default();
+        let root = self.project.as_ref().map(|p| short_path(p.root())).unwrap_or_default();
+        let draft = self.session.is_none();
+        ui(&self.weak, move |w| {
+            let st = w.global::<ProjectState>();
+            st.set_active_id(id.into());
+            st.set_active_name(name.into());
+            if draft {
+                w.global::<AppState>().set_cwd_label(root.into());
+            }
+        });
+    }
+
+    fn project_error(&self, message: String) {
+        let error = message.clone();
+        ui(&self.weak, move |w| w.global::<ProjectState>().set_error(error.into()));
+        self.banner(message, true);
+    }
+
+    async fn select_project(&mut self, id: String) {
+        let project = if id.is_empty() {
+            None
+        } else {
+            let Some(project) = self.projects.iter().find(|p| p.id == id).cloned() else {
+                return self.project_error("Project no longer exists. Refresh the project list.".into());
+            };
+            if let Err(error) = projects::existing_folder(
+                project.root(),
+                &std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default()),
+            ) {
+                return self.project_error(error);
+            }
+            Some(project)
+        };
+        if let Err(e) = self
+            .client
+            .request(
+                "projects.set_active",
+                json!({"id": if id.is_empty() { Value::Null } else { json!(id) }}),
+            )
+            .await
+        {
+            return self.project_error(format!("Could not select project: {e}"));
+        }
+        // Read back the pointer before changing the local scope.
+        match self.client.call::<ProjectList>("projects.list", json!({})).await {
+            Ok(list) if list.active_id.as_deref().unwrap_or_default() == id => {}
+            Ok(_) => return self.project_error("Project selection was not saved. Try again.".into()),
+            Err(e) => return self.project_error(format!("Could not verify project selection: {e}")),
+        }
+        self.project = project;
+        self.banner(String::new(), false);
+        Box::pin(self.handle_cmd(Cmd::NewChat)).await;
+        ui(&self.weak, |w| w.global::<ProjectState>().set_open(false));
+    }
+
+    async fn save_project(&mut self, id: String, name: String, path: String) {
+        let name = name.trim();
+        if name.is_empty() {
+            return self.project_error("Enter a project name.".into());
+        }
+        let (method, params) = if id.is_empty() {
+            let path = match projects::existing_folder(
+                &path,
+                &std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default()),
+            ) {
+                Ok(p) => p,
+                Err(e) => return self.project_error(e),
+            };
+            (
+                "projects.create",
+                json!({"name": name, "folders": [path], "primary_path": path, "use": false}),
+            )
+        } else {
+            ("projects.update", json!({"id": id, "name": name}))
+        };
+        match self.client.request(method, params).await {
+            Ok(result) => {
+                let saved_id = result
+                    .pointer("/project/id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned();
+                self.refresh_projects(false).await;
+                if !self.projects.iter().any(|p| p.id == saved_id && p.name == name) {
+                    return self
+                        .project_error("Project save could not be verified. Refresh before trying again.".into());
+                }
+                self.banner(String::new(), false);
+                ui(&self.weak, |w| {
+                    let st = w.global::<ProjectState>();
+                    st.set_edit_id(SharedString::new());
+                    st.set_name(SharedString::new());
+                    st.set_path(SharedString::new());
+                });
+            }
+            Err(e) => self.project_error(format!("Could not save project: {e}")),
+        }
+    }
+
+    async fn refresh_effort(&self) {
+        if self.session.is_none()
+            && let Some(level) = &self.draft_effort
+        {
+            let level = level.clone();
+            ui(&self.weak, move |w| {
+                w.global::<AppState>().set_effort_label(level.into())
+            });
+            return;
+        }
+        let mut params = json!({"key": "reasoning"});
+        if let Some(sid) = &self.session {
+            params["session_id"] = json!(sid);
+        }
+        match self.client.request("config.get", params).await {
+            Ok(result) => {
+                let level = result
+                    .get("value")
+                    .and_then(Value::as_str)
+                    .unwrap_or("medium")
+                    .to_owned();
+                ui(&self.weak, move |w| {
+                    w.global::<AppState>().set_effort_label(level.into())
+                });
+            }
+            Err(e) => self.banner(format!("Could not load reasoning: {e}"), true),
+        }
+    }
+
+    async fn select_effort(&mut self, level: String) {
+        if !projects::REASONING_LEVELS.contains(&level.as_str()) {
+            return self.banner("Unknown reasoning level.".into(), true);
+        }
+        let Some(sid) = &self.session else {
+            self.draft_effort = Some(level);
+            self.refresh_effort().await;
+            return;
+        };
+        match self
+            .client
+            .request(
+                "config.set",
+                json!({"key": "reasoning", "value": level, "scope": "session", "session_id": sid}),
+            )
+            .await
+        {
+            Ok(_) => self.refresh_effort().await,
+            Err(e) => self.banner(format!("Could not change reasoning: {e}"), true),
         }
     }
 
@@ -665,8 +992,30 @@ impl Controller {
                 let body = json!({ "config": patch });
                 match rest.put(&path, &body).await {
                     Ok(_) => {
-                        // Keep the local copy in step so the page shows what was saved.
-                        settings::set_in(&mut self.config, key, parsed.clone());
+                        self.config = match rest.get(&path).await {
+                            Ok(config) if settings::get(&config, key) == Some(&parsed) => config,
+                            Ok(_) => return self.settings_error(format!("The backend did not save {key}.")),
+                            Err(e) => return self.settings_error(format!("Could not verify {key}: {e}")),
+                        };
+                        if self.scope.is_empty() && matches!(key, "desktop.font_family" | "terminal.font_family") {
+                            let key = key.to_owned();
+                            let value = parsed.as_str().unwrap_or_default().to_owned();
+                            ui(&self.weak, move |w| {
+                                if key == "desktop.font_family" {
+                                    w.global::<Theme>().set_ui_font(if value.is_empty() {
+                                        "Inter".into()
+                                    } else {
+                                        value.into()
+                                    });
+                                } else {
+                                    w.global::<Theme>().set_mono_font(if value.is_empty() {
+                                        "JetBrains Mono".into()
+                                    } else {
+                                        value.into()
+                                    });
+                                }
+                            });
+                        }
                         self.settings_saved(key);
                         // Session-scoped switches the backend also tracks per session.
                         if key == "yolo"
@@ -887,9 +1236,16 @@ impl Controller {
             .client
             .call::<SessionCreateResult>("session.create", {
                 let mut p = json!({"source": "desktop"});
-                if let Some((provider, model)) = self.draft_model.take() {
+                if let Some((provider, model)) = &self.draft_model {
                     p["model"] = json!(model);
                     p["provider"] = json!(provider);
+                }
+                if let Some(effort) = &self.draft_effort {
+                    p["reasoning_effort"] = json!(effort);
+                }
+                if let Some(project) = &self.project {
+                    p["cwd"] = json!(project.root());
+                    p["cwd_explicit"] = json!(true);
                 }
                 p
             })
@@ -899,14 +1255,19 @@ impl Controller {
                 self.session = Some(r.session_id.clone());
                 self.stored = Some(r.stored_session_id.clone()).filter(|s| !s.is_empty());
                 let stored = self.stored.clone().unwrap_or_default();
+                let runtime = r.session_id.clone();
+                self.draft_model = None;
+                self.draft_effort = None;
                 let info = r.info;
                 ui(&self.weak, move |w| {
                     let st = w.global::<AppState>();
                     st.set_active_session(stored.into());
+                    st.set_runtime_session(runtime.into());
                     st.set_model_label(short_model(&info.model).into());
                     st.set_effort_label(info.reasoning_effort.into());
                     st.set_cwd_label(short_path(&info.cwd).into());
                 });
+                self.refresh_effort().await;
                 Some(r.session_id)
             }
             Err(e) => {
@@ -916,33 +1277,185 @@ impl Controller {
         }
     }
 
-    async fn send(&mut self, text: String) {
-        let ch = self.transcript.push_user(&text);
-        self.mark(ch);
-        self.flush();
+    /// Slash commands never fall through to a model prompt as ordinary text.
+    async fn slash(&mut self, text: String) {
+        let (command, arg) = text
+            .trim_start_matches('/')
+            .split_once(char::is_whitespace)
+            .unwrap_or((text.trim_start_matches('/'), ""));
+        let arg = arg.trim();
+        match command {
+            "new" | "reset" | "clear" => {
+                Box::pin(self.handle_cmd(Cmd::NewChat)).await;
+                return;
+            }
+            "stop" => {
+                Box::pin(self.handle_cmd(Cmd::Stop)).await;
+                return;
+            }
+            "reasoning" if !arg.is_empty() => {
+                self.select_effort(arg.into()).await;
+                return;
+            }
+            "reasoning" => {
+                ui(&self.weak, |w| w.set_effort_open(true));
+                return;
+            }
+            "model" if arg.is_empty() => {
+                self.refresh_models().await;
+                ui(&self.weak, |w| w.set_picker_open(true));
+                return;
+            }
+            _ => {}
+        }
         let Some(sid) = self.ensure_session().await else {
-            self.transcript.running = false;
-            self.flush_state();
+            ui(&self.weak, move |w| w.global::<AppState>().set_draft(text.into()));
             return;
         };
+        if command == "model" {
+            match self
+                .client
+                .request(
+                    "config.set",
+                    json!({"key":"model", "session_id":sid, "value":format!("{arg} --session")}),
+                )
+                .await
+            {
+                Ok(result) if result.get("confirm_required").and_then(Value::as_bool) == Some(true) => self.banner(
+                    result
+                        .get("confirm_message")
+                        .and_then(Value::as_str)
+                        .unwrap_or("Model change requires confirmation.")
+                        .into(),
+                    true,
+                ),
+                Ok(result) if result.get("deferred").and_then(Value::as_bool) == Some(true) => {
+                    self.banner("Model change queued for the next turn.".into(), false);
+                }
+                Ok(_) => {
+                    self.refresh_model_label().await;
+                    self.refresh_effort().await;
+                }
+                Err(e) => self.banner(format!("Could not switch model: {e}"), true),
+            }
+            return;
+        }
+        let result = match self
+            .client
+            .request("slash.exec", json!({"session_id":sid, "command":text}))
+            .await
+        {
+            Ok(v) => Ok(v),
+            Err(_) => {
+                self.client
+                    .request("command.dispatch", json!({"session_id":sid, "name":command, "arg":arg}))
+                    .await
+            }
+        };
+        match result {
+            Ok(result) => match result.get("type").and_then(Value::as_str).unwrap_or("exec") {
+                "send" | "skill" => {
+                    let prompt = result
+                        .get("message")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_owned();
+                    if prompt.is_empty() {
+                        return self.banner("The command returned no message to send.".into(), true);
+                    }
+                    // A skill's expanded prompt can include private instructions; its short display belongs in the transcript.
+                    let display = result
+                        .get("display")
+                        .and_then(Value::as_str)
+                        .unwrap_or(&text)
+                        .to_owned();
+                    self.submit(prompt, display).await;
+                }
+                "prefill" => {
+                    let draft = result
+                        .get("message")
+                        .or_else(|| result.get("text"))
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_owned();
+                    ui(&self.weak, move |w| w.global::<AppState>().set_draft(draft.into()));
+                }
+                "alias" => {
+                    self.banner(
+                        "This command is an alias. Use its full command name in this preview.".into(),
+                        false,
+                    );
+                }
+                _ => {
+                    let output = result
+                        .get("output")
+                        .or_else(|| result.get("notice"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("Command completed.")
+                        .to_owned();
+                    self.transcript.blocks.push(hermes_core::transcript::Block::Notice {
+                        text: output,
+                        error: false,
+                    });
+                    self.reset = true;
+                    self.flush();
+                    self.refresh_model_label().await;
+                    self.refresh_effort().await;
+                }
+            },
+            Err(e) => {
+                self.banner(format!("Command failed: {e}"), true);
+                ui(&self.weak, move |w| w.global::<AppState>().set_draft(text.into()));
+            }
+        }
+    }
+
+    async fn send(&mut self, text: String) {
+        if text.starts_with('/') {
+            self.slash(text).await;
+            return;
+        }
+        if self.transcript.running {
+            self.banner(
+                "The current reply is still running. Stop it before sending another message.".into(),
+                true,
+            );
+            ui(&self.weak, move |w| w.global::<AppState>().set_draft(text.into()));
+            return;
+        }
+        self.submit(text.clone(), text).await;
+    }
+
+    async fn submit(&mut self, text: String, display: String) {
+        if self.transcript.running {
+            self.banner(
+                "The current reply is still running. Stop it before sending another message.".into(),
+                true,
+            );
+            ui(&self.weak, move |w| w.global::<AppState>().set_draft(display.into()));
+            return;
+        }
+        let Some(sid) = self.ensure_session().await else {
+            ui(&self.weak, move |w| w.global::<AppState>().set_draft(display.into()));
+            return;
+        };
+        let ch = self.transcript.push_user(&display);
+        self.mark(ch);
+        self.flush();
+
         let client = self.client.clone();
-        let weak = self.weak.clone();
+        let commands = self.commands.clone();
         // prompt.submit acks immediately; streaming arrives as events. Don't block the loop.
         tokio::spawn(async move {
             if let Err(e) = client
                 .request_with_timeout(
                     "prompt.submit",
-                    json!({"session_id": sid, "text": text}),
+                    json!({"session_id": sid, "text": text.clone(), "title_preview": display, "display_kind": if text != display { json!("hidden") } else { Value::Null }}),
                     Duration::from_secs(1800),
                 )
                 .await
             {
-                ui(&weak, move |w| {
-                    let st = w.global::<AppState>();
-                    st.set_banner(format!("Message failed: {e}").into());
-                    st.set_banner_error(true);
-                    st.set_running(false);
-                });
+                let _ = commands.send(Cmd::SubmissionFailed { session_id: sid, text: display, message: e.to_string() });
             }
         });
     }
@@ -966,8 +1479,19 @@ impl Controller {
             .await
         {
             Ok(r) => {
+                self.draft_model = None;
+                self.draft_effort = None;
                 self.session = Some(r.session_id.clone());
                 self.stored = Some(stored_id.clone());
+                self.project = r
+                    .info
+                    .project
+                    .as_ref()
+                    .and_then(|p| p.id.as_ref())
+                    .and_then(|id| self.projects.iter().find(|p| &p.id == id))
+                    .or_else(|| projects::for_cwd(&self.projects, &r.info.cwd))
+                    .cloned();
+                self.publish_project();
                 self.transcript = Transcript::new();
                 let ch = self.transcript.load_history(&r.messages);
                 self.transcript.running = r.running.unwrap_or(r.info.running);
@@ -981,14 +1505,19 @@ impl Controller {
                     .find(|s| s.id == stored_id)
                     .map(display_title)
                     .unwrap_or_else(|| info.title.clone());
+                let runtime = r.session_id.clone();
+                let draft = self.drafts.get(&stored_id).cloned().unwrap_or_default();
                 ui(&self.weak, move |w| {
                     let st = w.global::<AppState>();
                     st.set_active_session(stored_id.into());
+                    st.set_draft(draft.into());
+                    st.set_runtime_session(runtime.into());
                     st.set_session_title(title.into());
                     st.set_model_label(short_model(&info.model).into());
                     st.set_effort_label(info.reasoning_effort.into());
                     st.set_cwd_label(short_path(&info.cwd).into());
                 });
+                self.refresh_effort().await;
             }
             Err(e) => self.banner(format!("Could not open chat: {e}"), true),
         }
@@ -1016,9 +1545,47 @@ impl Controller {
                     }
                     return;
                 }
+                if e.kind == "projects.changed" {
+                    self.refresh_projects(false).await;
+                    return;
+                }
                 // Only the open session's events touch the transcript.
                 if e.session_id.is_some() && e.session_id != self.session {
                     return;
+                }
+                if e.kind == "session.info" {
+                    if e.payload.get("project").is_some() || e.payload.get("cwd").is_some() {
+                        let id = e.payload.pointer("/project/id").and_then(Value::as_str);
+                        self.project = id
+                            .and_then(|id| self.projects.iter().find(|p| p.id == id))
+                            .or_else(|| {
+                                projects::for_cwd(
+                                    &self.projects,
+                                    e.payload.get("cwd").and_then(Value::as_str).unwrap_or_default(),
+                                )
+                            })
+                            .cloned();
+                        self.publish_project();
+                    }
+                    let model = e.payload.get("model").and_then(Value::as_str).map(short_model);
+                    let effort = e
+                        .payload
+                        .get("reasoning_effort")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned);
+                    let cwd = e.payload.get("cwd").and_then(Value::as_str).map(short_path);
+                    ui(&self.weak, move |w| {
+                        let st = w.global::<AppState>();
+                        if let Some(v) = model {
+                            st.set_model_label(v.into());
+                        }
+                        if let Some(v) = effort {
+                            st.set_effort_label(v.into());
+                        }
+                        if let Some(v) = cwd {
+                            st.set_cwd_label(v.into());
+                        }
+                    });
                 }
                 let ch = self.transcript.apply(&e);
                 self.mark(ch);
@@ -1138,6 +1705,9 @@ impl Controller {
             Ok(r) => {
                 let mut items = Vec::new();
                 for p in &r.providers {
+                    if p.authenticated == Some(false) && !p.is_current.unwrap_or(false) {
+                        continue;
+                    }
                     let ids = p.model_ids();
                     if ids.is_empty() {
                         continue;

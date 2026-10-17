@@ -63,6 +63,12 @@ Docs: [ANALYSIS](docs/ANALYSIS.md) (how the current desktop talks to the backend
 [ARCHITECTURE](docs/ARCHITECTURE.md) (crates, threading, why Slint) ·
 [DESIGN](docs/DESIGN.md) (tokens and motion) · [PARITY](docs/PARITY.md) (feature checklist).
 
+## Daily-use work
+
+Project selection, per-chat reasoning, slash routing, and settings readback are described
+in [Daily-use preview](docs/DAILY_USE.md). See its verification notes and remaining gaps;
+this is not full Electron feature parity.
+
 ## Benchmarks
 
 Measured 2026-10-16 on the dev machine (Omarchy, kernel 7.2, NVIDIA 610.57), release profile
