@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**42 done · 108 partial · 642 not started · 1 unsupported** (of 793).
+**42 done · 117 partial · 633 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -124,12 +124,12 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Composer pop-out (detach into floating window) — local (Electron) — src/store/composer-popout.ts, src/app/chat/composer/floating-surface.tsx
 - [ ] Restored-draft notice — local — src/app/chat/composer/restored-draft-notice.tsx
 - [x] Empty-chat intro splash — local — src/app/chat/intro-visibility.ts, src/components/assistant-ui/chat-empty-slot.tsx ⟶ serif greeting + centred composer, rs-*-empty.png
-- [ ] Voice input button (mic record) — REST /api/audio/transcribe — src/app/chat/composer/start-voice-button.tsx
-- [ ] Voice conversation toggle — RPC voice.toggle + REST audio — src/app/chat/composer/hooks/use-voice-conversation.ts
+- [~] Voice input button (mic record) — REST /api/audio/transcribe — src/app/chat/composer/start-voice-button.tsx ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
+- [~] Voice conversation toggle — RPC voice.toggle + REST audio — src/app/chat/composer/hooks/use-voice-conversation.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
 - [ ] Barge-in / stop-word while speaking — local — src/lib/voice-barge-in.ts, src/lib/voice-stop-word.ts
 - [ ] Voice activity indicator — local — src/app/chat/composer/voice-activity.tsx
 - [ ] Completion/thinking sound cues — local — src/lib/completion-sound.ts, src/lib/thinking-sound.ts
-- [ ] Auto-speak replies — local pref + RPC voice.tts — src/app/chat/composer/hooks/use-auto-speak-replies.ts
+- [~] Auto-speak replies — local pref + RPC voice.tts — src/app/chat/composer/hooks/use-auto-speak-replies.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
 - [~] Session goal control row — RPC session.control — src/app/chat/composer/status-stack/session-control-goal.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [~] Heartbeat / loop session controls — RPC session.control — src/app/chat/composer/status-stack/session-control-heartbeat.tsx, session-control-loop.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Coding-status row (auto-coding indicator) — local — src/app/chat/composer/status-stack/coding-row.tsx
@@ -544,10 +544,10 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Voice
 
-- [ ] Voice conversation (chained STT→agent→TTS) — RPC voice.toggle + REST /api/audio/* — src/app/chat/composer/hooks/use-voice-conversation.ts
-- [ ] GPT-Live voice mode — config voice.voice_chat_mode=gpt-live + REST /api/audio — src/app/chat/composer/hooks/use-voice-live-conversation.ts
+- [~] Voice conversation (chained STT→agent→TTS) — RPC voice.toggle + REST /api/audio/* — src/app/chat/composer/hooks/use-voice-conversation.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
+- [~] GPT-Live voice mode — config voice.voice_chat_mode=gpt-live + REST /api/audio — src/app/chat/composer/hooks/use-voice-live-conversation.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
 - [ ] Push-to-talk / mic recorder — local MediaRecorder — src/app/chat/composer/hooks/use-mic-recorder.ts
-- [ ] Voice recorder (record → transcribe) — REST /api/audio/transcribe — src/app/chat/composer/hooks/use-voice-recorder.ts
+- [~] Voice recorder (record → transcribe) — REST /api/audio/transcribe — src/app/chat/composer/hooks/use-voice-recorder.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
 - [ ] Dictation hotkey (unbound) — local — src/lib/keybinds/actions.ts (composer.dictate)
 - [ ] Speech-to-text enable — config stt.enabled — src/app/settings/constants.ts
 - [ ] STT provider select — config stt.provider — src/app/settings/constants.ts
@@ -555,16 +555,16 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] STT echo transcripts — config stt.echo_transcripts — src/app/settings/constants.ts
 - [ ] Local STT model/language — config stt.local.* — src/app/settings/constants.ts
 - [ ] Provider STT models (OpenAI/Groq/Mistral/xAI/DeepInfra/ElevenLabs) — config stt.* — src/app/settings/constants.ts
-- [ ] STT lease (warm/cool local engine) — REST /api/audio/stt-lease — src/lib/stt-lease.ts
+- [~] STT lease (warm/cool local engine) — REST /api/audio/stt-lease — src/lib/stt-lease.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
 - [ ] Text-to-speech provider — config tts.provider — src/app/settings/constants.ts
 - [ ] TTS voices per provider (Edge/OpenAI/ElevenLabs/xAI/MiniMax/Mistral/Gemini/NeuTTS/KittenTTS/Piper/DeepInfra) — config tts.* — src/app/settings/constants.ts
 - [ ] Read responses aloud — config voice.auto_tts — src/app/settings/constants.ts
-- [ ] Voice playback + queue — local + REST /api/audio/speak — src/lib/voice-playback.ts
+- [~] Voice playback + queue — local + REST /api/audio/speak — src/lib/voice-playback.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
 - [ ] Voice stream (live PCM sibling WS) — local WS /api/voice — src/lib/voice-stream.ts
 - [ ] Voice barge-in / interrupted — WS voice.interrupted — src/lib/voice-barge-in.ts
 - [ ] Wake word (always-listening) — RPC wake.start|stop|status|feed|pause|resume — src/store/wake-word.ts
 - [ ] Wake indicator window — local (Electron wake-indicator) — src/app/wake-indicator/wake-indicator-app.tsx
-- [ ] TTS lease (warm engine) — REST /api/audio/tts-lease — src/lib/tts-lease.ts
+- [~] TTS lease (warm engine) — REST /api/audio/tts-lease — src/lib/tts-lease.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
 - [ ] Voice provider fields visibility — local — src/app/settings/voice-provider-fields.tsx, voice-field-visible.ts
 - [ ] Max recording length — config voice.max_recording_seconds — src/app/settings/constants.ts
 - [ ] Client-direct voice — config voice.client_direct — src/app/settings/constants.ts
