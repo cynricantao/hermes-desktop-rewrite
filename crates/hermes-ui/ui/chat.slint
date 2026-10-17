@@ -102,7 +102,7 @@ component ToolGroup inherits Rectangle {
                 spacing: 6px;
                 HorizontalLayout {
                     spacing: 8px;
-                    if t.state == 0: Spinner { size: 12px; }
+                    if t.state == 0: Spinner { size: 12px; cross-axis-self-alignment: center; }
                     Text {
                         text: (t.name == "terminal" ? "$ " : t.name + "  ") + t.context;
                         font-family: Theme.mono-font;
@@ -402,6 +402,7 @@ export component Composer inherits Rectangle {
             IconButton {
                 icon: @image-url("../../../assets/icons/plus.svg");
                 tooltip: "Add files";
+                cross-axis-self-alignment: center;
                 clicked => { root.attach(); }
             }
             Rectangle { horizontal-stretch: 1; }

@@ -271,7 +271,12 @@ component ApprovalCard inherits Rectangle {
         spacing: 10px;
         HorizontalLayout {
             spacing: 8px;
-            Image { source: @image-url("../../../assets/icons/triangle-alert.svg"); width: 16px; height: 16px; colorize: Theme.warning; }
+            Image {
+                source: @image-url("../../../assets/icons/triangle-alert.svg");
+                width: 16px; height: 16px;
+                cross-axis-self-alignment: center;
+                colorize: Theme.warning;
+            }
             Text { text: AppState.approval.title; color: Theme.text; font-size: Theme.fs-md; font-weight: 600; }
         }
         if AppState.approval.description != "": Text { text: AppState.approval.description; color: Theme.text-2; wrap: word-wrap; font-size: Theme.fs-md; }

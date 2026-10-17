@@ -312,6 +312,7 @@ export component Banner inherits Rectangle {
             source: @image-url("../../../assets/icons/triangle-alert.svg");
             width: 16px;
             height: 16px;
+            cross-axis-self-alignment: center;
             colorize: root.error ? Theme.danger : Theme.warning;
         }
         Text { text: root.text; color: Theme.text-2; font-size: Theme.fs-md; wrap: word-wrap; horizontal-stretch: 1; vertical-alignment: center; }
@@ -320,6 +321,7 @@ export component Banner inherits Rectangle {
             icon: @image-url("../../../assets/icons/x.svg");
             icon-size: 14px;
             tooltip: "Dismiss";
+            cross-axis-self-alignment: center;
             clicked => { root.dismissed(); }
         }
     }

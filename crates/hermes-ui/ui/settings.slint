@@ -121,6 +121,9 @@ component NavRow inherits Rectangle {
             source: Icons.get(entry.icon);
             width: entry.level == 1 ? 14px : 15px;
             height: entry.level == 1 ? 14px : 15px;
+            // A fixed-size cell is parked at the top by the layout's default `stretch`
+            // cross-axis alignment; centre it on the row so the glyph lines up with the text.
+            cross-axis-self-alignment: center;
             colorize: entry.active ? Theme.text : Theme.text-3;
         }
         Text {
@@ -136,6 +139,7 @@ component NavRow inherits Rectangle {
             source: Icons.get(entry.expanded ? "chevron-down" : "chevron-right");
             width: 12px;
             height: 12px;
+            cross-axis-self-alignment: center;
             colorize: Theme.text-4;
         }
     }
@@ -203,6 +207,7 @@ component SelectControl inherits Rectangle {
             source: Icons.get("chevron-down");
             width: 13px;
             height: 13px;
+            cross-axis-self-alignment: center;
             colorize: Theme.text-3;
         }
     }
