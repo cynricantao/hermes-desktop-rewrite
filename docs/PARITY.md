@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**42 done · 99 partial · 651 not started · 1 unsupported** (of 793).
+**42 done · 108 partial · 642 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -463,13 +463,13 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Messaging gateways
 
-- [ ] Messaging platforms list — REST /api/messaging/platforms — src/app/messaging/index.tsx
-- [ ] Platform detail/config — REST /api/messaging/platforms/{id} — src/app/messaging/index.tsx
+- [~] Messaging platforms list — REST /api/messaging/platforms — src/app/messaging/index.tsx ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
+- [~] Platform detail/config — REST /api/messaging/platforms/{id} — src/app/messaging/index.tsx ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
 - [ ] Test a platform — REST /api/messaging/platforms/{id}/test — src/app/messaging/index.tsx
-- [ ] Telegram QR onboarding — REST /api/messaging/telegram/onboarding/* — src/app/messaging/telegram-qr-setup.tsx
-- [ ] Pairing status — REST /api/pairing — src/api/messaging.ts
-- [ ] Approve pairing — REST /api/pairing/approve — src/api/messaging.ts
-- [ ] Revoke pairing — REST /api/pairing/revoke — src/api/messaging.ts
+- [~] Telegram QR onboarding — REST /api/messaging/telegram/onboarding/* — src/app/messaging/telegram-qr-setup.tsx ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
+- [~] Pairing status — REST /api/pairing — src/api/messaging.ts ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
+- [~] Approve pairing — REST /api/pairing/approve — src/api/messaging.ts ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
+- [~] Revoke pairing — REST /api/pairing/revoke — src/api/messaging.ts ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
 - [ ] Allowlist field (per-platform users) — local — src/app/messaging/allowlist-field.tsx
 - [ ] Bot relay (outbox/reply/roster) — RPC bot_relay.* — src/plugins/hermes-bots/*
 - [ ] Platform changed events — WS platforms.changed / pairing.changed — src/store/notifications.ts
@@ -1018,9 +1018,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Extras: webhooks, imports, subagents, learning, telemetry
 
-- [ ] Webhooks list — REST /api/webhooks — src/app/webhooks/index.tsx
-- [ ] Enable webhook — REST /api/webhooks/enable — src/api/messaging.ts
-- [ ] Delete webhook — REST /api/webhooks/{name} (DELETE) — src/app/webhooks/index.tsx
+- [~] Webhooks list — REST /api/webhooks — src/app/webhooks/index.tsx ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
+- [~] Enable webhook — REST /api/webhooks/enable — src/api/messaging.ts ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
+- [~] Delete webhook — REST /api/webhooks/{name} (DELETE) — src/app/webhooks/index.tsx ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
 - [ ] Webhook enabled toggle — REST /api/webhooks/{name}/enabled — src/api/messaging.ts
 - [~] Session import (foreign agent sessions) — RPC session.foreign.list|preview|import — src/app/session-import/index.tsx, src/app/session-import/api.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Subagents list — RPC subagent.list — src/store/subagents.ts
