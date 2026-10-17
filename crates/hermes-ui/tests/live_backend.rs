@@ -5,7 +5,7 @@
 //! Always allow, by click and by keyboard), a long (600-message) conversation, and the
 //! settings panel (registry nav, "Applies to" profile scope, saving, persistence, search).
 //!
-//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings` runs a subset. The
+//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings,statusbar` runs a subset. The
 //! `long` section
 //! needs a seeded session: `HERMES_HOME=<private home> scripts/seed-long-session.py 600`. The
 //! `sessions` section (open / switch / new chat / Ctrl+Tab, continue an old chat, switch while
@@ -319,6 +319,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("settings") {
         settings_section(&ui, &log).await;
+    }
+    if want("statusbar") {
+        statusbar_section(&ui, &log).await;
     }
 }
 
@@ -1339,6 +1342,70 @@ async fn sessions_section(ui: &AppWindow, log: &Log) {
             idle_clean(&ui)
         ),
     );
+
+    // ── The tab strip lists the chats this window has opened ─────────────────────
+    let tabs: Vec<hermes_ui::TabItem> = st.get_tabs().iter().collect();
+    let active: Vec<&hermes_ui::TabItem> = tabs.iter().filter(|t| t.active).collect();
+    // `auto` mode: the strip itself only exists from the second chat on.
+    let strip = ElementHandle::find_by_element_type_name(&ui, "TabStrip").count();
+    record(
+        &log,
+        "tabs: every chat opened here has a tab, exactly one active",
+        tabs.len() >= 3
+            && active.len() == 1
+            && active[0].id.as_str() == st.get_active_session().as_str()
+            && strip == 1,
+        format!(
+            "{} tabs {:?}; active = {:?}; TabStrip drawn = {strip}",
+            tabs.len(),
+            tabs.iter().map(|t| (t.title.to_string(), t.active)).collect::<Vec<_>>(),
+            active.first().map(|t| t.id.to_string())
+        ),
+    );
+
+    // Selecting another tab switches the chat (the callbacks the strip's rows call).
+    let other = tabs.iter().find(|t| !t.active).map(|t| t.id.to_string()).unwrap_or_default();
+    st.invoke_select_tab(other.clone().into());
+    let switched = wait_until(20, || st.get_active_session() == other).await;
+    record(
+        &log,
+        "tabs: selecting a tab switches the chat",
+        switched && !rows(&ui).is_empty(),
+        format!("active={:?} rows={}", st.get_active_session(), rows(&ui).len()),
+    );
+
+    // Ctrl+W closes the active tab, lands on another one, and leaves the chat in the sidebar.
+    let before_close = st.get_tabs().row_count();
+    chord(&ui, &[Key::Control], "w");
+    let closed = wait_until(20, || st.get_tabs().row_count() < before_close).await;
+    let still_listed = st.get_sessions().iter().any(|s| s.id.as_str() == other.as_str());
+    record(
+        &log,
+        "tabs: Ctrl+W closes the tab but not the chat",
+        closed && still_listed && !st.get_active_session().is_empty() && idle_clean(&ui).is_ok(),
+        format!(
+            "tabs {before_close} → {}; chat still in the sidebar={still_listed}; active={:?}",
+            st.get_tabs().row_count(),
+            st.get_active_session()
+        ),
+    );
+
+    // Ctrl+T: a new chat, drawn as the active draft tab.
+    chord(&ui, &[Key::Control], "t");
+    let draft = wait_until(10, || {
+        st.get_active_session().is_empty() && st.get_tabs().iter().any(|t| t.active && t.title.as_str() == "New chat")
+    })
+    .await;
+    record(
+        &log,
+        "tabs: Ctrl+T opens a new chat as the active tab",
+        draft,
+        format!(
+            "{} tabs, titles {:?}",
+            st.get_tabs().row_count(),
+            st.get_tabs().iter().map(|t| t.title.to_string()).collect::<Vec<_>>()
+        ),
+    );
 }
 
 /// The private backend's home (what `scripts/live-test-backend.sh` created).
@@ -1589,6 +1656,127 @@ async fn settings_section(ui: &AppWindow, log: &Log) {
 
     ui.set_settings_open(false);
     sleep(200).await;
+}
+
+/// The bottom status bar against the private backend: the health label, a real token gauge
+/// built from the backend's own counters, the workspace branch, and the Ctrl+Shift+S toggle
+/// (whose choice is a device pref, so it survives a restart).
+async fn statusbar_section(ui: &AppWindow, log: &Log) {
+    let st = ui.global::<AppState>();
+
+    // A brand-new chat owns no counters: the bar must paint nothing, not a zero.
+    st.invoke_new_chat();
+    wait_until(5, || st.get_runtime_session().is_empty()).await;
+    sleep(200).await;
+    record(
+        log,
+        "status bar: a chat with no counters paints no reading",
+        st.get_usage_label().is_empty() && st.get_branch_label().is_empty(),
+        format!(
+            "usage={:?} detail={:?} branch={:?}",
+            st.get_usage_label(),
+            st.get_usage_detail(),
+            st.get_branch_label()
+        ),
+    );
+
+    // Health follows the live connection, and the bar is on by default.
+    record(
+        log,
+        "status bar: backend health tracks the connection",
+        st.get_statusbar_open() && st.get_connection() == "open",
+        format!("open={} connection={}", st.get_statusbar_open(), st.get_connection()),
+    );
+
+    // One real turn fills the gauge from the backend's counters.
+    if !send_and_wait(ui, "Reply with exactly: status ok", 120).await {
+        record(log, "status bar: turn for the token gauge", false, "no reply");
+        return;
+    }
+    let filled = wait_until(10, || !st.get_usage_label().is_empty()).await;
+    let sid = st.get_runtime_session().to_string();
+    // An independent readback over a second connection: the bar must show those numbers.
+    let reading = backend_request("session.usage", serde_json::json!({ "session_id": sid }))
+        .await
+        .ok()
+        .and_then(|v| hermes_core::usage::from_value(&v));
+    let label = st.get_usage_label().to_string();
+    record(
+        log,
+        "status bar: the token gauge shows the backend's own reading",
+        filled && reading.as_ref().is_some_and(|u| gauge_matches(&label, u)),
+        format!(
+            "ui={label:?} (detail {:?}) · backend {:?}",
+            st.get_usage_detail(),
+            reading.as_ref().map(hermes_core::usage::context_label)
+        ),
+    );
+    screenshot(ui, "chrome-statusbar");
+
+    // The bar follows the theme: capture the light palette too (DESIGN.md tokens).
+    let theme = ui.global::<hermes_ui::Theme>();
+    theme.set_mode(hermes_ui::ThemeMode::Light);
+    sleep(300).await;
+    screenshot(ui, "chrome-statusbar-light");
+    theme.set_mode(hermes_ui::ThemeMode::Dark);
+    sleep(200).await;
+
+    // Ctrl+Shift+S hides the bar; the choice is a device pref, not session state.
+    chord(ui, &[Key::Control, Key::Shift], "s");
+    let hidden = wait_until(5, || !st.get_statusbar_open()).await;
+    let prefs_file = std::env::var("HERMES_DESKTOP_PREFS").unwrap_or_default();
+    let on_disk = !hermes_core::prefs::Prefs::load(&prefs_file).get_bool(hermes_core::prefs::STATUSBAR_VISIBLE, true);
+    record(
+        log,
+        "status bar: Ctrl+Shift+S hides it and the choice persists",
+        hidden && on_disk,
+        format!("hidden={hidden}; prefs.json reads it hidden={on_disk}"),
+    );
+    chord(ui, &[Key::Control, Key::Shift], "s");
+    let shown = wait_until(5, || st.get_statusbar_open()).await;
+    record(
+        log,
+        "status bar: Ctrl+Shift+S brings it back",
+        shown,
+        format!("open={}", st.get_statusbar_open()),
+    );
+
+    // ── Sidebar surfaces: Sessions / Bots / Files ────────────────────────────────
+    record(
+        log,
+        "sidebar: opens on the Sessions surface",
+        st.get_sidebar_tab() == 0,
+        format!("surface={}", st.get_sidebar_tab()),
+    );
+    let mut to_bots = false;
+    if let Some(bots) = by_label(ui, "Bots") {
+        bots.single_click(PointerEventButton::Left).await;
+        to_bots = wait_until(5, || st.get_sidebar_tab() == 1).await;
+    }
+    record(
+        log,
+        "sidebar: clicking Bots switches the surface",
+        to_bots,
+        format!("surface={}", st.get_sidebar_tab()),
+    );
+    let mut back = false;
+    if let Some(sessions) = by_label(ui, "Sessions") {
+        sessions.single_click(PointerEventButton::Left).await;
+        back = wait_until(5, || st.get_sidebar_tab() == 0).await;
+    }
+    record(
+        log,
+        "sidebar: clicking Sessions brings the chat list back",
+        back && !st.get_sessions().iter().collect::<Vec<_>>().is_empty(),
+        format!("surface={} · {} chats listed", st.get_sidebar_tab(), st.get_sessions().row_count()),
+    );
+}
+
+/// The bar paints the context gauge when the backend knows one and the token total
+/// otherwise; both forms are the same reading, so either matches.
+fn gauge_matches(label: &str, u: &hermes_core::protocol::Usage) -> bool {
+    label == hermes_core::usage::context_label(u)
+        || label == format!("{} tok", hermes_core::usage::compact_number(u.total.unwrap_or(0)))
 }
 
 #[test]

@@ -295,6 +295,45 @@ export component Segmented inherits Rectangle {
     }
 }
 
+// Compact segmented tabs — the sidebar's Sessions / Bots / Files row. Same sliding-pill
+// idiom as `Segmented`, sized for a 288px column instead of the titlebar.
+export component MiniTabs inherits Rectangle {
+    in property <[string]> options;
+    in-out property <int> selected;
+    callback changed(int);
+    height: 28px;
+    border-radius: Theme.r-md;
+    background: Theme.bg.with-alpha(0.4);
+    property <length> seg-w: (self.width - 4px) / max(1, options.length);
+    Rectangle {
+        x: 2px + root.selected * root.seg-w;
+        y: 2px;
+        width: root.seg-w;
+        height: root.height - 4px;
+        border-radius: Theme.r-sm;
+        background: Theme.surface-2;
+        animate x { duration: Motion.base; easing: Ease.out; }
+    }
+    for opt[i] in root.options: Rectangle {
+        x: 2px + i * root.seg-w;
+        width: root.seg-w;
+        height: root.height;
+        accessible-role: tab;
+        accessible-label: opt;
+        accessible-item-selected: i == root.selected;
+        accessible-action-default => { root.selected = i; root.changed(i); }
+        Text {
+            text: opt;
+            font-size: Theme.fs-sm;
+            color: i == root.selected ? Theme.text : Theme.text-3;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+            animate color { duration: Motion.fast; }
+        }
+        TouchArea { mouse-cursor: pointer; clicked => { root.selected = i; root.changed(i); } }
+    }
+}
+
 export component Banner inherits Rectangle {
     in property <string> text;
     in property <bool> error: false;

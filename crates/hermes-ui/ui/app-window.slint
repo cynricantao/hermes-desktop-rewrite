@@ -2,7 +2,7 @@
 
 import { ScrollView, LineEdit } from "std-widgets.slint";
 import { Theme, Motion, Ease, ThemeMode } from "theme.slint";
-import { Icon, IconButton, NavItem, SectionHeader, Chip, Banner, Spinner, Toggle, Segmented, PrimaryButton, GhostButton } from "components.slint";
+import { Icon, IconButton, NavItem, SectionHeader, Chip, Banner, Spinner, Toggle, Segmented, MiniTabs, PrimaryButton, GhostButton } from "components.slint";
 import { Transcript, Composer, ChatRow, ToolRow } from "chat.slint";
 import { SettingsModal, SettingsState } from "settings.slint";
 
@@ -16,6 +16,15 @@ export struct SessionItem {
     group: string,
     first-in-group: bool,
     pinned: bool,
+    running: bool,
+}
+
+/// One chat open in this window. The strip is the original desktop's `auto` mode: a lone
+/// chat is not a tab, so it only appears once a second one is open.
+export struct TabItem {
+    id: string,
+    title: string,
+    active: bool,
     running: bool,
 }
 
@@ -54,6 +63,23 @@ export global AppState {
     in-out property <string> effort-label;
     in-out property <[string]> effort-options: ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"];
     in-out property <string> cwd-label;
+    // Bottom status bar. The labels are formatted in Rust (`hermes-core::usage`) so the
+    // controller and the tests can read exactly what the bar paints; an empty label hides
+    // its item — the bar never paints a made-up zero.
+    in-out property <string> usage-label;
+    in-out property <string> usage-detail;
+    in-out property <string> branch-label;
+    in-out property <bool> statusbar-open: true;
+    callback toggle-statusbar();
+    // Sidebar surface: 0 = Sessions (the chat list), 1 = Bots, 2 = Files. Pure view state —
+    // nothing outside the sidebar reads it, so the UI owns it.
+    in-out property <int> sidebar-tab: 0;
+    // Chats open in this window (the strip above the conversation).
+    in-out property <[TabItem]> tabs;
+    callback select-tab(string);
+    callback close-tab(string);
+    callback close-active-tab();
+    callback new-tab();
     in-out property <[ModelItem]> models;
     in-out property <string> banner;
     in-out property <bool> banner-error;
@@ -93,8 +119,34 @@ component Sidebar inherits Rectangle {
         padding-bottom: 8px;
         spacing: 2px;
 
+        // The three surfaces the original's sidebar leads with. Sessions is the list below;
+        // Bots and Files say plainly that this preview does not have them yet.
+        MiniTabs {
+            options: ["Sessions", "Bots", "Files"];
+            selected <=> AppState.sidebar-tab;
+        }
+        Rectangle { height: 6px; }
+        NavItem {
+            icon: @image-url("../../../assets/icons/plus.svg");
+            text: "New chat";
+            emphasized: true;
+            clicked => { AppState.new-chat(); }
+        }
+        NavItem {
+            icon: @image-url("../../../assets/icons/folder.svg");
+            text: ProjectState.active-name != "" ? ProjectState.active-name : "Projects";
+            clicked => { ProjectState.open = true; ProjectState.refresh(); }
+        }
+        NavItem { icon: @image-url("../../../assets/icons/puzzle.svg"); text: "Capabilities"; clicked => { AppState.banner = "Capabilities (skills, tools, MCP) are not available in this preview yet."; AppState.banner-error = false; } }
+        NavItem { icon: @image-url("../../../assets/icons/message-circle.svg"); text: "Messaging"; clicked => { AppState.banner = "Messaging gateways are not available in this preview yet."; AppState.banner-error = false; } }
+        NavItem { icon: @image-url("../../../assets/icons/box.svg"); text: "Artifacts"; clicked => { AppState.banner = "Artifact browsing is not available in this preview yet."; AppState.banner-error = false; } }
+        NavItem { icon: @image-url("../../../assets/icons/clock.svg"); text: "Scheduled"; clicked => { AppState.banner = "Scheduled-job management is not available in this preview yet."; AppState.banner-error = false; } }
+        NavItem { icon: @image-url("../../../assets/icons/list-todo.svg"); text: "Kanban"; clicked => { AppState.banner = "Kanban boards are not available in this preview yet."; AppState.banner-error = false; } }
+        NavItem { icon: @image-url("../../../assets/icons/sliders-horizontal.svg"); text: "Customize"; clicked => { root.open-settings(); } }
+
+        if AppState.sidebar-tab == 0: Rectangle { height: 6px; }
         // Search
-        Rectangle {
+        if AppState.sidebar-tab == 0: Rectangle {
             height: 32px;
             border-radius: Theme.r-md;
             border-width: 1px;
@@ -125,26 +177,11 @@ component Sidebar inherits Rectangle {
                 }
             }
         }
-        Rectangle { height: 6px; }
-        NavItem {
-            icon: @image-url("../../../assets/icons/plus.svg");
-            text: "New chat";
-            emphasized: true;
-            clicked => { AppState.new-chat(); }
-        }
-        NavItem {
-            icon: @image-url("../../../assets/icons/folder.svg");
-            text: ProjectState.active-name != "" ? ProjectState.active-name : "Projects";
-            clicked => { ProjectState.open = true; ProjectState.refresh(); }
-        }
-        NavItem { icon: @image-url("../../../assets/icons/box.svg"); text: "Artifacts"; clicked => { AppState.banner = "Artifact browsing is not available in this preview yet."; AppState.banner-error = false; } }
-        NavItem { icon: @image-url("../../../assets/icons/clock.svg"); text: "Scheduled"; clicked => { AppState.banner = "Scheduled-job management is not available in this preview yet."; AppState.banner-error = false; } }
-        NavItem { icon: @image-url("../../../assets/icons/sliders-horizontal.svg"); text: "Customize"; clicked => { root.open-settings(); } }
 
-        Rectangle { height: 10px; }
-        SectionHeader { text: "Recents"; }
+        if AppState.sidebar-tab == 0: Rectangle { height: 10px; }
+        if AppState.sidebar-tab == 0: SectionHeader { text: "Recents"; }
 
-        ScrollView {
+        if AppState.sidebar-tab == 0: ScrollView {
             vertical-stretch: 1;
             VerticalLayout {
                 spacing: 1px;
@@ -165,6 +202,27 @@ component Sidebar inherits Rectangle {
                 }
             }
         }
+        if AppState.sidebar-tab == 1: VerticalLayout {
+            vertical-stretch: 1;
+            padding: 12px;
+            Text {
+                text: "Bot sessions are not part of this preview yet.";
+                color: Theme.text-4;
+                font-size: Theme.fs-sm;
+                wrap: word-wrap;
+            }
+        }
+        if AppState.sidebar-tab == 2: VerticalLayout {
+            vertical-stretch: 1;
+            padding: 12px;
+            Text {
+                text: "The file browser is not part of this preview yet.";
+                color: Theme.text-4;
+                font-size: Theme.fs-sm;
+                wrap: word-wrap;
+            }
+        }
+        if AppState.sidebar-tab != 0: Rectangle { vertical-stretch: 1; }
 
         // Footer: user + settings
         Rectangle {
@@ -298,6 +356,172 @@ component ApprovalCard inherits Rectangle {
     }
 }
 
+// Bottom status bar: one quiet row of read-only state — backend health on the left, the
+// open session's token gauge, model and branch on the right. The composer above it owns
+// the *controls* (model / reasoning / folder pickers); this is the readout, which is why
+// nothing here is clickable. Items hide themselves on an empty label.
+component StatusBar inherits Rectangle {
+    property <color> health-color: AppState.connection == "open" ? Theme.success : AppState.connection == "error" ? Theme.danger : Theme.warning;
+    property <string> health-text: AppState.connection == "open" ? "Backend ready" : AppState.connection == "error" ? "Offline" : "Connecting…";
+    height: Theme.statusbar-h;
+    background: Theme.sidebar-bg;
+    Rectangle {
+        height: 1px;
+        background: Theme.border;
+    }
+    // Health can also be read from the accessibility tree, where a bare colour says nothing.
+    accessible-role: text;
+    accessible-label: health-text;
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 14px;
+        HorizontalLayout {
+            spacing: 6px;
+            cross-axis-self-alignment: center;
+            Rectangle {
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: root.health-color;
+                cross-axis-self-alignment: center;
+            }
+            Text {
+                text: root.health-text;
+                color: Theme.text-3;
+                font-size: Theme.fs-xs;
+                vertical-alignment: center;
+            }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        // Token gauge: `61.2k/200k` once the backend has measured the context, else the
+        // session's token total (`492.9k tok`); empty until there is a reading at all.
+        HorizontalLayout {
+            visible: AppState.usage-label != "";
+            spacing: 5px;
+            cross-axis-self-alignment: center;
+            Image {
+                source: @image-url("../../../assets/icons/gauge.svg");
+                width: 12px;
+                height: 12px;
+                colorize: Theme.text-4;
+                cross-axis-self-alignment: center;
+            }
+            Text {
+                text: AppState.usage-label;
+                color: Theme.text-3;
+                font-size: Theme.fs-xs;
+                vertical-alignment: center;
+                accessible-label: AppState.usage-detail;
+            }
+        }
+        // Model + reasoning effort as one readout (`deepseek-v4.1-flash · max`).
+        Text {
+            visible: AppState.model-label != "" && AppState.model-label != "Model";
+            text: AppState.effort-label != "" ? AppState.model-label + " · " + AppState.effort-label : AppState.model-label;
+            color: Theme.text-3;
+            font-size: Theme.fs-xs;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-label: "Model " + AppState.model-label + (AppState.effort-label != "" ? ", reasoning " + AppState.effort-label : "");
+        }
+        // Workspace branch — only when the session's working copy is a git worktree.
+        HorizontalLayout {
+            visible: AppState.branch-label != "";
+            spacing: 5px;
+            cross-axis-self-alignment: center;
+            Image {
+                source: @image-url("../../../assets/icons/git-branch.svg");
+                width: 12px;
+                height: 12px;
+                colorize: Theme.text-4;
+                cross-axis-self-alignment: center;
+            }
+            Text {
+                text: AppState.branch-label;
+                color: Theme.text-3;
+                font-size: Theme.fs-xs;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-label: "Branch " + AppState.branch-label;
+            }
+        }
+    }
+}
+
+// Chats open in this window, above the conversation. `auto` mode like the original's tab
+// strip: a lone chat is not a tab, so this only draws from the second one on (see the
+// `tabs-h` property on AppWindow, which keeps the transcript clear of it). Click to
+// switch, × to close that chat, + for a new one.
+component TabStrip inherits Rectangle {
+    height: Theme.tabstrip-h;
+    background: Theme.bg;
+    Rectangle { y: parent.height - 1px; height: 1px; background: Theme.border; }
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 2px;
+        for t in AppState.tabs: Rectangle {
+            height: 26px;
+            // Room for the title plus the close affordance, never wider than a third of a
+            // comfortable column — a long chat title must not push the strip out of shape.
+            width: min(tab-text.preferred-width + 40px, 220px);
+            border-radius: Theme.r-md;
+            border-width: 1px;
+            border-color: t.active ? Theme.border : transparent;
+            background: t.active ? Theme.surface : tab-ta.has-hover ? Theme.hover : transparent;
+            animate background { duration: Motion.fast; }
+            accessible-role: tab;
+            accessible-label: t.title;
+            accessible-item-selected: t.active;
+            accessible-action-default => { AppState.select-tab(t.id); }
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 4px;
+                spacing: 6px;
+                if t.running: Rectangle {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    background: Theme.accent;
+                    cross-axis-self-alignment: center;
+                }
+                tab-text := Text {
+                    text: t.title;
+                    color: t.active ? Theme.text : Theme.text-3;
+                    font-size: Theme.fs-sm;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                }
+                if t.active || tab-ta.has-hover: IconButton {
+                    width: 20px;
+                    height: 20px;
+                    icon-size: 11px;
+                    icon: @image-url("../../../assets/icons/x.svg");
+                    tooltip: "Close tab (Ctrl+W)";
+                    cross-axis-self-alignment: center;
+                    clicked => { AppState.close-tab(t.id); }
+                }
+            }
+            tab-ta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { AppState.select-tab(t.id); }
+            }
+        }
+        IconButton {
+            width: 26px;
+            height: 26px;
+            icon-size: 14px;
+            icon: @image-url("../../../assets/icons/plus.svg");
+            tooltip: "New chat (Ctrl+T)";
+            cross-axis-self-alignment: center;
+            clicked => { AppState.new-tab(); }
+        }
+        Rectangle { horizontal-stretch: 1; }
+    }
+}
+
 export component AppWindow inherits Window {
     title: "Hermes";
     preferred-width: 1280px;
@@ -324,6 +548,10 @@ export component AppWindow inherits Window {
     in-out property <bool> effort-open: false;
     property <bool> empty: AppState.rows.length == 0;
     property <length> dock-h: 92px;
+    // Height the status bar reserves from the content above it (0 while hidden).
+    property <length> status-h: AppState.statusbar-open ? Theme.statusbar-h : 0px;
+    // Height the tab strip reserves (0 while a lone chat is open — the original's `auto`).
+    property <length> tabs-h: AppState.tabs.length >= 2 ? Theme.tabstrip-h : 0px;
 
     callback quit();
 
@@ -335,8 +563,13 @@ export component AppWindow inherits Window {
     keys := FocusScope {
         capture-key-pressed(e) => {
             if e.modifiers.control && (e.text == "n" || e.text == "N") { AppState.new-chat(); return accept; }
+            // Tabs: Ctrl+T opens a chat in a new tab, Ctrl+W closes the active one.
+            if e.modifiers.control && (e.text == "t" || e.text == "T") { AppState.new-tab(); return accept; }
+            if e.modifiers.control && (e.text == "w" || e.text == "W") { AppState.close-active-tab(); return accept; }
             if e.modifiers.control && e.text == "," { root.settings-open = true; return accept; }
             if e.modifiers.control && (e.text == "b" || e.text == "B") { root.sidebar-open = !root.sidebar-open; return accept; }
+            // Show/hide the status bar (the Electron app's ⌘⇧S).
+            if e.modifiers.control && e.modifiers.shift && (e.text == "s" || e.text == "S") { AppState.toggle-statusbar(); return accept; }
             if e.modifiers.control && (e.text == "q" || e.text == "Q") { root.quit(); return accept; }
             // Next / previous chat in sidebar order. Some backends report Shift+Tab as Backtab.
             if e.modifiers.control && e.text == Key.Backtab { AppState.cycle-session(-1); return accept; }
@@ -361,16 +594,16 @@ export component AppWindow inherits Window {
             x: 0;
             y: 0;
             width: root.sb-w;
-            height: root.height;
+            height: root.height - root.status-h;
             open-settings => { root.settings-open = true; }
         }
-        if root.sb-w > 0: Rectangle { x: root.sb-w - 1px; width: 1px; height: root.height; background: Theme.border; }
+        if root.sb-w > 0: Rectangle { x: root.sb-w - 1px; width: 1px; height: root.height - root.status-h; background: Theme.border; }
 
         main := Rectangle {
             x: root.sb-w;
             y: 0;
             width: root.width - root.sb-w;
-            height: root.height;
+            height: root.height - root.status-h;
 
             // Title strip
             HorizontalLayout {
@@ -407,9 +640,14 @@ export component AppWindow inherits Window {
                 }
             }
 
+            if AppState.tabs.length >= 2: TabStrip {
+                y: Theme.titlebar-h;
+                width: parent.width;
+            }
+
             if AppState.banner != "": Banner {
                 x: (parent.width - self.width) / 2;
-                y: Theme.titlebar-h + 4px;
+                y: Theme.titlebar-h + root.tabs-h + 4px;
                 width: min(parent.width - 48px, Theme.column-w);
                 text: AppState.banner;
                 error: AppState.banner-error;
@@ -418,6 +656,8 @@ export component AppWindow inherits Window {
 
             // Empty state: serif greeting + centred composer.
             if root.empty: VerticalLayout {
+                y: Theme.titlebar-h + root.tabs-h;
+                height: parent.height - Theme.titlebar-h - root.tabs-h;
                 alignment: center;
                 spacing: 22px;
                 padding-bottom: 80px;
@@ -460,9 +700,9 @@ export component AppWindow inherits Window {
             }
 
             if !root.empty: transcript := Transcript {
-                y: Theme.titlebar-h;
+                y: Theme.titlebar-h + root.tabs-h;
                 width: parent.width;
-                height: parent.height - Theme.titlebar-h - root.dock-h - 8px;
+                height: parent.height - Theme.titlebar-h - root.tabs-h - root.dock-h - 8px;
                 rows: AppState.rows;
                 running: AppState.running;
                 status: AppState.status;
@@ -522,6 +762,14 @@ export component AppWindow inherits Window {
                 x: parent.width - self.width - max(24px, (parent.width - Theme.column-w) / 2);
                 y: parent.height - self.height - 54px;
             }
+        }
+
+        // Full-width, under the sidebar too — the same place the Electron app's bar sits.
+        StatusBar {
+            x: 0;
+            y: root.height - root.status-h;
+            width: root.width;
+            visible: AppState.statusbar-open;
         }
 
         ProjectsModal { width: root.width; height: root.height; }

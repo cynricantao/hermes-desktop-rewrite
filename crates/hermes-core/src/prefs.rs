@@ -25,6 +25,11 @@ pub fn default_path() -> PathBuf {
     base.join("hermes-desktop-rs").join("prefs.json")
 }
 
+/// Whole-bar status-bar visibility, the original's Electron-storage key
+/// (`src/store/statusbar-prefs.ts`). It is a device pref, not a profile setting: the bar
+/// is chrome of this window, and the keybind that flips it is `view.toggleStatusbar`.
+pub const STATUSBAR_VISIBLE: &str = "hermes.desktop.statusbarVisible.v2";
+
 #[derive(Debug, Clone)]
 pub struct Prefs {
     path: PathBuf,
@@ -129,6 +134,7 @@ pub fn default_for(key: &str) -> &'static str {
         "hermes.desktop.interfaceMode.v1" => "advanced",
         "hermes.desktop.sessionListDensity" => "compact",
         "hermes.desktop.tabStripDefault" => "auto",
+        "hermes.desktop.statusbarVisible.v2" => "true",
         "hermes.desktop.titlebarAppActions" => "right",
         "minimize-to-tray" => "false",
         "hermes.desktop.backdrop.v1" => "false",

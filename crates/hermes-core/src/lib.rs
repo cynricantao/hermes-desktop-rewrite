@@ -6,6 +6,7 @@
 //!   notifications, server→client requests, `gateway.ping` heartbeat).
 //! * [`protocol`] — serde types for the subset of the gateway contract we consume.
 //! * [`transcript`] — a pure reducer turning gateway events into a renderable transcript.
+//! * [`usage`] — status-bar token gauge formatting + the `session.usage` merge rule.
 //! * [`markdown`] — block-level splitting of assistant replies into prose / fenced code /
 //!   GFM tables, streaming-safe (a half-received table never flickers).
 //! * [`diff`] — unified-diff parsing for the diff view (line kinds, numbers, paths).
@@ -25,5 +26,6 @@ pub mod rpc;
 pub mod sessions;
 pub mod settings;
 pub mod transcript;
+pub mod usage;
 
 pub use rpc::{Client, ClientEvent, RpcError};

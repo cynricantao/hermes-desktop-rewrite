@@ -253,7 +253,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Gateway/profile grouping in sidebar — local — src/app/chat/sidebar/gateway-groups.tsx
 - [ ] Session drag-and-drop reorder — local — src/app/chat/sidebar/reorderable-list.tsx, session-drag.ts
 - [ ] Load-more row for long session lists — local — src/app/chat/sidebar/load-more-row.tsx
-- [ ] Session usage/token meter — RPC session.usage, REST /api/analytics/usage — src/app/session/hooks/use-session-actions/index.ts
+- [x] Session usage/token meter — RPC session.usage, REST /api/analytics/usage — src/app/session/hooks/use-session-actions/index.ts ⟶ the status bar's token gauge: `session.usage` on open, `session.usage` ticks mid-turn and `message.complete` merged (a tick carries only the fields it measured, so it merges rather than replaces), formatted `61.2k/200k` — or `492.9k tok` when the backend reports no context max — by `hermes-core::usage`. Verified live 2026-10-17, `tests/live_backend.rs` `statusbar` section: after one real turn the gauge read the private backend's own counters, checked against an independent `session.usage` readback (`ui="19.9k/1M"` vs `backend "19.9k/1M"`), and a chat with no counters painted nothing. Not built: the REST analytics view and the click-through breakdown popover (see next row)
 - [ ] Context breakdown panel — RPC session.context_breakdown — src/app/shell/hooks/use-context-breakdown.ts
 - [ ] Session branch (fork at message) — RPC session.branch, session.branch_stored, session.branch_whole — src/app/session/hooks/use-session-actions/branch-create-key.ts
 - [ ] Session compress (manual) — RPC session.compress — src/store/compaction.ts
@@ -294,7 +294,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Project appearance (color/icon) — local — src/app/chat/sidebar/projects/project-appearance.tsx
 - [ ] Project filter in sidebar — local — src/app/chat/sidebar/project-filter.ts
 - [ ] Workspace page header (page-owned controls) — local — src/app/contrib/workspace-page-header.tsx
-- [ ] Sidebar workspace nav (Agents/Capabilities/Messaging/Artifacts/Cron) — local routes — src/app/routes.ts
+- [~] Sidebar workspace nav (Agents/Capabilities/Messaging/Artifacts/Cron) — local routes — src/app/routes.ts ⟶ the sidebar leads with the original's three surfaces (Sessions / Bots / Files; Bots and Files say plainly that this preview has them out) and the nav rows render in the original's order — Capabilities, Messaging, Artifacts, Scheduled, Kanban — but have no pages behind them: each answers with the "not available in this preview yet" banner. No routes, no Agents row, no per-surface content.
 
 ## Models & providers
 
@@ -591,7 +591,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Dictation (unbound) — local — src/lib/keybinds/actions.ts
 - [ ] Reasoning up/down (unbound) — local — src/lib/keybinds/actions.ts
 - [x] New session (⌘N) — RPC session.create — src/lib/keybinds/actions.ts ⟶ Ctrl+N, see Sessions & sidebar
-- [ ] New tab (⌘T) — local — src/lib/keybinds/actions.ts
+- [x] New tab (⌘T) — local — src/lib/keybinds/actions.ts ⟶ Ctrl+T opens a new chat as the active draft tab; live-tested 2026-10-17 (`statusbar` section: 6 tabs, `["New chat", …]`, no active session)
 - [ ] New window (⌘⇧N) — local — src/lib/keybinds/actions.ts
 - [ ] Next/prev session (⌃Tab / ⌃⇧Tab, ⌃PgDn/PgUp) — local — src/lib/keybinds/actions.ts
 - [ ] Session slots (⌃1…⌃9) — local — src/lib/keybinds/actions.ts
@@ -605,7 +605,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Toggle sidebar (⌘B) — local — src/lib/keybinds/actions.ts
 - [ ] Cycle sidebar grouping (unbound) — local — src/lib/keybinds/actions.ts
 - [ ] Toggle right sidebar (⌘J) — local — src/lib/keybinds/actions.ts
-- [ ] Toggle statusbar (⌘⇧S) — local — src/lib/keybinds/actions.ts
+- [x] Toggle statusbar (⌘⇧S) — local — src/lib/keybinds/actions.ts ⟶ Ctrl+Shift+S hides/shows the bar and persists the choice as the original's device pref `hermes.desktop.statusbarVisible.v2`; live-tested 2026-10-17: hidden → a fresh `Prefs::load(prefs.json)` read it back hidden → shown again
 - [ ] Toggle tab strip (⌘⌥T) — local — src/lib/keybinds/actions.ts
 - [ ] Toggle profile rail (unbound) — local — src/lib/keybinds/actions.ts
 - [ ] Toggle simple mode (unbound) — local — src/lib/keybinds/actions.ts
@@ -618,7 +618,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Next/prev terminal (⌃⇧↓ / ⌃⇧↑) — local — src/lib/keybinds/actions.ts
 - [ ] Close terminal (⌃⇧W) — local — src/lib/keybinds/actions.ts
 - [ ] Flip panes (⌘\) — local — src/lib/keybinds/actions.ts
-- [ ] Close tab (⌘W) — local — src/lib/keybinds/actions.ts
+- [x] Close tab (⌘W) — local — src/lib/keybinds/actions.ts ⟶ Ctrl+W closes the tab the window shows and lands on the remaining one, leaving the chat itself in the sidebar; live-tested 2026-10-17 (`tabs: Ctrl+W closes the tab but not the chat`)
 - [ ] Reopen tab (⌘⇧T) — local — src/lib/keybinds/actions.ts
 - [ ] Find in page (⌘F) — local — src/lib/keybinds/actions.ts
 - [ ] Find next/prev (unbound) — local — src/lib/keybinds/actions.ts
@@ -697,7 +697,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Session list density — local — src/store/session-list-density.ts
   ⟶ row renders and persists; the sidebar keeps one density
 - [~] Tab strip mode — local — src/store/tabstrip-prefs.ts
-  ⟶ row renders and persists; no zone tab strip yet
+  ⟶ the strip exists in the original's `auto` mode: it draws from the second chat this window has open and shows each open chat's title, a running dot, × to close and + for a new chat. The explicit always/never preference is not wired (the row still only persists), and the open set is per-run, not restored on launch.
 - [~] Titlebar app actions side — local — src/app/settings/settings-manifest.ts (appearance.appActions)
   ⟶ row renders and persists; the titlebar layout is fixed
 - [~] Minimize to tray — local (Electron) — src/app/settings/minimize-to-tray-setting.tsx
@@ -948,7 +948,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Main window lifecycle / state — local (Electron) — electron/main-window-lifecycle.ts, electron/window-state.ts
 - [ ] Window controls (custom titlebar) — local (Electron) — src/app/shell/titlebar-controls.tsx, electron/window-controls.ts
 - [ ] Titlebar app actions (left/right) — local — src/app/shell/titlebar.ts
-- [ ] Statusbar (custom status items) — local — src/app/shell/statusbar-controls.tsx, hooks/use-statusbar-items.tsx
+- [~] Statusbar (custom status items) — local — src/app/shell/statusbar-controls.tsx, hooks/use-statusbar-items.tsx ⟶ the bottom bar draws what this app can back with real data: backend health on the left, then the token/context gauge, model + reasoning effort, and the workspace branch; empty labels hide their item (never a painted zero) and Ctrl+Shift+S hides the whole bar. Verified live 2026-10-17 (`tests/live_backend.rs` `statusbar`): health tracked the connection, the gauge matched an independent `session.usage` readback, the toggle persisted; screenshots `docs/screenshots/rs-chrome-statusbar-*.png`. Missing against the original: the items this app has no backend for (connection/profile switchers, free tier, agents/cron/webhooks, turn + session timers, cache-hit rate, tokens/sec, terminal toggle, version pills, CPU/RAM/GPU resources), the right-click show/hide list, and the click-through popovers
 - [ ] System resources statusbar (CPU/RAM/battery) — local (Electron system.battery) — src/app/shell/system-resources-statusbar.tsx
 - [ ] Tray icon + menu — local (Electron) (platform) — electron/tray-host.ts
 - [ ] Minimize to tray — local (Electron) (platform) — electron/minimize-to-tray.ts

@@ -10,11 +10,12 @@ use hermes_core::http::{Rest, profile_query};
 use hermes_core::prefs::Prefs;
 use hermes_core::projects::{self, Project, ProjectList};
 use hermes_core::protocol::{
-    ModelOptionsResult, SessionCreateResult, SessionListResult, SessionListRow, SessionResumeResult,
+    ModelOptionsResult, SessionCreateResult, SessionListResult, SessionListRow, SessionResumeResult, Usage,
 };
 use hermes_core::sessions::{cycle_index, display_title, group_by_age};
 use hermes_core::settings::{self, Store};
 use hermes_core::transcript::{Change, Transcript};
+use hermes_core::usage;
 use hermes_core::{Client, ClientEvent};
 use serde_json::{Value, json};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
@@ -23,7 +24,7 @@ use tokio::sync::mpsc;
 use crate::rows::to_row;
 use crate::{
     AppState, AppWindow, ApprovalInfo, ChatRow, ModelItem, NavEntry, ProjectItem, ProjectState, ScopeChip, SearchHit,
-    SessionItem, SettingRowUI, SettingsState, Theme,
+    SessionItem, SettingRowUI, SettingsState, TabItem, Theme,
 };
 
 /// Commands from the UI thread to the controller.
@@ -63,6 +64,16 @@ pub enum Cmd {
         request_id: String,
         choice: String,
     },
+    /// Show/hide the bottom status bar (Ctrl+Shift+S).
+    ToggleStatusbar,
+    /// Switch to a chat open in this window ("" = the new-chat draft tab).
+    SelectTab(String),
+    /// Close a tab ("" = the draft). The chat itself stays in the sidebar.
+    CloseTab(String),
+    /// Ctrl+W: close the tab the window is showing.
+    CloseActiveTab,
+    /// Ctrl+T / the strip's +: a new chat, which becomes a tab once it exists.
+    NewTab,
     Settings(SettingsCmd),
 }
 
@@ -143,6 +154,26 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
     let t = tx.clone();
     st.on_cycle_session(move |step| {
         let _ = t.send(Cmd::Cycle(step));
+    });
+    let t = tx.clone();
+    st.on_toggle_statusbar(move || {
+        let _ = t.send(Cmd::ToggleStatusbar);
+    });
+    let t = tx.clone();
+    st.on_select_tab(move |id| {
+        let _ = t.send(Cmd::SelectTab(id.into()));
+    });
+    let t = tx.clone();
+    st.on_close_tab(move |id| {
+        let _ = t.send(Cmd::CloseTab(id.into()));
+    });
+    let t = tx.clone();
+    st.on_close_active_tab(move || {
+        let _ = t.send(Cmd::CloseActiveTab);
+    });
+    let t = tx.clone();
+    st.on_new_tab(move || {
+        let _ = t.send(Cmd::NewTab);
     });
     let t = tx.clone();
     st.on_refresh_models(move || {
@@ -273,6 +304,10 @@ pub fn apply_device_pref(ui: &AppWindow, key: &str, value: &str) {
         };
         ui.global::<Theme>().set_mode(mode);
     }
+    // Whole-bar status-bar visibility (`view.toggleStatusbar` / Ctrl+Shift+S here).
+    if key == hermes_core::prefs::STATUSBAR_VISIBLE {
+        ui.global::<AppState>().set_statusbar_open(value != "false");
+    }
 }
 
 pub fn greeting_for_hour(h: u32) -> &'static str {
@@ -341,6 +376,16 @@ struct Controller {
     schema: Option<Value>,
     /// Device preferences (the original's Electron-storage settings).
     prefs: Prefs,
+    /// Rendered status bar is on (Ctrl+Shift+S). Mirrored here so the toggle is a
+    /// controller-side decision that is persisted, not a UI-only flip that forgets itself.
+    statusbar: bool,
+    /// Running token/context reading for the open session, merged from `session.usage`
+    /// ticks. Cleared whenever the open session changes.
+    usage: Usage,
+    /// Chats open in this window, in the order their tabs appeared (stored ids). The chat
+    /// on screen is `stored`; the new-chat draft is not listed here — `publish_tabs` adds
+    /// it as a virtual tab while `stored` is `None`.
+    open_tabs: Vec<String>,
     /// Open settings page: (group, page).
     settings_page: (String, String),
     /// Row id a search jumped to (highlighted on its page).
@@ -377,6 +422,10 @@ impl Controller {
         {
             tracing::warn!("client.capabilities failed: {e}");
         }
+        // The status bar's saved visibility decides its first frame (the original's
+        // `hermes.desktop.statusbarVisible.v2`, on by default).
+        let prefs = Prefs::load(hermes_core::prefs::default_path());
+        let statusbar = prefs.get_bool(hermes_core::prefs::STATUSBAR_VISIBLE, true);
         let mut c = Controller {
             weak: weak.clone(),
             commands,
@@ -401,7 +450,10 @@ impl Controller {
             scope: String::new(),
             config: Value::Null,
             schema: None,
-            prefs: Prefs::load(hermes_core::prefs::default_path()),
+            prefs,
+            statusbar,
+            usage: Usage::default(),
+            open_tabs: Vec::new(),
             settings_page: ("appearance".into(), "general".into()),
             settings_hit: String::new(),
             reset_armed: false,
@@ -608,6 +660,8 @@ impl Controller {
                     st.set_draft(SharedString::new());
                     st.set_approval(ApprovalInfo::default());
                 });
+                self.reset_usage();
+                self.publish_tabs();
                 self.publish_project();
                 self.refresh_model_label().await;
                 self.refresh_effort().await;
@@ -615,10 +669,12 @@ impl Controller {
             Cmd::Open(id) => self.open(id).await,
             Cmd::Delete(id) => match self.client.request("session.delete", json!({"session_id": id})).await {
                 Ok(_) => {
+                    self.open_tabs.retain(|t| t != &id);
                     if self.stored.as_deref() == Some(id.as_str()) {
                         Box::pin(self.handle_cmd(Cmd::NewChat)).await;
                     }
                     self.refresh_sessions().await;
+                    self.publish_tabs();
                 }
                 Err(e) => self.banner(format!("Could not delete chat: {e}"), true),
             },
@@ -672,6 +728,46 @@ impl Controller {
                     }
                     Err(e) => self.banner(format!("Could not switch model: {e}"), true),
                 }
+            }
+            Cmd::ToggleStatusbar => {
+                self.statusbar = !self.statusbar;
+                let open = self.statusbar;
+                ui(&self.weak, move |w| w.global::<AppState>().set_statusbar_open(open));
+                if let Err(e) = self.prefs.set(hermes_core::prefs::STATUSBAR_VISIBLE, json!(open)) {
+                    tracing::warn!("could not save the status-bar preference: {e}");
+                }
+            }
+            Cmd::CloseActiveTab => {
+                let id = self.stored.clone().unwrap_or_default();
+                Box::pin(self.handle_cmd(Cmd::CloseTab(id))).await;
+            }
+            Cmd::NewTab => Box::pin(self.handle_cmd(Cmd::NewChat)).await,
+            Cmd::SelectTab(id) => {
+                if id.is_empty() {
+                    Box::pin(self.handle_cmd(Cmd::NewChat)).await;
+                } else {
+                    self.open(id).await;
+                }
+            }
+            Cmd::CloseTab(id) => {
+                let was_active = if id.is_empty() {
+                    self.stored.is_none()
+                } else {
+                    self.stored.as_deref() == Some(id.as_str())
+                };
+                self.open_tabs.retain(|t| t != &id);
+                if was_active {
+                    // Land on the tab that took its place; with none left, a new chat.
+                    match self.open_tabs.last().cloned() {
+                        Some(next) => {
+                            self.stored = None;
+                            self.session = None;
+                            self.open(next).await;
+                        }
+                        None => Box::pin(self.handle_cmd(Cmd::NewChat)).await,
+                    }
+                }
+                self.publish_tabs();
             }
             Cmd::Approve { request_id, choice } => {
                 if let Some(rpc_id) = self.pending_approval.take() {
@@ -1255,9 +1351,15 @@ impl Controller {
                 self.session = Some(r.session_id.clone());
                 self.stored = Some(r.stored_session_id.clone()).filter(|s| !s.is_empty());
                 let stored = self.stored.clone().unwrap_or_default();
+                self.remember_tab(&stored);
+                self.publish_tabs();
                 let runtime = r.session_id.clone();
                 self.draft_model = None;
                 self.draft_effort = None;
+                // A chat that just started has no counters of its own: never inherit the
+                // previous chat's gauge.
+                self.usage = r.info.usage.clone().unwrap_or_default();
+                self.publish_usage();
                 let info = r.info;
                 ui(&self.weak, move |w| {
                     let st = w.global::<AppState>();
@@ -1266,8 +1368,10 @@ impl Controller {
                     st.set_model_label(short_model(&info.model).into());
                     st.set_effort_label(info.reasoning_effort.into());
                     st.set_cwd_label(short_path(&info.cwd).into());
+                    st.set_branch_label(info.branch.clone().unwrap_or_default().into());
                 });
                 self.refresh_effort().await;
+                self.refill_usage().await;
                 Some(r.session_id)
             }
             Err(e) => {
@@ -1469,6 +1573,100 @@ impl Controller {
         });
     }
 
+    /// Publish the running token gauge. The label is formatted in `hermes-core::usage`, so
+    /// what the bar paints is exactly what the unit tests assert on, and an empty label
+    /// hides the item instead of painting a zero.
+    fn publish_usage(&self) {
+        let label: SharedString = usage::context_label(&self.usage).into();
+        let detail: SharedString = usage::context_detail(&self.usage).into();
+        ui(&self.weak, move |w| {
+            let st = w.global::<AppState>();
+            st.set_usage_label(label);
+            st.set_usage_detail(detail);
+        });
+    }
+
+    /// The open chat changed (new chat, another chat opened): the previous session's
+    /// counters and branch must not linger on the bar.
+    fn reset_usage(&mut self) {
+        self.usage = Usage::default();
+        ui(&self.weak, |w| {
+            let st = w.global::<AppState>();
+            st.set_usage_label(SharedString::new());
+            st.set_usage_detail(SharedString::new());
+            st.set_branch_label(SharedString::new());
+        });
+    }
+
+    /// Remember a chat as an open tab — no duplicates, order = the order they were opened.
+    fn remember_tab(&mut self, id: &str) {
+        if !id.is_empty() && !self.open_tabs.iter().any(|t| t == id) {
+            self.open_tabs.push(id.to_owned());
+        }
+    }
+
+    /// Publish the tab strip.
+    ///
+    /// Titles come from the sidebar rows, except the open chat's, which prefers the live
+    /// transcript title (fresher than the list). While no session exists the new-chat draft
+    /// is published as a virtual tab, so Ctrl+T never leaves the strip without an active
+    /// tab; `auto` mode (the strip only draws at two tabs) is the UI's `tabs-h`.
+    fn publish_tabs(&self) {
+        let live = self.transcript.title.clone().unwrap_or_default();
+        let mut tabs: Vec<TabItem> = Vec::new();
+        if self.stored.is_none() {
+            tabs.push(TabItem {
+                id: "".into(),
+                title: "New chat".into(),
+                active: true,
+                running: self.transcript.running,
+            });
+        }
+        for id in &self.open_tabs {
+            let active = self.stored.as_deref() == Some(id.as_str());
+            let title = if active && !live.is_empty() {
+                live.clone()
+            } else {
+                self.all_sessions
+                    .iter()
+                    .find(|s| &s.id == id)
+                    .map(display_title)
+                    .filter(|t| !t.is_empty())
+                    .unwrap_or_else(|| "Chat".to_owned())
+            };
+            tabs.push(TabItem {
+                id: id.as_str().into(),
+                title: title.into(),
+                active,
+                running: active && self.transcript.running,
+            });
+        }
+        ui(&self.weak, move |w| {
+            w.global::<AppState>()
+                .set_tabs(Rc::new(VecModel::from(tabs)).into());
+        });
+    }
+
+    /// Read the session's counters once, over `session.usage`.
+    ///
+    /// `session.info` carries a reading only once a turn has run inside this backend
+    /// process, so a resumed chat would otherwise open with an empty gauge while it has real
+    /// numbers. Best effort: a backend that answers nothing leaves the last reading alone.
+    async fn refill_usage(&mut self) {
+        let Some(sid) = self.session.clone() else {
+            return;
+        };
+        match self.client.request("session.usage", json!({ "session_id": sid })).await {
+            Ok(v) => {
+                if let Some(reading) = usage::from_value(&v) {
+                    usage::merge(&mut self.usage, &reading);
+                    self.publish_usage();
+                }
+            }
+            Err(e) => tracing::debug!("session.usage failed: {e}"),
+        }
+    }
+
     async fn open(&mut self, stored_id: String) {
         if self.stored.as_deref() == Some(stored_id.as_str()) {
             return;
@@ -1483,6 +1681,11 @@ impl Controller {
                 self.draft_effort = None;
                 self.session = Some(r.session_id.clone());
                 self.stored = Some(stored_id.clone());
+                self.remember_tab(&stored_id);
+                // The gauge belongs to the session opening now, never the previous one.
+                self.usage = r.info.usage.clone().unwrap_or_default();
+                self.publish_usage();
+                self.publish_tabs();
                 self.project = r
                     .info
                     .project
@@ -1516,8 +1719,10 @@ impl Controller {
                     st.set_model_label(short_model(&info.model).into());
                     st.set_effort_label(info.reasoning_effort.into());
                     st.set_cwd_label(short_path(&info.cwd).into());
+                    st.set_branch_label(info.branch.clone().unwrap_or_default().into());
                 });
                 self.refresh_effort().await;
+                self.refill_usage().await;
             }
             Err(e) => self.banner(format!("Could not open chat: {e}"), true),
         }
@@ -1574,6 +1779,18 @@ impl Controller {
                         .and_then(Value::as_str)
                         .map(str::to_owned);
                     let cwd = e.payload.get("cwd").and_then(Value::as_str).map(short_path);
+                    let branch = e
+                        .payload
+                        .get("branch")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_owned();
+                    // A reading here is authoritative, but a `session.info` that carries none
+                    // must not blank a gauge the ticks already filled — merge.
+                    if let Some(reading) = usage::from_value(&e.payload) {
+                        usage::merge(&mut self.usage, &reading);
+                        self.publish_usage();
+                    }
                     ui(&self.weak, move |w| {
                         let st = w.global::<AppState>();
                         if let Some(v) = model {
@@ -1585,7 +1802,17 @@ impl Controller {
                         if let Some(v) = cwd {
                             st.set_cwd_label(v.into());
                         }
+                        st.set_branch_label(branch.into());
                     });
+                }
+                // Mid-turn usage tick: partial by design (it carries only the fields this
+                // tick measured), so merge. It has nothing to say to the transcript.
+                if e.kind == "session.usage" {
+                    if let Some(tick) = usage::from_value(&e.payload) {
+                        usage::merge(&mut self.usage, &tick);
+                        self.publish_usage();
+                    }
+                    return;
                 }
                 let ch = self.transcript.apply(&e);
                 self.mark(ch);
@@ -1597,6 +1824,11 @@ impl Controller {
                     self.flush_state();
                 }
                 if e.kind == "message.complete" {
+                    // The turn's final, authoritative reading rides the same payload.
+                    if let Some(reading) = usage::from_value(&e.payload) {
+                        usage::merge(&mut self.usage, &reading);
+                        self.publish_usage();
+                    }
                     self.flush();
                 }
             }
@@ -1681,6 +1913,8 @@ impl Controller {
             w.global::<AppState>()
                 .set_sessions(Rc::new(VecModel::from(items)).into());
         });
+        // The sidebar list is the tab titles' source, so refresh the strip with it.
+        self.publish_tabs();
     }
 
     async fn refresh_model_label(&self) {

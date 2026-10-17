@@ -30,6 +30,10 @@ pub struct Usage {
     pub context_used: Option<u64>,
     pub context_max: Option<u64>,
     pub context_percent: Option<f64>,
+    /// The context figures are an estimate rather than a measured occupancy
+    /// (`context_source` says where they came from); the desktop prefixes the
+    /// reading with `~` in that case.
+    pub context_estimated: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
