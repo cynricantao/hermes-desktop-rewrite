@@ -67,6 +67,11 @@ impl Rest {
         self.send("DELETE", path, None).await
     }
 
+    /// `PATCH` with a JSON body (the session mutation routes require it; `PUT` answers 405).
+    pub async fn patch(&self, path: &str, body: &Value) -> Result<Value, HttpError> {
+        self.send("PATCH", path, Some(body)).await
+    }
+
     async fn send(&self, method: &str, path: &str, body: Option<&Value>) -> Result<Value, HttpError> {
         let payload = body.map(|b| b.to_string()).unwrap_or_default();
         let mut req = format!(

@@ -904,7 +904,7 @@ async fn archive_session(ctx: &Ctx, id: &str, archived: bool) -> Outcome {
         body["profile"] = json!(ctx.scope);
     }
     let path = format!("/api/sessions/{}", hermes_core::backend::percent_encode(id));
-    match ctx.put_json(&path, &body).await {
+    match ctx.patch_json(&path, &body).await {
         Ok(_) => {
             load_archived(ctx).await;
             Outcome::Notice(if archived {

@@ -1107,14 +1107,14 @@ impl Controller {
             return self.apply_widget_outcome(outcome).await;
         }
         match id {
-            "notifications.test" | "test-notification" => {
-                let Some(rest) = self.rest() else { return };
-                let body = json!({"title": "Hermes", "body": "Test notification"});
-                match rest.post("/api/desktop/notify", &body).await {
-                    Ok(_) => self.settings_notice("Test notification sent", false),
-                    Err(e) => self.settings_error(format!("Could not send a notification: {e}")),
-                }
-            }
+            // The original raises a *native* notification here; this client has no OS
+            // notification path yet, and the gateway API exposes no notify route (the old
+            // code posted to /api/desktop/notify, which answers 405) — so say that plainly
+            // instead of claiming a delivery.
+            "notifications.test" | "test-notification" => self.settings_error(
+                "This client cannot raise desktop notifications yet — the switches below are stored, but nothing notifies."
+                    .to_owned(),
+            ),
             other => self.settings_error(format!("No handler for the “{other}” action yet")),
         }
     }

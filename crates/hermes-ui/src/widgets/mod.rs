@@ -89,6 +89,10 @@ impl Ctx {
         self.rest.delete(path).await.map_err(|e| e.to_string())
     }
 
+    pub(crate) async fn patch_json(&self, path: &str, body: &Value) -> Result<Value, String> {
+        self.rest.patch(path, body).await.map_err(|e| e.to_string())
+    }
+
     /// The scoped profile's config, as the settings pages see it.
     pub(crate) async fn config(&self) -> Result<Value, String> {
         self.get_json(&format!("/api/config{}", self.profile_query())).await
