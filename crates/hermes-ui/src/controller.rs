@@ -20,10 +20,11 @@ use serde_json::{Value, json};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
 use tokio::sync::mpsc;
 
+use crate::capabilities::CapCmd;
 use crate::rows::to_row;
 use crate::{
-    AppState, AppWindow, ApprovalInfo, ChatRow, ModelItem, NavEntry, ProjectItem, ProjectState, ScopeChip, SearchHit,
-    SessionItem, SettingRowUI, SettingsState, Theme,
+    AppState, AppWindow, ApprovalInfo, CapState, ChatRow, ModelItem, NavEntry, ProjectItem, ProjectState, ScopeChip,
+    SearchHit, SessionItem, SettingRowUI, SettingsState, Theme,
 };
 
 /// Commands from the UI thread to the controller.
@@ -64,6 +65,8 @@ pub enum Cmd {
         choice: String,
     },
     Settings(SettingsCmd),
+    /// Capabilities-screen intents, forwarded to its own task (`capabilities.rs`).
+    Caps(CapCmd),
 }
 
 /// Settings-panel intents from the UI (see `ui/settings.slint`).
@@ -250,6 +253,51 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
         let _ = t.send(Cmd::Settings(SettingsCmd::Reset));
     });
 
+    let c = ui.global::<CapState>();
+    let t = tx.clone();
+    c.on_refresh(move || {
+        let _ = t.send(Cmd::Caps(CapCmd::Refresh));
+    });
+    let t = tx.clone();
+    c.on_set_tab(move |i| {
+        let _ = t.send(Cmd::Caps(CapCmd::Tab(i)));
+    });
+    let t = tx.clone();
+    c.on_set_scope(move |name| {
+        let _ = t.send(Cmd::Caps(CapCmd::Scope(name.into())));
+    });
+    let t = tx.clone();
+    c.on_filter(move |q| {
+        let _ = t.send(Cmd::Caps(CapCmd::Filter(q.into())));
+    });
+    let t = tx.clone();
+    c.on_toggle(move |id, on| {
+        let _ = t.send(Cmd::Caps(CapCmd::Toggle { id: id.into(), on }));
+    });
+    let t = tx.clone();
+    c.on_act(move |id, action| {
+        let _ = t.send(Cmd::Caps(CapCmd::Act {
+            id: id.into(),
+            action: action.into(),
+        }));
+    });
+    // Form and editor text are read on the UI thread when the button is clicked.
+    let (t, w) = (tx.clone(), ui.as_weak());
+    c.on_create(move || {
+        if let Some(ui) = w.upgrade() {
+            let s = ui.global::<CapState>();
+            let fields = [s.get_f1().into(), s.get_f2().into(), s.get_f3().into()];
+            let _ = t.send(Cmd::Caps(CapCmd::Create(fields)));
+        }
+    });
+    let (t, w) = (tx.clone(), ui.as_weak());
+    c.on_save_detail(move || {
+        if let Some(ui) = w.upgrade() {
+            let text = ui.global::<CapState>().get_detail_text().into();
+            let _ = t.send(Cmd::Caps(CapCmd::SaveDetail(text)));
+        }
+    });
+
     ui.global::<AppState>()
         .set_greeting(greeting_for_hour(local_hour()).into());
     ui.global::<AppState>().set_user_name(user_name().into());
@@ -347,6 +395,8 @@ struct Controller {
     settings_hit: String,
     /// Set while a Reset click is waiting for its confirmation click.
     reset_armed: bool,
+    /// The Capabilities screen's own task.
+    caps: mpsc::UnboundedSender<CapCmd>,
 }
 
 impl Controller {
@@ -377,7 +427,12 @@ impl Controller {
         {
             tracing::warn!("client.capabilities failed: {e}");
         }
+        let caps = {
+            let e = &backend.endpoint;
+            crate::capabilities::spawn(Rest::new(e.host.clone(), e.port, e.token.clone()), weak.clone())
+        };
         let mut c = Controller {
+            caps,
             weak: weak.clone(),
             commands,
             client,
@@ -581,6 +636,9 @@ impl Controller {
                         }
                     });
                 }
+            }
+            Cmd::Caps(cmd) => {
+                let _ = self.caps.send(cmd);
             }
             Cmd::Stop => {
                 if let Some(sid) = self.session.clone()

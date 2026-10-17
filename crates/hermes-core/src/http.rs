@@ -1,7 +1,7 @@
 //! Minimal HTTP/1.1 JSON client for the backend's REST routes (`/api/config`,
 //! `/api/profiles`, `/api/model/*`). Same raw-TCP approach as the token fetch in
 //! [`crate::backend`], so no HTTP crate is needed: one request per connection
-//! (`Connection: close`), `Content-Length` or chunked responses, 10 s timeout.
+//! (`Connection: close`), `Content-Length` or chunked responses, 10 s default timeout.
 //!
 //! Auth mirrors `apps/desktop/electron/api-transport.ts`: the session token goes in
 //! `X-Hermes-Session-Token`.
@@ -23,6 +23,8 @@ pub enum HttpError {
     #[error("bad response: {0}")]
     Bad(String),
 }
+
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// A REST handle to one backend (host, port, session token). Cheap to clone.
 #[derive(Clone)]
@@ -63,7 +65,20 @@ impl Rest {
         self.send("POST", path, Some(body)).await
     }
 
-    async fn send(&self, method: &str, path: &str, body: Option<&Value>) -> Result<Value, HttpError> {
+    /// Any method, with the default 10 s timeout.
+    pub async fn send(&self, method: &str, path: &str, body: Option<&Value>) -> Result<Value, HttpError> {
+        self.send_with_timeout(method, path, body, DEFAULT_TIMEOUT).await
+    }
+
+    /// Any method with an explicit timeout, for the few slow endpoints (an MCP server
+    /// test connects for real; a cron "run now" waits for the whole job).
+    pub async fn send_with_timeout(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&Value>,
+        timeout: Duration,
+    ) -> Result<Value, HttpError> {
         let payload = body.map(|b| b.to_string()).unwrap_or_default();
         let mut req = format!(
             "{method} {path} HTTP/1.1\r\nHost: {}:{}\r\nConnection: close\r\nAccept: application/json\r\nX-Hermes-Session-Token: {}\r\n",
@@ -90,7 +105,7 @@ impl Rest {
                 .map_err(|e| HttpError::Io(e.to_string()))?;
             Ok::<_, HttpError>(buf)
         };
-        let raw = tokio::time::timeout(Duration::from_secs(10), fut)
+        let raw = tokio::time::timeout(timeout, fut)
             .await
             .map_err(|_| HttpError::Timeout)??;
         let (status, body) = parse_response(&raw)?;

@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**22 done · 42 partial · 728 not started · 1 unsupported** (of 793).
+**42 done · 49 partial · 701 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -331,12 +331,12 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Profiles
 
-- [ ] Profiles list — RPC profiles.list, REST /api/profiles — src/app/profiles/index.tsx
-- [ ] Create profile — RPC profiles.create — src/app/profiles/create-profile-dialog.tsx
-- [ ] Rename profile — REST /api/profiles/{name} (PATCH) — src/app/profiles/rename-profile-dialog.tsx
-- [ ] Delete profile — RPC/REST profile delete — src/app/profiles/delete-profile-dialog.tsx
+- [x] Profiles list — RPC profiles.list, REST /api/profiles — src/app/profiles/index.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): Capabilities › Profiles lists default/swe/ea
+- [x] Create profile — RPC profiles.create — src/app/profiles/create-profile-dialog.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): Create profile → GET /api/profiles has it; via REST POST /api/profiles (as `src/api/profiles.ts`)
+- [x] Rename profile — REST /api/profiles/{name} (PATCH) — src/app/profiles/rename-profile-dialog.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): Rename → list shows only the new name
+- [x] Delete profile — RPC/REST profile delete — src/app/profiles/delete-profile-dialog.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): first click arms "Confirm delete", second deletes; backend read-back gone; default profile has no Delete
 - [ ] Describe/configure profile — RPC profiles.describe, profiles.configure — src/plugins/hermes-bots/data.ts
-- [ ] Profile soul file — REST /api/profiles/{name}/soul — src/plugins/hermes-bots/soul.ts
+- [x] Profile soul file — REST /api/profiles/{name}/soul — src/plugins/hermes-bots/soul.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): SOUL.md editor save → GET /api/profiles/{name}/soul matches
 - [ ] Profile assets (avatar) — RPC profiles.get_asset, profiles.set_asset — src/components/assistant-ui/thread/user-message.tsx
 - [ ] Profile export/import — REST /api/profiles/{name}/export, /api/profiles/import — src/api/profiles.ts
 - [ ] Switch profile (⌘D default; ⌘1…⌘9 / ⌘⌥1…⌘⌥9 named) — local + connection route — src/store/profile.ts
@@ -356,9 +356,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Skills
 
-- [ ] Skills list — REST /api/skills — src/app/capabilities/skills/skills-tab.tsx
-- [ ] Skill detail + SKILL.md viewer — REST /api/skills/content — src/app/capabilities/skills/skill-detail.tsx
-- [ ] Toggle skill enabled — REST /api/skills/toggle — src/app/capabilities/skills/skills-data.ts
+- [x] Skills list — REST /api/skills — src/app/capabilities/skills/skills-tab.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): Capabilities › Skills, with a client-side filter
+- [x] Skill detail + SKILL.md viewer — REST /api/skills/content — src/app/capabilities/skills/skill-detail.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): View opens SKILL.md (frontmatter shown); the pane also saves edits via PUT /api/skills/content (edit save not live-verified)
+- [x] Toggle skill enabled — REST /api/skills/toggle — src/app/capabilities/skills/skills-data.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): switch off/on read back from GET /api/skills; in the swe pill only swe changes
 - [ ] Skill Hub (official source) — REST /api/skills/hub/official, /sources — src/app/capabilities/skills/embedded-hub-picker.tsx
 - [ ] Skill Hub search — REST /api/skills/hub/search — src/app/capabilities/skills/skills-data.ts
 - [ ] Skill Hub preview — REST /api/skills/hub/preview — src/app/capabilities/skills/official-skill-detail.tsx
@@ -367,17 +367,17 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Skill provenance display — local — src/app/capabilities/skills/skill-provenance.ts
 - [ ] Skill frontmatter parse — local — src/app/capabilities/skills/frontmatter.ts
 - [ ] Skill deeplink install — local + REST install — src/store/skill-deeplink-install.ts
-- [ ] Skill manage (create/edit/delete) — RPC skills.manage — src/plugins/hermes-bots/skills-hub.tsx
+- [~] Skill manage (create/edit/delete) — RPC skills.manage — src/plugins/hermes-bots/skills-hub.tsx ⟶ create via REST POST /api/skills verified live (default + swe scope); edit implemented (PUT /api/skills/content) but not live-verified; delete not built
 - [ ] Skill reload — RPC skills.reload — src/plugins/hermes-bots/skills-hub.tsx
 - [ ] Skill suggestions in composer — local — src/store/suggestion-providers/skill.ts
-- [ ] Skill curator status — REST /api/curator — src/api/system.ts
-- [ ] Background skill-curator control (pause/run) — REST /api/curator/paused, /run — src/api/system.ts
+- [x] Skill curator status — REST /api/curator — src/api/system.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): Memory tab curator row shows interval/last run; paused flag read back
+- [~] Background skill-curator control (pause/run) — REST /api/curator/paused, /run — src/api/system.ts ⟶ pause/resume switch verified live (GET /api/curator paused true→false); Run now implemented behind a confirm click (explicit ?profile=) but not run live: it starts an agent run
 
 ## Tools / toolsets
 
-- [ ] Toolsets list — REST /api/tools/toolsets — src/app/capabilities/toolsets/toolsets-tab.tsx
+- [x] Toolsets list — REST /api/tools/toolsets — src/app/capabilities/toolsets/toolsets-tab.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): Capabilities › Tools lists toolsets with tool counts / needs-setup badge
 - [ ] Toolset detail — REST /api/tools/toolsets/{name} — src/app/capabilities/toolsets/toolset-detail.tsx
-- [ ] Toggle toolset enabled — REST /api/tools/toolsets/{name} (POST) — src/app/capabilities/toolsets/toolsets-data.ts
+- [x] Toggle toolset enabled — REST /api/tools/toolsets/{name} (POST) — src/app/capabilities/toolsets/toolsets-data.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): `terminal` off/on read back from GET /api/tools/toolsets; a post-setup install start is surfaced as a notice (not exercised: test avoids install toolsets)
 - [ ] Toolset config — REST /api/tools/toolsets/{name}/config — src/app/settings/toolset-config-panel.tsx
 - [ ] Toolset model/provider selection — REST /api/tools/toolsets/{name}/model, /provider — src/app/settings/toolset-config-panel.tsx
 - [ ] Toolset model list — REST /api/tools/toolsets/{name}/models — src/app/settings/toolset-config-panel.tsx
@@ -398,12 +398,12 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## MCP
 
-- [ ] MCP servers list — REST /api/mcp/servers + RPC mcp.servers.list — src/app/capabilities/mcp/use-mcp-servers.ts
-- [ ] Add MCP server — REST /api/mcp/servers (POST) + RPC mcp.servers.add — src/app/capabilities/mcp/mcp-editor.tsx
+- [x] MCP servers list — REST /api/mcp/servers + RPC mcp.servers.list — src/app/capabilities/mcp/use-mcp-servers.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): REST /api/mcp/servers; plugin-provided servers shown read-only
+- [x] Add MCP server — REST /api/mcp/servers (POST) + RPC mcp.servers.add — src/app/capabilities/mcp/mcp-editor.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): stdio add saved as command `echo` args [live-test] (whitespace split, no shell); http(s) URL form unit-tested only
 - [ ] Edit MCP server — REST /api/mcp/servers/{name} — src/app/capabilities/mcp/mcp-editor.tsx
-- [ ] Remove MCP server — RPC mcp.servers.remove — src/app/capabilities/mcp/use-mcp-servers.ts
-- [ ] Enable/disable MCP server — REST /api/mcp/servers/{name}/enabled — src/app/capabilities/mcp/use-mcp-servers.ts
-- [ ] Test MCP server — REST /api/mcp/servers/{name}/test + RPC mcp.servers.test — src/app/capabilities/mcp/use-mcp-servers.ts
+- [x] Remove MCP server — RPC mcp.servers.remove — src/app/capabilities/mcp/use-mcp-servers.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): two-click Remove → backend read-back gone
+- [x] Enable/disable MCP server — REST /api/mcp/servers/{name}/enabled — src/app/capabilities/mcp/use-mcp-servers.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): switch → GET enabled=false
+- [~] Test MCP server — REST /api/mcp/servers/{name}/test + RPC mcp.servers.test — src/app/capabilities/mcp/use-mcp-servers.ts ⟶ implemented (POST …/test, 60 s timeout, runs off the chat loop) but not run live: it spawns/connects the server
 - [ ] MCP server status/health — RPC mcp.servers.status — src/store/mcp-health.ts
 - [ ] MCP OAuth start/poll/callback/cancel — RPC mcp.servers.oauth.* — src/lib/mcp-dashboard-oauth.ts
 - [ ] MCP API key — RPC mcp.servers.set_api_key — src/hermes.ts
@@ -446,15 +446,15 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Memory
 
-- [ ] Memory status (provider + file sizes) — REST /api/memory — src/app/settings/memory/connect.tsx
-- [ ] Memory reset — REST /api/memory/reset — src/api/system.ts
+- [x] Memory status (provider + file sizes) — REST /api/memory — src/app/settings/memory/connect.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): MEMORY.md/USER.md sizes, providers, active badge
+- [x] Memory reset — REST /api/memory/reset — src/api/system.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): two-click Reset deleted a fixture MEMORY.md; sends explicit ?profile= (the route 400s an unnamed profile on a multi-profile backend)
 - [ ] Memory providers discovery — REST /api/memory/providers/{p}/config — src/app/settings/memory/provider-config-panel.tsx
 - [ ] Memory provider connect (OAuth) — REST /api/memory/providers/{p}/oauth/start|status — src/app/settings/memory/connect.tsx
 - [ ] Memory provider config modal — local + REST — src/app/settings/memory/provider-config-modal.tsx
 - [ ] Persistent memory toggle — config memory.memory_enabled — src/app/settings/constants.ts
 - [ ] User profile toggle — config memory.user_profile_enabled — src/app/settings/constants.ts
 - [ ] Memory/profile char budgets — config memory.memory_char_limit, user_char_limit — src/app/settings/constants.ts
-- [ ] Memory provider select — config memory.provider — src/app/settings/constants.ts
+- [~] Memory provider select — config memory.provider — src/app/settings/constants.ts ⟶ Use button → PUT /api/memory/provider implemented and unit-tested; not live-verified (fixture home has no configured external provider)
 - [ ] Context engine select — config context.engine — src/app/settings/constants.ts
 - [ ] Auto-compression + thresholds — config compression.* — src/app/settings/constants.ts
 - [ ] Compression aux-model timeout — config auxiliary.compression.timeout — src/app/settings/constants.ts
@@ -478,16 +478,16 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Scheduled / cron
 
-- [ ] Cron jobs list — REST /api/cron/jobs — src/app/cron/index.tsx
-- [ ] Create/edit cron job — REST /api/cron/jobs (POST/PUT) + RPC cron.manage — src/app/cron/cron-actions.ts
-- [ ] Delete cron job — REST /api/cron/jobs/{id} (DELETE) — src/store/cron.ts
-- [ ] Pause/resume cron job — REST /api/cron/jobs/{id}/pause|resume — src/app/cron/cron-actions.ts
-- [ ] Trigger cron job now — REST /api/cron/jobs/{id}/trigger — src/app/cron/cron-actions.ts
+- [x] Cron jobs list — REST /api/cron/jobs — src/app/cron/index.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): Scheduled tab (sidebar Scheduled opens it)
+- [~] Create/edit cron job — REST /api/cron/jobs (POST/PUT) + RPC cron.manage — src/app/cron/cron-actions.ts ⟶ create (name/schedule/prompt, deliver local) and prompt edit verified live; schedule/name/delivery/model editing not built
+- [x] Delete cron job — REST /api/cron/jobs/{id} (DELETE) — src/store/cron.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): two-click Delete → backend read-back gone
+- [x] Pause/resume cron job — REST /api/cron/jobs/{id}/pause|resume — src/app/cron/cron-actions.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): switch → state paused, then scheduled
+- [~] Trigger cron job now — REST /api/cron/jobs/{id}/trigger — src/app/cron/cron-actions.ts ⟶ Run now implemented behind a confirm click (30 min timeout, off the chat loop); live test checks only that one click runs nothing (last_run_at null) — a real run spends model calls
 - [ ] Cron runs history — REST /api/cron/jobs/{id}/runs — src/app/cron/job-state.ts
 - [ ] Cron delivery targets — REST /api/cron/delivery-targets — src/api/cron.ts
 - [ ] Cron blueprints — REST /api/cron/blueprints — src/app/cron/blueprints.tsx
 - [ ] Instantiate blueprint — REST /api/cron/blueprints/instantiate — src/app/cron/blueprints.tsx
-- [ ] Cron jobs section in sidebar — local — src/app/chat/sidebar/cron-jobs-section.tsx
+- [~] Cron jobs section in sidebar — local — src/app/chat/sidebar/cron-jobs-section.tsx ⟶ sidebar Scheduled opens the Scheduled tab (verified live); jobs are not listed inline in the sidebar
 - [ ] Open cron run in chat — local — src/app/cron/open-cron-run.ts
 - [ ] Cron changed event — WS cron.changed — src/store/cron.ts
 

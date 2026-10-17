@@ -12,8 +12,11 @@
 //! * [`highlight`] — syntect-backed code highlighting on a background thread, with a
 //!   bounded content-keyed cache and per-stream checkpoint resume.
 //! * [`sessions`] — session-list grouping helpers.
+//! * [`capabilities`] — requests and rows for the Capabilities screen (profiles, skills,
+//!   toolsets, MCP servers, memory, scheduled jobs) over the backend's REST routes.
 
 pub mod backend;
+pub mod capabilities;
 pub mod diff;
 pub mod highlight;
 pub mod http;

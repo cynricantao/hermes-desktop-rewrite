@@ -7,8 +7,9 @@ import { Transcript, Composer, ChatRow, ToolRow } from "chat.slint";
 import { SettingsModal, SettingsState } from "settings.slint";
 
 import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
+import { CapAction, CapItem, CapState, CapabilitiesModal } from "capabilities.slint";
 
-export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState }
+export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, CapAction, CapItem, CapState }
 
 export struct SessionItem {
     id: string,
@@ -138,7 +139,8 @@ component Sidebar inherits Rectangle {
             clicked => { ProjectState.open = true; ProjectState.refresh(); }
         }
         NavItem { icon: @image-url("../../../assets/icons/box.svg"); text: "Artifacts"; clicked => { AppState.banner = "Artifact browsing is not available in this preview yet."; AppState.banner-error = false; } }
-        NavItem { icon: @image-url("../../../assets/icons/clock.svg"); text: "Scheduled"; clicked => { AppState.banner = "Scheduled-job management is not available in this preview yet."; AppState.banner-error = false; } }
+        NavItem { icon: @image-url("../../../assets/icons/clock.svg"); text: "Scheduled"; clicked => { CapState.open = true; CapState.tab = 5; CapState.set-tab(5); } }
+        NavItem { icon: @image-url("../../../assets/icons/puzzle.svg"); text: "Capabilities"; clicked => { CapState.open = true; CapState.set-tab(CapState.tab); } }
         NavItem { icon: @image-url("../../../assets/icons/sliders-horizontal.svg"); text: "Customize"; clicked => { root.open-settings(); } }
 
         Rectangle { height: 10px; }
@@ -343,13 +345,18 @@ export component AppWindow inherits Window {
             if e.modifiers.control && e.text == Key.Tab { AppState.cycle-session(e.modifiers.shift ? -1 : 1); return accept; }
             if e.text == Key.Escape {
                 if ProjectState.open { ProjectState.open = false; return accept; }
+                if CapState.open {
+                    if CapState.detail-open { CapState.detail-open = false; } else { CapState.open = false; }
+                    return accept;
+                }
                 if root.effort-open { root.effort-open = false; return accept; }
                 if root.settings-open { root.settings-open = false; return accept; }
                 if root.picker-open { root.picker-open = false; return accept; }
             }
             // Approval card keys (same as the Electron app's approval-keys.ts): Esc denies,
             // Enter on an empty composer allows once. Checked before Esc-to-Stop.
-            if AppState.approval.visible && !root.settings-open && !e.modifiers.shift && !e.modifiers.control && !e.modifiers.alt {
+            // Not while a modal has focus: Enter in its text fields must not answer the card.
+            if AppState.approval.visible && !root.settings-open && !CapState.open && !ProjectState.open && !e.modifiers.shift && !e.modifiers.control && !e.modifiers.alt {
                 if e.text == Key.Escape { AppState.approve(AppState.approval.request-id, "deny"); return accept; }
                 if e.text == Key.Return && AppState.draft == "" { AppState.approve(AppState.approval.request-id, "once"); return accept; }
             }
@@ -525,6 +532,8 @@ export component AppWindow inherits Window {
         }
 
         ProjectsModal { width: root.width; height: root.height; }
+
+        CapabilitiesModal { width: root.width; height: root.height; }
 
         SettingsModal {
             width: root.width;
