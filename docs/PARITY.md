@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**42 done · 49 partial · 701 not started · 1 unsupported** (of 793).
+**42 done · 86 partial · 664 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -87,20 +87,20 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 ## Chat & composer
 
 - [x] Send message / submit turn — RPC prompt.submit — src/app/session/hooks/use-prompt-actions/submit.ts ⟶ live: `HERMES_DESKTOP_AUTOSEND` run, screenshots rs-dark-chat-*.png
-- [ ] Steer a running turn — RPC session.steer — src/app/chat/session-tile-actions.ts
+- [~] Steer a running turn — RPC session.steer — src/app/chat/session-tile-actions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Queue a message while busy (⌘Enter) — local + RPC prompt.submit (queue drain) — src/store/composer-queue.ts
 - [ ] Send next queued message (⌘⇧K) — local — src/store/composer-queue.ts, src/lib/keybinds/actions.ts
 - [x] Interrupt / stop the active turn — RPC session.interrupt — src/app/chat/session-tile-actions.ts ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: Stop clicked mid-stream → reply stops growing (30 of 300 lines, unchanged 3 s later), running=false, no spinner, button back to Send, next prompt answered. **Esc** (global shortcut, focus in composer) verified the same way: stopped at 24 of 300 lines, unchanged 3 s later, next prompt answered
-- [ ] Redirect a running turn — RPC session.redirect — src/app/chat/session-tile-actions.ts
-- [ ] Rewind / edit-and-resend a prior user turn — RPC session.history + prompt.submit — src/app/session/hooks/use-prompt-actions/rewind.ts
+- [~] Redirect a running turn — RPC session.redirect — src/app/chat/session-tile-actions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Rewind / edit-and-resend a prior user turn — RPC session.history + prompt.submit — src/app/session/hooks/use-prompt-actions/rewind.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [x] Newline without sending (⇧Enter) — local — src/lib/keybinds/actions.ts (KEYBIND_READONLY) ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: Shift+Enter → composer `hello\n`, nothing sent; Enter sends and clears; IME preedit+commit (`日本`) inserts text without sending
 - [ ] Cancel composer / dismiss (Esc) — local — src/app/chat/composer/hooks/use-composer-esc-cancel.ts
 - [ ] Rich text editor with markdown affordances — local — src/app/chat/composer/rich-editor.tsx
 - [ ] Soft focus composer (/, Shift+Enter, type-to-focus) — local — src/app/chat/composer/paste-to-focus.ts, src/lib/keybinds/composer-focus-keys.ts
 - [ ] Focus composer from anywhere (⌘/Ctrl+L) — local — src/app/chat/composer/focus-chord.ts
-- [ ] Slash command completion — RPC commands.catalog, complete.slash — src/app/chat/composer/hooks/use-slash-completions.ts
+- [~] Slash command completion — RPC commands.catalog, complete.slash — src/app/chat/composer/hooks/use-slash-completions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [~] Execute a slash command — RPC slash.exec — src/app/session/hooks/use-prompt-actions/slash.ts ⟶ slash.exec/command.dispatch routing plus local model/reasoning/new/stop. Aliases remain unsupported; model-generated skill execution is not part of the no-credentials check.
-- [ ] @-mention path completion — RPC complete.path — src/app/chat/composer/hooks/use-at-completions.ts
+- [~] @-mention path completion — RPC complete.path — src/app/chat/composer/hooks/use-at-completions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Emoji completion (:name) — local — src/app/chat/composer/hooks/use-emoji-completions.ts
 - [ ] Slash help hint (?) — local — src/app/chat/composer/help-hint.tsx
 - [ ] Composer input history (↑/↓) — local — src/store/composer-input-history.ts
@@ -109,11 +109,11 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Detach an image attachment — RPC image.detach — src/app/chat/hooks/use-composer-actions.ts
 - [ ] Attach file — RPC file.attach — src/app/session/hooks/use-prompt-actions/index.ts
 - [ ] Attach PDF — RPC pdf.attach — src/lib/desktop-slash-commands.ts
-- [ ] Large-paste collapse to attachment — RPC paste.collapse — src/app/chat/composer/large-paste.tsx
+- [~] Large-paste collapse to attachment — RPC paste.collapse — src/app/chat/composer/large-paste.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Drag-and-drop file onto chat — local drop zone — src/app/chat/hooks/use-file-drop-zone.ts
 - [ ] Drag-over affordance overlay — local — src/app/chat/chat-drop-overlay.tsx
 - [ ] Screenshot attach from OS shortcut — local (Electron) + RPC image.attach_bytes — src/app/chat/composer/hooks/use-composer-screenshot.ts
-- [ ] Inline references (/file, @path) in composer — local + RPC complete.path — src/app/chat/composer/inline-refs.ts, path-refs.ts
+- [~] Inline references (/file, @path) in composer — local + RPC complete.path — src/app/chat/composer/inline-refs.ts, path-refs.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] URL reference chips — local — src/app/chat/composer/url-refs.ts, url-dialog.tsx
 - [x] Model pill (per-composer model switcher) — REST /api/model/set, /api/model/options — src/app/chat/composer/model-pill.tsx ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: mid-session deepseek-v4.1-flash → glm-5.3-flash via `config.set model` (session-scoped); label updates; next reply answered by the new model. Re-verified 2026-10-16 (PR #3): a pick on the **new-chat screen** is kept and sent with `session.create` (`model`/`provider`, as the Electron app does), because `config.set model` answers 4001 without a live session. This was a real bug: the pick was silently ignored. Then switching back mid-session also works
 - [x] Reasoning-effort pill — RPC config.set (agent.reasoning_effort) — src/app/chat/composer/reasoning-pill.tsx ⟶ live private backend, tests/live_backend.rs daily: actual chip/max clicks, session.create preserves max, live change reads back high, config default remains medium, switching restores low.
@@ -130,8 +130,8 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Voice activity indicator — local — src/app/chat/composer/voice-activity.tsx
 - [ ] Completion/thinking sound cues — local — src/lib/completion-sound.ts, src/lib/thinking-sound.ts
 - [ ] Auto-speak replies — local pref + RPC voice.tts — src/app/chat/composer/hooks/use-auto-speak-replies.ts
-- [ ] Session goal control row — RPC session.control — src/app/chat/composer/status-stack/session-control-goal.tsx
-- [ ] Heartbeat / loop session controls — RPC session.control — src/app/chat/composer/status-stack/session-control-heartbeat.tsx, session-control-loop.tsx
+- [~] Session goal control row — RPC session.control — src/app/chat/composer/status-stack/session-control-goal.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Heartbeat / loop session controls — RPC session.control — src/app/chat/composer/status-stack/session-control-heartbeat.tsx, session-control-loop.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Coding-status row (auto-coding indicator) — local — src/app/chat/composer/status-stack/coding-row.tsx
 - [ ] Preview-status row in composer — local — src/app/chat/composer/status-stack/preview-row.tsx
 - [ ] Status drawer (expandable status stack) — local — src/app/chat/composer/status-stack/drawer.tsx
@@ -155,7 +155,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Changed-files card — REST /api/git + local diff — src/components/assistant-ui/thread/changed-files-card.tsx
 - [ ] Thread timeline rail (jump-to-turn) — local — src/components/assistant-ui/thread/timeline.tsx, timeline-rail.tsx
 - [ ] Timeline timestamps + hover time — local — src/components/assistant-ui/thread/timeline-timestamp.tsx, message-hover-time.tsx
-- [ ] Message reactions (emoji) — RPC message.react + WS message.reaction — src/components/assistant-ui/thread/message-reactions.tsx, src/store/reactions.ts
+- [~] Message reactions (emoji) — RPC message.react + WS message.reaction — src/components/assistant-ui/thread/message-reactions.tsx, src/store/reactions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Vibe hearts celebration — local — src/components/chat/vibe-hearts.tsx, src/store/vibe-hearts-enabled.ts
 - [ ] Transcript directives (custom blocks) — local — src/components/assistant-ui/transcript-directive.tsx, src/lib/transcript-directives.ts
 - [ ] Artifact card inline in transcript — local — src/components/assistant-ui/artifact-card.tsx
@@ -208,7 +208,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Approval activity feed — WS approval.* — src/components/assistant-ui/tool/approval-activity.ts
 - [x] Respond to approval (allow/deny/always) — RPC approval.respond / approval.received — src/lib/keybinds/approval-keys.ts ⟶ live 2026-10-16, `tests/live_backend.rs` (14/14) vs private backend: Deny/Allow once by click; **Esc denies** and **Enter (empty composer) allows once**, same keys as approval-keys.ts; **Allow for session** → next `rm -r` in that chat runs with no card, a new chat asks again; **Always allow** → `command_allowlist` written to the private config.yaml, a new chat runs it with no card
 - [ ] Approval mode selector (manual/smart/off) — config approvals.mode (config.set) — src/app/shell/approval-mode-menu.tsx
-- [ ] Pending approvals list — RPC approval.pending — src/store/approval-mode.ts
+- [~] Pending approvals list — RPC approval.pending — src/store/approval-mode.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Clarify questions (1–5) render + submit — SRV clarify — src/components/assistant-ui/clarify/index.tsx
 - [ ] Clarify choice rows / confirm bar — local — src/components/assistant-ui/clarify/core/choice-row.tsx, confirm-bar.tsx
 - [ ] Clarify keyboard handlers (1–9, Enter) — local — src/components/assistant-ui/clarify/core/use-clarify-keys.ts
@@ -220,26 +220,26 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Sudo request (terminal/display) — SRV sudo, display.install.sudo — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts
 - [ ] Connection request (remote OAuth/pairing) — SRV connection.request, RPC connection.respond — src/store/connection-request.ts
 - [ ] Free-tier challenge prompt — WS free_tier.challenge — src/store/free-tier-challenge.ts
-- [ ] Clarify lock (single-flight) — RPC clarify.lock — src/store/clarify.ts
+- [~] Clarify lock (single-flight) — RPC clarify.lock — src/store/clarify.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 
 ## Sessions & sidebar
 
 - [~] Session list (paged, virtualized) — REST /api/profiles/sessions — src/app/chat/sidebar/sessions-section.tsx, virtual-session-list.tsx ⟶ RPC session.list (200) grouped Today/Yesterday/7 days/Older; not paged
-- [ ] Sidebar recents feed — REST /api/profiles/sessions/sidebar — src/app/chat/sidebar/sessions-section.tsx
+- [~] Sidebar recents feed — REST /api/profiles/sessions/sidebar — src/app/chat/sidebar/sessions-section.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [x] Open session / transcript hydrate — RPC session.history, REST /api/sessions/{id}/messages — src/app/session/hooks/use-session-actions/index.ts ⟶ live 2026-10-16, `tests/live_backend.rs` `sessions` section vs private backend (3 seeded chats): clicking a sidebar chat shows its history and only its (no rows from other chats), highlights it and sets the title; cold open 1.6 s, reopening a chat already live in the backend ~0.1 s (`session.resume` reuses it). Continuing an old chat: reply lands under its history and is still there after switching away and back. Switching away mid-stream: the other chat stays free of the stream and idle; coming back shows the finished reply. Uses `session.resume` (full history in one response), not the REST prefetch
 - [x] New session (⌘N) — RPC session.create — src/app/session/hooks/use-session-actions/index.ts ⟶ live 2026-10-16, `tests/live_backend.rs` `sessions` section vs private backend (3 seeded chats): Ctrl+N from an open chat → empty transcript, no highlight, title "New chat"; the session is created lazily on first send
 - [ ] New session in tab (⌘T) — local + RPC session.create — src/app/chat/new-session-drag.ts
 - [ ] New window (⌘⇧N) — local (Electron session-windows) — electron/session-windows.ts
 - [x] Switch to next/prev session (⌃Tab / ⌃⇧Tab) — local — src/store/session-switcher.ts ⟶ live 2026-10-16, `tests/live_backend.rs` `sessions` section vs private backend (3 seeded chats): walks the sidebar order (this app has no tabs, unlike the Electron recent-tab switcher), wrapping at both ends; from a new chat ⌃Tab opens the first chat, ⌃⇧Tab the last. Order logic unit-tested (`sessions::tests::cycling`)
 - [ ] Jump to session slot N (⌃1…⌃9) — local — src/lib/keybinds/actions.ts
-- [ ] Close session — RPC session.close — src/app/session/hooks/use-session-actions/index.ts
+- [~] Close session — RPC session.close — src/app/session/hooks/use-session-actions/index.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Delete session — RPC session.delete — src/store/session-removal.ts
-- [ ] Archive session — RPC session.archive — src/app/chat/sidebar/session-actions-menu.tsx
-- [ ] Pin/unpin session — local + REST /api/sessions/{id} — src/store/session-pin-sync.ts
+- [~] Archive session — RPC session.archive — src/app/chat/sidebar/session-actions-menu.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Pin/unpin session — local + REST /api/sessions/{id} — src/store/session-pin-sync.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Rename session / auto-title — RPC session.title — src/app/chat/sidebar/session-actions-menu.tsx
-- [ ] Hide session — RPC session.set_hidden — src/store/session-list-density.ts
-- [ ] Session read/unread state — REST PATCH /api/sessions/{id} — src/store/session-unread-remote.ts
-- [ ] Session search (⌘⇧F) — REST /api/sessions/search — src/app/chat/sidebar/use-server-session-search.ts, src/lib/session-search.ts
+- [~] Hide session — RPC session.set_hidden — src/store/session-list-density.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Session read/unread state — REST PATCH /api/sessions/{id} — src/store/session-unread-remote.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Session search (⌘⇧F) — REST /api/sessions/search — src/app/chat/sidebar/use-server-session-search.ts, src/lib/session-search.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Session sort (recent/title) — local — src/store/sidebar-sort.ts
 - [ ] Session list density (compact/comfortable/detailed) — local — src/store/session-list-density.ts
 - [ ] Sidebar grouping cycle — local — src/app/chat/sidebar/order.ts
@@ -249,22 +249,22 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Session tile (multi-pane tile view) — local — src/app/chat/session-tile.tsx, session-tile-actions.ts
 - [ ] Session tile grid / route tiles — local — src/store/route-tiles.ts, src/app/chat/route-tile.tsx
 - [ ] Pane split / mirror (multi-session layout) — local — src/app/chat/pane-mirror.tsx, src/components/pane-shell/*
-- [ ] Fleet rail (multi-gateway session roster) — RPC session.active_list — src/app/chat/sidebar/fleet-rail.ts, use-fleet-roster.ts
+- [~] Fleet rail (multi-gateway session roster) — RPC session.active_list — src/app/chat/sidebar/fleet-rail.ts, use-fleet-roster.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Gateway/profile grouping in sidebar — local — src/app/chat/sidebar/gateway-groups.tsx
 - [ ] Session drag-and-drop reorder — local — src/app/chat/sidebar/reorderable-list.tsx, session-drag.ts
 - [ ] Load-more row for long session lists — local — src/app/chat/sidebar/load-more-row.tsx
-- [ ] Session usage/token meter — RPC session.usage, REST /api/analytics/usage — src/app/session/hooks/use-session-actions/index.ts
-- [ ] Context breakdown panel — RPC session.context_breakdown — src/app/shell/hooks/use-context-breakdown.ts
-- [ ] Session branch (fork at message) — RPC session.branch, session.branch_stored, session.branch_whole — src/app/session/hooks/use-session-actions/branch-create-key.ts
-- [ ] Session compress (manual) — RPC session.compress — src/store/compaction.ts
-- [ ] Session undo — RPC session.undo — src/app/session/hooks/use-session-actions/index.ts
-- [ ] Session resume (reconnect/revive) — RPC session.resume, session.most_recent — src/app/session/hooks/use-prompt-actions/resolve-target-session.ts
-- [ ] Session status polling — RPC session.status — src/lib/desktop-slash-commands.ts
+- [~] Session usage/token meter — RPC session.usage, REST /api/analytics/usage — src/app/session/hooks/use-session-actions/index.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Context breakdown panel — RPC session.context_breakdown — src/app/shell/hooks/use-context-breakdown.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Session branch (fork at message) — RPC session.branch, session.branch_stored, session.branch_whole — src/app/session/hooks/use-session-actions/branch-create-key.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Session compress (manual) — RPC session.compress — src/store/compaction.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Session undo — RPC session.undo — src/app/session/hooks/use-session-actions/index.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Session resume (reconnect/revive) — RPC session.resume, session.most_recent — src/app/session/hooks/use-prompt-actions/resolve-target-session.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Session status polling — RPC session.status — src/lib/desktop-slash-commands.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Dead-session pruning — local — src/store/dead-session-prune.ts
 - [ ] Session watchdog / gone latch — local — src/store/session-watchdog.ts, session-gone-latch.ts
 - [ ] Broken/missing-session panes — local — src/app/retirement-view.tsx
 - [ ] Backend/agent-scoped session caches — local — src/store/session-states.ts
-- [ ] Session unread aggregation across connections — RPC session.active_list — src/store/session-unread-remote.ts
+- [~] Session unread aggregation across connections — RPC session.active_list — src/store/session-unread-remote.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Resume-exhausted overlay — local — src/app/chat/resume-exhausted-overlay.tsx
 - [ ] Session sidebar focus hotkey — local — src/store/session-sidebar-focus.ts
 
@@ -290,7 +290,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Base-branch picker for worktree — local — src/app/chat/sidebar/projects/base-branch-picker.tsx
 - [ ] Worktree dialog — local — src/app/chat/sidebar/projects/worktree-dialog.tsx
 - [~] Open folder as project (⌘O) — local (Electron select-paths) — electron/select-paths-dialog.ts ⟶ the project dialog accepts a full existing-folder path; native file dialog and Ctrl+O are not built.
-- [ ] Change workspace cwd — RPC session.workspace.move, session.cwd.set — src/app/session/hooks/use-cwd-actions.ts
+- [~] Change workspace cwd — RPC session.workspace.move, session.cwd.set — src/app/session/hooks/use-cwd-actions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Project appearance (color/icon) — local — src/app/chat/sidebar/projects/project-appearance.tsx
 - [ ] Project filter in sidebar — local — src/app/chat/sidebar/project-filter.ts
 - [ ] Workspace page header (page-owned controls) — local — src/app/contrib/workspace-page-header.tsx
@@ -579,7 +579,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Open settings (⌘,) — local — src/app/shell/hooks/use-overlay-routing.ts
 - [ ] Open shortcuts panel (⌘/) — local — src/app/settings/keybind-settings.tsx
 - [ ] Send message (Enter) — RPC prompt.submit — src/lib/keybinds/actions.ts (composer.send)
-- [ ] Steer (Enter) / queue (⌘Enter) — RPC session.steer / prompt.submit — src/lib/keybinds/actions.ts
+- [~] Steer (Enter) / queue (⌘Enter) — RPC session.steer / prompt.submit — src/lib/keybinds/actions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Send queued (⌘⇧K) — local — src/lib/keybinds/actions.ts
 - [ ] Mention (@) / slash (/) / help (?) — local — src/lib/keybinds/actions.ts
 - [ ] Input history (↑/↓) — local — src/lib/keybinds/actions.ts
@@ -595,9 +595,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] New window (⌘⇧N) — local — src/lib/keybinds/actions.ts
 - [ ] Next/prev session (⌃Tab / ⌃⇧Tab, ⌃PgDn/PgUp) — local — src/lib/keybinds/actions.ts
 - [ ] Session slots (⌃1…⌃9) — local — src/lib/keybinds/actions.ts
-- [ ] Search sessions (⌘⇧F) — REST /api/sessions/search — src/lib/keybinds/actions.ts
+- [~] Search sessions (⌘⇧F) — REST /api/sessions/search — src/lib/keybinds/actions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Toggle session pin (unbound) — local — src/lib/keybinds/actions.ts
-- [ ] Archive session (unbound) — RPC session.archive — src/lib/keybinds/actions.ts
+- [~] Archive session (unbound) — RPC session.archive — src/lib/keybinds/actions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Scroll transcript page up/down (PgUp/PgDn) — local — src/lib/keybinds/actions.ts
 - [ ] New worktree (⌘⇧B) — local — src/lib/keybinds/actions.ts
 - [ ] Open folder as project (⌘O) — local — src/lib/keybinds/actions.ts
@@ -860,7 +860,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 - [ ] Auto-archive stale sessions — local — src/app/settings/sessions-settings.tsx
 - [ ] Default directory — local — src/app/settings/sessions-settings.tsx
-- [ ] Archived sessions list — REST /api/profiles/sessions — src/app/settings/sessions-settings.tsx
+- [~] Archived sessions list — REST /api/profiles/sessions — src/app/settings/sessions-settings.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 
 ## Settings — Vault page
 
@@ -1022,21 +1022,21 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Enable webhook — REST /api/webhooks/enable — src/api/messaging.ts
 - [ ] Delete webhook — REST /api/webhooks/{name} (DELETE) — src/app/webhooks/index.tsx
 - [ ] Webhook enabled toggle — REST /api/webhooks/{name}/enabled — src/api/messaging.ts
-- [ ] Session import (foreign agent sessions) — RPC session.foreign.list|preview|import — src/app/session-import/index.tsx, src/app/session-import/api.ts
+- [~] Session import (foreign agent sessions) — RPC session.foreign.list|preview|import — src/app/session-import/index.tsx, src/app/session-import/api.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Subagents list — RPC subagent.list — src/store/subagents.ts
 - [ ] Subagent tail — RPC subagent.tail — src/store/subagents.ts
 - [ ] Subagent steer/interrupt — RPC subagent.steer, subagent.interrupt — src/store/subagents.ts
 - [ ] Subagent spawn tree save/load/list — RPC spawn_tree.save|load|list — src/store/subagents.ts
 - [ ] Delegation status/pause — RPC delegation.status, delegation.pause — src/store/background-delegation.ts
-- [ ] Background prompt (BTW) — RPC prompt.background, prompt.btw; WS btw.complete — src/app/session/hooks/use-prompt-actions/slash.ts
-- [ ] Agents page (roster) — local + RPC session.active_list — src/app/agents/index.tsx
+- [~] Background prompt (BTW) — RPC prompt.background, prompt.btw; WS btw.complete — src/app/session/hooks/use-prompt-actions/slash.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Agents page (roster) — local + RPC session.active_list — src/app/agents/index.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Learning graph — REST /api/learning/graph — src/api/skills.ts
 - [ ] Learning node detail/edit/delete — REST /api/learning/node + RPC learning.* — src/api/skills.ts
 - [ ] Learning frames — RPC learning.frames — src/app/learning/archive-skill-confirm-dialog.tsx
 - [ ] Insights — RPC insights.get — src/hermes.ts
 - [ ] Starmap (session/learning map + timeline) — local — src/app/starmap/star-map.tsx, src/app/starmap/timeline.tsx
 - [ ] Starmap share code + controls — local — src/app/starmap/share-code.ts, src/app/starmap/share-controls.tsx
-- [ ] Command center (command dispatch console) — RPC command.dispatch, command.resolve — src/app/command-center/index.tsx
+- [~] Command center (command dispatch console) — RPC command.dispatch, command.resolve — src/app/command-center/index.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Command center maintenance (doctor/audit/backup) — REST /api/ops/* — src/app/command-center/maintenance.tsx
 - [ ] Desktop telemetry (feature use/daily) — RPC shared_metrics.* — src/store/desktop-metrics.ts
 - [ ] Startup latency reporting — RPC shared_metrics.startup_latency — src/app/gateway/report-startup-latency.ts
