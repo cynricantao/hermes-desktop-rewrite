@@ -7,6 +7,7 @@
 
 slint::include_modules!();
 
+pub mod browser;
 pub mod capabilities;
 pub mod controller;
 pub mod perf;
