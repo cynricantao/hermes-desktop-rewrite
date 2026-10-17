@@ -1,0 +1,93 @@
+// Icon lookup by name for registry-driven UI (settings nav, page rows). Names are the
+// Lucide file names under assets/icons (ISC, see LICENSE-lucide.txt). Images are
+// compiled in at build time; unknown names fall back to `settings`.
+
+export global Icons {
+    public pure function get(name: string) -> image {
+        if name == "app-window" { return @image-url("../../../assets/icons/app-window.svg"); }
+        if name == "archive" { return @image-url("../../../assets/icons/archive.svg"); }
+        if name == "arrow-up" { return @image-url("../../../assets/icons/arrow-up.svg"); }
+        if name == "audio-lines" { return @image-url("../../../assets/icons/audio-lines.svg"); }
+        if name == "bell" { return @image-url("../../../assets/icons/bell.svg"); }
+        if name == "book-open" { return @image-url("../../../assets/icons/book-open.svg"); }
+        if name == "box" { return @image-url("../../../assets/icons/box.svg"); }
+        if name == "brain" { return @image-url("../../../assets/icons/brain.svg"); }
+        if name == "calendar-clock" { return @image-url("../../../assets/icons/calendar-clock.svg"); }
+        if name == "camera" { return @image-url("../../../assets/icons/camera.svg"); }
+        if name == "chart-column" { return @image-url("../../../assets/icons/chart-column.svg"); }
+        if name == "check" { return @image-url("../../../assets/icons/check.svg"); }
+        if name == "chevron-down" { return @image-url("../../../assets/icons/chevron-down.svg"); }
+        if name == "chevron-right" { return @image-url("../../../assets/icons/chevron-right.svg"); }
+        if name == "circle-alert" { return @image-url("../../../assets/icons/circle-alert.svg"); }
+        if name == "circle-check" { return @image-url("../../../assets/icons/circle-check.svg"); }
+        if name == "circle-stop" { return @image-url("../../../assets/icons/circle-stop.svg"); }
+        if name == "clock" { return @image-url("../../../assets/icons/clock.svg"); }
+        if name == "cloud" { return @image-url("../../../assets/icons/cloud.svg"); }
+        if name == "cloud-download" { return @image-url("../../../assets/icons/cloud-download.svg"); }
+        if name == "command" { return @image-url("../../../assets/icons/command.svg"); }
+        if name == "copy" { return @image-url("../../../assets/icons/copy.svg"); }
+        if name == "cpu" { return @image-url("../../../assets/icons/cpu.svg"); }
+        if name == "download" { return @image-url("../../../assets/icons/download.svg"); }
+        if name == "ellipsis" { return @image-url("../../../assets/icons/ellipsis.svg"); }
+        if name == "eye" { return @image-url("../../../assets/icons/eye.svg"); }
+        if name == "eye-off" { return @image-url("../../../assets/icons/eye-off.svg"); }
+        if name == "file-pen" { return @image-url("../../../assets/icons/file-pen.svg"); }
+        if name == "folder" { return @image-url("../../../assets/icons/folder.svg"); }
+        if name == "folder-open" { return @image-url("../../../assets/icons/folder-open.svg"); }
+        if name == "gauge" { return @image-url("../../../assets/icons/gauge.svg"); }
+        if name == "git-branch" { return @image-url("../../../assets/icons/git-branch.svg"); }
+        if name == "globe" { return @image-url("../../../assets/icons/globe.svg"); }
+        if name == "hand" { return @image-url("../../../assets/icons/hand.svg"); }
+        if name == "hard-drive" { return @image-url("../../../assets/icons/hard-drive.svg"); }
+        if name == "history" { return @image-url("../../../assets/icons/history.svg"); }
+        if name == "image" { return @image-url("../../../assets/icons/image.svg"); }
+        if name == "info" { return @image-url("../../../assets/icons/info.svg"); }
+        if name == "key-round" { return @image-url("../../../assets/icons/key-round.svg"); }
+        if name == "keyboard" { return @image-url("../../../assets/icons/keyboard.svg"); }
+        if name == "layers" { return @image-url("../../../assets/icons/layers.svg"); }
+        if name == "link" { return @image-url("../../../assets/icons/link.svg"); }
+        if name == "list-todo" { return @image-url("../../../assets/icons/list-todo.svg"); }
+        if name == "loader-circle" { return @image-url("../../../assets/icons/loader-circle.svg"); }
+        if name == "lock" { return @image-url("../../../assets/icons/lock.svg"); }
+        if name == "message-circle" { return @image-url("../../../assets/icons/message-circle.svg"); }
+        if name == "message-square" { return @image-url("../../../assets/icons/message-square.svg"); }
+        if name == "mic" { return @image-url("../../../assets/icons/mic.svg"); }
+        if name == "monitor" { return @image-url("../../../assets/icons/monitor.svg"); }
+        if name == "moon" { return @image-url("../../../assets/icons/moon.svg"); }
+        if name == "palette" { return @image-url("../../../assets/icons/palette.svg"); }
+        if name == "panel-left" { return @image-url("../../../assets/icons/panel-left.svg"); }
+        if name == "panel-right" { return @image-url("../../../assets/icons/panel-right.svg"); }
+        if name == "paw-print" { return @image-url("../../../assets/icons/paw-print.svg"); }
+        if name == "pencil" { return @image-url("../../../assets/icons/pencil.svg"); }
+        if name == "pin" { return @image-url("../../../assets/icons/pin.svg"); }
+        if name == "plug" { return @image-url("../../../assets/icons/plug.svg"); }
+        if name == "plus" { return @image-url("../../../assets/icons/plus.svg"); }
+        if name == "puzzle" { return @image-url("../../../assets/icons/puzzle.svg"); }
+        if name == "refresh-cw" { return @image-url("../../../assets/icons/refresh-cw.svg"); }
+        if name == "rotate-ccw" { return @image-url("../../../assets/icons/rotate-ccw.svg"); }
+        if name == "search" { return @image-url("../../../assets/icons/search.svg"); }
+        if name == "send-horizontal" { return @image-url("../../../assets/icons/send-horizontal.svg"); }
+        if name == "server" { return @image-url("../../../assets/icons/server.svg"); }
+        if name == "settings" { return @image-url("../../../assets/icons/settings.svg"); }
+        if name == "settings-2" { return @image-url("../../../assets/icons/settings-2.svg"); }
+        if name == "shield-check" { return @image-url("../../../assets/icons/shield-check.svg"); }
+        if name == "sliders-horizontal" { return @image-url("../../../assets/icons/sliders-horizontal.svg"); }
+        if name == "sparkles" { return @image-url("../../../assets/icons/sparkles.svg"); }
+        if name == "square" { return @image-url("../../../assets/icons/square.svg"); }
+        if name == "sun" { return @image-url("../../../assets/icons/sun.svg"); }
+        if name == "terminal" { return @image-url("../../../assets/icons/terminal.svg"); }
+        if name == "trash" { return @image-url("../../../assets/icons/trash.svg"); }
+        if name == "triangle-alert" { return @image-url("../../../assets/icons/triangle-alert.svg"); }
+        if name == "type" { return @image-url("../../../assets/icons/type.svg"); }
+        if name == "undo-2" { return @image-url("../../../assets/icons/undo-2.svg"); }
+        if name == "upload" { return @image-url("../../../assets/icons/upload.svg"); }
+        if name == "user" { return @image-url("../../../assets/icons/user.svg"); }
+        if name == "user-round" { return @image-url("../../../assets/icons/user-round.svg"); }
+        if name == "users" { return @image-url("../../../assets/icons/users.svg"); }
+        if name == "volume-2" { return @image-url("../../../assets/icons/volume-2.svg"); }
+        if name == "wrench" { return @image-url("../../../assets/icons/wrench.svg"); }
+        if name == "x" { return @image-url("../../../assets/icons/x.svg"); }
+        if name == "zap" { return @image-url("../../../assets/icons/zap.svg"); }
+        return @image-url("../../../assets/icons/settings.svg");
+    }
+}

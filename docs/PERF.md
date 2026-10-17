@@ -215,3 +215,21 @@ sweep** (the ListView instantiates only visible rows). RSS: 24.3 MiB before open
 So virtualisation holds, memory stays flat, and CPU returns to ~0 when scrolling stops.
 The sweep is far faster than a human scrolls, so 12 % is an upper bound. Not measured
 on your real session: it needs a private backend port, so it can't point at your sessions.
+
+## Settings panel open
+
+The panel is registry-driven: opening it fetches the profile roster
+(`GET /api/profiles`), the scoped profile's config (`GET /api/config?profile=`) and the
+config schema (`GET /api/config/schema`), then resolves the page's rows and hands them to
+the UI thread. Measured from the `opened` command reaching the controller (Ctrl+, or the
+dev hook) to those rows being published — the controller's own trace, so it excludes window
+and compositor time:
+
+| Metric | Value | Source |
+|---|---|---|
+| Settings open, software renderer | **median 22.9 ms** (10 runs, 21.6–25.8) | hidden display, `scripts/measure-settings-open.sh 10 appearance/general` |
+
+The three GETs go to a private backend on loopback; a remote gateway adds its own latency.
+Reopening a page is cheaper still: the profile roster and schema stay cached in the
+controller, while the config is re-fetched every time so the panel always shows what the
+backend actually has (that is the "saved value survives a reopen" live check).

@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**17 done · 4 partial · 772 not started · 0 unsupported** (of 793).
+**20 done · 36 partial · 736 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -637,10 +637,14 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Settings (shell)
 
-- [ ] Settings overlay shell + search — local — src/app/settings/index.tsx, use-settings-search.ts
-- [ ] Settings deep-link (tab/page/field) — local — src/app/settings/use-setting-deep-link.ts
-- [ ] Settings manifest (searchable row registry) — local — src/app/settings/settings-manifest.ts
-- [ ] Legacy tab redirects (connections→gateway, mcp→capabilities) — local — src/app/settings/moved-tabs.ts
+- [x] Settings overlay shell + search — local — src/app/settings/index.tsx, use-settings-search.ts
+  ⟶ registry-driven panel: 19-group nav (active group's pages expanded, section dividers), Ctrl+, a search field over every page/control, "Applies to" profile pills — tests/live_backend.rs `settings` (live, private backend, 2026-10-17); shots in docs/screenshots/rs-settings-*.png
+- [~] Settings deep-link (tab/page/field) — local — src/app/settings/use-setting-deep-link.ts
+  ⟶ a search hit jumps to its page and highlights the row (live-tested); the Electron URL/tab deep-link has no native analogue — `HERMES_DESKTOP_OPEN_SETTINGS=<group>/<page>` opens a page for scripted screenshots
+- [x] Settings manifest (searchable row registry) — local — src/app/settings/settings-manifest.ts
+  ⟶ crates/hermes-core/src/settings.rs: every page and control in one table (labels, descriptions and option lists from the original; backend-config rows derived from /api/config/schema), ranked search, per-profile vs device store, conditional rows — 8 unit tests
+- [-] Legacy tab redirects (connections→gateway, mcp→capabilities) — local — src/app/settings/moved-tabs.ts
+  ⟶ unsupported: the native app has no URL-based settings tabs; each page carries one registry id, so there is nothing to redirect
 
 ## Settings — Model page
 
@@ -662,39 +666,73 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Settings — Appearance page
 
-- [ ] Language / locale — local — src/app/settings/settings-manifest.ts (appearance.language)
-- [ ] Intro splash — local — src/app/settings/settings-manifest.ts (appearance.introSplash)
-- [ ] Model pricing in picker — local — src/app/settings/settings-manifest.ts (appearance.modelPricing)
-- [ ] Resume last session on launch — local — src/app/settings/settings-manifest.ts (appearance.resumeLastSession)
-- [ ] Tips — local — src/app/settings/settings-manifest.ts (appearance.tips)
-- [ ] Tours — local — src/app/settings/settings-manifest.ts (appearance.tours)
-- [ ] Theme / skin — local — src/app/settings/settings-manifest.ts (appearance.theme)
-- [ ] Dark/light/system mode — local — src/app/settings/constants.ts (MODE_OPTIONS)
-- [ ] UI scale — local — src/app/settings/settings-manifest.ts (appearance.uiScale)
-- [ ] Chat text scale — local — src/app/settings/settings-manifest.ts (appearance.chatTextScale)
-- [ ] Chat font — local — src/app/settings/settings-manifest.ts (appearance.chatFont)
-- [ ] Terminal font — local — src/app/settings/settings-manifest.ts (appearance.terminalFont)
-- [ ] Interface mode (Simple/Advanced) — local — src/store/interface-mode.ts
-- [ ] Session list density — local — src/store/session-list-density.ts
-- [ ] Tab strip mode — local — src/store/tabstrip-prefs.ts
-- [ ] Titlebar app actions side — local — src/app/settings/settings-manifest.ts (appearance.appActions)
-- [ ] Minimize to tray — local (Electron) — src/app/settings/minimize-to-tray-setting.tsx
-- [ ] Window translucency — local (Electron) — src/app/settings/settings-manifest.ts (appearance.translucency)
-- [ ] Backdrop / glass tint/fade/frost/area — local — src/store/backdrop.ts, src/app/settings/appearance-settings.tsx
-- [ ] File browser pane startup — local — src/store/layout.ts
-- [ ] Composer popout — local — src/store/composer-popout.ts
-- [ ] User bubble opacity — local — src/store/user-bubble-transparency.ts
-- [ ] Text direction (LTR/RTL) — local — src/store/text-direction.ts
-- [ ] Hide thread timeline — local — src/store/thread-timeline.ts
+> Every `[~]` row renders in the panel and persists its value (device prefs in `prefs.json`, or the scoped profile's config through `PUT /api/config?profile=`) — the note names the part of the feature that is still missing.
+
+- [~] Language / locale — local — src/app/settings/settings-manifest.ts (appearance.language)
+  ⟶ writes display.language per profile (live-tested); no localisation catalog yet
+- [~] Intro splash — local — src/app/settings/settings-manifest.ts (appearance.introSplash)
+  ⟶ row renders and persists; the empty-chat greeting ignores it
+- [~] Model pricing in picker — local — src/app/settings/settings-manifest.ts (appearance.modelPricing)
+  ⟶ row renders and persists; the model picker shows no prices
+- [~] Resume last session on launch — local — src/app/settings/settings-manifest.ts (appearance.resumeLastSession)
+  ⟶ row renders and persists; launch always starts a new chat
+- [~] Tips — local — src/app/settings/settings-manifest.ts (appearance.tips)
+  ⟶ row renders and persists; no tips system
+- [~] Tours — local — src/app/settings/settings-manifest.ts (appearance.tours)
+  ⟶ row renders and persists; no tours
+- [~] Theme / skin — local — src/app/settings/settings-manifest.ts (appearance.theme)
+  ⟶ row renders and persists; the palette grid and palette application are not built (the row shows a labelled placeholder)
+- [x] Dark/light/system mode — local — src/app/settings/constants.ts (MODE_OPTIONS)
+  ⟶ applied live to the app's Theme global (mode switch is immediate); shot in light and dark (docs/screenshots/rs-settings-*.png)
+- [~] UI scale — local — src/app/settings/settings-manifest.ts (appearance.uiScale)
+  ⟶ row renders and persists; the layout does not scale yet
+- [~] Chat text scale — local — src/app/settings/settings-manifest.ts (appearance.chatTextScale)
+  ⟶ row renders and persists; conversation text does not scale yet
+- [~] Chat font — local — src/app/settings/settings-manifest.ts (appearance.chatFont)
+  ⟶ a plain text input writes the config key; the installed-font picker is not built
+- [~] Terminal font — local — src/app/settings/settings-manifest.ts (appearance.terminalFont)
+  ⟶ a plain text input writes the config key; there is no terminal panel yet
+- [~] Interface mode (Simple/Advanced) — local — src/store/interface-mode.ts
+  ⟶ row renders and persists; the shell always shows the advanced layout
+- [~] Session list density — local — src/store/session-list-density.ts
+  ⟶ row renders and persists; the sidebar keeps one density
+- [~] Tab strip mode — local — src/store/tabstrip-prefs.ts
+  ⟶ row renders and persists; no zone tab strip yet
+- [~] Titlebar app actions side — local — src/app/settings/settings-manifest.ts (appearance.appActions)
+  ⟶ row renders and persists; the titlebar layout is fixed
+- [~] Minimize to tray — local (Electron) — src/app/settings/minimize-to-tray-setting.tsx
+  ⟶ row renders and persists; no tray integration yet
+- [~] Window translucency — local (Electron) — src/app/settings/settings-manifest.ts (appearance.translucency)
+  ⟶ row renders and persists; the window is opaque
+- [~] Backdrop / glass tint/fade/frost/area — local — src/store/backdrop.ts, src/app/settings/appearance-settings.tsx
+  ⟶ row renders and persists; no backdrop rendering
+- [~] File browser pane startup — local — src/store/layout.ts
+  ⟶ row renders and persists; no file browser pane
+- [~] Composer popout — local — src/store/composer-popout.ts
+  ⟶ row renders and persists; the composer stays docked
+- [~] User bubble opacity — local — src/store/user-bubble-transparency.ts
+  ⟶ the slider writes the pref; user bubbles ignore it
+- [~] Text direction (LTR/RTL) — local — src/store/text-direction.ts
+  ⟶ row renders and persists; the layout is LTR only
+- [~] Hide thread timeline — local — src/store/thread-timeline.ts
+  ⟶ row renders and persists; no thread timeline
 - [ ] Reactions (emoji) — local + config.set display.reactions — src/store/reactions-enabled.ts
-- [ ] Vibe hearts — local — src/store/vibe-hearts-enabled.ts
-- [ ] Tool view (product/technical) — local — src/store/tool-view.ts
-- [ ] Hide code diffs — local — src/app/settings/settings-manifest.ts (appearance.hideCodeDiffs)
-- [ ] Reasoning collapsed — local — src/store/reasoning-disclosure.ts
-- [ ] Embeds mode (ask/always/off) — local — src/store/embed-consent.ts
-- [ ] Pet appearance — local — src/app/settings/pet-settings.tsx
-- [ ] Video playback speed — local — src/store/video-playback-speed.ts
-- [ ] Appearance plugin seam (appearance.extra) — local — src/app/settings/appearance-contrib.tsx
+- [~] Vibe hearts — local — src/store/vibe-hearts-enabled.ts
+  ⟶ row renders and persists; no hearts
+- [~] Tool view (product/technical) — local — src/store/tool-view.ts
+  ⟶ row renders and persists; tool rows have one rendering
+- [~] Hide code diffs — local — src/app/settings/settings-manifest.ts (appearance.hideCodeDiffs)
+  ⟶ row renders and persists; diffs are always shown
+- [~] Reasoning collapsed — local — src/store/reasoning-disclosure.ts
+  ⟶ row renders and persists; reasoning blocks are not rendered yet
+- [~] Embeds mode (ask/always/off) — local — src/store/embed-consent.ts
+  ⟶ row renders and persists; no embed handling
+- [~] Pet appearance — local — src/app/settings/pet-settings.tsx
+  ⟶ row renders and persists; no pet
+- [~] Video playback speed — local — src/store/video-playback-speed.ts
+  ⟶ row renders and persists; no in-app video
+- [~] Appearance plugin seam (appearance.extra) — local — src/app/settings/appearance-contrib.tsx
+  ⟶ row renders and persists; plugins have no appearance contributions
 
 ## Settings — Workspace page
 

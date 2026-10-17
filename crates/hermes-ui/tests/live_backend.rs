@@ -2,9 +2,11 @@
 //! against a real Hermes backend. Covers the PARITY items that need a live run:
 //! composer keys (Enter / Shift+Enter / IME composition), Stop mid-stream (button and Esc),
 //! model switching mid-session, the approval card (Deny / Allow once / Allow for session /
-//! Always allow, by click and by keyboard), and a long (600-message) conversation.
+//! Always allow, by click and by keyboard), a long (600-message) conversation, and the
+//! settings panel (registry nav, "Applies to" profile scope, saving, persistence, search).
 //!
-//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions` runs a subset. The `long` section
+//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings` runs a subset. The
+//! `long` section
 //! needs a seeded session: `HERMES_HOME=<private home> scripts/seed-long-session.py 600`. The
 //! `sessions` section (open / switch / new chat / Ctrl+Tab, continue an old chat, switch while
 //! streaming) needs three small labelled ones:
@@ -19,17 +21,22 @@
 //! SLINT_EMIT_DEBUG_INFO=1 HERMES_DESKTOP_PORT=<port> cargo test -p hermes-ui --test live_backend -- --ignored --nocapture
 //! ```
 //!
+//! `settings` writes through the panel and must never touch real files, so it points the app
+//! at scratch copies: `HERMES_DESKTOP_PREFS` and `HERMES_DESKTOP_EXPORT_DIR` are set to a
+//! temporary directory before the controller starts (the config writes go to the private
+//! backend's own home).
+//!
 //! The approval part runs `rm -r` on throwaway directories under
 //! `$HERMES_LIVE_SCRATCH` (default `$TMPDIR/hermes-live-test`). "Always allow" writes
 //! `command_allowlist` into the private backend's config.yaml
-//! (`$HERMES_LIVE_HOME`, default `$TMPDIR/hermes-live-home`), which
-//! `scripts/live-test-backend.sh` regenerates on every start.
+//! (`$HERMES_LIVE_HOME`, default `~/.cache/hermes-desktop-rs/live-home`, which
+//! `scripts/live-test-backend.sh` regenerates on every start).
 
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use hermes_ui::{AppState, AppWindow};
+use hermes_ui::{AppState, AppWindow, SettingsState};
 use i_slint_backend_testing::ElementHandle;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, Model, SharedString};
@@ -301,6 +308,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     if want("sessions") {
         sessions_section(&ui, &log).await;
     }
+    if want("settings") {
+        settings_section(&ui, &log).await;
+    }
 }
 
 async fn keys_section(ui: &AppWindow, log: &Log) {
@@ -502,7 +512,7 @@ async fn approval_section(ui: &AppWindow, log: &Log) {
     let (ui, log) = (ui.clone_strong(), log.clone());
     let st = ui.global::<AppState>();
     let scratch = std::env::var("HERMES_LIVE_SCRATCH").unwrap_or_else(|_| format!("{}/hermes-live-test", tmpdir()));
-    let live_home = std::env::var("HERMES_LIVE_HOME").unwrap_or_else(|_| format!("{}/hermes-live-home", tmpdir()));
+    let live_home = live_home();
     // "Always allow" persists in the private config; a second run on the same backend would
     // never see a card. live-test-backend.sh regenerates config.yaml on every start.
     let cfg_path = format!("{live_home}/config.yaml");
@@ -889,6 +899,256 @@ async fn sessions_section(ui: &AppWindow, log: &Log) {
     );
 }
 
+/// The private backend's home (what `scripts/live-test-backend.sh` created).
+fn live_home() -> String {
+    std::env::var("HERMES_LIVE_HOME").unwrap_or_else(|_| {
+        format!(
+            "{}/.cache/hermes-desktop-rs/live-home",
+            std::env::var("HOME").unwrap_or_default()
+        )
+    })
+}
+
+/// The rows the settings panel is currently showing.
+fn settings_rows(ui: &AppWindow) -> Vec<hermes_ui::SettingRowUI> {
+    ui.global::<SettingsState>().get_rows().iter().collect()
+}
+
+fn row_value(ui: &AppWindow, id: &str) -> Option<String> {
+    settings_rows(ui)
+        .into_iter()
+        .find(|r| r.id.as_str() == id)
+        .map(|r| r.value.to_string())
+}
+
+/// The settings panel, end to end against the private backend: the registry renders, the
+/// "Applies to" scope really switches profiles, an edit lands in that profile's config.yaml
+/// (and only there), a device pref survives on disk, and a search hit jumps to its page.
+///
+/// Driven through the same Slint callbacks the widgets call (`invoke_edit` …) plus the real
+/// Ctrl+, keybinding, so the controller wiring is exercised, not a mock.
+async fn settings_section(ui: &AppWindow, log: &Log) {
+    let s = ui.global::<SettingsState>();
+
+    // ── Opens on the real keybinding and renders the registry page ───────────────
+    chord(ui, &[Key::Control], ",");
+    let opened = wait_until(20, || s.get_open() && !settings_rows(ui).is_empty()).await;
+    let nav: Vec<hermes_ui::NavEntry> = s.get_nav().iter().collect();
+    let groups = nav.iter().filter(|n| n.level == 0).count();
+    let expected_groups = hermes_core::settings::GROUPS.len();
+    let page_rows = settings_rows(ui);
+    let nav_ok = nav.iter().any(|n| n.label.as_str() == "Appearance")
+        && nav.iter().any(|n| n.level == 1 && n.page.as_str() == "typography");
+    record(
+        log,
+        "settings: Ctrl+, opens the registry page",
+        opened && groups == expected_groups && nav_ok && page_rows.iter().any(|r| r.id.as_str() == "display.language"),
+        format!(
+            "open={opened}; nav {} rows ({groups} groups, expected {expected_groups}, appearance expanded={nav_ok}); \
+             Appearance › General shows {:?}",
+            nav.len(),
+            page_rows.iter().map(|r| r.id.to_string()).collect::<Vec<_>>()
+        ),
+    );
+
+    // ── "Applies to": every profile is offered, the default is active ────────────
+    let scopes: Vec<hermes_ui::ScopeChip> = s.get_scopes().iter().collect();
+    let names: Vec<String> = scopes.iter().map(|c| c.name.to_string()).collect();
+    record(
+        log,
+        "settings: profile pills list every profile",
+        names.contains(&"default".to_owned())
+            && names.contains(&"swe".to_owned())
+            && names.contains(&"ea".to_owned())
+            && scopes.iter().any(|c| c.name.as_str() == "default" && c.active),
+        format!(
+            "{names:?}, active={:?}",
+            scopes
+                .iter()
+                .filter(|c| c.active)
+                .map(|c| c.name.to_string())
+                .collect::<Vec<_>>()
+        ),
+    );
+
+    // ── Switching scope reads that profile's config ─────────────────────────────
+    s.invoke_goto("appearance".into(), "general".into());
+    sleep(200).await;
+    let default_language = row_value(ui, "display.language");
+    s.invoke_scope("swe".into());
+    let switched = wait_until(20, || {
+        s.get_scopes().iter().any(|c| c.name.as_str() == "swe" && c.active)
+    })
+    .await;
+    sleep(600).await; // scoped config GET + re-render
+    let swe_language = row_value(ui, "display.language");
+    record(
+        log,
+        "settings: scope switch loads that profile's config",
+        switched,
+        format!("default={default_language:?} → swe={swe_language:?} (rows are the same registry page)"),
+    );
+
+    // ── An edit is saved into the scoped profile only ───────────────────────────
+    let home = live_home();
+    let swe_cfg_before = std::fs::read_to_string(format!("{home}/profiles/swe/config.yaml")).unwrap_or_default();
+    let default_cfg_before = std::fs::read_to_string(format!("{home}/config.yaml")).unwrap_or_default();
+    s.invoke_edit("display.language".into(), "de".into());
+    let saved = wait_until(20, || row_value(ui, "display.language").as_deref() == Some("de")).await;
+    sleep(300).await;
+    let swe_cfg_after = std::fs::read_to_string(format!("{home}/profiles/swe/config.yaml")).unwrap_or_default();
+    let default_cfg_after = std::fs::read_to_string(format!("{home}/config.yaml")).unwrap_or_default();
+    record(
+        log,
+        "settings: a row saves into the scoped profile's config.yaml only",
+        saved
+            && swe_cfg_after.contains("language: de")
+            && !swe_cfg_before.contains("language: de")
+            && default_cfg_after == default_cfg_before,
+        format!(
+            "row shows de={saved}; swe config.yaml changed={}; default config.yaml untouched={}",
+            swe_cfg_before != swe_cfg_after,
+            default_cfg_after == default_cfg_before
+        ),
+    );
+
+    // ── The saved value survives closing and reopening the panel ────────────────
+    ui.set_settings_open(false);
+    sleep(250).await;
+    let closed = wait_until(5, || !s.get_open()).await;
+    ui.set_settings_open(true);
+    let reopened = wait_until(20, || s.get_open() && !settings_rows(ui).is_empty()).await;
+    sleep(500).await;
+    let after_reopen = row_value(ui, "display.language");
+    record(
+        log,
+        "settings: a saved config value survives a reopen (fresh GET)",
+        closed && reopened && after_reopen.as_deref() == Some("de"),
+        format!("closed={closed}, reopened={reopened}, language after reopen={after_reopen:?}"),
+    );
+
+    // ── A device pref is written to prefs.json and read back from disk ──────────
+    s.invoke_edit("hermes.desktop.intro-splash.v1".into(), "false".into());
+    let toggled = wait_until(10, || {
+        row_value(ui, "hermes.desktop.intro-splash.v1").as_deref() == Some("false")
+    })
+    .await;
+    let prefs_file = std::env::var("HERMES_DESKTOP_PREFS").unwrap_or_default();
+    let fresh = hermes_core::prefs::Prefs::load(&prefs_file);
+    let on_disk = !fresh.get_bool("hermes.desktop.intro-splash.v1", true);
+    record(
+        log,
+        "settings: a device pref persists to prefs.json",
+        toggled && on_disk,
+        format!("row shows false={toggled}; a fresh Prefs::load({prefs_file}) reads back false={on_disk}"),
+    );
+
+    // ── Search: a hit jumps to its page and highlights its row ──────────────────
+    s.invoke_search("session list density".into());
+    let hit_ready = wait_until(10, || s.get_hits().row_count() > 0).await;
+    let hits: Vec<hermes_ui::SearchHit> = s.get_hits().iter().collect();
+    let first = hits.first().cloned();
+    let hit_ok = first
+        .as_ref()
+        .is_some_and(|h| h.page.as_str() == "window-layout" && !h.setting.is_empty());
+    if let Some(h) = first.clone() {
+        s.invoke_jump(h.group.clone(), h.page.clone(), h.setting.clone());
+    }
+    let jumped = wait_until(10, || {
+        s.get_group().as_str() == "appearance"
+            && s.get_page().as_str() == "window-layout"
+            && s.get_query().is_empty()
+            && settings_rows(ui)
+                .iter()
+                .any(|r| r.id == first.clone().map(|h| h.setting).unwrap_or_default() && r.highlight)
+    })
+    .await;
+    record(
+        log,
+        "settings: a search hit jumps to the right page and highlights the row",
+        hit_ready && hit_ok && jumped,
+        format!(
+            "hits={:?}; jumped to {}/{} with query cleared={}",
+            hits.iter().map(|h| h.path.to_string()).collect::<Vec<_>>(),
+            s.get_group(),
+            s.get_page(),
+            s.get_query().is_empty()
+        ),
+    );
+
+    // ── Export → edit → Import → Reset, all against the scratch directory ───────
+    // Back to the page that holds the Language row: the search jump moved us off it.
+    s.invoke_goto("appearance".into(), "general".into());
+    let back = wait_until(10, || {
+        s.get_page().as_str() == "general" && row_value(ui, "display.language").is_some()
+    })
+    .await;
+    let export_dir = std::path::PathBuf::from(std::env::var("HERMES_DESKTOP_EXPORT_DIR").unwrap_or_default());
+    s.invoke_export_config();
+    let exported_file = export_dir.join("hermes-config-swe.json");
+    let exported = wait_until(10, || exported_file.exists()).await;
+    let exported_language = std::fs::read_to_string(&exported_file)
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| {
+            v.get("display")
+                .and_then(|d| d.get("language"))
+                .and_then(|l| l.as_str())
+                .map(str::to_owned)
+        });
+    record(
+        log,
+        "settings: Export writes the scoped profile's config",
+        back && exported && exported_language.as_deref() == Some("de"),
+        format!(
+            "page back on General={back}; {} exists={exported}, display.language={exported_language:?}",
+            exported_file.display()
+        ),
+    );
+
+    let import_file = export_dir.join("imports").join("hermes-config-swe.json");
+    let import_ok = if let Some(parent) = import_file.parent() {
+        std::fs::create_dir_all(parent).is_ok()
+            && std::fs::read_to_string(&exported_file)
+                .ok()
+                .map(|t| t.replace("\"language\": \"de\"", "\"language\": \"es\""))
+                .map(|t| std::fs::write(&import_file, t).is_ok())
+                .unwrap_or(false)
+    } else {
+        false
+    };
+    s.invoke_import_config();
+    let imported = wait_until(15, || row_value(ui, "display.language").as_deref() == Some("es")).await;
+    record(
+        log,
+        "settings: Import replaces the scoped config from a JSON file",
+        import_ok && imported,
+        format!("wrote {}={import_ok}; row shows es={imported}", import_file.display()),
+    );
+
+    // Reset is two clicks (the original confirms first); the first only arms it.
+    s.invoke_reset_config();
+    let armed_notice = wait_until(10, || s.get_notice().contains("Press reset again")).await;
+    s.invoke_reset_config();
+    let reset = wait_until(20, || {
+        row_value(ui, "display.language").is_some_and(|v| v != "es" && v != "de")
+    })
+    .await;
+    let swe_cfg = std::fs::read_to_string(format!("{home}/profiles/swe/config.yaml")).unwrap_or_default();
+    record(
+        log,
+        "settings: Reset asks for a second click, then restores the backend defaults",
+        armed_notice && reset && !swe_cfg.contains("language: es"),
+        format!(
+            "first click notice={armed_notice:?}; second click restored defaults={reset} (language now {:?})",
+            row_value(ui, "display.language")
+        ),
+    );
+
+    ui.set_settings_open(false);
+    sleep(200).await;
+}
+
 #[test]
 #[ignore = "needs a running Hermes backend (HERMES_DESKTOP_PORT); see module docs"]
 fn live_backend() {
@@ -897,6 +1157,15 @@ fn live_backend() {
         "set HERMES_DESKTOP_PORT to a private test backend"
     );
     i_slint_backend_testing::init_integration_test_with_system_time();
+    // The panel's own files (device prefs, config export/import) go to a scratch directory
+    // so a live run never writes the user's prefs.json or ~/.local/share.
+    let scratch = std::env::temp_dir().join(format!("hermes-live-settings-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&scratch);
+    std::fs::create_dir_all(&scratch).unwrap();
+    unsafe {
+        std::env::set_var("HERMES_DESKTOP_PREFS", scratch.join("prefs.json"));
+        std::env::set_var("HERMES_DESKTOP_EXPORT_DIR", scratch.join("export"));
+    }
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()

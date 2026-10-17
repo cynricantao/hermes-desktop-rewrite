@@ -16,10 +16,13 @@
 pub mod backend;
 pub mod diff;
 pub mod highlight;
+pub mod http;
 pub mod markdown;
+pub mod prefs;
 pub mod protocol;
 pub mod rpc;
 pub mod sessions;
+pub mod settings;
 pub mod transcript;
 
 pub use rpc::{Client, ClientEvent, RpcError};

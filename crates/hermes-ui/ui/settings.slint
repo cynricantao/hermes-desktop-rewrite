@@ -1,86 +1,630 @@
-// Settings modal: fades + scales in (Motion.base, ease-out), left nav + scrolling sections.
+// Settings — the whole panel is generated from hermes-core's settings registry
+// (`crates/hermes-core/src/settings.rs`): the nav, the search, the "Applies to" profile
+// pills and every item. Adding a setting in core shows up here with no Slint change; one
+// reusable control component per `Control` variant.
+//
+// The controller owns the data: it loads the profile list and the scoped profile's config
+// through the backend's REST API, resolves each row, and pushes the models below. The UI
+// only sends intents back (goto / search / jump / scope / edit / export…).
 
-import { ScrollView, LineEdit } from "std-widgets.slint";
-import { Theme, Motion, Ease, ThemeMode } from "theme.slint";
-import { IconButton, Toggle, Segmented } from "components.slint";
+import { ScrollView, LineEdit, Slider } from "std-widgets.slint";
+import { Theme, Motion, Ease } from "theme.slint";
+import { IconButton, Toggle, Segmented, PrimaryButton, Chip } from "components.slint";
+import { Icons } from "icons.slint";
+
+// ── Models the controller fills ─────────────────────────────────────────────────
+
+/// One "Applies to" profile pill.
+export struct ScopeChip {
+    name: string,
+    label: string,
+    active: bool,
+}
+
+/// One nav row: a group (level 0) or one of its pages (level 1). Single-page groups emit
+/// one level-0 row that opens the page directly, like the original's childless groups.
+export struct NavEntry {
+    group: string,
+    page: string,
+    label: string,
+    icon: string,
+    level: int,
+    divider: bool,
+    active: bool,
+    expanded: bool,
+}
+
+/// One settings-search result. `setting` is empty for a page-level hit.
+export struct SearchHit {
+    group: string,
+    page: string,
+    setting: string,
+    label: string,
+    path: string,
+}
+
+/// One rendered setting item.
+export struct SettingRowUI {
+    id: string,
+    kind: string,
+    label: string,
+    description: string,
+    value: string,
+    option-labels: [string],
+    option-values: [string],
+    selected: int,
+    min: int,
+    max: int,
+    unit: string,
+    highlight: bool,
+    note: string,
+}
 
 export global SettingsState {
-    in-out property <int> page: 0;
-    in-out property <int> theme-mode: 0; // 0 system 1 light 2 dark
-    in-out property <bool> reduce-motion: false;
-    in-out property <int> transcript-default: 0;
-    in-out property <int> ui-font: 0; // 0 Inter 1 System
-    in-out property <string> code-font: "JetBrains Mono";
-    in-out property <bool> show-reasoning: true;
-    in-out property <bool> yolo: false;
-    in-out property <string> backend-version;
-    in-out property <string> hermes-home;
-    callback changed(string, string);
+    in-out property <bool> open: false;
+    in-out property <bool> loading: false;
+    in-out property <string> notice;
+    in-out property <bool> notice-error: false;
+    /// Current page (group + page id) and its labels for the header.
+    in-out property <string> group: "appearance";
+    in-out property <string> page: "general";
+    in-out property <string> page-title: "General";
+    in-out property <string> group-title: "Appearance";
+    /// Per-profile pages show the "Applies to" pills.
+    in-out property <bool> per-profile: false;
+    in-out property <[NavEntry]> nav: [];
+    in-out property <[SettingRowUI]> rows: [];
+    in-out property <[ScopeChip]> scopes: [];
+    /// Search.
+    in-out property <string> query;
+    in-out property <[SearchHit]> hits: [];
+    /// Estimated content offset for the row a search jumped to (approximate; the row is
+    /// also highlighted, so it is findable either way).
+    in-out property <int> jump-scroll: 0;
+    /// About page facts.
+    in-out property <string> version;
+    in-out property <string> home;
+
+    callback opened();
+    callback closed();
+    callback goto(string, string);
+    callback search(string);
+    callback jump(string, string, string);
+    callback scope(string);
+    callback edit(string, string);
+    callback action(string);
+    callback export-config();
+    callback import-config();
+    callback reset-config();
 }
+
+// ── Nav ─────────────────────────────────────────────────────────────────────────
 
 component NavRow inherits Rectangle {
-    in property <image> icon;
-    in property <string> text;
-    in property <int> index;
-    height: 32px;
+    in property <NavEntry> entry;
+    callback clicked();
+    height: entry.level == 1 ? 30px : 32px;
     border-radius: Theme.r-md;
-    background: SettingsState.page == index ? Theme.selected : ta.has-hover ? Theme.hover : transparent;
-    animate background { duration: Motion.fast; }
-    accessible-role: tab;
-    accessible-label: text;
-    accessible-item-selected: SettingsState.page == index;
-    accessible-action-default => { SettingsState.page = index; }
-    HorizontalLayout {
-        padding-left: 10px;
-        spacing: 10px;
-        Image { source: root.icon; width: 16px; height: 16px; y: 8px; colorize: SettingsState.page == root.index ? Theme.text : Theme.text-2; }
-        Text { text: root.text; color: SettingsState.page == root.index ? Theme.text : Theme.text-2; font-size: Theme.fs-md; vertical-alignment: center; }
+    // The active *page* carries the fill; an expanded group only tints, so the two never
+    // look like two selected rows.
+    background: entry.active && entry.level == 1 ? Theme.selected : (entry.active || ta.has-hover) ? Theme.hover : transparent;
+    animate background { duration: Motion.fast; easing: Ease.standard; }
+    accessible-role: button;
+    accessible-label: entry.label;
+    accessible-item-selected: entry.active;
+    accessible-action-default => { root.clicked(); }
+    lay := HorizontalLayout {
+        padding-left: entry.level == 1 ? 26px : 10px;
+        padding-right: 8px;
+        spacing: 9px;
+        Image {
+            source: Icons.get(entry.icon);
+            width: entry.level == 1 ? 14px : 15px;
+            height: entry.level == 1 ? 14px : 15px;
+            colorize: entry.active ? Theme.text : Theme.text-3;
+        }
+        Text {
+            vertical-alignment: center;
+            text: entry.label;
+            color: entry.active ? Theme.text : Theme.text-2;
+            font-size: Theme.fs-md;
+            font-weight: entry.level == 0 ? 500 : 400;
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+        if entry.level == 0 && entry.page == "": Image {
+            source: Icons.get(entry.expanded ? "chevron-down" : "chevron-right");
+            width: 12px;
+            height: 12px;
+            colorize: Theme.text-4;
+        }
     }
-    ta := TouchArea { mouse-cursor: pointer; clicked => { SettingsState.page = root.index; } }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
 }
 
-export component SettingRow inherits Rectangle {
-    in property <string> title;
-    in property <string> description;
-    min-height: lay.preferred-height;
+component ScopePill inherits Rectangle {
+    in property <string> text;
+    in property <bool> active: false;
+    callback clicked();
+    height: 26px;
+    width: label.preferred-width + 22px;
+    border-radius: Theme.r-pill;
+    border-width: 1px;
+    border-color: active ? Theme.border-strong : Theme.border;
+    background: active ? Theme.selected : ta.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.fast; }
+    accessible-role: button;
+    accessible-label: text;
+    accessible-action-default => { root.clicked(); }
+    label := Text {
+        text: root.text;
+        color: root.active ? Theme.text : Theme.text-3;
+        font-size: Theme.fs-sm;
+        font-weight: root.active ? 500 : 400;
+        horizontal-alignment: center;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// ── Controls, one per registry Control variant ──────────────────────────────────
+
+component SelectControl inherits Rectangle {
+    in property <SettingRowUI> item;
+    in property <string> current-label;
+    width: 260px;
+    height: 32px;
+    border-radius: Theme.r-md;
+    border-width: 1px;
+    border-color: ta.has-hover ? Theme.border-strong : Theme.border;
+    background: Theme.bg;
+    accessible-role: button;
+    accessible-label: item.label;
+    accessible-value: root.current-label;
+    accessible-action-default => { pop.show(); }
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 8px;
+        spacing: 6px;
+        Text {
+            vertical-alignment: center;
+            text: root.current-label;
+            color: root.current-label == "" ? Theme.text-4 : Theme.text;
+            font-size: Theme.fs-md;
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+        Image {
+            source: Icons.get("chevron-down");
+            width: 13px;
+            height: 13px;
+            colorize: Theme.text-3;
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { pop.show(); }
+    }
+    pop := PopupWindow {
+        x: 0;
+        y: root.height + 4px;
+        width: max(root.width, 200px);
+        height: min(root.item.option-labels.length * 30px + 10px, 320px);
+        close-policy: close-on-click-outside;
+        Rectangle {
+            background: Theme.surface;
+            border-radius: Theme.r-md;
+            border-width: 1px;
+            border-color: Theme.border-strong;
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 6px;
+            drop-shadow-color: #00000059;
+            ScrollView {
+                VerticalLayout {
+                    padding: 5px;
+                    spacing: 1px;
+                    for opt[i] in root.item.option-labels: Rectangle {
+                        height: 28px;
+                        border-radius: Theme.r-sm;
+                        background: i == root.item.selected ? Theme.selected : ota.has-hover ? Theme.hover : transparent;
+                        accessible-role: button;
+                        accessible-label: opt;
+                        accessible-item-selected: i == root.item.selected;
+                        accessible-action-default => {
+                            SettingsState.edit(root.item.id, root.item.option-values[i]);
+                            pop.close();
+                        }
+                        Text {
+                            vertical-alignment: center;
+                            text: opt;
+                            color: Theme.text;
+                            font-size: Theme.fs-md;
+                            x: 9px;
+                        }
+                        ota := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                SettingsState.edit(root.item.id, root.item.option-values[i]);
+                                pop.close();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component TextControl inherits LineEdit {
+    in property <SettingRowUI> item;
+    width: 260px;
+    height: 32px;
+    font-size: Theme.fs-md;
+    font-family: item.kind == "mono" ? Theme.mono-font : Theme.ui-font;
+    text: item.value;
+    accessible-label: item.label;
+    edited(text) => { SettingsState.edit(item.id, text); }
+}
+
+component SliderControl inherits Rectangle {
+    in property <SettingRowUI> item;
+    property <float> live: 0;
+    width: 260px;
+    height: 32px;
+    init => { root.live = root.item.value.to-float(); }
+    changed item => { root.live = root.item.value.to-float(); }
+    HorizontalLayout {
+        spacing: 12px;
+        slider := Slider {
+            horizontal-stretch: 1;
+            minimum: root.item.min * 1.0;
+            maximum: root.item.max * 1.0;
+            step: 1.0;
+            value <=> root.live;
+            accessible-label: root.item.label;
+            released() => { SettingsState.edit(root.item.id, "\{(root.live)}"); }
+        }
+        Text {
+            vertical-alignment: center;
+            text: root.item.value + root.item.unit;
+            color: Theme.text-2;
+            font-size: Theme.fs-sm;
+            width: 44px;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+/// The right-hand control of one item. `item.kind` comes straight from the registry.
+component RowControl inherits VerticalLayout {
+    in property <SettingRowUI> item;
+    alignment: center;
+    if item.kind == "toggle": Toggle {
+        checked: item.value == "true";
+        accessible-label: item.label;
+        toggled(v) => { SettingsState.edit(item.id, v ? "true" : "false"); }
+    }
+    if item.kind == "segmented": Segmented {
+        width: min(340px, max(160px, item.option-labels.length * 72px));
+        options: item.option-labels;
+        selected: item.selected;
+        changed(i) => { SettingsState.edit(item.id, item.option-values[i]); }
+    }
+    if item.kind == "select" && item.option-labels.length > 0: SelectControl {
+        item: item;
+        current-label: item.selected >= 0 ? item.option-labels[item.selected] : item.value;
+    }
+    if item.kind == "select" && item.option-labels.length == 0: TextControl { item: item; }
+    if item.kind == "text" || item.kind == "mono" || item.kind == "number" || item.kind == "list" || item.kind == "secret": TextControl {
+        item: item;
+    }
+    if item.kind == "slider": SliderControl { item: item; }
+    if item.kind == "fallback": Text {
+        text: item.value == "" ? "None" : item.value;
+        color: Theme.text-2;
+        font-size: Theme.fs-sm;
+        horizontal-alignment: right;
+        width: 260px;
+        overflow: elide;
+    }
+    if item.kind == "action": PrimaryButton {
+        text: item.label;
+        clicked => { SettingsState.action(item.id); }
+    }
+    // Font keys render as plain text inputs today (the original lists installed fonts);
+    // the rest are page widgets that are not built yet and say so.
+    if item.kind == "widget" && (item.id == "desktop.font_family" || item.id == "terminal.font_family"): TextControl {
+        item: item;
+    }
+    if item.kind == "widget" && !(item.id == "desktop.font_family" || item.id == "terminal.font_family"): Chip {
+        interactive: false;
+        outlined: true;
+        text: item.note == "" ? "Not built yet" : item.note;
+    }
+    if item.kind == "info": Text {
+        text: item.value;
+        color: Theme.text-2;
+        font-size: Theme.fs-sm;
+    }
+}
+
+component SettingRowView inherits Rectangle {
+    in property <SettingRowUI> item;
+    background: item.highlight ? Theme.accent-soft : transparent;
     lay := HorizontalLayout {
-        padding-top: 12px;
-        padding-bottom: 12px;
-        spacing: 24px;
+        padding-left: 14px;
+        padding-right: 14px;
+        padding-top: 11px;
+        padding-bottom: 11px;
+        spacing: 28px;
         VerticalLayout {
             horizontal-stretch: 1;
             spacing: 3px;
             alignment: center;
-            Text { text: root.title; color: Theme.text; font-size: Theme.fs-md + 0.5px; }
-            if root.description != "": Text { text: root.description; color: Theme.text-3; font-size: Theme.fs-sm + 0.5px; wrap: word-wrap; }
+            Text {
+                vertical-alignment: center;
+                text: root.item.label;
+                color: Theme.text;
+                font-size: Theme.fs-md;
+            }
+            if root.item.description != "": Text {
+                text: root.item.description;
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                wrap: word-wrap;
+            }
         }
-        VerticalLayout { alignment: center; @children }
+        RowControl { item: root.item; }
     }
-    Rectangle { y: parent.height - 1px; height: 1px; background: Theme.border; }
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.border;
+    }
 }
 
-export component SectionTitle inherits Text {
-    color: Theme.text;
-    font-size: Theme.fs-lg - 1px;
-    font-weight: 600;
+// ── Nav, search results, content ────────────────────────────────────────────────
+
+component SettingsNav inherits Rectangle {
+    VerticalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-top: 12px;
+        padding-bottom: 8px;
+        spacing: 8px;
+        HorizontalLayout {
+            height: 30px;
+            spacing: 8px;
+            Text {
+                vertical-alignment: center;
+                text: "Settings";
+                color: Theme.text;
+                font-size: Theme.fs-lg - 2px;
+                font-weight: 600;
+                horizontal-stretch: 1;
+            }
+            IconButton {
+                icon: Icons.get("x");
+                tooltip: "Close settings";
+                clicked => { SettingsState.open = false; }
+            }
+        }
+        search := LineEdit {
+            placeholder-text: "Search settings";
+            accessible-label: "Search settings";
+            font-size: Theme.fs-md;
+            height: 30px;
+            text <=> SettingsState.query;
+            edited(text) => { SettingsState.search(text); }
+            accepted(text) => { SettingsState.search(text); }
+        }
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                alignment: start;
+                spacing: 2px;
+                for e[i] in SettingsState.nav: VerticalLayout {
+                    if e.divider: VerticalLayout {
+                        padding-top: 7px;
+                        padding-bottom: 7px;
+                        Rectangle { height: 1px; background: Theme.border; }
+                    }
+                    NavRow {
+                        entry: e;
+                        clicked => {
+                            if e.page == "" {
+                                SettingsState.goto(e.group, "");
+                            } else {
+                                SettingsState.goto(e.group, e.page);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            height: 30px;
+            spacing: 4px;
+            IconButton {
+                icon: Icons.get("download");
+                tooltip: "Export config";
+                clicked => { SettingsState.export-config(); }
+            }
+            IconButton {
+                icon: Icons.get("upload");
+                tooltip: "Import config";
+                clicked => { SettingsState.import-config(); }
+            }
+            IconButton {
+                icon: Icons.get("refresh-cw");
+                tooltip: "Reset to defaults";
+                clicked => { SettingsState.reset-config(); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            if SettingsState.version != "": Text {
+                text: SettingsState.version;
+                color: Theme.text-4;
+                font-size: Theme.fs-xs;
+            }
+        }
+    }
 }
+
+component SearchResults inherits Rectangle {
+    VerticalLayout {
+        padding-left: 22px;
+        padding-right: 22px;
+        padding-top: 18px;
+        padding-bottom: 18px;
+        spacing: 6px;
+        Text {
+            vertical-alignment: center;
+            text: SettingsState.hits.length == 1 ? "1 result" : SettingsState.hits.length + " results";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+        }
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                alignment: start;
+                spacing: 2px;
+                for h[i] in SettingsState.hits: Rectangle {
+                    height: 46px;
+                    border-radius: Theme.r-md;
+                    background: hta.has-hover ? Theme.hover : transparent;
+                    accessible-role: button;
+                    accessible-label: h.label;
+                    accessible-action-default => { SettingsState.jump(h.group, h.page, h.setting); }
+                    VerticalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: center;
+                        spacing: 2px;
+                        Text {
+                            vertical-alignment: center;
+                            text: h.label;
+                            color: Theme.text;
+                            font-size: Theme.fs-md;
+                            overflow: elide;
+                        }
+                        Text {
+                            vertical-alignment: center;
+                            text: h.path;
+                            color: Theme.text-3;
+                            font-size: Theme.fs-xs;
+                            overflow: elide;
+                        }
+                    }
+                    hta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { SettingsState.jump(h.group, h.page, h.setting); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component ScopePills inherits VerticalLayout {
+    spacing: 7px;
+    Text {
+        vertical-alignment: center;
+        text: "Applies to";
+        color: Theme.text-2;
+        font-size: Theme.fs-sm;
+        font-weight: 500;
+    }
+    HorizontalLayout {
+        spacing: 6px;
+        for s[i] in SettingsState.scopes: ScopePill {
+            text: s.label;
+            active: s.active;
+            clicked => { SettingsState.scope(s.name); }
+        }
+        Rectangle { horizontal-stretch: 1; }
+    }
+}
+
+component SettingsPageView inherits Rectangle {
+    // Approximate scroll to a search-jumped row: the controller estimates the offset.
+    // (`changed` handlers only bind to local properties, so the global is mirrored here.)
+    property <int> jump: SettingsState.jump-scroll;
+    changed jump => {
+        if jump > 0 {
+            scroll.content-y = jump * 1px;
+        }
+    }
+    VerticalLayout {
+        padding-left: 28px;
+        padding-right: 28px;
+        padding-top: 20px;
+        spacing: 14px;
+        VerticalLayout {
+            spacing: 3px;
+            Text {
+                vertical-alignment: center;
+                text: SettingsState.group-title + " › " + SettingsState.page-title;
+                color: Theme.text;
+                font-size: Theme.fs-lg - 2px;
+                font-weight: 600;
+            }
+            if SettingsState.loading: Text {
+                text: "Loading…";
+                color: Theme.text-4;
+                font-size: Theme.fs-sm;
+            }
+        }
+        if SettingsState.per-profile && SettingsState.scopes.length > 1: ScopePills { }
+        if SettingsState.notice != "": Rectangle {
+            height: 30px;
+            border-radius: Theme.r-md;
+            background: SettingsState.notice-error ? Theme.diff-del-bg : Theme.diff-add-bg;
+            Text {
+                vertical-alignment: center;
+                text: SettingsState.notice;
+                color: SettingsState.notice-error ? Theme.diff-del-fg : Theme.diff-add-fg;
+                font-size: Theme.fs-sm;
+                x: 10px;
+            }
+        }
+        if SettingsState.rows.length == 0 && !SettingsState.loading: Text {
+                text: "Nothing on this page yet — its feature is still on the parity checklist.";
+                color: Theme.text-4;
+                font-size: Theme.fs-sm;
+            }
+        scroll := ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                alignment: start;
+                for r[i] in SettingsState.rows: SettingRowView { item: r; }
+                Rectangle { height: 12px; }
+            }
+        }
+    }
+}
+
+// ── The modal ───────────────────────────────────────────────────────────────────
 
 export component SettingsModal inherits Rectangle {
-    in-out property <bool> open;
+    in-out property <bool> open <=> SettingsState.open;
     property <float> t: open ? 1 : 0;
     animate t { duration: open ? Motion.base : Motion.exit; easing: Ease.standard; }
     visible: t > 0.001;
 
-    // Scrim
     Rectangle {
         background: Theme.scrim;
         opacity: root.t;
-        TouchArea { clicked => { root.open = false; } }
+        TouchArea { clicked => { SettingsState.open = false; } }
     }
 
     card := Rectangle {
-        width: min(root.width - 80px, 1000px);
-        height: min(root.height - 80px, 720px);
+        width: min(root.width - 80px, 1020px);
+        height: min(root.height - 80px, 700px);
         x: (root.width - self.width) / 2;
         y: (root.height - self.height) / 2;
         opacity: root.t;
@@ -97,107 +641,14 @@ export component SettingsModal inherits Rectangle {
         TouchArea {} // swallow clicks so they don't close the modal
 
         HorizontalLayout {
-            // Left nav
-            Rectangle {
-                width: 192px;
+            spacing: 0px;
+            SettingsNav {
+                width: 226px;
                 background: Theme.sidebar-bg;
-                VerticalLayout {
-                    padding: 12px;
-                    spacing: 2px;
-                    Text { text: "Settings"; color: Theme.text-3; font-size: Theme.fs-sm; height: 28px; vertical-alignment: center; x: 10px; }
-                    NavRow { index: 0; text: "General"; icon: @image-url("../../../assets/icons/settings.svg"); }
-                    NavRow { index: 1; text: "Appearance"; icon: @image-url("../../../assets/icons/sun.svg"); }
-                    NavRow { index: 2; text: "Models"; icon: @image-url("../../../assets/icons/brain.svg"); }
-                    NavRow { index: 3; text: "Tools & approvals"; icon: @image-url("../../../assets/icons/wrench.svg"); }
-                    NavRow { index: 4; text: "About"; icon: @image-url("../../../assets/icons/sparkles.svg"); }
-                    Rectangle { vertical-stretch: 1; }
-                }
             }
             Rectangle { width: 1px; background: Theme.border; }
-            // Content
-            Rectangle {
-                horizontal-stretch: 1;
-                ScrollView {
-                    VerticalLayout {
-                        alignment: start;
-                        padding: 32px;
-                        padding-top: 28px;
-                        spacing: 4px;
-
-                        if SettingsState.page == 0: VerticalLayout {
-                            alignment: start;
-                            spacing: 4px;
-                            SectionTitle { text: "General"; }
-                            SettingRow {
-                                title: "Show reasoning";
-                                description: "Stream the model's thinking into a collapsible block above each reply.";
-                                Toggle { checked <=> SettingsState.show-reasoning; toggled(v) => { SettingsState.changed("show_reasoning", v ? "true" : "false"); } }
-                            }
-                            SettingRow {
-                                title: "Default transcript view";
-                                description: "Normal hides thinking, Thinking shows it collapsed, Verbose expands tool output.";
-                                Segmented { width: 240px; options: ["Normal", "Thinking", "Verbose"]; selected <=> SettingsState.transcript-default; changed(i) => { SettingsState.changed("transcript_default", i); } }
-                            }
-                        }
-                        if SettingsState.page == 1: VerticalLayout {
-                            alignment: start;
-                            spacing: 4px;
-                            SectionTitle { text: "Appearance"; }
-                            SettingRow {
-                                title: "Theme";
-                                description: "Follow the system colour scheme or pick one.";
-                                Segmented { width: 240px; options: ["System", "Light", "Dark"]; selected <=> SettingsState.theme-mode; changed(i) => { SettingsState.changed("theme", i); } }
-                            }
-                            SettingRow {
-                                title: "Interface font";
-                                description: "Font for menus, sidebars and panels.";
-                                Segmented { width: 200px; options: ["Inter", "System"]; selected <=> SettingsState.ui-font; changed(i) => { SettingsState.changed("ui_font", i); } }
-                            }
-                            SettingRow {
-                                title: "Code font";
-                                description: "Monospace font for code and terminal output.";
-                                LineEdit { width: 220px; text <=> SettingsState.code-font; edited(t) => { SettingsState.changed("code_font", t); } }
-                            }
-                            SettingRow {
-                                title: "Reduce motion";
-                                description: "Turn off non-essential animation (also follows the system setting).";
-                                Toggle { checked <=> SettingsState.reduce-motion; toggled(v) => { SettingsState.changed("reduce_motion", v ? "true" : "false"); } }
-                            }
-                        }
-                        if SettingsState.page == 2: VerticalLayout {
-                            alignment: start;
-                            spacing: 4px;
-                            SectionTitle { text: "Models"; }
-                            SettingRow { title: "Pick a model from the composer chip."; description: "Provider setup and defaults are added in the settings phase (see PARITY.md)."; }
-                        }
-                        if SettingsState.page == 3: VerticalLayout {
-                            alignment: start;
-                            spacing: 4px;
-                            SectionTitle { text: "Tools & approvals"; }
-                            SettingRow {
-                                title: "Auto-approve dangerous commands (YOLO)";
-                                description: "Skip approval prompts for this session.";
-                                Toggle { checked <=> SettingsState.yolo; toggled(v) => { SettingsState.changed("yolo", v ? "true" : "false"); } }
-                            }
-                        }
-                        if SettingsState.page == 4: VerticalLayout {
-                            alignment: start;
-                            spacing: 4px;
-                            SectionTitle { text: "About"; }
-                            SettingRow { title: "Hermes backend"; description: SettingsState.backend-version; }
-                            SettingRow { title: "Hermes home"; description: SettingsState.hermes-home; }
-                            SettingRow { title: "Licences"; description: "Inter, Source Serif 4 and JetBrains Mono (SIL OFL 1.1); Lucide icons (ISC). Built with Slint."; }
-                        }
-                    }
-                }
-                IconButton {
-                    x: parent.width - self.width - 14px;
-                    y: 14px;
-                    icon: @image-url("../../../assets/icons/x.svg");
-                    tooltip: "Close settings";
-                    clicked => { root.open = false; }
-                }
-            }
+            if SettingsState.query != "": SearchResults { horizontal-stretch: 1; }
+            if SettingsState.query == "": SettingsPageView { horizontal-stretch: 1; }
         }
     }
 }
