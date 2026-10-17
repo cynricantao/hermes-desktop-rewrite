@@ -7,7 +7,8 @@ pkgdesc="Native Rust (Slint) desktop client for Hermes Agent"
 arch=('x86_64' 'aarch64')
 url="https://github.com/cynricantao/hermes-desktop-rewrite"
 license=('MIT')
-depends=('fontconfig' 'freetype2' 'libxkbcommon' 'wayland' 'libglvnd' 'gcc-libs')
+depends=('fontconfig' 'freetype2' 'libxkbcommon' 'wayland' 'libglvnd' 'gcc-libs'
+         'gtk3' 'webkit2gtk-4.1')  # gtk3 + webkit2gtk-4.1: the in-app browser helper (hermes-browser)
 makedepends=('cargo')
 optdepends=('hermes-agent: the backend (the `hermes` CLI must be on PATH)')
 options=('!lto')
@@ -19,12 +20,15 @@ prepare() {
   cd "$(_root)"
   export RUSTUP_TOOLCHAIN=stable
   cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+  # The in-app browser helper is its own package outside the workspace (docs/browser.md).
+  (cd helpers/hermes-browser && cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')")
 }
 
 build() {
   cd "$(_root)"
   export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
   cargo build --frozen --release -p hermes-app
+  (cd helpers/hermes-browser && CARGO_TARGET_DIR="$srcdir/target-browser" cargo build --frozen --release)
 }
 
 check() {
@@ -36,6 +40,8 @@ check() {
 package() {
   local root; root="$(_root)"
   install -Dm755 "$srcdir/target/release/hermes-desktop-rs" "$pkgdir/usr/bin/hermes-desktop-rs"
+  # Found next to the app binary by hermes_core::browser::find_helper.
+  install -Dm755 "$srcdir/target-browser/release/hermes-browser" "$pkgdir/usr/bin/hermes-browser"
   install -Dm644 "$root/packaging/hermes-desktop-rs.desktop" "$pkgdir/usr/share/applications/hermes-desktop-rs.desktop"
   install -Dm644 "$root/packaging/hermes-desktop-rs.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/hermes-desktop-rs.svg"
   install -Dm644 "$root/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"

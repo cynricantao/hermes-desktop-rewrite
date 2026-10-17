@@ -1,0 +1,27 @@
+# The in-app browser helper: a standalone GTK + wry program, deliberately NOT a member of
+# the repo workspace (root Cargo.toml lists it in `exclude`) so wry/GTK/WebKit never link
+# into the Slint app — that measured +46 ms first frame and +20 MiB PSS (docs/browser.md).
+# Build: CARGO_TARGET_DIR=<dir> cargo build --release   (in this directory)
+[package]
+name = "hermes-browser"
+description = "Standalone GTK + wry in-app browser window for Hermes Desktop, driven over line-delimited JSON on stdin/stdout."
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/cynricantao/hermes-desktop-rewrite"
+rust-version = "1.88"
+publish = false
+
+[dependencies]
+wry = "0.57"
+gtk = "0.18"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+# Thin LTO: the point of a separate program is that nothing here is on the app's critical
+# path, so build time is not worth spending on fat LTO.
+lto = "thin"
+codegen-units = 1
+strip = true

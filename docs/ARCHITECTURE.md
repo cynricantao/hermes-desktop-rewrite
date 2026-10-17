@@ -16,6 +16,11 @@ crates/
     protocol.rs    lenient serde types mirroring gateway-contract.openrpc.json
     transcript.rs  gateway events → transcript blocks, reporting row-level `Change`s
     sessions.rs    sidebar grouping helpers
+    remote.rs        Remote gateway connections: URL rules, HTTP + WebSocket auth probe, saved profile.
+    artifacts.rs     Artifact detection, registry and library scan (pure).
+    notify.rs        Notification rules: when to toast / notify, copy, throttling (pure).
+    keybinds.rs      Shortcut registry: actions, Linux defaults, parse/match, overrides.
+    browser.rs       In-app browser helper protocol + preview.read / preview.act mapping.
     api/            Typed backend client, one module per area (sessions, plugins, messaging,
                      voice, workspace, system, extras). Pure request builders + lenient reply
                      types; screens call these. Map: docs/BACKEND_API.md.
@@ -112,3 +117,7 @@ All durations come from the `Motion` global (60/120/200/300 ms ladder from DESIG
 * `cargo run -p hermes-core --example probe` — live round trip against the real backend.
 * Screenshots are produced headlessly (Weston headless + pixman, kiosk shell) so the
   user's own Hyprland session is never touched; see README.
+
+## In-app browser helper
+
+`helpers/hermes-browser` is a separate GTK + wry (WebKitGTK) program, excluded from the workspace and started only when a page is opened. The app drives it over line-delimited JSON on stdin/stdout (`hermes-core::browser`); `crates/hermes-ui/src/browser.rs` owns it on its own task. Linking WebKit into the app measured +46 ms first frame and +20 MiB, hence the separate process. Details: docs/browser.md.

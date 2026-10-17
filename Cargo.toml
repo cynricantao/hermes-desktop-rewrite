@@ -1,6 +1,11 @@
 [workspace]
 resolver = "3"
 members = ["crates/hermes-core", "crates/hermes-ui", "crates/hermes-app"]
+# `helpers/hermes-browser` is the in-app browser, a separate GTK + wry program launched by
+# the app (never linked into it: that measured +46 ms first frame and +20 MiB PSS — see
+# docs/browser.md). Out of the workspace so its WebKit dependency never reaches the app's
+# build; it carries its own Cargo.toml and Cargo.lock.
+exclude = ["helpers/hermes-browser"]
 
 [workspace.package]
 version = "0.1.0"

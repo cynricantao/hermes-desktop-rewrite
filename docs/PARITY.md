@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**43 done · 215 partial · 534 not started · 1 unsupported** (of 793).
+**43 done · 219 partial · 530 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -496,13 +496,13 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Artifacts library (list/grid) — local — src/app/artifacts/index.tsx ⟶ logic in `hermes-core::artifacts` (detection thresholds, registry/dedupe/pruning, library scan, preview kinds; 42 unit tests from Electron fixtures); no artifacts screen yet
 - [~] Artifact detection from messages — local — src/lib/artifact-detect.ts ⟶ logic in `hermes-core::artifacts` (detection thresholds, registry/dedupe/pruning, library scan, preview kinds; 42 unit tests from Electron fixtures); no artifacts screen yet
 - [~] Artifact store — local — src/store/artifacts.ts ⟶ logic in `hermes-core::artifacts` (detection thresholds, registry/dedupe/pruning, library scan, preview kinds; 42 unit tests from Electron fixtures); no artifacts screen yet
-- [ ] Preview pane (in-app browser) — local — src/app/chat/right-rail/preview.tsx
+- [~] Preview pane (in-app browser) — local — src/app/chat/right-rail/preview.tsx ⟶ separate `hermes-browser` window (helpers/hermes-browser) driven via `hermes-core::browser`; preview.open/close events, preview.read and preview.act (back/forward/reload/click/type/scroll; no element refs, hover, press or annotations) answered by the app; end-to-end test vs a local page on a private broadway display 2026-10-17 (`tests/browser_helper.rs`); the agent round trip itself was not run (needs a model)
 - [ ] Preview guest webview (Chromium) — local (Electron webview) (platform) — src/app/chat/right-rail/preview-guest-offscreen.ts
-- [ ] Preview navigation bar + address — local — src/app/chat/right-rail/preview-browser-bar.tsx
+- [~] Preview navigation bar + address — local — src/app/chat/right-rail/preview-browser-bar.tsx ⟶ separate `hermes-browser` window (helpers/hermes-browser) driven via `hermes-core::browser`; preview.open/close events, preview.read and preview.act (back/forward/reload/click/type/scroll; no element refs, hover, press or annotations) answered by the app; end-to-end test vs a local page on a private broadway display 2026-10-17 (`tests/browser_helper.rs`); the agent round trip itself was not run (needs a model)
 - [ ] Preview console (JS console output) — local — src/app/chat/right-rail/preview-console.tsx
 - [ ] Preview annotate (draw on page) — SRV preview.act — src/app/chat/right-rail/preview-annotate-card.tsx
-- [ ] Preview act (click/type/scroll proxy) — SRV preview.act — src/lib/preview-act/*
-- [ ] Preview read (text extraction) — SRV preview.read — src/app/chat/right-rail/preview-reader.ts
+- [~] Preview act (click/type/scroll proxy) — SRV preview.act — src/lib/preview-act/* ⟶ separate `hermes-browser` window (helpers/hermes-browser) driven via `hermes-core::browser`; preview.open/close events, preview.read and preview.act (back/forward/reload/click/type/scroll; no element refs, hover, press or annotations) answered by the app; end-to-end test vs a local page on a private broadway display 2026-10-17 (`tests/browser_helper.rs`); the agent round trip itself was not run (needs a model)
+- [~] Preview read (text extraction) — SRV preview.read — src/app/chat/right-rail/preview-reader.ts ⟶ separate `hermes-browser` window (helpers/hermes-browser) driven via `hermes-core::browser`; preview.open/close events, preview.read and preview.act (back/forward/reload/click/type/scroll; no element refs, hover, press or annotations) answered by the app; end-to-end test vs a local page on a private broadway display 2026-10-17 (`tests/browser_helper.rs`); the agent round trip itself was not run (needs a model)
 - [~] Preview restart — RPC preview.restart — src/app/session/hooks/use-preview-routing.ts ⟶ backend client ready in `api::sessions` (see docs/api/); UI not wired
 - [ ] Preview file viewer — local — src/app/chat/right-rail/preview-file.tsx
 - [ ] Preview script runner — local — src/app/chat/right-rail/preview-script-runner.ts

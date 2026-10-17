@@ -21,6 +21,7 @@ use serde_json::{Value, json};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
 use tokio::sync::mpsc;
 
+use crate::browser::BrowserCmd;
 use crate::capabilities::CapCmd;
 use crate::rows::to_row;
 use crate::{
@@ -412,6 +413,8 @@ struct Controller {
     caps: mpsc::UnboundedSender<CapCmd>,
     /// Images queued on the backend for the next turn of `session`.
     attachments: Vec<AttachedImage>,
+    /// The in-app browser's own task (`crate::browser`).
+    browser: mpsc::UnboundedSender<BrowserCmd>,
 }
 
 impl Controller {
@@ -446,8 +449,10 @@ impl Controller {
             let e = &backend.endpoint;
             crate::capabilities::spawn(Rest::new(e.host.clone(), e.port, e.token.clone()), weak.clone())
         };
+        let browser = crate::browser::spawn(client.clone(), weak.clone());
         let mut c = Controller {
             caps,
+            browser,
             attachments: Vec::new(),
             weak: weak.clone(),
             commands,
@@ -1378,6 +1383,19 @@ impl Controller {
                 ui(&self.weak, |w| w.set_effort_open(true));
                 return;
             }
+            // In-app browser (the app's own command; Hermes's /browser is the CDP connector).
+            "preview" if arg == "close" => {
+                let _ = self.browser.send(BrowserCmd::Close);
+                return;
+            }
+            "preview" if !arg.is_empty() => {
+                let _ = self.browser.send(BrowserCmd::Open(arg.to_owned()));
+                return;
+            }
+            "preview" => {
+                self.banner("Usage: /preview <url or file path>, or /preview close".into(), false);
+                return;
+            }
             "model" if arg.is_empty() => {
                 self.refresh_models().await;
                 ui(&self.weak, |w| w.set_picker_open(true));
@@ -1688,6 +1706,18 @@ impl Controller {
                 }
                 // The backend withdraws an open server request (timeout, Stop, another surface
                 // answered): tear the card down, or it would outlive the request.
+                // The agent's open_preview / close_preview tools.
+                if e.kind == "preview.open" {
+                    let url = e.payload.get("url").and_then(Value::as_str).unwrap_or_default();
+                    if !url.is_empty() {
+                        let _ = self.browser.send(BrowserCmd::Open(url.to_owned()));
+                    }
+                    return;
+                }
+                if e.kind == "preview.close" {
+                    let _ = self.browser.send(BrowserCmd::Close);
+                    return;
+                }
                 if e.kind == "request.cancel" {
                     let id = e.payload.get("id").and_then(Value::as_str).unwrap_or_default();
                     if self.pending_approval.as_deref() == Some(id) {
@@ -1773,8 +1803,18 @@ impl Controller {
                 };
                 ui(&self.weak, move |w| w.global::<AppState>().set_approval(info));
             }
+            // The agent reads / drives the in-app browser (read_preview, drive_preview).
+            "preview.read" => {
+                let _ = self.browser.send(BrowserCmd::Read { id, params });
+            }
+            "preview.act" => {
+                let sid = params.get("session_id").and_then(Value::as_str).unwrap_or_default();
+                let active =
+                    !sid.is_empty() && (self.session.as_deref() == Some(sid) || self.stored.as_deref() == Some(sid));
+                let _ = self.browser.send(BrowserCmd::Act { id, params, active });
+            }
             other => {
-                // Not yet implemented in this build (clarify, secret, sudo, preview.*): decline
+                // Not yet implemented in this build (clarify, secret, sudo): decline
                 // explicitly so the agent never hangs waiting. Tracked in docs/PARITY.md.
                 tracing::warn!(method = other, "declining unsupported server request");
                 self.client.respond(
