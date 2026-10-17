@@ -1,0 +1,1 @@
+//! In-app browser: control protocol for the separate `hermes-browser` helper program (line-delimited JSON over stdin/stdout), helper discovery and process handle, and the mapping between the backend's `preview.read` / `preview.act` server requests and helper commands. UI-free.

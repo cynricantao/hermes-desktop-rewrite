@@ -1,0 +1,1 @@
+//! Connecting to a Hermes gateway on another machine: URL normalisation, HTTP + WebSocket reachability probe, auth modes (token / OAuth), saved connection profiles. UI-free; the connection screen calls these.
