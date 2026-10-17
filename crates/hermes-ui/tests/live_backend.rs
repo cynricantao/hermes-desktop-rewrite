@@ -5,10 +5,12 @@
 //! Always allow, by click and by keyboard), a long (600-message) conversation, and the
 //! settings panel (registry nav, "Applies to" profile scope, saving, persistence, search).
 //!
-//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings` runs a subset. The
-//! `long` section
-//! needs a seeded session: `HERMES_HOME=<private home> scripts/seed-long-session.py 600`. The
-//! `sessions` section (open / switch / new chat / Ctrl+Tab, continue an old chat, switch while
+//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings,artifacts` runs a subset.
+//! The `long` section needs a seeded session:
+//! `HERMES_HOME=<private home> scripts/seed-long-session.py 600`. The `artifacts` section needs
+//! its fixtures too: `HERMES_HOME=<private home> scripts/seed-artifact-session.py` (default
+//! profile) and the same with `swe` (a second account, proving cross-profile rows).
+//! The `sessions` section (open / switch / new chat / Ctrl+Tab, continue an old chat, switch while
 //! streaming) needs three small labelled ones:
 //! `for l in SessA SessB SessC; do HERMES_HOME=<private home> scripts/seed-long-session.py 6 $l; done`.
 //! `HERMES_LIVE_NO_MODEL=1` skips its two model-call checks.
@@ -36,7 +38,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use hermes_ui::{AppState, AppWindow, SettingsState};
+use hermes_ui::{AppState, AppWindow, ArtifactsState, SettingsState};
 use i_slint_backend_testing::ElementHandle;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, Model, SharedString};
@@ -319,6 +321,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("settings") {
         settings_section(&ui, &log).await;
+    }
+    if want("artifacts") {
+        artifacts_section(&ui, &log).await;
     }
 }
 
@@ -1363,10 +1368,158 @@ fn row_value(ui: &AppWindow, id: &str) -> Option<String> {
         .map(|r| r.value.to_string())
 }
 
+/// The Artifacts library: sidebar entry → scan → tabs, search, pagination, thumbnails and
+/// the chat jump. Needs the seeded fixtures:
+/// `HERMES_HOME=<private home> scripts/seed-artifact-session.py default` and `… swe`.
+async fn artifacts_section(ui: &AppWindow, log: &Log) {
+    let a = ui.global::<ArtifactsState>();
+
+    // ── The sidebar entry opens the library (the path a user takes) ──────────────
+    let clicked = click(ui, "Artifacts").await;
+    let opened = clicked && wait_until(5, || a.get_open()).await;
+    record(
+        log,
+        "artifacts: the sidebar entry opens the library",
+        opened,
+        format!("clicked={clicked}, open={}", a.get_open()),
+    );
+
+    // ── The scan runs on its own task and reports progress ───────────────────────
+    let indexed = wait_until(30, || !a.get_loading() && a.get_count_all() > 0).await;
+    record(
+        log,
+        "artifacts: the library indexes the seeded chats",
+        indexed,
+        format!(
+            "{} all / {} images / {} files / {} links (status {:?})",
+            a.get_count_all(),
+            a.get_count_image(),
+            a.get_count_file(),
+            a.get_count_link(),
+            a.get_status().to_string()
+        ),
+    );
+    if !indexed {
+        return;
+    }
+
+    // ── Images render as cards, files/links as table rows ───────────────────────
+    let cards: Vec<hermes_ui::ArtifactCard> = a.get_cards().iter().collect();
+    let rows: Vec<hermes_ui::ArtifactRow> = a.get_rows().iter().collect();
+    let card_labels: Vec<String> = cards.iter().map(|c| c.label.to_string()).collect();
+    let row_labels: Vec<String> = rows.iter().map(|r| r.label.to_string()).collect();
+    record(
+        log,
+        "artifacts: the seeded images render as cards",
+        card_labels.iter().any(|l| l == "final_A1.jpg") && card_labels.iter().any(|l| l == "term-shot.png"),
+        format!("cards = {card_labels:?}"),
+    );
+    record(
+        log,
+        "artifacts: files and links render as table rows",
+        row_labels.iter().any(|l| l == "report.pdf") && row_labels.iter().any(|l| l == "final.html"),
+        format!("rows = {row_labels:?}"),
+    );
+    // The scan covers every profile, not just the one the sidebar lists.
+    let sessions: Vec<String> = cards.iter().map(|c| c.session.to_string()).collect();
+    record(
+        log,
+        "artifacts: rows from every profile share the library",
+        sessions.iter().any(|s| s.contains("(swe)")),
+        format!("session lines = {sessions:?}"),
+    );
+
+    // ── Range label + pagination controls ───────────────────────────────────────
+    let buttons: Vec<hermes_ui::PageButton> = a.get_image_pages().iter().collect();
+    record(
+        log,
+        "artifacts: the header shows the visible range and pagination",
+        a.get_image_range().to_string().contains("of") && buttons.len() >= 3 && buttons[0].label == "‹",
+        format!("range = {:?}, buttons = {:?}", a.get_image_range().to_string(), buttons.iter().map(|b| b.label.to_string()).collect::<Vec<_>>()),
+    );
+
+    // ── Tabs filter without changing the counts ─────────────────────────────────
+    a.invoke_filter_changed(1);
+    sleep(200).await;
+    record(
+        log,
+        "artifacts: the Images tab shows only the grid",
+        a.get_rows().row_count() == 0 && a.get_cards().row_count() > 0 && a.get_count_file() > 0,
+        format!("cards={}, rows={}, files count={}", a.get_cards().row_count(), a.get_rows().row_count(), a.get_count_file()),
+    );
+    a.invoke_filter_changed(3);
+    sleep(200).await;
+    record(
+        log,
+        "artifacts: the Links tab shows only links",
+        a.get_cards().row_count() == 0
+            && a.get_rows().row_count() == a.get_count_link() as usize
+            && a.get_rows().iter().all(|r| r.kind == "link"),
+        format!("rows={}, links count={}", a.get_rows().row_count(), a.get_count_link()),
+    );
+
+    // ── Search narrows the grid while the tab counts stay library-wide ──────────
+    a.invoke_filter_changed(0);
+    a.invoke_search_changed("final_A1".into());
+    sleep(200).await;
+    let hits: Vec<hermes_ui::ArtifactCard> = a.get_cards().iter().collect();
+    record(
+        log,
+        "artifacts: search narrows the grid, counts stay library-wide",
+        hits.len() == 1 && hits[0].label == "final_A1.jpg" && a.get_count_image() > 1,
+        format!("hits = {:?}, images count = {}", hits.iter().map(|c| c.label.to_string()).collect::<Vec<_>>(), a.get_count_image()),
+    );
+    a.invoke_search_changed("".into());
+    sleep(200).await;
+
+    // ── Thumbnails decode after the page data (batched on the UI thread) ────────
+    let thumbs = wait_until(10, || {
+        a.get_cards()
+            .iter()
+            .filter(|c| c.thumb.size().width > 0)
+            .count()
+            > 1
+    })
+    .await;
+    record(
+        log,
+        "artifacts: image thumbnails decode for the visible page",
+        thumbs,
+        format!(
+            "{}/{} cards have a decoded thumbnail",
+            a.get_cards().iter().filter(|c| c.thumb.size().width > 0).count(),
+            a.get_cards().row_count()
+        ),
+    );
+
+    // ── A row's Chat button opens the chat that produced it ─────────────────────
+    let chat_id = a
+        .get_cards()
+        .iter()
+        .find(|c| c.label == "final_A1.jpg")
+        .map(|c| c.chat.to_string())
+        .unwrap_or_default();
+    a.invoke_open_chat(chat_id.clone().into());
+    let st = ui.global::<AppState>();
+    let opened_chat = wait_until(20, || {
+        !a.get_open() && st.get_session_title().to_string().contains("Artifact fixture")
+    })
+    .await;
+    record(
+        log,
+        "artifacts: the Chat button opens the session that produced the row",
+        opened_chat && st.get_active_session().to_string() == chat_id,
+        format!("title = {:?}, active = {:?}", st.get_session_title().to_string(), st.get_active_session().to_string()),
+    );
+    if opened_chat {
+        st.invoke_new_chat();
+        sleep(200).await;
+    }
+}
+
 /// The settings panel, end to end against the private backend: the registry renders, the
 /// "Applies to" scope really switches profiles, an edit lands in that profile's config.yaml
 /// (and only there), a device pref survives on disk, and a search hit jumps to its page.
-///
 /// Driven through the same Slint callbacks the widgets call (`invoke_edit` …) plus the real
 /// Ctrl+, keybinding, so the controller wiring is exercised, not a mock.
 async fn settings_section(ui: &AppWindow, log: &Log) {

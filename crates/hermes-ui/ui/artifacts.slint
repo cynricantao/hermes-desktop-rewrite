@@ -1,0 +1,606 @@
+// Artifacts — the library page: every image, file and link the indexed chats produced.
+//
+// Modeled on the Electron desktop's Artifacts page (`src/app/artifacts/index.tsx`): a
+// search box, All / Images / Files / Links tabs with counts, an image grid (24 per page)
+// and a file/link table (100 per page) with Item · Location · Session columns. The
+// controller owns the data (it scans every session's transcript through the backend's
+// REST API — `hermes_core::artifacts`) and pushes the models below; the UI only sends
+// intents back.
+
+import { ScrollView } from "std-widgets.slint";
+import { Theme, Motion, Ease } from "theme.slint";
+import { IconButton, Spinner, PrimaryButton } from "components.slint";
+
+// ── Models the controller fills ────────────────────────────────────────────────
+
+/// One image card of the grid.
+export struct ArtifactCard {
+    /// Artifact id (`session:value`) — the row identity sent back on open.
+    id: string,
+    /// Stored session id that produced it — the "Chat" button's target.
+    chat: string,
+    /// Grid position on the page (0-based), so the cards place themselves without a
+    /// nested model: the original's auto-fill grid is six columns wide at panel size.
+    col: int,
+    row: int,
+    /// File name (the row title).
+    label: string,
+    /// Full path or URL (the row's location line).
+    value: string,
+    /// "Session title · 17 Oct, 13:24".
+    session: string,
+    kind: string,
+    /// Decoded thumbnail; empty until the controller loads it.
+    thumb: image,
+}
+
+/// One file/link table row.
+export struct ArtifactRow {
+    id: string,
+    chat: string,
+    label: string,
+    value: string,
+    session: string,
+    /// "file" or "link".
+    kind: string,
+}
+
+/// One pagination control: a page number, the arrows, or an ellipsis gap (`target == -1`).
+export struct PageButton {
+    label: string,
+    target: int,
+    active: bool,
+}
+
+export global ArtifactsState {
+    in-out property <bool> open: false;
+    in-out property <bool> loading: false;
+    /// Progress / partial-failure line next to the title (empty when idle).
+    in-out property <string> status: "";
+    in-out property <string> query: "";
+    /// 0 = all, 1 = images, 2 = files, 3 = links.
+    in-out property <int> filter: 0;
+
+    in-out property <int> count-all: 0;
+    in-out property <int> count-image: 0;
+    in-out property <int> count-file: 0;
+    in-out property <int> count-link: 0;
+
+    in-out property <[ArtifactCard]> cards;
+    in-out property <[ArtifactRow]> rows;
+    /// Height of the image grid container (rows of six), computed by the controller.
+    in-out property <length> image-height: 0px;
+    in-out property <string> image-range: "";
+    in-out property <string> file-range: "";
+    in-out property <[PageButton]> image-pages;
+    in-out property <[PageButton]> file-pages;
+    /// Column headers of the table, which follow the active tab.
+    in-out property <[string]> table-headers: ["Item", "Location", "Session"];
+
+    callback opened();
+    callback closed();
+    callback refresh();
+    callback search-changed(string);
+    callback filter-changed(int);
+    callback page-images(int);
+    callback page-files(int);
+    /// Open the chat that produced a row (stored session id).
+    callback open-chat(string);
+    /// Open one file/link artifact (its library id); links in the browser, files on disk.
+    callback open-item(string);
+}
+
+// ── Small parts ────────────────────────────────────────────────────────────────
+
+component TabButton inherits Rectangle {
+    in-out property <string> text;
+    in-out property <int> count: -1;
+    in-out property <bool> active: false;
+    callback clicked();
+
+    height: 34px;
+    width: tab.preferred-width + 20px;
+    background: tab.has-hover && !active ? Theme.hover : transparent;
+    border-radius: Theme.r-sm;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 6px;
+        Text {
+            text: root.text;
+            color: root.active ? Theme.text : Theme.text-2;
+            font-size: Theme.fs-md;
+            font-weight: root.active ? 600 : 400;
+            vertical-alignment: center;
+        }
+        if root.count >= 0: Text {
+            text: "\{root.count}";
+            color: Theme.text-4;
+            font-size: Theme.fs-xs;
+            vertical-alignment: center;
+        }
+    }
+    Rectangle {
+        x: 8px;
+        width: parent.width - 16px;
+        height: 2px;
+        y: parent.height - 3px;
+        border-radius: 1px;
+        background: Theme.accent;
+        visible: root.active;
+    }
+    tab := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component PageChip inherits Rectangle {
+    in-out property <PageButton> item;
+    callback picked(int);
+
+    height: 24px;
+    width: item.label == "…" ? 20px : max(26px, body.preferred-width + 14px);
+    border-radius: Theme.r-sm;
+    background: item.active ? Theme.interactive.with-alpha(0.16) : ta.has-hover ? Theme.hover : transparent;
+    border-width: item.active ? 1px : 0px;
+    border-color: Theme.interactive.with-alpha(0.55);
+
+    body := Text {
+        text: item.label;
+        color: item.active ? Theme.interactive : Theme.text-3;
+        font-size: Theme.fs-xs;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+        x: 0;
+        width: parent.width;
+        height: parent.height;
+    }
+    ta := TouchArea {
+        enabled: item.target >= 0;
+        mouse-cursor: pointer;
+        clicked => { picked(item.target); }
+    }
+}
+
+component RangeLabel inherits Text {
+    color: Theme.text-4;
+    font-size: Theme.fs-xs;
+    vertical-alignment: center;
+}
+
+// ── The page (components above must precede their use in Slint) ───────────────────────────────────────────────────────────────────
+
+component ArtifactsIndexing inherits Rectangle {
+    VerticalLayout {
+        alignment: center;
+        spacing: 10px;
+        HorizontalLayout {
+            alignment: center;
+            Spinner { size: 20px; }
+        }
+        Text {
+            text: "Indexing artifacts…";
+            color: Theme.text-3;
+            font-size: Theme.fs-md;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+component ArtifactsEmpty inherits Rectangle {
+    VerticalLayout {
+        alignment: center;
+        spacing: 4px;
+        Text {
+            text: "No artifacts";
+            color: Theme.text;
+            font-size: Theme.fs-md;
+            font-weight: 600;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: "Images, files and links produced in your chats appear here.";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+component ArtifactsNoMatch inherits Rectangle {
+    VerticalLayout {
+        alignment: center;
+        spacing: 4px;
+        Text {
+            text: "No artifacts match";
+            color: Theme.text;
+            font-size: Theme.fs-md;
+            font-weight: 600;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: "Try a different search or tab.";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+component ArtifactCardView inherits Rectangle {
+    in-out property <ArtifactCard> card;
+    callback open-chat(string);
+
+    height: 178px;
+    border-radius: Theme.r-md;
+    border-width: 1px;
+    border-color: Theme.border;
+    background: Theme.raised.with-alpha(0.5);
+    clip: true;
+
+    VerticalLayout {
+        padding: 6px;
+        spacing: 5px;
+        Rectangle {
+            height: 92px;
+            border-radius: Theme.r-sm;
+            background: Theme.bg.with-alpha(0.6);
+            Image {
+                source: card.thumb;
+                width: parent.width - 8px;
+                height: parent.height - 8px;
+                image-fit: contain;
+            }
+        }
+        Text {
+            text: card.kind + "  ·  " + card.label;
+            color: Theme.text;
+            font-size: Theme.fs-sm;
+            font-weight: 600;
+            overflow: elide;
+        }
+        Text {
+            text: card.value;
+            color: Theme.text-3;
+            font-size: Theme.fs-xs;
+            overflow: elide;
+        }
+        Text {
+            text: card.session;
+            color: Theme.text-4;
+            font-size: Theme.fs-xs;
+            overflow: elide;
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            Rectangle { horizontal-stretch: 1; }
+            PrimaryButton {
+                text: "Chat";
+                height: 20px;
+                clicked => { open-chat(card.chat); }
+            }
+        }
+    }
+}
+
+component ArtifactTableRow inherits Rectangle {
+    in-out property <ArtifactRow> item;
+    callback open-item(string);
+    callback open-chat(string);
+    callback copy-path(string);
+
+    height: 34px;
+    background: hover.has-hover ? Theme.hover : transparent;
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
+        Text {
+            text: item.label;
+            width: 35%;
+            color: Theme.text-2;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        Text {
+            text: item.value;
+            width: 41%;
+            color: Theme.text-4;
+            font-size: Theme.fs-xs;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        Text {
+            text: item.session;
+            horizontal-stretch: 1;
+            color: Theme.text-3;
+            font-size: Theme.fs-xs;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        IconButton {
+            y: 5px;
+            icon-size: 13px;
+            icon: @image-url("../../../assets/icons/copy.svg");
+            tooltip: item.kind == "link" ? "Copy URL" : "Copy path";
+            clicked => { copy-path(item.value); }
+        }
+    }
+    hover := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { open-item(item.id); }
+    }
+    // The session cell is its own click target (opens the chat that produced the row).
+    TouchArea {
+        x: parent.width * 0.76;
+        width: parent.width * 0.24;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { open-chat(item.chat); }
+    }
+}
+
+export component ArtifactsPage inherits Rectangle {
+    in-out property <bool> open <=> ArtifactsState.open;
+    property <float> t: open ? 1 : 0;
+    animate t { duration: open ? Motion.base : Motion.exit; easing: Ease.standard; }
+    visible: t > 0.001;
+
+    // Clipboard is a hidden TextInput: Slint has no clipboard API (see the repo notes).
+    clip := TextInput { visible: false; width: 0px; height: 0px; }
+
+    Rectangle {
+        background: Theme.scrim;
+        opacity: root.t;
+        TouchArea { clicked => { ArtifactsState.open = false; } }
+    }
+
+    card := Rectangle {
+        width: min(root.width - 80px, 1100px);
+        height: min(root.height - 80px, 760px);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        opacity: root.t;
+        border-radius: Theme.r-lg;
+        background: Theme.bg;
+        border-width: 1px;
+        border-color: Theme.border-strong;
+        drop-shadow-blur: 40px;
+        drop-shadow-offset-y: 12px;
+        drop-shadow-color: #00000080;
+        clip: true;
+        TouchArea {} // swallow clicks so they don't close the page
+
+        VerticalLayout {
+            padding: 0px;
+            spacing: 0px;
+
+            // Header: title, status, search, refresh, close.
+            HorizontalLayout {
+                padding-left: 18px;
+                padding-right: 12px;
+                padding-top: 12px;
+                spacing: 10px;
+                Text {
+                    text: "Artifacts";
+                    color: Theme.text;
+                    font-size: Theme.fs-lg;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: ArtifactsState.status;
+                    color: Theme.text-4;
+                    font-size: Theme.fs-xs;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                }
+                search := Rectangle {
+                    width: 240px;
+                    height: 30px;
+                    border-radius: Theme.r-md;
+                    border-width: 1px;
+                    border-color: field.has-focus ? Theme.border-strong : Theme.border;
+                    background: Theme.bg.with-alpha(0.4);
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 6px;
+                        Image {
+                            source: @image-url("../../../assets/icons/search.svg");
+                            width: 13px;
+                            height: 13px;
+                            y: 8px;
+                            colorize: Theme.text-3;
+                        }
+                        field := TextInput {
+                            text <=> ArtifactsState.query;
+                            font-size: Theme.fs-md;
+                            color: Theme.text;
+                            vertical-alignment: center;
+                            single-line: true;
+                            accessible-label: "Search artifacts";
+                            edited => { ArtifactsState.search-changed(self.text); }
+                            Text {
+                                visible: parent.text == "";
+                                text: "Search artifacts";
+                                color: Theme.text-3;
+                                font-size: Theme.fs-md;
+                                vertical-alignment: center;
+                                height: parent.height;
+                            }
+                        }
+                    }
+                }
+                IconButton {
+                    y: 4px;
+                    opacity: ArtifactsState.loading ? 0.4 : 1;
+                    icon: @image-url("../../../assets/icons/refresh-cw.svg");
+                    tooltip: "Refresh";
+                    clicked => { ArtifactsState.refresh(); }
+                }
+                IconButton {
+                    y: 4px;
+                    icon: @image-url("../../../assets/icons/x.svg");
+                    tooltip: "Close";
+                    clicked => { ArtifactsState.open = false; }
+                }
+            }
+
+            // Tabs with counts.
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                padding-top: 6px;
+                spacing: 4px;
+                TabButton {
+                    text: "All";
+                    count: ArtifactsState.count-all;
+                    active: ArtifactsState.filter == 0;
+                    clicked => { ArtifactsState.filter-changed(0); }
+                }
+                TabButton {
+                    text: "Images";
+                    count: ArtifactsState.count-image;
+                    active: ArtifactsState.filter == 1;
+                    clicked => { ArtifactsState.filter-changed(1); }
+                }
+                TabButton {
+                    text: "Files";
+                    count: ArtifactsState.count-file;
+                    active: ArtifactsState.filter == 2;
+                    clicked => { ArtifactsState.filter-changed(2); }
+                }
+                TabButton {
+                    text: "Links";
+                    count: ArtifactsState.count-link;
+                    active: ArtifactsState.filter == 3;
+                    clicked => { ArtifactsState.filter-changed(3); }
+                }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            Rectangle { height: 1px; background: Theme.border; }
+
+            // Body. A Slint element conditional takes no `else`, so each empty state is a
+            // sibling gated by `visible`, and only the list itself uses `if`.
+            ArtifactsIndexing { visible: ArtifactsState.loading && ArtifactsState.count-all == 0; }
+            ArtifactsEmpty { visible: !ArtifactsState.loading && ArtifactsState.count-all == 0; }
+            ArtifactsNoMatch {
+                visible: ArtifactsState.count-all > 0
+                    && ArtifactsState.cards.length == 0 && ArtifactsState.rows.length == 0;
+            }
+            if ArtifactsState.cards.length > 0 || ArtifactsState.rows.length > 0: ScrollView {
+                vertical-stretch: 1;
+                content-width: card.width;
+                VerticalLayout {
+                    padding-bottom: 16px;
+                    spacing: 10px;
+
+                    if ArtifactsState.cards.length > 0: section := VerticalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        padding-top: 6px;
+                        spacing: 6px;
+                        HorizontalLayout {
+                            height: 24px;
+                            RangeLabel { text: ArtifactsState.image-range; }
+                            Rectangle { horizontal-stretch: 1; }
+                            for page in ArtifactsState.image-pages: PageChip {
+                                item: page;
+                                picked(n) => { ArtifactsState.page-images(n); }
+                            }
+                        }
+                        // Fixed six columns; the card's `index` places it, so the last row
+                        // stays left-aligned exactly like the original's auto-fill grid.
+                        grid := Rectangle {
+                            height: ArtifactsState.image-height;
+                            for item in ArtifactsState.cards: ArtifactCardView {
+                                card: item;
+                                width: (grid.width - 5 * 8px) / 6;
+                                height: 178px;
+                                x: item.col * ((grid.width - 5 * 8px) / 6 + 8px);
+                                y: item.row * 186px;
+                                open-chat(id) => { ArtifactsState.open-chat(id); }
+                            }
+                        }
+                    }
+
+                    if ArtifactsState.rows.length > 0: list := VerticalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        padding-top: 4px;
+                        spacing: 6px;
+                        HorizontalLayout {
+                            height: 24px;
+                            RangeLabel { text: ArtifactsState.file-range; }
+                            Rectangle { horizontal-stretch: 1; }
+                            for page in ArtifactsState.file-pages: PageChip {
+                                item: page;
+                                picked(n) => { ArtifactsState.page-files(n); }
+                            }
+                        }
+                        Rectangle {
+                            height: head.preferred-height + body-rows.preferred-height + 2px;
+                            border-radius: Theme.r-md;
+                            border-width: 1px;
+                            border-color: Theme.border;
+                            background: Theme.raised.with-alpha(0.5);
+                            clip: true;
+                            VerticalLayout {
+                                padding: 0px;
+                                spacing: 0px;
+                                head := HorizontalLayout {
+                                    height: 26px;
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    spacing: 8px;
+                                    Text {
+                                        text: ArtifactsState.table-headers[0];
+                                        width: 35%;
+                                        color: Theme.text-4;
+                                        font-size: Theme.fs-xs;
+                                        vertical-alignment: center;
+                                    }
+                                    Text {
+                                        text: ArtifactsState.table-headers[1];
+                                        width: 41%;
+                                        color: Theme.text-4;
+                                        font-size: Theme.fs-xs;
+                                        vertical-alignment: center;
+                                    }
+                                    Text {
+                                        text: ArtifactsState.table-headers[2];
+                                        horizontal-stretch: 1;
+                                        color: Theme.text-4;
+                                        font-size: Theme.fs-xs;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                Rectangle { height: 1px; background: Theme.border; }
+                                body-rows := VerticalLayout {
+                                    padding: 0px;
+                                    spacing: 0px;
+                                    for row in ArtifactsState.rows: ArtifactTableRow {
+                                        item: row;
+                                        copy-path(p) => { clip.text = p; clip.select-all(); clip.copy(); clip.clear-selection(); }
+                                        open-item(id) => { ArtifactsState.open-item(id); }
+                                        open-chat(id) => { ArtifactsState.open-chat(id); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+
+

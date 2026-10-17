@@ -5,10 +5,11 @@ import { Theme, Motion, Ease, ThemeMode } from "theme.slint";
 import { Icon, IconButton, NavItem, SectionHeader, Chip, Banner, Spinner, Toggle, Segmented, PrimaryButton, GhostButton } from "components.slint";
 import { Transcript, Composer, ChatRow, ToolRow } from "chat.slint";
 import { SettingsModal, SettingsState } from "settings.slint";
+import { ArtifactsPage, ArtifactsState, ArtifactCard, ArtifactRow, PageButton } from "artifacts.slint";
 
 import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
 
-export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState }
+export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, ArtifactsState, ArtifactCard, ArtifactRow, PageButton }
 
 export struct SessionItem {
     id: string,
@@ -137,7 +138,7 @@ component Sidebar inherits Rectangle {
             text: ProjectState.active-name != "" ? ProjectState.active-name : "Projects";
             clicked => { ProjectState.open = true; ProjectState.refresh(); }
         }
-        NavItem { icon: @image-url("../../../assets/icons/box.svg"); text: "Artifacts"; clicked => { AppState.banner = "Artifact browsing is not available in this preview yet."; AppState.banner-error = false; } }
+        NavItem { icon: @image-url("../../../assets/icons/box.svg"); text: "Artifacts"; selected: ArtifactsState.open; clicked => { ArtifactsState.open = true; } }
         NavItem { icon: @image-url("../../../assets/icons/clock.svg"); text: "Scheduled"; clicked => { AppState.banner = "Scheduled-job management is not available in this preview yet."; AppState.banner-error = false; } }
         NavItem { icon: @image-url("../../../assets/icons/sliders-horizontal.svg"); text: "Customize"; clicked => { root.open-settings(); } }
 
@@ -320,6 +321,16 @@ export component AppWindow inherits Window {
             SettingsState.closed();
         }
     }
+    // Same pattern for the Artifacts library: the controller loads and indexes the
+    // moment the page opens, and drops its progress line when it closes.
+    in-out property <bool> artifacts-open <=> ArtifactsState.open;
+    changed artifacts-open => {
+        if artifacts-open {
+            ArtifactsState.opened();
+        } else {
+            ArtifactsState.closed();
+        }
+    }
     in-out property <bool> picker-open: false;
     in-out property <bool> effort-open: false;
     property <bool> empty: AppState.rows.length == 0;
@@ -345,6 +356,7 @@ export component AppWindow inherits Window {
                 if ProjectState.open { ProjectState.open = false; return accept; }
                 if root.effort-open { root.effort-open = false; return accept; }
                 if root.settings-open { root.settings-open = false; return accept; }
+                if root.artifacts-open { root.artifacts-open = false; return accept; }
                 if root.picker-open { root.picker-open = false; return accept; }
             }
             // Approval card keys (same as the Electron app's approval-keys.ts): Esc denies,
@@ -525,6 +537,11 @@ export component AppWindow inherits Window {
         }
 
         ProjectsModal { width: root.width; height: root.height; }
+
+        ArtifactsPage {
+            width: root.width;
+            height: root.height;
+        }
 
         SettingsModal {
             width: root.width;

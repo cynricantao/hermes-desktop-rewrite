@@ -12,7 +12,10 @@
 //! * [`highlight`] — syntect-backed code highlighting on a background thread, with a
 //!   bounded content-keyed cache and per-stream checkpoint resume.
 //! * [`sessions`] — session-list grouping helpers.
+//! * [`artifacts`] — the Artifacts library: which images/files/links every session's
+//!   transcript produced, across all profiles (REST scan, pure value rules).
 
+pub mod artifacts;
 pub mod backend;
 pub mod diff;
 pub mod highlight;

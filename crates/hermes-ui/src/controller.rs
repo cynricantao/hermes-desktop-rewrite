@@ -22,8 +22,9 @@ use tokio::sync::mpsc;
 
 use crate::rows::to_row;
 use crate::{
-    AppState, AppWindow, ApprovalInfo, ChatRow, ModelItem, NavEntry, ProjectItem, ProjectState, ScopeChip, SearchHit,
-    SessionItem, SettingRowUI, SettingsState, Theme,
+    AppState, AppWindow, ApprovalInfo, ArtifactCard, ArtifactRow, ArtifactsState, ChatRow, ModelItem,
+    NavEntry, PageButton, ProjectItem, ProjectState, ScopeChip, SearchHit, SessionItem, SettingRowUI,
+    SettingsState, Theme,
 };
 
 /// Commands from the UI thread to the controller.
@@ -64,6 +65,211 @@ pub enum Cmd {
         choice: String,
     },
     Settings(SettingsCmd),
+    Artifacts(ArtifactsCmd),
+}
+
+/// Artifacts-library intents from the UI (see `ui/artifacts.slint`).
+#[derive(Debug, Clone)]
+pub enum ArtifactsCmd {
+    /// The page opened (sidebar click, or the dev hook).
+    Opened,
+    Closed,
+    /// One session of the scan finished (`done` of `total`); `scan` discards stale runs.
+    Progress {
+        scan: u64,
+        done: usize,
+        total: usize,
+    },
+    /// The scan finished on its own task; carries the whole library.
+    Loaded {
+        scan: u64,
+        loaded: Box<hermes_core::artifacts::Loaded>,
+    },
+    /// The scan could not even list the sessions.
+    Failed {
+        scan: u64,
+        error: String,
+    },
+    Search(String),
+    Filter(usize),
+    Refresh,
+    PageImages(usize),
+    PageFiles(usize),
+    /// Open the chat that produced an artifact (stored id).
+    OpenChat(String),
+    /// Open one file/link artifact by its library id.
+    OpenItem(String),
+}
+
+/// Images per grid page (the original's `imagePageCount`).
+const IMAGE_PAGE: usize = 24;
+/// Files/links per table page (the original's `filePageCount`).
+const FILE_PAGE: usize = 100;
+/// Grid columns: the original's `minmax(11rem, 1fr)` lands on six at the panel's width.
+const IMAGE_COLUMNS: usize = 6;
+/// Grid geometry, mirrored by `ui/artifacts.slint` (card height + gap).
+const CARD_ROW_HEIGHT: usize = 186;
+
+/// A row of the controller-side library the publisher hands to the UI thread.
+#[derive(Debug, Clone, PartialEq)]
+struct CardSpec {
+    id: String,
+    chat: String,
+    index: usize,
+    label: String,
+    value: String,
+    session: String,
+    kind: String,
+    /// Local file to decode as the thumbnail; `None` when it is not a readable file.
+    thumb: Option<std::path::PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct RowSpec {
+    id: String,
+    chat: String,
+    label: String,
+    value: String,
+    session: String,
+    kind: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ButtonSpec {
+    label: String,
+    target: i32,
+    active: bool,
+}
+
+fn page_count(total: usize, page_size: usize) -> usize {
+    total.div_ceil(page_size.max(1)).max(1)
+}
+
+fn page_slice<'a, T>(items: &[&'a T], page: usize, page_size: usize) -> Vec<&'a T> {
+    let start = (page.max(1) - 1) * page_size;
+    items.iter().skip(start).take(page_size).copied().collect()
+}
+
+/// Rows a grid of `count` cards occupies (six per row).
+fn rows_of(count: usize, per_row: usize) -> usize {
+    count.div_ceil(per_row.max(1))
+}
+
+/// "1–24 of 113 images" — the original's `rangeOf` label. Empty for an empty list.
+pub fn range_label(page: usize, page_size: usize, total: usize, unit: &str) -> String {
+    if total == 0 {
+        return String::new();
+    }
+    let start = (page.max(1) - 1) * page_size + 1;
+    let end = (page * page_size).min(total);
+    format!("{start}–{end} of {total} {unit}")
+}
+
+/// Pagination controls with the original's window: arrows, then 1 … n±1 … N.
+/// `target == -1` renders as an inert gap (an ellipsis or a disabled arrow).
+pub fn page_buttons(page: usize, pages: usize) -> Vec<ButtonSpec> {
+    let pages = pages.max(1);
+    let mut out = vec![ButtonSpec {
+        label: "‹".into(),
+        target: if page > 1 { page as i32 - 1 } else { -1 },
+        active: false,
+    }];
+    let numbers: Vec<usize> = if pages <= 7 {
+        (1..=pages).collect()
+    } else {
+        let mut items = vec![1usize];
+        let start = page.saturating_sub(1).max(2);
+        let end = (page + 1).min(pages - 1);
+        if start > 2 {
+            items.push(0); // ellipsis
+        }
+        for n in start..=end {
+            items.push(n);
+        }
+        if end < pages - 1 {
+            items.push(0);
+        }
+        items.push(pages);
+        items
+    };
+    for n in numbers {
+        if n == 0 {
+            out.push(ButtonSpec { label: "…".into(), target: -1, active: false });
+        } else {
+            out.push(ButtonSpec { label: n.to_string(), target: n as i32, active: n == page });
+        }
+    }
+    out.push(ButtonSpec {
+        label: "›".into(),
+        target: if page < pages { page as i32 + 1 } else { -1 },
+        active: false,
+    });
+    out
+}
+
+/// "17 Oct, 13:24" — the timestamp half of a card's "session · time" line.
+pub fn stamp(ms: f64) -> String {
+    use chrono::{Local, TimeZone};
+    let secs = (ms / 1000.0) as i64;
+    match Local.timestamp_opt(secs, 0).single() {
+        Some(t) => t.format("%d %b, %H:%M").to_string(),
+        None => String::new(),
+    }
+}
+
+/// Hand a file/link to the desktop's opener (the original calls `shell.openExternal`).
+fn open_external(target: &str) -> Result<(), String> {
+    std::process::Command::new("xdg-open")
+        .arg(target)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// Decode thumbnails for one page in small batches on the UI thread.
+///
+/// Slint's `Image` can only be built on the UI thread, and decoding a whole page of
+/// full-size screenshots in one callback would stall a frame; each batch re-posts the
+/// remainder through the event loop so the window keeps painting between batches.
+fn load_thumbs(weak: &Weak<AppWindow>, items: Vec<(usize, std::path::PathBuf)>) {
+    if items.is_empty() {
+        return;
+    }
+    const BATCH: usize = 3;
+    let weak = weak.clone();
+    let _ = weak.clone().upgrade_in_event_loop(move |_| {
+        let mut batch: Vec<(usize, std::path::PathBuf)> = Vec::new();
+        let mut rest: Vec<(usize, std::path::PathBuf)> = Vec::new();
+        for (i, item) in items.into_iter().enumerate() {
+            if i < BATCH {
+                batch.push(item);
+            } else {
+                rest.push(item);
+            }
+        }
+        if let Some(w) = weak.upgrade() {
+            let st = w.global::<ArtifactsState>();
+            let cards = st.get_cards();
+            if let Some(vm) = cards.as_any().downcast_ref::<VecModel<ArtifactCard>>() {
+                for (index, path) in batch {
+                    let Some(mut card) = vm.row_data(index) else { continue };
+                    match slint::Image::load_from_path(&path) {
+                        Ok(image) => {
+                            card.thumb = image;
+                            vm.set_row_data(index, card);
+                        }
+                        Err(e) => tracing::debug!("thumbnail {path:?}: {e}"),
+                    }
+                }
+            }
+        }
+        if !rest.is_empty() {
+            load_thumbs(&weak, rest);
+        }
+    });
 }
 
 /// Settings-panel intents from the UI (see `ui/settings.slint`).
@@ -250,6 +456,45 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
         let _ = t.send(Cmd::Settings(SettingsCmd::Reset));
     });
 
+    // Artifacts library (ui/artifacts.slint).
+    let a = ui.global::<ArtifactsState>();
+    let t = tx.clone();
+    a.on_opened(move || {
+        let _ = t.send(Cmd::Artifacts(ArtifactsCmd::Opened));
+    });
+    let t = tx.clone();
+    a.on_closed(move || {
+        let _ = t.send(Cmd::Artifacts(ArtifactsCmd::Closed));
+    });
+    let t = tx.clone();
+    a.on_refresh(move || {
+        let _ = t.send(Cmd::Artifacts(ArtifactsCmd::Refresh));
+    });
+    let t = tx.clone();
+    a.on_search_changed(move |q| {
+        let _ = t.send(Cmd::Artifacts(ArtifactsCmd::Search(q.into())));
+    });
+    let t = tx.clone();
+    a.on_filter_changed(move |f| {
+        let _ = t.send(Cmd::Artifacts(ArtifactsCmd::Filter(f as usize)));
+    });
+    let t = tx.clone();
+    a.on_page_images(move |p| {
+        let _ = t.send(Cmd::Artifacts(ArtifactsCmd::PageImages(p.max(0) as usize)));
+    });
+    let t = tx.clone();
+    a.on_page_files(move |p| {
+        let _ = t.send(Cmd::Artifacts(ArtifactsCmd::PageFiles(p.max(0) as usize)));
+    });
+    let t = tx.clone();
+    a.on_open_chat(move |id| {
+        let _ = t.send(Cmd::Artifacts(ArtifactsCmd::OpenChat(id.into())));
+    });
+    let t = tx.clone();
+    a.on_open_item(move |id| {
+        let _ = t.send(Cmd::Artifacts(ArtifactsCmd::OpenItem(id.into())));
+    });
+
     ui.global::<AppState>()
         .set_greeting(greeting_for_hour(local_hour()).into());
     ui.global::<AppState>().set_user_name(user_name().into());
@@ -347,6 +592,20 @@ struct Controller {
     settings_hit: String,
     /// Set while a Reset click is waiting for its confirmation click.
     reset_armed: bool,
+    /// Artifacts library: every row the last scan produced (newest first).
+    artifacts: Vec<hermes_core::artifacts::Artifact>,
+    artifact_query: String,
+    /// 0 = all, 1 = images, 2 = files, 3 = links.
+    artifact_filter: usize,
+    artifact_loading: bool,
+    /// Sessions scanned so far and how many the scan will walk.
+    artifact_progress: (usize, usize),
+    /// Sessions whose transcript could not be read.
+    artifact_failed: usize,
+    artifact_image_page: usize,
+    artifact_file_page: usize,
+    /// Bumped per scan so a stale task's result is ignored (refresh mid-scan).
+    artifact_gen: u64,
 }
 
 impl Controller {
@@ -405,6 +664,15 @@ impl Controller {
             settings_page: ("appearance".into(), "general".into()),
             settings_hit: String::new(),
             reset_armed: false,
+            artifacts: Vec::new(),
+            artifact_query: String::new(),
+            artifact_filter: 0,
+            artifact_loading: false,
+            artifact_progress: (0, 0),
+            artifact_failed: 0,
+            artifact_image_page: 1,
+            artifact_file_page: 1,
+            artifact_gen: 0,
         };
         ui(&weak, |w| {
             let st = w.global::<AppState>();
@@ -461,6 +729,10 @@ impl Controller {
             && !p.trim().is_empty()
         {
             c.send(p).await;
+        }
+        // Dev/screenshot hook: open the Artifacts library once connected.
+        if std::env::var("HERMES_DESKTOP_OPEN_ARTIFACTS").is_ok_and(|v| !v.is_empty() && v != "0") {
+            ui(&weak, |w| w.global::<ArtifactsState>().set_open(true));
         }
 
         let mut tick = tokio::time::interval(FRAME);
@@ -690,6 +962,7 @@ impl Controller {
                 });
             }
             Cmd::Settings(cmd) => self.settings_cmd(cmd).await,
+            Cmd::Artifacts(cmd) => self.artifacts_cmd(cmd).await,
         }
     }
 
@@ -1470,14 +1743,20 @@ impl Controller {
     }
 
     async fn open(&mut self, stored_id: String) {
-        if self.stored.as_deref() == Some(stored_id.as_str()) {
+        self.open_scoped(stored_id, None).await;
+    }
+
+    /// Open a stored chat. `profile` scopes the resume to another account's store — the
+    /// Artifacts library indexes every profile, while the sidebar only lists the default one.
+    async fn open_scoped(&mut self, stored_id: String, profile: Option<String>) {
+        if profile.is_none() && self.stored.as_deref() == Some(stored_id.as_str()) {
             return;
         }
-        match self
-            .client
-            .call::<SessionResumeResult>("session.resume", json!({"session_id": stored_id, "source": "desktop"}))
-            .await
-        {
+        let mut params = json!({"session_id": stored_id, "source": "desktop"});
+        if let Some(p) = &profile {
+            params["profile"] = json!(p);
+        }
+        match self.client.call::<SessionResumeResult>("session.resume", params).await {
             Ok(r) => {
                 self.draft_model = None;
                 self.draft_effort = None;
@@ -1681,6 +1960,299 @@ impl Controller {
             w.global::<AppState>()
                 .set_sessions(Rc::new(VecModel::from(items)).into());
         });
+    }
+
+    // ── Artifacts library ─────────────────────────────────────────────────────
+
+    async fn artifacts_cmd(&mut self, cmd: ArtifactsCmd) {
+        match cmd {
+            ArtifactsCmd::Opened => {
+                // Show whatever the last scan produced immediately; index when we have
+                // nothing yet (the page's Refresh re-runs it on demand).
+                self.publish_artifacts();
+                if self.artifacts.is_empty() && !self.artifact_loading {
+                    self.artifacts_scan();
+                }
+            }
+            ArtifactsCmd::Closed => {
+                self.publish_artifacts_status();
+            }
+            ArtifactsCmd::Progress { scan, done, total } => {
+                if scan != self.artifact_gen {
+                    return;
+                }
+                self.artifact_progress = (done, total);
+                self.publish_artifacts_status();
+            }
+            ArtifactsCmd::Loaded { scan, loaded } => {
+                if scan != self.artifact_gen {
+                    return;
+                }
+                self.artifact_loading = false;
+                self.artifacts = loaded.artifacts;
+                self.artifact_failed = loaded.failed;
+                self.artifact_image_page = 1;
+                self.artifact_file_page = 1;
+                self.publish_artifacts();
+            }
+            ArtifactsCmd::Failed { scan, error } => {
+                if scan != self.artifact_gen {
+                    return;
+                }
+                self.artifact_loading = false;
+                self.banner(format!("Could not index artifacts: {error}"), true);
+                self.publish_artifacts_status();
+            }
+            ArtifactsCmd::Search(q) => {
+                self.artifact_query = q;
+                self.artifact_image_page = 1;
+                self.artifact_file_page = 1;
+                self.publish_artifacts();
+            }
+            ArtifactsCmd::Filter(f) => {
+                self.artifact_filter = f.min(3);
+                self.artifact_image_page = 1;
+                self.artifact_file_page = 1;
+                self.publish_artifacts();
+            }
+            ArtifactsCmd::Refresh => self.artifacts_scan(),
+            ArtifactsCmd::PageImages(p) => {
+                self.artifact_image_page = p.max(1);
+                self.publish_artifacts();
+            }
+            ArtifactsCmd::PageFiles(p) => {
+                self.artifact_file_page = p.max(1);
+                self.publish_artifacts();
+            }
+            ArtifactsCmd::OpenChat(id) => {
+                ui(&self.weak, |w| w.global::<ArtifactsState>().set_open(false));
+                let profile = self
+                    .artifacts
+                    .iter()
+                    .find(|a| a.session_id == id)
+                    .map(|a| a.profile.clone())
+                    .filter(|p| p != "default");
+                self.open_scoped(id, profile).await;
+            }
+            ArtifactsCmd::OpenItem(id) => {
+                let Some(row) = self.artifacts.iter().find(|a| a.id == id) else {
+                    return;
+                };
+                let target = hermes_core::artifacts::local_path(&row.value)
+                    .filter(|p| p.exists())
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| row.value.clone());
+                if let Err(e) = open_external(&target) {
+                    self.banner(format!("Could not open {}: {e}", row.label), true);
+                }
+            }
+        }
+    }
+
+    /// Start an indexing run on its own task; progress and the result come back as
+    /// commands so the UI thread and the transcript stream never wait for the scan.
+    fn artifacts_scan(&mut self) {
+        let Some(rest) = self.rest() else { return };
+        self.artifact_gen += 1;
+        let scan = self.artifact_gen;
+        self.artifact_loading = true;
+        self.artifact_progress = (0, 0);
+        self.publish_artifacts_status();
+        let tx = self.commands.clone();
+        tokio::spawn(async move {
+            let ticker = tx.clone();
+            let result = hermes_core::artifacts::load(
+                &rest,
+                hermes_core::artifacts::MAX_SESSIONS,
+                move |done, total| {
+                    let _ = ticker.send(Cmd::Artifacts(ArtifactsCmd::Progress { scan, done, total }));
+                },
+            )
+            .await;
+            let msg = match result {
+                Ok(loaded) => ArtifactsCmd::Loaded { scan, loaded: Box::new(loaded) },
+                Err(e) => ArtifactsCmd::Failed { scan, error: e.to_string() },
+            };
+            let _ = tx.send(Cmd::Artifacts(msg));
+        });
+    }
+
+    fn publish_artifacts_status(&self) {
+        let (done, total) = self.artifact_progress;
+        let (loading, failed) = (self.artifact_loading, self.artifact_failed);
+        ui(&self.weak, move |w| {
+            let st = w.global::<ArtifactsState>();
+            st.set_loading(loading);
+            let status = if loading {
+                if total == 0 {
+                    "Indexing artifacts…".to_owned()
+                } else {
+                    format!("Indexing artifacts… {done}/{total} chats")
+                }
+            } else if failed > 0 {
+                format!("{failed} chats could not be read")
+            } else {
+                String::new()
+            };
+            st.set_status(status.into());
+        });
+    }
+
+    /// Filter, paginate and push both models, then start the thumbnail loads.
+    fn publish_artifacts(&self) {
+        let query = self.artifact_query.trim().to_lowercase();
+        let filter = self.artifact_filter;
+        let matches = |a: &hermes_core::artifacts::Artifact| {
+            let kind_ok = match filter {
+                1 => a.kind == hermes_core::artifacts::Kind::Image,
+                2 => a.kind == hermes_core::artifacts::Kind::File,
+                3 => a.kind == hermes_core::artifacts::Kind::Link,
+                _ => true,
+            };
+            kind_ok
+                && (query.is_empty()
+                    || a.label.to_lowercase().contains(&query)
+                    || a.value.to_lowercase().contains(&query)
+                    || a.session_title.to_lowercase().contains(&query))
+        };
+        let visible: Vec<&hermes_core::artifacts::Artifact> = self.artifacts.iter().filter(|a| matches(a)).collect();
+        let images: Vec<&hermes_core::artifacts::Artifact> = visible
+            .iter()
+            .copied()
+            .filter(|a| a.kind == hermes_core::artifacts::Kind::Image)
+            .collect();
+        let files: Vec<&hermes_core::artifacts::Artifact> = visible
+            .iter()
+            .copied()
+            .filter(|a| a.kind != hermes_core::artifacts::Kind::Image)
+            .collect();
+
+        let image_pages = page_count(images.len(), IMAGE_PAGE);
+        let file_pages = page_count(files.len(), FILE_PAGE);
+        let image_page = self.artifact_image_page.clamp(1, image_pages);
+        let file_page = self.artifact_file_page.clamp(1, file_pages);
+        let image_slice = page_slice(&images, image_page, IMAGE_PAGE);
+        let file_slice = page_slice(&files, file_page, FILE_PAGE);
+
+        let stamp = |a: &hermes_core::artifacts::Artifact| format!("{} · {}", a.session_title, stamp(a.timestamp));
+        let cards: Vec<CardSpec> = image_slice
+            .iter()
+            .enumerate()
+            .map(|(i, a)| CardSpec {
+                id: a.id.clone(),
+                chat: a.session_id.clone(),
+                index: i,
+                label: a.label.clone(),
+                value: a.value.clone(),
+                session: stamp(a),
+                kind: a.kind.as_str().to_owned(),
+                thumb: hermes_core::artifacts::local_path(&a.value).filter(|p| p.exists()),
+            })
+            .collect();
+        let rows: Vec<RowSpec> = file_slice
+            .iter()
+            .map(|a| RowSpec {
+                id: a.id.clone(),
+                chat: a.session_id.clone(),
+                label: a.label.clone(),
+                value: a.value.clone(),
+                session: stamp(a),
+                kind: a.kind.as_str().to_owned(),
+            })
+            .collect();
+
+        let counts = [
+            self.artifacts.len(),
+            self.artifacts.iter().filter(|a| a.kind == hermes_core::artifacts::Kind::Image).count(),
+            self.artifacts.iter().filter(|a| a.kind == hermes_core::artifacts::Kind::File).count(),
+            self.artifacts.iter().filter(|a| a.kind == hermes_core::artifacts::Kind::Link).count(),
+        ];
+        let image_range = range_label(image_page, IMAGE_PAGE, images.len(), "images");
+        let file_range = range_label(
+            file_page,
+            FILE_PAGE,
+            files.len(),
+            match filter {
+                2 => "files",
+                3 => "links",
+                _ => "items",
+            },
+        );
+        let headers = match filter {
+            2 => ["Item", "Location", "Session"],
+            3 => ["Title", "Location", "Session"],
+            _ => ["Item", "Location", "Session"],
+        };
+        let image_buttons: Vec<ButtonSpec> = page_buttons(image_page, image_pages);
+        let file_buttons: Vec<ButtonSpec> = page_buttons(file_page, file_pages);
+        let grid_rows = rows_of(image_slice.len(), IMAGE_COLUMNS);
+        let loading = self.artifact_loading;
+        // Pull the thumbnail jobs out before the card specs move into the UI closure.
+        let thumbs: Vec<(usize, std::path::PathBuf)> =
+            cards.iter().filter_map(|c| c.thumb.clone().map(|p| (c.index, p))).collect();
+
+        ui(&self.weak, move |w| {
+            let st = w.global::<ArtifactsState>();
+            let card_models: Vec<ArtifactCard> = cards
+                .into_iter()
+                .map(|c| ArtifactCard {
+                    id: c.id.into(),
+                    chat: c.chat.into(),
+                    col: (c.index % IMAGE_COLUMNS) as i32,
+                    row: (c.index / IMAGE_COLUMNS) as i32,
+                    label: c.label.into(),
+                    value: c.value.into(),
+                    session: c.session.into(),
+                    kind: c.kind.into(),
+                    thumb: slint::Image::default(),
+                })
+                .collect();
+            st.set_cards(Rc::new(VecModel::from(card_models)).into());
+            st.set_image_height((grid_rows as f32 * CARD_ROW_HEIGHT as f32).into());
+            let row_models: Vec<ArtifactRow> = rows
+                .into_iter()
+                .map(|r| ArtifactRow {
+                    id: r.id.into(),
+                    chat: r.chat.into(),
+                    label: r.label.into(),
+                    value: r.value.into(),
+                    session: r.session.into(),
+                    kind: r.kind.into(),
+                })
+                .collect();
+            st.set_rows(Rc::new(VecModel::from(row_models)).into());
+            st.set_count_all(counts[0] as i32);
+            st.set_count_image(counts[1] as i32);
+            st.set_count_file(counts[2] as i32);
+            st.set_count_link(counts[3] as i32);
+            st.set_image_range(image_range.into());
+            st.set_file_range(file_range.into());
+            st.set_table_headers(Rc::new(VecModel::from(
+                headers.iter().map(|h| SharedString::from(*h)).collect::<Vec<_>>(),
+            ))
+            .into());
+            st.set_image_pages(
+                Rc::new(VecModel::from(
+                    image_buttons
+                        .iter()
+                        .map(|b| PageButton { label: b.label.clone().into(), target: b.target, active: b.active })
+                        .collect::<Vec<_>>(),
+                ))
+                .into(),
+            );
+            st.set_file_pages(
+                Rc::new(VecModel::from(
+                    file_buttons
+                        .iter()
+                        .map(|b| PageButton { label: b.label.clone().into(), target: b.target, active: b.active })
+                        .collect::<Vec<_>>(),
+                ))
+                .into(),
+            );
+            st.set_loading(loading);
+        });
+
+        load_thumbs(&self.weak, thumbs);
     }
 
     async fn refresh_model_label(&self) {
@@ -2052,5 +2624,62 @@ mod tests {
         assert_eq!(c(json!({"allow_permanent": false})), ["once", "session", "deny"]);
         assert_eq!(c(json!({"allow_session": false})), ["once", "deny"]);
         assert_eq!(c(json!({"smart_denied": true})), ["once", "deny"]);
+    }
+
+    #[test]
+    fn artifact_paging_labels_match_the_original() {
+        // "1–24 of 113 images" — the Electron page's rangeOf label.
+        assert_eq!(range_label(1, 24, 113, "images"), "1–24 of 113 images");
+        assert_eq!(range_label(5, 24, 113, "images"), "97–113 of 113 images");
+        assert_eq!(range_label(2, 100, 198, "items"), "101–198 of 198 items");
+        assert_eq!(range_label(1, 100, 0, "items"), "");
+    }
+
+    #[test]
+    fn artifact_pagination_windows_like_the_original() {
+        let labels = |page: usize, pages: usize| {
+            page_buttons(page, pages)
+                .iter()
+                .map(|b| (b.label.clone(), b.target, b.active))
+                .collect::<Vec<_>>()
+        };
+        // One page: both arrows inert.
+        assert_eq!(labels(1, 1), vec![("‹".into(), -1, false), ("1".into(), 1, true), ("›".into(), -1, false)]);
+        // Up to seven pages: every number.
+        assert_eq!(labels(1, 7).len(), 9);
+        assert_eq!(labels(1, 7)[1], ("1".into(), 1, true));
+        assert_eq!(labels(1, 7)[8], ("7".into(), 7, false));
+        // Many pages: 1 … n-1 n n+1 … N, with inert arrows at the ends.
+        let middle = labels(5, 20);
+        assert_eq!(middle[0], ("‹".into(), 4, false));
+        assert_eq!(middle[1], ("1".into(), 1, false));
+        assert_eq!(middle[2], ("…".into(), -1, false));
+        assert_eq!(middle[3], ("4".into(), 4, false));
+        assert_eq!(middle[4], ("5".into(), 5, true));
+        assert_eq!(middle[5], ("6".into(), 6, false));
+        assert_eq!(middle[6], ("…".into(), -1, false));
+        assert_eq!(middle[7], ("20".into(), 20, false));
+        assert_eq!(middle[8], ("›".into(), 6, false));
+        let first = labels(1, 20);
+        assert_eq!(first[0], ("‹".into(), -1, false));
+        assert_eq!(first[2], ("…".into(), -1, false));
+        let last = labels(20, 20);
+        assert_eq!(last[0], ("‹".into(), 19, false));
+        assert_eq!(last[last.len() - 1], ("›".into(), -1, false));
+    }
+
+    #[test]
+    fn artifact_grid_and_stamp() {
+        assert_eq!(rows_of(0, 6), 0);
+        assert_eq!(rows_of(1, 6), 1);
+        assert_eq!(rows_of(24, 6), 4);
+        assert_eq!(rows_of(25, 6), 5);
+        assert_eq!(page_count(0, 24), 1);
+        assert_eq!(page_count(24, 24), 1);
+        assert_eq!(page_count(25, 24), 2);
+        // A timestamp lands in the local timezone; the shape is what the card shows.
+        let text = stamp(1_700_000_000_000.0);
+        assert!(text.contains(',') && text.contains(':'), "stamp = {text}");
+        assert!(!stamp(0.0).is_empty());
     }
 }
