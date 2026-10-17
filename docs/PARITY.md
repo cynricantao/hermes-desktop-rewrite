@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**43 done · 200 partial · 549 not started · 1 unsupported** (of 793).
+**43 done · 203 partial · 546 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -493,9 +493,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Artifacts / preview
 
-- [ ] Artifacts library (list/grid) — local — src/app/artifacts/index.tsx
-- [ ] Artifact detection from messages — local — src/lib/artifact-detect.ts
-- [ ] Artifact store — local — src/store/artifacts.ts
+- [~] Artifacts library (list/grid) — local — src/app/artifacts/index.tsx ⟶ logic in `hermes-core::artifacts` (detection thresholds, registry/dedupe/pruning, library scan, preview kinds; 42 unit tests from Electron fixtures); no artifacts screen yet
+- [~] Artifact detection from messages — local — src/lib/artifact-detect.ts ⟶ logic in `hermes-core::artifacts` (detection thresholds, registry/dedupe/pruning, library scan, preview kinds; 42 unit tests from Electron fixtures); no artifacts screen yet
+- [~] Artifact store — local — src/store/artifacts.ts ⟶ logic in `hermes-core::artifacts` (detection thresholds, registry/dedupe/pruning, library scan, preview kinds; 42 unit tests from Electron fixtures); no artifacts screen yet
 - [ ] Preview pane (in-app browser) — local — src/app/chat/right-rail/preview.tsx
 - [ ] Preview guest webview (Chromium) — local (Electron webview) (platform) — src/app/chat/right-rail/preview-guest-offscreen.ts
 - [ ] Preview navigation bar + address — local — src/app/chat/right-rail/preview-browser-bar.tsx
