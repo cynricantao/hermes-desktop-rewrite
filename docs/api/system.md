@@ -64,6 +64,13 @@ HERMES_DESKTOP_PORT=37273 cargo test -p hermes-core --test live_api_system -- --
 | Handoff request | `handoff_request` / `handoff_request_call` | `handoff.request {session_id, platform, profile}` | **Network** — the gateway watcher posts to the platform's home channel. Builder-only. |
 | Handoff fail | `handoff_fail` / `handoff_fail_call` | `handoff.fail {session_id, error?, profile}` | CAS write against the watcher; builder-only. |
 | Wake word | `wake_status` / `wake_status_call` | `wake.status {surface?, client_capture?, profile}` | Read-only state (phrase, provider, input device, ownership). Ran live. |
+| Wake arm | `wake_start` / `wake_start_call` | `wake.start {surface?, persist?, session_id?, client_capture?, profile}` | **Spawns/records** — opens the mic on the backend host; `started:false` carries `reason` (`unavailable` / `disabled` / `disabled_for_surface` / `owned`) + `hint`. Builder-only. |
+| Wake stop | `wake_stop` / `wake_stop_call` | `wake.stop {persist?, profile}` | **Releases the mic**; `persist:true` (explicit gesture) also writes `wake_word.enabled:false`. Builder-only. |
+| Wake pause / resume | `wake_pause` / `wake_resume` (+ `_call`) | `wake.pause` / `wake.resume {profile}` | Mic handoff while the desktop's browser captures audio; `resume` no-ops when not armed. Builder-only. |
+| Wake feed | `wake_feed` / `wake_feed_call` | `wake.feed {pcm, sample_rate?, profile}` | Client-captured PCM (base64 int16 mono LE, 16 kHz only; the strict contract names the field `pcm`, not `pcm_b64`). **Feeds the backend detector.** Builder-only. |
+| Onboarding state | `onboarding_state` / `onboarding_state_call` | `onboarding.state {assume_fresh?}` | **No `profile`** — the strict param model answers 4000 on it. Read-only. Ran live (`assume_fresh=false` and `true`). |
+| Onboarding start | `onboarding_start` / `onboarding_start_call` | `onboarding.start {fresh_launch?, rerun?, assume_fresh?, locale?, facts_source?}` | **Spends model calls** (submits the opening prompt; a first install may claim the trial). No `profile` param either. Builder-only. |
+| Onboarding skip | `onboarding_skip` / `onboarding_skip_call` | `onboarding.skip {session_id, profile?}` | **Writes the run record** (advances the step, closes the setup card); needs the run's live session. Builder-only. |
 | Diagnostics share | `diagnostics_share_nous` / `diagnostics_share_nous_call` | `diagnostics.share_nous {error_context?, extra_files?, log_lines?}` | **Network** — uploads a redacted bundle to Nous storage. Builder-only. |
 | CLI exec | `cli_exec` / `cli_exec_call` | `cli.exec {argv, timeout?, profile}` | **Spawns a process** — runs `hermes <argv>`. Builder-only. |
 
@@ -83,6 +90,9 @@ HERMES_DESKTOP_PORT=37273 cargo test -p hermes-core --test live_api_system -- --
 | `handoff_request`, `handoff_fail` | Post to a messaging platform / CAS-write a queue row. |
 | `diagnostics_share_nous` | Uploads to Nous storage (network). |
 | `cli_exec` | Runs arbitrary `hermes` subcommands (spawns a process). |
+| `wake_start`, `wake_stop`, `wake_pause`, `wake_resume`, `wake_feed` | Start/stop/feed the backend host's microphone (spawns/records audio); `wake.status` remains the live probe. |
+| `onboarding_start` | **Spends model calls** — opens the chat and submits the onboarding opening turn (may claim the trial). |
+| `onboarding_skip` | Writes the run's stored record and needs its live session; no throwaway onboarding run was created for the live pass. |
 
 Also: the success body of `setup.runtime_check` was not observed on the private test backend
 (it answers the documented retryable 5097); the retryable code itself is what the live check

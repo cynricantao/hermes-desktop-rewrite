@@ -750,6 +750,90 @@ pub async fn profiles_get_asset(client: &Client, name: &str, asset: &str) -> Res
     call_as(client, &profiles_get_asset_call(name, asset)).await
 }
 
+/// Options for `profiles.create`: only the fields the New Profile dialog sends.
+#[derive(Debug, Clone, Default)]
+pub struct ProfileCreateOptions {
+    pub description: String,
+    /// Source profile to clone; empty = a fresh profile with the bundled skills.
+    pub clone_from: String,
+    /// Clone the source's config too (not just its soul/description).
+    pub clone_all: bool,
+    /// Keep the source's bot tokens/allowlists; off strips them so two profiles never share a bot.
+    pub clone_channels: bool,
+    /// Skip seeding the bundled skills.
+    pub no_skills: bool,
+    /// SOUL.md written at create time.
+    pub soul: String,
+    /// Model to pin (only when `provider` is set as well).
+    pub model: String,
+    pub provider: String,
+    /// Share the launching profile's auth material.
+    pub share_auth: bool,
+    /// Skip the `hermes-<name>` wrapper script.
+    pub no_alias: bool,
+}
+
+/// `profiles.create` reply (the RPC twin of `POST /api/profiles`).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct ProfileCreated {
+    pub ok: bool,
+    pub name: String,
+    /// The profile directory the backend created.
+    pub path: String,
+    pub soul_written: bool,
+    pub model_set: bool,
+    /// Credential-mirroring report (`methods_profiles._mirror_launch_credentials`).
+    pub mirrored: Value,
+}
+
+/// `profiles.create` (the RPC twin of the REST create already covered by
+/// [`crate::capabilities`]). `mirror_credentials: Some(false)` stops the backend seeding
+/// credentials from the launching profile; `None` keeps its default (`true`). Flags left at
+/// their defaults are omitted, matching the REST body.
+///
+/// **Writes a profile directory** (and its alias script); builder + unit test only.
+pub fn profiles_create_call(name: &str, options: &ProfileCreateOptions, mirror_credentials: Option<bool>) -> Call {
+    let mut params = json!({ "name": name });
+    for (key, value) in [
+        ("description", options.description.clone()),
+        ("clone_from", options.clone_from.clone()),
+        ("soul", options.soul.clone()),
+        ("model", options.model.clone()),
+        ("provider", options.provider.clone()),
+    ] {
+        if !value.is_empty() {
+            params[key] = json!(value);
+        }
+    }
+    for (key, flag) in [
+        ("clone_all", options.clone_all),
+        ("clone_channels", options.clone_channels),
+        ("no_skills", options.no_skills),
+        ("share_auth", options.share_auth),
+        ("no_alias", options.no_alias),
+    ] {
+        if flag {
+            params[key] = json!(true);
+        }
+    }
+    if let Some(v) = mirror_credentials {
+        params["mirror_credentials"] = json!(v);
+    }
+    call_of("profiles.create", params)
+}
+
+/// Create a profile (RPC). **Writes a profile directory**; builder + unit test only — the REST
+/// create in [`crate::capabilities`] stays the live-tested path.
+pub async fn profiles_create(
+    client: &Client,
+    name: &str,
+    options: &ProfileCreateOptions,
+    mirror_credentials: Option<bool>,
+) -> Result<ProfileCreated, ApiError> {
+    call_as(client, &profiles_create_call(name, options, mirror_credentials)).await
+}
+
 // ── Memory providers ───────────────────────────────────────────────────────────
 
 /// One option of a `select` field.
@@ -1412,5 +1496,35 @@ mod tests {
             decode::<MemoryOAuthStatus>(json!({})).unwrap(),
             MemoryOAuthStatus::default()
         );
+    }
+
+    #[test]
+    fn profiles_create_rpc() {
+        let mut opts = ProfileCreateOptions {
+            description: "Test".into(),
+            clone_from: "default".into(),
+            clone_all: true,
+            soul: "SOUL".into(),
+            ..ProfileCreateOptions::default()
+        };
+        assert_eq!(
+            profiles_create_call("work", &opts, None).params,
+            json!({"name": "work", "description": "Test", "clone_from": "default",
+                   "soul": "SOUL", "clone_all": true})
+        );
+        opts.clone_from.clear();
+        assert_eq!(
+            profiles_create_call("work", &opts, Some(false)).params,
+            json!({"name": "work", "description": "Test", "soul": "SOUL", "clone_all": true,
+                   "mirror_credentials": false})
+        );
+        let c: ProfileCreated = decode(json!({
+            "ok": true, "name": "work", "path": "/h/profiles/work", "soul_written": true,
+            "model_set": false, "mirrored": {"auth": true, "env": false}
+        }))
+        .unwrap();
+        assert!(c.ok && c.soul_written);
+        assert_eq!(c.mirrored["auth"], json!(true));
+        assert_eq!(decode::<ProfileCreated>(json!({})).unwrap(), ProfileCreated::default());
     }
 }

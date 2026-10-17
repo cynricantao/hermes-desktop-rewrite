@@ -53,6 +53,9 @@ id as `session_key`.
 | Answer request | `request_answer` / `request_answer_call` | `request.answer` | Answers a clarify/question request; unknown id answers `{"status":"expired"}`. |
 | Clarify lock | `clarify_lock` / `clarify_lock_call` | `clarify.lock` | Locks one question's answer; unknown id ⇒ `expired`. |
 | Path completion | `complete_path` / `complete_path_call` | `complete.path` | `@path` completion. |
+| One-shot LLM | `llm_oneshot` / `llm_oneshot_call` | `llm.oneshot {session_id?, template?, instructions?, input?, variables?, task?, max_tokens?, temperature?, profile}` | **Spends model calls**; `LlmOneshotOptions` carries `variables` / `task` (default `title_generation`) / `max_tokens` (1024) / `temperature` (0.3). Builder-only. |
+| Image generation | `image_generate` / `image_generate_call` | `image.generate {prompt?, aspect_ratio?, probe?, max_bytes?}` | **Spends model calls / network**; `probe:true` answers availability only but is not run live (batch rule). `image_data` (data URL) omitted when the download failed. Builder-only. |
+| Preview restart | `preview_restart` / `preview_restart_call` | `preview.restart {session_id, url, cwd?, context?}` | **Spawns a hidden side agent** that diagnoses the URL and deliberately leaves a restarted dev server running. Builder-only. |
 | Slash completion | `complete_slash` / `complete_slash_call` | `complete.slash` | Commands + skills. |
 | Detect drop | `input_detect_drop` / `input_detect_drop_call` | `input.detect_drop` | Dragged-file reference in composer text. |
 | Collapse paste | `paste_collapse` / `paste_collapse_call` | `paste.collapse` | Placeholder + on-disk path + line count. |
@@ -87,6 +90,9 @@ Exercised live: `session.activate`, `session.active_list`, `session.most_recent`
 - `session.compress`, `session.steer`, `session.redirect`, `session.usage`,
   `prompt.background`, `prompt.btw`: builder + unit tests only by the safety rules (model spend
   or network).
+- `llm.oneshot`, `image.generate` (even `probe:true`, which is availability-only),
+  `preview.restart`: model spend / provider call / a hidden side agent that leaves a background
+  server running.
 - REST mutations (`PATCH`/`DELETE /api/sessions/{id}`, bulk-delete, import, prune,
   owner-backfill) are out of scope. The live test's cleanup used the out-of-scope
   `session.delete` RPC with the throwaway stored id, as the brief allows.

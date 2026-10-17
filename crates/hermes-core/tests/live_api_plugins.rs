@@ -172,6 +172,17 @@ async fn live_plugins_and_connectors() {
         ),
         format!("{wake:?}"),
     );
+    // `connection.respond` validates its `result` first, then looks the operation up; an
+    // unanswered bogus op id must answer the documented 4004 and settle nothing.
+    let respond = connection_respond(&client, &owner, "no-such-op", &serde_json::json!({"targets": []}), "").await;
+    checks.check(
+        "connection.respond unknown op -> 4004",
+        matches!(
+            &respond,
+            Err(hermes_core::api::ApiError::Rpc(RpcError::Server { code: 4004, .. }))
+        ),
+        format!("{respond:?}"),
+    );
 
     // ── Reloads ─────────────────────────────────────────────────────────────────
     // reload.env only re-reads the backend's own .env from disk (local config).

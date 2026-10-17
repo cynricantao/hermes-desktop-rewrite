@@ -1,0 +1,1 @@
+//! Notification rules: which events (approval needed, input needed, turn finished, error) raise an in-app toast or a desktop notification, given the user's settings and whether the window is focused. UI-free.

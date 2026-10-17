@@ -39,6 +39,7 @@ wrapper that sends it.
 | Profile — configure | `profile_configure` | RPC `profiles.configure` | `patch` = any of `ui_meta`(+expected revisions), `soul`, `description`, `model`+`provider`, `disabled_skills`, `enabled_toolsets`, `enabled_mcp_servers`; `applied` reports each section. **May switch models** (echoes `confirm_required`). Live on a throwaway profile. |
 | Profile — avatar write | `profiles_set_asset` | RPC `profiles.set_asset` | `asset:"avatar"`, data URL or bare base64 (PNG/JPEG/WebP ≤2 MB, sniffed), or `clear:true`. **Writes a file.** Live (set 1×1 PNG on throwaway). |
 | Profile — avatar read | `profiles_get_asset` | RPC `profiles.get_asset` | Data URL; `found:false` is not an error. Live (found, mime `image/png`). |
+| Profile — create (RPC) | `profiles_create` / `profiles_create_call` | RPC `profiles.create {name, …}` | JSON-RPC twin of `POST /api/profiles`; `ProfileCreateOptions` = description, clone_from/all/channels, no_skills, soul, model+provider, share_auth, no_alias; `mirror_credentials` default true. **Writes a profile directory + alias script** — builder-only (the REST create in `capabilities` holds the live coverage). |
 | Memory — config form | `memory_provider_config` | `GET /api/memory/providers/{name}/config?surface=&profile=` | `surface=declared` = manifest schema the desktop panel renders. Secrets are write-only (`value:""`, `is_set`). Live (2/2 providers decoded; values never printed). |
 | Memory — config save | `memory_provider_config_update` | `PUT /api/memory/providers/{name}/config` | Body `{values}`; secrets go to the profile `.env`; declared surface sets the provider active. **Writes config/secrets** — builder-only. |
 | Memory — setup | `memory_provider_setup` | `POST /api/memory/providers/{name}/setup` | Optional `{values}`; installs pip/external deps and runs setup commands. **Spawns processes** — builder-only. |
@@ -84,6 +85,8 @@ provider's model listing.`
 * `profile_export` / `profile_import` — write archives / create profiles from files the test
   does not own.
 * `profile_open_terminal` — spawns a terminal emulator (no desktop session on the test host).
+* `profiles_create` (RPC) — creates a real profile directory and alias script; builder +
+  unit-tested here, while the live-tested create path stays the REST one in `capabilities`.
 * `memory_provider_config_update` — writes config and secrets; `memory_provider_setup` —
   installs packages; both OAuth wrappers — network/browser.
 * `cron_manage_job` (pause/resume/remove) — the REST routes for these are already live-tested
@@ -92,8 +95,8 @@ provider's model listing.`
 ## Not found / not implemented
 
 * Profile create / rename / delete / soul and cron create / pause / resume / trigger / delete
-  — covered by `capabilities`; deliberately not duplicated. (`profiles.create` RPC likewise;
-  use the REST create path.)
+  — covered by `capabilities` (REST). The `profiles.create` RPC twin is implemented here for
+  API-surface parity (builder + unit tests); the REST path keeps the live coverage.
 * `GET /api/cron/jobs/{id}/runs` (run history) and `POST /api/cron/fire` (NAS gateway
   webhook) exist but are outside this module's scope.
 * No `GET /api/profiles/{name}/description` (only PUT); no separate avatar route (use

@@ -16,20 +16,28 @@
 //!   bounded content-keyed cache and per-stream checkpoint resume.
 //! * [`sessions`] — session-list grouping helpers.
 //! * [`api`] — typed client for every backend feature area (REST + JSON-RPC), UI-free.
+//! * [`remote`], [`artifacts`], [`notify`], [`keybinds`], [`browser`] — desktop logic with no UI
+//!   (remote gateway connections, artifact detection, notification rules, shortcut map,
+//!   in-app browser helper protocol).
 //! * [`capabilities`] — requests and rows for the Capabilities screen (profiles, skills,
 //!   toolsets, MCP servers, memory, scheduled jobs) over the backend's REST routes.
 
 pub mod api;
+pub mod artifacts;
 pub mod attachments;
 pub mod backend;
+pub mod browser;
 pub mod capabilities;
 pub mod diff;
 pub mod highlight;
 pub mod http;
+pub mod keybinds;
 pub mod markdown;
+pub mod notify;
 pub mod prefs;
 pub mod projects;
 pub mod protocol;
+pub mod remote;
 pub mod rpc;
 pub mod sessions;
 pub mod settings;

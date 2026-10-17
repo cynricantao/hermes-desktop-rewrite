@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**43 done · 188 partial · 561 not started · 1 unsupported** (of 793).
+**43 done · 193 partial · 556 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -160,7 +160,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Transcript directives (custom blocks) — local — src/components/assistant-ui/transcript-directive.tsx, src/lib/transcript-directives.ts
 - [ ] Artifact card inline in transcript — local — src/components/assistant-ui/artifact-card.tsx
 - [ ] Inline file preview directive — local — src/components/assistant-ui/inline-preview-directive.tsx
-- [ ] Generated image result + zoom — RPC image.generate result — src/components/chat/generated-image-result.tsx, zoomable-image.tsx
+- [~] Generated image result + zoom — RPC image.generate result — src/components/chat/generated-image-result.tsx, zoomable-image.tsx ⟶ backend client ready in `api::sessions` (see docs/api/); UI not wired
 - [ ] Transcript video playback — local — src/components/chat/transcript-video.tsx
 - [ ] Mermaid diagram embeds — local — src/components/assistant-ui/embeds/mermaid-embed.tsx
 - [ ] Rich link embeds (YouTube/X/Spotify/Instagram/TikTok/Pinterest/Vimeo/Maps) — local (consent-gated) — src/components/assistant-ui/embeds/providers/*
@@ -218,7 +218,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Restore pending approval/clarify on resume — local — src/app/session/hooks/use-session-actions/restore-pending-approval.ts, restore-pending-clarify.ts
 - [ ] Secret request (masked value) — SRV secret — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts
 - [ ] Sudo request (terminal/display) — SRV sudo, display.install.sudo — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts
-- [ ] Connection request (remote OAuth/pairing) — SRV connection.request, RPC connection.respond — src/store/connection-request.ts
+- [~] Connection request (remote OAuth/pairing) — SRV connection.request, RPC connection.respond — src/store/connection-request.ts ⟶ backend client ready in `api::plugins` (see docs/api/); UI not wired
 - [ ] Free-tier challenge prompt — WS free_tier.challenge — src/store/free-tier-challenge.ts
 - [~] Clarify lock (single-flight) — RPC clarify.lock — src/store/clarify.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 
@@ -503,7 +503,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Preview annotate (draw on page) — SRV preview.act — src/app/chat/right-rail/preview-annotate-card.tsx
 - [ ] Preview act (click/type/scroll proxy) — SRV preview.act — src/lib/preview-act/*
 - [ ] Preview read (text extraction) — SRV preview.read — src/app/chat/right-rail/preview-reader.ts
-- [ ] Preview restart — RPC preview.restart — src/app/session/hooks/use-preview-routing.ts
+- [~] Preview restart — RPC preview.restart — src/app/session/hooks/use-preview-routing.ts ⟶ backend client ready in `api::sessions` (see docs/api/); UI not wired
 - [ ] Preview file viewer — local — src/app/chat/right-rail/preview-file.tsx
 - [ ] Preview script runner — local — src/app/chat/right-rail/preview-script-runner.ts
 - [ ] Preview popout window — local (Electron) (platform) — src/app/chat/browser-popout-shell.tsx, right-rail/preview-popout-bridge.ts
@@ -562,7 +562,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Voice playback + queue — local + REST /api/audio/speak — src/lib/voice-playback.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
 - [ ] Voice stream (live PCM sibling WS) — local WS /api/voice — src/lib/voice-stream.ts
 - [ ] Voice barge-in / interrupted — WS voice.interrupted — src/lib/voice-barge-in.ts
-- [ ] Wake word (always-listening) — RPC wake.start|stop|status|feed|pause|resume — src/store/wake-word.ts
+- [~] Wake word (always-listening) — RPC wake.start|stop|status|feed|pause|resume — src/store/wake-word.ts ⟶ backend client ready in `api::system` (see docs/api/); UI not wired
 - [ ] Wake indicator window — local (Electron wake-indicator) — src/app/wake-indicator/wake-indicator-app.tsx
 - [~] TTS lease (warm engine) — REST /api/audio/tts-lease — src/lib/tts-lease.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
 - [ ] Voice provider fields visibility — local — src/app/settings/voice-provider-fields.tsx, voice-field-visible.ts
@@ -977,7 +977,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 - [ ] First-run setup gate (local install vs connect) — local (Electron) — src/components/onboarding/*, electron/first-run-setup-gate.ts
 - [ ] Bootstrap runner (provision bundled/source runtime) — local (Electron) (platform) — electron/bootstrap-runner.ts
-- [ ] Onboarding state — RPC onboarding.state, onboarding.mark_seen — src/store/onboarding.ts
+- [~] Onboarding state — RPC onboarding.state, onboarding.mark_seen — src/store/onboarding.ts ⟶ backend client ready in `api::system` (see docs/api/); UI not wired
 - [ ] Ensure setup profile/session — RPC onboarding.ensure_setup_profile|ensure_setup_session — src/app/contrib/onboarding-kickoff.ts
 - [ ] Onboarding chat (setup assistant) — local + RPC — src/components/onboarding-chat/gate.tsx
 - [ ] Provider OAuth sign-in — REST /api/providers/oauth/* — src/store/onboarding.ts
