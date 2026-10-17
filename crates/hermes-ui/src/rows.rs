@@ -1,5 +1,6 @@
 //! Conversion from core transcript blocks to Slint row structs (pure, unit-tested).
 
+use hermes_core::styled;
 use hermes_core::transcript::{Block, Role, ToolCall, ToolState};
 use slint::{ModelRc, SharedString, StyledText, VecModel};
 
@@ -54,10 +55,25 @@ pub fn group_label(calls: &[ToolCall]) -> String {
     }
 }
 
-/// Markdown → StyledText. Slint's parser rejects some constructs (e.g. raw HTML); fall
-/// back to plain text instead of dropping the message.
-pub fn markdown(text: &str) -> StyledText {
-    StyledText::from_markdown(text).unwrap_or_else(|_| StyledText::from_plain_text(text))
+/// Reply markdown → StyledText. `styled::to_styled_markdown` first rewrites every block
+/// Slint rejects (headings, tables, code, quotes, rules, task lists, images, HTML). If a
+/// block is still rejected, only that block is shown literally — never the whole reply.
+pub fn markdown(text: &str, streaming: bool) -> StyledText {
+    let md = styled::to_styled_markdown(text, streaming);
+    if let Ok(t) = StyledText::from_markdown(&md) {
+        return t;
+    }
+    let safe: Vec<String> = md
+        .split("\n\n")
+        .map(|block| {
+            if StyledText::from_markdown(block).is_ok() {
+                block.to_owned()
+            } else {
+                styled::escape_literal(block)
+            }
+        })
+        .collect();
+    StyledText::from_markdown(&safe.join("\n\n")).unwrap_or_else(|_| StyledText::from_plain_text(text))
 }
 
 pub fn to_row(b: &Block) -> ChatRow {
@@ -73,7 +89,7 @@ pub fn to_row(b: &Block) -> ChatRow {
             md: if *role == Role::User {
                 StyledText::default()
             } else {
-                markdown(text)
+                markdown(text, *streaming)
             },
             reasoning: reasoning.as_str().into(),
             streaming: *streaming,
@@ -142,6 +158,43 @@ mod tests {
         let t = truncate_lines(&s, 200);
         assert!(t.starts_with("… 100 earlier lines\n100\n"));
         assert!(t.ends_with("299"));
+    }
+
+    /// The reply that showed raw `**`, `##` and `|` (a heading made Slint reject it all).
+    const REAL_REPLY: &str = "I added one new feature, a **Capabilities screen**.\n\n## What you can now do in the app\n\n\
+        | Tab | What you can do |\n|---|---|\n| **Profiles** | See all profiles; create, rename or delete one |\n\
+        | **Skills** | Search your skills, switch them on/off |\n\nOther details:\n- The **Scheduled** button works.\n\
+        - [x] done\n\n> quoted\n\n---\n\n```sh\ncargo build\n```\n\nSee <b>this</b> ![img](a.png).";
+
+    #[test]
+    fn real_reply_renders_as_markdown_not_raw_text() {
+        let md = styled::to_styled_markdown(REAL_REPLY, false);
+        assert!(
+            StyledText::from_markdown(REAL_REPLY).is_err(),
+            "precondition: Slint rejects the raw reply"
+        );
+        assert!(
+            StyledText::from_markdown(&md).is_ok(),
+            "converted reply must parse: {md}"
+        );
+        assert!(!md.contains("## "), "heading markers removed");
+        assert!(
+            md.contains("` Tab      │ What you can do"),
+            "table drawn as aligned monospace: {md}"
+        );
+    }
+
+    #[test]
+    fn html_blocks_and_literal_fallback_parse() {
+        let md = styled::to_styled_markdown("**bold** stays\n\n<div>\nraw\n</div>", false);
+        assert!(StyledText::from_markdown(&md).is_ok(), "escaped HTML must parse: {md}");
+        // The last-resort literal form of any block always parses.
+        for block in ["## h", "<div>x</div>", "| a | b |", "    code", "> q", "- [ ] t", "---"] {
+            assert!(
+                StyledText::from_markdown(&styled::escape_literal(block)).is_ok(),
+                "{block}"
+            );
+        }
     }
 
     #[test]

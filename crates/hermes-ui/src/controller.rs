@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
+use hermes_core::attachments::{self, AttachedImage, ClipboardError};
 use hermes_core::backend::{self, ManagedBackend};
 use hermes_core::http::{Rest, profile_query};
 use hermes_core::prefs::Prefs;
@@ -65,6 +66,10 @@ pub enum Cmd {
         choice: String,
     },
     Settings(SettingsCmd),
+    /// Ctrl+V in the composer: attach the clipboard image, if there is one.
+    PasteImage,
+    /// Remove the queued attachment at this index.
+    RemoveAttachment(i32),
     /// Capabilities-screen intents, forwarded to its own task (`capabilities.rs`).
     Caps(CapCmd),
 }
@@ -177,6 +182,14 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
             name: name.into(),
             path: path.into(),
         });
+    });
+    let t = tx.clone();
+    st.on_paste_image(move || {
+        let _ = t.send(Cmd::PasteImage);
+    });
+    let t = tx.clone();
+    st.on_remove_attachment(move |i| {
+        let _ = t.send(Cmd::RemoveAttachment(i));
     });
     let t = tx.clone();
     st.on_approve(move |id, choice| {
@@ -397,6 +410,8 @@ struct Controller {
     reset_armed: bool,
     /// The Capabilities screen's own task.
     caps: mpsc::UnboundedSender<CapCmd>,
+    /// Images queued on the backend for the next turn of `session`.
+    attachments: Vec<AttachedImage>,
 }
 
 impl Controller {
@@ -433,6 +448,7 @@ impl Controller {
         };
         let mut c = Controller {
             caps,
+            attachments: Vec::new(),
             weak: weak.clone(),
             commands,
             client,
@@ -640,6 +656,8 @@ impl Controller {
             Cmd::Caps(cmd) => {
                 let _ = self.caps.send(cmd);
             }
+            Cmd::PasteImage => self.paste_image().await,
+            Cmd::RemoveAttachment(i) => self.remove_attachment(i).await,
             Cmd::Stop => {
                 if let Some(sid) = self.session.clone()
                     && let Err(e) = self
@@ -651,6 +669,7 @@ impl Controller {
                 }
             }
             Cmd::NewChat => {
+                self.clear_attachments();
                 self.draft_model = None;
                 self.draft_effort = None;
                 self.session = None;
@@ -1497,6 +1516,12 @@ impl Controller {
             ui(&self.weak, move |w| w.global::<AppState>().set_draft(display.into()));
             return;
         };
+        // The backend sends its queued images with this turn; show which ones went.
+        let mut display = display;
+        for a in std::mem::take(&mut self.attachments) {
+            display.push_str(&format!("\n📎 {}", a.label()));
+        }
+        self.publish_attachments();
         let ch = self.transcript.push_user(&display);
         self.mark(ch);
         self.flush();
@@ -1518,6 +1543,74 @@ impl Controller {
         });
     }
 
+    // ── Attachments ─────────────────────────────────────────────────────────────
+
+    fn publish_attachments(&self) {
+        let labels: Vec<SharedString> = self.attachments.iter().map(|a| a.label().into()).collect();
+        ui(&self.weak, move |w| {
+            w.global::<AppState>()
+                .set_attachments(ModelRc::new(VecModel::from(labels)));
+        });
+    }
+
+    fn clear_attachments(&mut self) {
+        if !self.attachments.is_empty() {
+            self.attachments.clear();
+            self.publish_attachments();
+        }
+    }
+
+    /// Ctrl+V: read the desktop clipboard; an image goes to the backend's queue for the
+    /// next turn. No image = an ordinary text paste, which the text field already did.
+    async fn paste_image(&mut self) {
+        let image = match attachments::read_clipboard_image().await {
+            Ok(None) => return,
+            Ok(Some(image)) => Some(image),
+            // No wl-paste/xclip here: let the backend try its own host clipboard.
+            Err(ClipboardError::Unavailable(why)) => {
+                tracing::info!("desktop clipboard unavailable ({why}); asking the backend");
+                None
+            }
+            Err(e) => return self.banner(format!("Could not paste the image: {e}"), true),
+        };
+        let Some(sid) = self.ensure_session().await else { return };
+        let (method, params) = match &image {
+            Some(img) => attachments::attach_bytes_params(&sid, img),
+            None => attachments::clipboard_paste_params(&sid),
+        };
+        let result = self.client.request(method, params).await;
+        match result.map(|v| serde_json::from_value::<AttachedImage>(v).unwrap_or_default()) {
+            Ok(a) if a.attached => {
+                self.attachments.push(a);
+                self.publish_attachments();
+            }
+            // Backend fallback found no image: the paste was text.
+            Ok(_) if image.is_none() => {}
+            Ok(a) => self.banner(
+                format!("The image was not attached: {}", a.message.unwrap_or_default()),
+                true,
+            ),
+            Err(e) => self.banner(format!("Could not attach the image: {e}"), true),
+        }
+    }
+
+    async fn remove_attachment(&mut self, index: i32) {
+        let Some(i) = usize::try_from(index).ok().filter(|i| *i < self.attachments.len()) else {
+            return;
+        };
+        let (Some(sid), Some(path)) = (self.session.clone(), self.attachments[i].path.clone()) else {
+            return;
+        };
+        let (method, params) = attachments::detach_params(&sid, &path);
+        match self.client.request(method, params).await {
+            Ok(_) => {
+                self.attachments.remove(i);
+                self.publish_attachments();
+            }
+            Err(e) => self.banner(format!("Could not remove the attachment: {e}"), true),
+        }
+    }
+
     fn flush_state(&self) {
         let (running, status) = (self.transcript.running, self.transcript.status.clone());
         ui(&self.weak, move |w| {
@@ -1528,6 +1621,8 @@ impl Controller {
     }
 
     async fn open(&mut self, stored_id: String) {
+        // Queued images belong to the chat they were pasted into.
+        self.clear_attachments();
         if self.stored.as_deref() == Some(stored_id.as_str()) {
             return;
         }

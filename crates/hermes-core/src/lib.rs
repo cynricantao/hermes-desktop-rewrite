@@ -8,6 +8,9 @@
 //! * [`transcript`] — a pure reducer turning gateway events into a renderable transcript.
 //! * [`markdown`] — block-level splitting of assistant replies into prose / fenced code /
 //!   GFM tables, streaming-safe (a half-received table never flickers).
+//! * [`attachments`] — clipboard image read (wl-paste/xclip), base64, attach/detach calls.
+//! * [`styled`] — rewrites reply markdown into the subset Slint renders (tables/code as
+//!   aligned monospace, headings as bold) so a reply never falls back to raw text.
 //! * [`diff`] — unified-diff parsing for the diff view (line kinds, numbers, paths).
 //! * [`highlight`] — syntect-backed code highlighting on a background thread, with a
 //!   bounded content-keyed cache and per-stream checkpoint resume.
@@ -17,6 +20,7 @@
 //!   toolsets, MCP servers, memory, scheduled jobs) over the backend's REST routes.
 
 pub mod api;
+pub mod attachments;
 pub mod backend;
 pub mod capabilities;
 pub mod diff;
@@ -29,6 +33,7 @@ pub mod protocol;
 pub mod rpc;
 pub mod sessions;
 pub mod settings;
+pub mod styled;
 pub mod transcript;
 
 pub use rpc::{Client, ClientEvent, RpcError};
