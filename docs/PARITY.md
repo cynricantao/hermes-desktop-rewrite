@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**42 done · 117 partial · 633 not started · 1 unsupported** (of 793).
+**42 done · 134 partial · 616 not started · 1 unsupported** (of 793).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -152,7 +152,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Reasoning step rows — local — src/lib/reasoning-step.ts
 - [x] Turn activity / tool ticker — WS tool.start/tool.complete — src/components/assistant-ui/thread/turn-activity.ts ⟶ grouped "Ran N commands" rows with spinner
 - [ ] Run summary (per-turn tool digest) — local — src/components/assistant-ui/tool/run-summary.ts
-- [ ] Changed-files card — REST /api/git + local diff — src/components/assistant-ui/thread/changed-files-card.tsx
+- [~] Changed-files card — REST /api/git + local diff — src/components/assistant-ui/thread/changed-files-card.tsx ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
 - [ ] Thread timeline rail (jump-to-turn) — local — src/components/assistant-ui/thread/timeline.tsx, timeline-rail.tsx
 - [ ] Timeline timestamps + hover time — local — src/components/assistant-ui/thread/timeline-timestamp.tsx, message-hover-time.tsx
 - [~] Message reactions (emoji) — RPC message.react + WS message.reaction — src/components/assistant-ui/thread/message-reactions.tsx, src/store/reactions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
@@ -273,19 +273,19 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Projects list (groups of folders/repos/worktrees) — RPC projects.list — src/store/projects.ts ⟶ project dialog lists non-archived projects and its rows are pointer-click tested against the private backend; hierarchical grouping remains unbuilt.
 - [x] Create project — RPC projects.create — src/app/chat/sidebar/project-dialog.tsx ⟶ live private backend, daily: actual Add project click, existing folder validation, missing folder rejection without creation, independent projects.list readback; dialog currently adds one folder.
 - [~] Update project (name/color/icon) — RPC projects.update — src/app/chat/sidebar/projects/project-menu.tsx ⟶ name edit click and independent projects.get readback verified live; color/icon editing is not built.
-- [ ] Delete project — RPC projects.delete — src/app/chat/sidebar/projects/project-menu.tsx
-- [ ] Archive project — RPC projects.archive — src/store/projects.ts
+- [~] Delete project — RPC projects.delete — src/app/chat/sidebar/projects/project-menu.tsx ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
+- [~] Archive project — RPC projects.archive — src/store/projects.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
 - [~] Enter/leave project (sidebar scope) — RPC projects.set_active — src/app/chat/sidebar/projects/workspace-groups.ts ⟶ actual selection/leave clicks, pointer readback, correct session.create cwd and restore/new-chat inheritance verified live; Recents remains global, not project-filtered.
-- [ ] Set primary project — RPC projects.set_primary — src/store/projects.ts
-- [ ] Add folder to project — RPC projects.add_folder — src/app/chat/sidebar/projects/project-menu.tsx
-- [ ] Remove folder from project — RPC projects.remove_folder — src/app/chat/sidebar/projects/project-menu.tsx
-- [ ] Project tree (folders/repos) — RPC projects.tree — src/store/project-tree.ts
-- [ ] Project facts (stack/commands summary) — RPC project.facts — src/store/projects.ts
-- [ ] Project sessions — RPC projects.project_sessions — src/app/chat/sidebar/use-entered-project-sessions.ts
-- [ ] Project for current cwd — RPC projects.for_cwd — src/store/project-scope.ts
-- [ ] Auto repository discovery (repo scan) — RPC projects.discover_repos — src/store/projects.ts
+- [~] Set primary project — RPC projects.set_primary — src/store/projects.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
+- [~] Add folder to project — RPC projects.add_folder — src/app/chat/sidebar/projects/project-menu.tsx ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
+- [~] Remove folder from project — RPC projects.remove_folder — src/app/chat/sidebar/projects/project-menu.tsx ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
+- [~] Project tree (folders/repos) — RPC projects.tree — src/store/project-tree.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
+- [~] Project facts (stack/commands summary) — RPC project.facts — src/store/projects.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
+- [~] Project sessions — RPC projects.project_sessions — src/app/chat/sidebar/use-entered-project-sessions.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
+- [~] Project for current cwd — RPC projects.for_cwd — src/store/project-scope.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
+- [~] Auto repository discovery (repo scan) — RPC projects.discover_repos — src/store/projects.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
 - [ ] Repo scan roots / exclusions — config desktop.repo_scan_* — src/app/settings/constants.ts
-- [ ] Record discovered repos — RPC projects.record_repos — src/store/projects.ts
+- [~] Record discovered repos — RPC projects.record_repos — src/store/projects.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
 - [ ] New git worktree (⌘⇧B) — local (Electron git-worktree) — electron/git-worktree-ops.ts
 - [ ] Base-branch picker for worktree — local — src/app/chat/sidebar/projects/base-branch-picker.tsx
 - [ ] Worktree dialog — local — src/app/chat/sidebar/projects/worktree-dialog.tsx
@@ -394,7 +394,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Command allowlist — config command_allowlist — src/app/settings/constants.ts
 - [ ] Tool output limits — config tool_output.* — src/app/settings/constants.ts
 - [ ] Checkpoints (file snapshots) — config checkpoints.* — src/app/settings/constants.ts
-- [ ] Rollback list/diff/restore — RPC rollback.list|diff|restore — src/hermes.ts
+- [~] Rollback list/diff/restore — RPC rollback.list|diff|restore — src/hermes.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
 
 ## MCP
 
@@ -521,21 +521,21 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] File actions (open/reveal/copy path) — local (Electron) — src/app/right-sidebar/file-actions.tsx
 - [ ] File drag-and-drop manager — local — src/app/right-sidebar/files/dnd-manager.ts
 - [ ] Remote file picker — local + remote gateway — src/app/right-sidebar/files/remote-picker.tsx
-- [ ] Project tree source (files pane) — RPC projects.tree — src/app/right-sidebar/files/use-project-tree.ts
-- [ ] Review pane (source control) — REST /api/git/* — src/app/right-sidebar/review/index.tsx
+- [~] Project tree source (files pane) — RPC projects.tree — src/app/right-sidebar/files/use-project-tree.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
+- [~] Review pane (source control) — REST /api/git/* — src/app/right-sidebar/review/index.tsx ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
 - [ ] Review file tree — local — src/app/right-sidebar/review/file-tree.tsx
 - [ ] Review churn bar (additions/deletions) — local — src/app/right-sidebar/review/churn-bar.tsx
 - [ ] Review scope row (staged/unstaged/PR) — local — src/app/right-sidebar/review/scope-row.tsx
 - [ ] Review ship bar (commit/push actions) — local (Electron git-ipc) — src/app/right-sidebar/review/ship-bar.tsx
 - [ ] Review summary (agent-produced) — WS review.summary — src/store/review.ts
 - [ ] Pull-requests list — REST /api/profiles/sessions/pull-requests — src/store/pull-requests.ts
-- [ ] GitHub auth probe — REST /api/git/gh-auth — src/store/suggestion-providers/github.ts
+- [~] GitHub auth probe — REST /api/git/gh-auth — src/store/suggestion-providers/github.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
 - [ ] Terminal pane (persistent PTY) — local (Electron terminal-ipc) — src/app/right-sidebar/terminal/instance.tsx
 - [ ] Terminal tabs rail — local — src/app/right-sidebar/terminal/rail.tsx
 - [ ] New terminal — local — src/app/right-sidebar/terminal/terminals.ts
 - [ ] Terminal copy/paste (⌘C/⌘V or ⌃⇧C/⌃⇧V) — local — src/app/right-sidebar/terminal/clipboard.ts
 - [ ] Terminal links (open URLs from output) — local — src/app/right-sidebar/terminal/links.ts
-- [ ] Agent terminal stream (agent runs a command in the pane) — RPC terminal.resize + WS agent.terminal.output — src/app/right-sidebar/terminal/agent-terminal-stream.ts
+- [~] Agent terminal stream (agent runs a command in the pane) — RPC terminal.resize + WS agent.terminal.output — src/app/right-sidebar/terminal/agent-terminal-stream.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
 - [ ] Terminal font settings — local — src/app/settings/terminal-font-setting.tsx
 - [ ] Terminal backend warning — local — src/store/terminal-backend-warning.ts
 - [ ] Terminal toggle (⌃`) / new (⌃⇧`) / next/prev / close hotkeys — local — src/lib/keybinds/actions.ts
