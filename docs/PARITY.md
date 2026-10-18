@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**65 done · 288 partial · 435 not started · 6 unsupported** (of 794).
+**68 done · 290 partial · 430 not started · 6 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -308,15 +308,15 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Provider API keys view — REST /api/env, /api/env/reveal — src/app/settings/keys-settings.tsx, env-credentials.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Custom endpoints (OpenAI/Anthropic-compatible) — REST /api/providers/custom-endpoints — src/app/settings/custom-endpoints-settings.tsx
 - [ ] Validate provider/endpoint — REST /api/providers/validate, /api/providers/custom-endpoints/validate — src/app/settings/helpers.ts
-- [ ] Favorite models — local — src/store/favorite-models.ts
-- [ ] Model visibility (hide models) — local — src/store/model-visibility.ts, src/app/model-visibility-overlay.tsx
-- [ ] Model picker overlay (⌘⇧M) — REST /api/model/options — src/app/model-picker-overlay.tsx
+- [x] Favorite models — local — src/store/favorite-models.ts ⟶ the star on every picker row pins the model into a Favorites section above the provider groups (star order preserved, section off while searching); stored in `prefs.json` (`hermes.desktop.favorite-models`). Verified by the live `models` section (2026-10-17).
+- [x] Model visibility (hide models) — local — src/store/model-visibility.ts, src/app/model-visibility-overlay.tsx ⟶ "Edit models…" opens the tick dialog: per-model ticks, a provider master tick (indeterminate when partial), fold state, add/forget custom ids and "Reset to defaults" — stored in `prefs.json` (`hermes.desktop.visible-models` / `-known-models`), never in backend config. Verified by the live `models` section (2026-10-17).
+- [~] Model picker overlay (⌘⇧M) — REST /api/model/options — src/app/model-picker-overlay.tsx ⟶ the composer's model chip opens the curated catalog menu (`model.options`, every provider the backend reports, search, favourites) and a pick switches the model. No global ⌘⇧M overlay and no MoA/pricing rows.
 - [ ] Model presets — local — src/store/model-presets.ts
 - [ ] Model pricing display — local — src/store/model-pricing.ts
-- [ ] Custom models (user-added) — local + REST /api/model/options — src/store/custom-models.ts
+- [x] Custom models (user-added) — local + REST /api/model/options — src/store/custom-models.ts ⟶ typing an id no provider lists offers "Add <id> to <provider>" in the menu and the dialog; the id joins its provider at once and is remembered in `prefs.json` (`hermes.desktop.custom-models`), removable from the dialog. Verified by the live `models` section (2026-10-17).
 - [ ] Per-profile model assignment — local — src/store/model-assignment.ts
 - [ ] Model menu (titlebar model switcher) — local — src/app/shell/model-menu-panel.tsx, use-model-menu-controller.ts
-- [ ] Model catalog menu — local — src/app/shell/model-catalog-menu.tsx
+- [~] Model catalog menu — local — src/app/shell/model-catalog-menu.tsx ⟶ search (case/separator folding), provider groups with fold state, Favorites section, footer (Refresh models / Add custom model… / Edit models…) are built and live-verified; MoA presets, pricing/usage rows, per-model reasoning/fast submenus and "Use Settings default" are not.
 - [ ] Disconnect a model/provider — RPC model.disconnect — src/hermes.ts
 - [ ] Provider wait (in-flight model selection) — local — src/store/provider-wait.ts
 - [~] Guarded model switch (warn mid-turn) — local — src/lib/guarded-model-switch.ts ⟶ deferred model changes and backend confirmation warnings are surfaced. Expensive-model confirmation UI remains unbuilt; no automatic confirmation.

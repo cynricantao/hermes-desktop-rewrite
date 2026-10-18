@@ -334,7 +334,7 @@ impl Controller {
                 return;
             }
             "model" if arg.is_empty() => {
-                self.refresh_models().await;
+                self.refresh_models(false).await;
                 ui(&self.weak, |w| w.set_picker_open(true));
                 return;
             }

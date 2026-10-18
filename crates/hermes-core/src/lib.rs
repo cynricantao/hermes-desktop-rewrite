@@ -22,6 +22,8 @@
 //!   in-app browser helper protocol).
 //! * [`capabilities`] — requests and rows for the Capabilities screen (profiles, skills,
 //!   toolsets, MCP servers, memory, scheduled jobs) over the backend's REST routes.
+//! * [`models`] — picker curation: which models are visible, favourites, custom ids
+//!   (front-end state in `prefs.json`; the backend stays the catalog authority).
 
 pub mod api;
 pub mod artifacts;
@@ -36,6 +38,7 @@ pub mod http;
 pub mod input_requests;
 pub mod keybinds;
 pub mod markdown;
+pub mod models;
 pub mod notify;
 pub mod prefs;
 pub mod projects;
