@@ -21,6 +21,8 @@ use serde_json::{Value, json};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
 use tokio::sync::mpsc;
 
+mod slash;
+
 use crate::browser::BrowserCmd;
 use crate::capabilities::CapCmd;
 use crate::rows::to_row;
@@ -34,6 +36,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum Cmd {
     Send(String),
+    Queue(String),
     SaveDraft {
         session: String,
         text: String,
@@ -129,6 +132,14 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
         if !s.is_empty() {
             let _ = t.send(Cmd::Send(s));
         }
+    });
+    let t = tx.clone();
+    st.on_queue(move |text| {
+        let _ = t.send(Cmd::Queue(text.into()));
+    });
+    let t = tx.clone();
+    st.on_inspect_queue(move || {
+        let _ = t.send(Cmd::Send("/queue list".into()));
     });
     let t = tx.clone();
     st.on_stop(move || {
@@ -376,6 +387,11 @@ struct Controller {
     client: Client,
     _backend: Arc<ManagedBackend>,
     transcript: Transcript,
+    queues: hermes_core::commands::PromptQueues,
+    queue_paused: std::collections::HashSet<String>,
+    side_results: std::collections::HashMap<String, Vec<String>>,
+    runtime_stores: std::collections::HashMap<String, String>,
+    completion_task: Option<tokio::task::JoinHandle<()>>,
     /// Runtime session id of the open chat (None = new-chat screen).
     session: Option<String>,
     /// Stored id of the open chat (sidebar highlight / delete).
@@ -463,6 +479,11 @@ impl Controller {
             client,
             _backend: backend,
             transcript: Transcript::new(),
+            queues: Default::default(),
+            queue_paused: Default::default(),
+            side_results: Default::default(),
+            runtime_stores: Default::default(),
+            completion_task: None,
             session: None,
             stored: None,
             draft_model: None,
@@ -641,25 +662,51 @@ impl Controller {
     async fn handle_cmd(&mut self, cmd: Cmd) {
         match cmd {
             Cmd::Send(text) => self.send(text).await,
+            Cmd::Queue(text) => {
+                if !self.queue_command(&format!("add {text}")).await {
+                    self.restore_rejected_queue(&text);
+                }
+            }
             Cmd::SaveDraft { session, text } => {
-                self.drafts.insert(session, text);
+                self.drafts.insert(session, text.clone());
+                self.completions(text);
             }
             Cmd::SubmissionFailed {
                 session_id,
                 text,
                 message,
             } => {
-                if self.session.as_deref() == Some(&session_id) {
+                let key = self
+                    .runtime_stores
+                    .get(&session_id)
+                    .cloned()
+                    .unwrap_or_else(|| session_id.clone());
+                self.queue_paused.insert(key.clone());
+                let draft = self.drafts.entry(key.clone()).or_default();
+                if draft.is_empty() {
+                    *draft = text.clone();
+                }
+                let notice = format!("Message failed: {message}\nUnsent: {text}");
+                if self.queue_key() == Some(key.as_str()) {
+                    // An old runtime failure must not stop a newer resumed turn.
+                    if self.session.as_deref() == Some(&session_id) {
+                        self.transcript.running = false;
+                        self.transcript.status.clear();
+                    }
+                    self.notice(notice, true);
                     self.banner(format!("Message failed: {message}"), true);
-                    self.transcript.running = false;
-                    self.transcript.status.clear();
-                    self.flush_state();
                     ui(&self.weak, move |w| {
                         let st = w.global::<AppState>();
-                        if st.get_draft().is_empty() {
+                        if st.get_active_session().as_str() == key && st.get_draft().is_empty() {
                             st.set_draft(text.into());
                         }
                     });
+                } else {
+                    self.side_results.entry(key).or_default().push(notice);
+                    self.banner(
+                        "A message failed in another chat. Reopen it to recover the unsent prompt.".into(),
+                        true,
+                    );
                 }
             }
             Cmd::Caps(cmd) => {
@@ -668,6 +715,9 @@ impl Controller {
             Cmd::PasteImage => self.paste_image().await,
             Cmd::RemoveAttachment(i) => self.remove_attachment(i).await,
             Cmd::Stop => {
+                if let Some(key) = self.queue_key().map(str::to_owned) {
+                    self.queue_paused.insert(key);
+                }
                 if let Some(sid) = self.session.clone()
                     && let Err(e) = self
                         .client
@@ -683,6 +733,7 @@ impl Controller {
                 self.draft_effort = None;
                 self.session = None;
                 self.stored = None;
+                self.publish_queue();
                 self.transcript = Transcript::new();
                 self.reset = true;
                 self.flush();
@@ -690,6 +741,7 @@ impl Controller {
                     let st = w.global::<AppState>();
                     st.set_active_session(SharedString::new());
                     st.set_runtime_session(SharedString::new());
+                    st.set_completions(ModelRc::default());
                     st.set_session_title("New chat".into());
                     st.set_draft(SharedString::new());
                     st.set_approval(ApprovalInfo::default());
@@ -1395,6 +1447,9 @@ impl Controller {
             Ok(r) => {
                 self.session = Some(r.session_id.clone());
                 self.stored = Some(r.stored_session_id.clone()).filter(|s| !s.is_empty());
+                if let Some(stored) = &self.stored {
+                    self.runtime_stores.insert(r.session_id.clone(), stored.clone());
+                }
                 let stored = self.stored.clone().unwrap_or_default();
                 let runtime = r.session_id.clone();
                 self.draft_model = None;
@@ -1414,152 +1469,6 @@ impl Controller {
             Err(e) => {
                 self.banner(format!("Could not start a chat: {e}"), true);
                 None
-            }
-        }
-    }
-
-    /// Slash commands never fall through to a model prompt as ordinary text.
-    async fn slash(&mut self, text: String) {
-        let (command, arg) = text
-            .trim_start_matches('/')
-            .split_once(char::is_whitespace)
-            .unwrap_or((text.trim_start_matches('/'), ""));
-        let arg = arg.trim();
-        match command {
-            "new" | "reset" | "clear" => {
-                Box::pin(self.handle_cmd(Cmd::NewChat)).await;
-                return;
-            }
-            "stop" => {
-                Box::pin(self.handle_cmd(Cmd::Stop)).await;
-                return;
-            }
-            "reasoning" if !arg.is_empty() => {
-                self.select_effort(arg.into()).await;
-                return;
-            }
-            "reasoning" => {
-                ui(&self.weak, |w| w.set_effort_open(true));
-                return;
-            }
-            // In-app browser (the app's own command; Hermes's /browser is the CDP connector).
-            "preview" if arg == "close" => {
-                let _ = self.browser.send(BrowserCmd::Close);
-                return;
-            }
-            "preview" if !arg.is_empty() => {
-                let _ = self.browser.send(BrowserCmd::Open(arg.to_owned()));
-                return;
-            }
-            "preview" => {
-                self.banner("Usage: /preview <url or file path>, or /preview close".into(), false);
-                return;
-            }
-            "model" if arg.is_empty() => {
-                self.refresh_models().await;
-                ui(&self.weak, |w| w.set_picker_open(true));
-                return;
-            }
-            _ => {}
-        }
-        let Some(sid) = self.ensure_session().await else {
-            ui(&self.weak, move |w| w.global::<AppState>().set_draft(text.into()));
-            return;
-        };
-        if command == "model" {
-            match self
-                .client
-                .request(
-                    "config.set",
-                    json!({"key":"model", "session_id":sid, "value":format!("{arg} --session")}),
-                )
-                .await
-            {
-                Ok(result) if result.get("confirm_required").and_then(Value::as_bool) == Some(true) => self.banner(
-                    result
-                        .get("confirm_message")
-                        .and_then(Value::as_str)
-                        .unwrap_or("Model change requires confirmation.")
-                        .into(),
-                    true,
-                ),
-                Ok(result) if result.get("deferred").and_then(Value::as_bool) == Some(true) => {
-                    self.banner("Model change queued for the next turn.".into(), false);
-                }
-                Ok(_) => {
-                    self.refresh_model_label().await;
-                    self.refresh_effort().await;
-                }
-                Err(e) => self.banner(format!("Could not switch model: {e}"), true),
-            }
-            return;
-        }
-        let result = match self
-            .client
-            .request("slash.exec", json!({"session_id":sid, "command":text}))
-            .await
-        {
-            Ok(v) => Ok(v),
-            Err(_) => {
-                self.client
-                    .request("command.dispatch", json!({"session_id":sid, "name":command, "arg":arg}))
-                    .await
-            }
-        };
-        match result {
-            Ok(result) => match result.get("type").and_then(Value::as_str).unwrap_or("exec") {
-                "send" | "skill" => {
-                    let prompt = result
-                        .get("message")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_owned();
-                    if prompt.is_empty() {
-                        return self.banner("The command returned no message to send.".into(), true);
-                    }
-                    // A skill's expanded prompt can include private instructions; its short display belongs in the transcript.
-                    let display = result
-                        .get("display")
-                        .and_then(Value::as_str)
-                        .unwrap_or(&text)
-                        .to_owned();
-                    self.submit(prompt, display).await;
-                }
-                "prefill" => {
-                    let draft = result
-                        .get("message")
-                        .or_else(|| result.get("text"))
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_owned();
-                    ui(&self.weak, move |w| w.global::<AppState>().set_draft(draft.into()));
-                }
-                "alias" => {
-                    self.banner(
-                        "This command is an alias. Use its full command name in this preview.".into(),
-                        false,
-                    );
-                }
-                _ => {
-                    let output = result
-                        .get("output")
-                        .or_else(|| result.get("notice"))
-                        .and_then(Value::as_str)
-                        .unwrap_or("Command completed.")
-                        .to_owned();
-                    self.transcript.blocks.push(hermes_core::transcript::Block::Notice {
-                        text: output,
-                        error: false,
-                    });
-                    self.reset = true;
-                    self.flush();
-                    self.refresh_model_label().await;
-                    self.refresh_effort().await;
-                }
-            },
-            Err(e) => {
-                self.banner(format!("Command failed: {e}"), true);
-                ui(&self.weak, move |w| w.global::<AppState>().set_draft(text.into()));
             }
         }
     }
@@ -1713,6 +1622,7 @@ impl Controller {
                 self.draft_effort = None;
                 self.session = Some(r.session_id.clone());
                 self.stored = Some(stored_id.clone());
+                self.runtime_stores.insert(r.session_id.clone(), stored_id.clone());
                 self.project = r
                     .info
                     .project
@@ -1748,6 +1658,12 @@ impl Controller {
                     st.set_cwd_label(short_path(&info.cwd).into());
                 });
                 self.refresh_effort().await;
+                if let Some(key) = self.queue_key().map(str::to_owned) {
+                    for result in self.side_results.remove(&key).unwrap_or_default() {
+                        self.notice(result, false);
+                    }
+                    self.publish_queue();
+                }
             }
             Err(e) => self.banner(format!("Could not open chat: {e}"), true),
         }
@@ -1789,6 +1705,25 @@ impl Controller {
                 }
                 if e.kind == "projects.changed" {
                     self.refresh_projects(false).await;
+                    return;
+                }
+                if matches!(e.kind.as_str(), "background.complete" | "btw.complete") {
+                    let sid = e.session_id.clone().unwrap_or_default();
+                    let key = self.runtime_stores.get(&sid).cloned().unwrap_or_else(|| sid.clone());
+                    let text = e
+                        .payload
+                        .get("text")
+                        .and_then(Value::as_str)
+                        .unwrap_or("No result text.");
+                    let error = e.payload.get("error").and_then(Value::as_str).unwrap_or_default();
+                    let task = e.payload.get("task_id").and_then(Value::as_str).unwrap_or("task");
+                    let output = format!("{task}: {}", if error.is_empty() { text } else { error });
+                    if self.queue_key() == Some(key.as_str()) {
+                        self.notice(output, !error.is_empty() || text.starts_with("error:"));
+                    } else {
+                        self.side_results.entry(key).or_default().push(output);
+                        self.banner("Background result ready in its original chat.".into(), false);
+                    }
                     return;
                 }
                 // Only the open session's events touch the transcript.
@@ -1840,6 +1775,18 @@ impl Controller {
                 }
                 if e.kind == "message.complete" {
                     self.flush();
+                    if e.payload.get("error").is_some_and(|v| !v.is_null())
+                        || matches!(
+                            e.payload.get("status").and_then(Value::as_str),
+                            Some("error" | "failed" | "interrupted" | "cancelled")
+                        )
+                    {
+                        if let Some(key) = self.queue_key().map(str::to_owned) {
+                            self.queue_paused.insert(key);
+                        }
+                    } else {
+                        self.drain_queue().await;
+                    }
                 }
             }
         }

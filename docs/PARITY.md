@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**62 done · 282 partial · 444 not started · 6 unsupported** (of 794).
+**65 done · 282 partial · 441 not started · 6 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -87,8 +87,8 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 ## Chat & composer
 
 - [x] Send message / submit turn — RPC prompt.submit — src/app/session/hooks/use-prompt-actions/submit.ts ⟶ live: `HERMES_DESKTOP_AUTOSEND` run, screenshots rs-dark-chat-*.png
-- [~] Steer a running turn — RPC session.steer — src/app/chat/session-tile-actions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
-- [ ] Queue a message while busy (⌘Enter) — local + RPC prompt.submit (queue drain) — src/store/composer-queue.ts
+- [~] Steer a running turn — RPC session.steer — src/app/chat/session-tile-actions.ts ⟶ `/steer` and registry aliases wired; 2026-10-18 `tests/command_controls.rs` verifies exact live-runtime RPC, no interrupt, accepted/rejected/unknown-status handling against a gateway simulation. Provider/tool-boundary delivery remains unverified.
+- [~] Queue a message while busy (⌘Enter) — local + RPC prompt.submit (queue drain) — src/store/composer-queue.ts ⟶ `/queue`/`/q` and Ctrl+Enter wired, keyed by stored chat, FIFO/edit/rm/move/clear/resume. Live 2026-10-18 `tests/live_backend.rs` commands verifies management without inference; gateway simulation verifies drains, Stop/error/attachment pause, runtime-remint isolation and rejected queue draft recovery (keyboard, slash/quick aliases, session-create failures, newer-draft protection). Live inference drain, disk persistence and macOS Cmd chord unverified/unbuilt.
 - [ ] Send next queued message (⌘⇧K) — local — src/store/composer-queue.ts, src/lib/keybinds/actions.ts
 - [x] Interrupt / stop the active turn — RPC session.interrupt — src/app/chat/session-tile-actions.ts ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: Stop clicked mid-stream → reply stops growing (30 of 300 lines, unchanged 3 s later), running=false, no spinner, button back to Send, next prompt answered. **Esc** (global shortcut, focus in composer) verified the same way: stopped at 24 of 300 lines, unchanged 3 s later, next prompt answered
 - [~] Redirect a running turn — RPC session.redirect — src/app/chat/session-tile-actions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
@@ -98,8 +98,8 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Rich text editor with markdown affordances — local — src/app/chat/composer/rich-editor.tsx
 - [ ] Soft focus composer (/, Shift+Enter, type-to-focus) — local — src/app/chat/composer/paste-to-focus.ts, src/lib/keybinds/composer-focus-keys.ts
 - [ ] Focus composer from anywhere (⌘/Ctrl+L) — local — src/app/chat/composer/focus-chord.ts
-- [~] Slash command completion — RPC commands.catalog, complete.slash — src/app/chat/composer/hooks/use-slash-completions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
-- [~] Execute a slash command — RPC slash.exec — src/app/session/hooks/use-prompt-actions/slash.ts ⟶ slash.exec/command.dispatch routing plus local model/reasoning/new/stop. Aliases remain unsupported; model-generated skill execution is not part of the no-credentials check.
+- [x] Slash command completion — RPC commands.catalog, complete.slash — src/app/chat/composer/hooks/use-slash-completions.ts ⟶ live 2026-10-18 `tests/live_backend.rs` commands: real backend command/installed-skill suggestions, pointer selection fills draft without sending; headless screenshot rs-command-completions.png. Top five matches; Tab and stale-draft rejection tested with the gateway simulation.
+- [~] Execute a slash command — RPC slash.exec — src/app/session/hooks/use-prompt-actions/slash.ts ⟶ native bg/btw/queue/steer/help/skills/reload-skills plus existing model/reasoning/new/stop; registry/quick aliases, extension dispatch and desktop/subcommand restrictions. Live 2026-10-18 commands subset checks catalog/aliases/rejections. Gateway simulation checks skill privacy, bounded alias loops and non-retry after execution errors. Full forwarded-command/provider parity remains unverified; docs/COMMANDS.md inventories all defaults.
 - [~] @-mention path completion — RPC complete.path — src/app/chat/composer/hooks/use-at-completions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Emoji completion (:name) — local — src/app/chat/composer/hooks/use-emoji-completions.ts
 - [ ] Slash help hint (?) — local — src/app/chat/composer/help-hint.tsx
@@ -368,8 +368,8 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Skill frontmatter parse — local — src/app/capabilities/skills/frontmatter.ts
 - [ ] Skill deeplink install — local + REST install — src/store/skill-deeplink-install.ts
 - [~] Skill manage (create/edit/delete) — RPC skills.manage — src/plugins/hermes-bots/skills-hub.tsx ⟶ create via REST POST /api/skills verified live (default + swe scope); edit implemented (PUT /api/skills/content) but not live-verified; delete not built
-- [~] Skill reload — RPC skills.reload — src/plugins/hermes-bots/skills-hub.tsx ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
-- [ ] Skill suggestions in composer — local — src/store/suggestion-providers/skill.ts
+- [x] Skill reload — RPC skills.reload — src/plugins/hermes-bots/skills-hub.tsx ⟶ live 2026-10-18 `tests/live_backend.rs` commands: `/reload_skills` resolves to native `/reload-skills`, invokes the session-scoped rescan and verifies its catalog against an independent read. No-op rescan verified; adding/removing files was not exercised.
+- [~] Skill suggestions in composer — local — src/store/suggestion-providers/skill.ts ⟶ dynamic `/name` skills offered via real complete.slash, verified 2026-10-18 commands subset. Natural-language/proactive suggestion provider is not built.
 - [x] Skill curator status — REST /api/curator — src/api/system.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): Memory tab curator row shows interval/last run; paused flag read back
 - [~] Background skill-curator control (pause/run) — REST /api/curator/paused, /run — src/api/system.ts ⟶ pause/resume switch verified live (GET /api/curator paused true→false); Run now implemented behind a confirm click (explicit ?profile=) but not run live: it starts an agent run
 
@@ -579,7 +579,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Open settings (⌘,) — local — src/app/shell/hooks/use-overlay-routing.ts
 - [ ] Open shortcuts panel (⌘/) — local — src/app/settings/keybind-settings.tsx
 - [ ] Send message (Enter) — RPC prompt.submit — src/lib/keybinds/actions.ts (composer.send)
-- [~] Steer (Enter) / queue (⌘Enter) — RPC session.steer / prompt.submit — src/lib/keybinds/actions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Steer (Enter) / queue (⌘Enter) — RPC session.steer / prompt.submit — src/lib/keybinds/actions.ts ⟶ Enter executes `/steer`/`/queue` while busy; Ctrl+Enter queues plain text. Gateway-simulation keyboard and routing checks pass 2026-10-18. Bare Enter on busy plain text explains the limit and retains the draft; live tool-boundary delivery and macOS Cmd chord unverified.
 - [ ] Send queued (⌘⇧K) — local — src/lib/keybinds/actions.ts
 - [ ] Mention (@) / slash (/) / help (?) — local — src/lib/keybinds/actions.ts
 - [ ] Input history (↑/↓) — local — src/lib/keybinds/actions.ts
@@ -1143,7 +1143,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Subagent steer/interrupt — RPC subagent.steer, subagent.interrupt — src/store/subagents.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [~] Subagent spawn tree save/load/list — RPC spawn_tree.save|load|list — src/store/subagents.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [~] Delegation status/pause — RPC delegation.status, delegation.pause — src/store/background-delegation.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
-- [~] Background prompt (BTW) — RPC prompt.background, prompt.btw; WS btw.complete — src/app/session/hooks/use-prompt-actions/slash.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Background prompt (BTW) — RPC prompt.background, prompt.btw; WS btw.complete — src/app/session/hooks/use-prompt-actions/slash.ts ⟶ native `/bg`/`/background` and `/btw` use side-agent RPCs; completions return to stored parent chat even after navigation. Gateway simulation verifies bg request/results and wrong-chat isolation 2026-10-18. Successful live provider bg/btw completion and durable result storage remain unverified/unbuilt.
 - [~] Agents page (roster) — local + RPC session.active_list — src/app/agents/index.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [~] Learning graph — REST /api/learning/graph — src/api/skills.ts ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
 - [~] Learning node detail/edit/delete — REST /api/learning/node + RPC learning.* — src/api/skills.ts ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
@@ -1158,7 +1158,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Friction/dislike reporting — RPC shared_metrics.desktop_friction|desktop_dislike — src/store/shared-metrics.ts
 - [~] Diagnostics share (Nous) — RPC diagnostics.share_nous — src/store/send-diagnostics.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] i18n backend language packs — RPC i18n.languages, i18n.catalog — src/i18n/backend-packs.ts
-- [ ] Slash command catalog (desktop) — local registry — src/lib/desktop-slash-commands.ts, src/lib/desktop-slash-registry.json
+- [x] Slash command catalog (desktop) — local registry — src/lib/desktop-slash-commands.ts, src/lib/desktop-slash-registry.json ⟶ `/help`/`/commands` consume commands.catalog rather than copying registry data. Live 2026-10-18 commands subset checks every advertised entry against rendered notice text. This is a text catalog, not the still-unbuilt command-palette/command-center overlay.
 - [ ] Electron preload bridge (native API surface) — local (Electron) — electron/preload.ts
 - [ ] CDP / dev inspector — local (Electron) (platform) — electron/dev-cdp.ts
 - [ ] Renderer accessibility tree — local (Electron) (platform) — electron/renderer-accessibility.ts

@@ -323,6 +323,8 @@ export component Transcript inherits Rectangle {
     }
 }
 
+export struct CommandItem { text: string, label: string, detail: string }
+
 export component Composer inherits Rectangle {
     in-out property <string> text;
     in property <bool> running;
@@ -331,6 +333,12 @@ export component Composer inherits Rectangle {
     in property <string> model-label;
     in property <string> effort-label;
     in property <string> cwd-label;
+    in property <[CommandItem]> completions;
+    in property <int> queue-count;
+    property <bool> dismissed;
+    changed text => { root.dismissed = false; }
+    callback inspect-queue();
+    callback queue(string);
     callback send(string);
     callback stop();
     callback pick-model();
@@ -373,8 +381,17 @@ export component Composer inherits Rectangle {
                     root.paste-image();
                     reject
                 }
+                if e.text == Key.Escape { root.dismissed = true; return reject; }
+                if e.text == Key.Tab && root.completions.length > 0 && !root.dismissed {
+                    root.text = root.completions[0].text;
+                    root.dismissed = true;
+                    return accept;
+                }
                 if e.text == Key.Return && !e.modifiers.shift {
-                    if root.running { return accept; }
+                    if e.modifiers.control {
+                        if root.text != "" { root.queue(root.text); }
+                        return accept;
+                    }
                     if root.text != "" { root.send(root.text); }
                     return accept;
                 }
@@ -439,6 +456,33 @@ export component Composer inherits Rectangle {
         }
     }
 
+    if root.completions.length > 0 && !root.dismissed: Rectangle {
+        y: -self.height - 6px;
+        width: parent.width;
+        height: min(240px, root.completions.length * 42px);
+        background: Theme.raised;
+        border-radius: Theme.r-md;
+        border-width: 1px;
+        border-color: Theme.border-strong;
+        clip: true;
+        VerticalLayout {
+            spacing: 0px;
+            for c in root.completions: Rectangle {
+                height: 42px;
+                background: choice.has-hover ? Theme.hover : transparent;
+                accessible-role: button;
+                accessible-label: "Complete " + c.label;
+                accessible-action-default => { root.text = c.text; root.dismissed = true; }
+                VerticalLayout {
+                    padding-left: 12px; padding-right: 12px; spacing: 0px;
+                    Text { text: c.label; color: Theme.text; font-size: Theme.fs-md; overflow: elide; }
+                    Text { text: c.detail; color: Theme.text-3; font-size: Theme.fs-sm; overflow: elide; }
+                }
+                choice := TouchArea { clicked => { root.text = c.text; root.dismissed = true; } }
+            }
+        }
+    }
+
     // Chips row under the card.
     HorizontalLayout {
         y: card.height + 6px;
@@ -456,6 +500,10 @@ export component Composer inherits Rectangle {
             text: "📎 " + name + "  ✕";
             outlined: true;
             clicked => { root.remove-attachment(i); }
+        }
+        if root.queue-count > 0: Chip {
+            text: "Queued: " + root.queue-count;
+            clicked => { root.inspect-queue(); }
         }
         Rectangle { horizontal-stretch: 1; }
         Chip {

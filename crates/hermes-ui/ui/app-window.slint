@@ -3,7 +3,7 @@
 import { ScrollView, LineEdit } from "std-widgets.slint";
 import { Theme, Motion, Ease, ThemeMode } from "theme.slint";
 import { Icon, IconButton, NavItem, SectionHeader, Chip, Banner, Spinner, Toggle, Segmented, PrimaryButton, GhostButton } from "components.slint";
-import { Transcript, Composer, ChatRow, ToolRow } from "chat.slint";
+import { Transcript, Composer, ChatRow, ToolRow, CommandItem } from "chat.slint";
 import { SettingsModal, SettingsState } from "settings.slint";
 import { AppearanceState } from "w-appearance.slint";
 import { ModelsState } from "w-models.slint";
@@ -13,7 +13,7 @@ import { SystemState } from "w-system.slint";
 import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
 import { CapAction, CapItem, CapState, CapabilitiesModal } from "capabilities.slint";
 
-export { Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, AppearanceState, ModelsState, ProvidersState, SystemState, CapAction, CapItem, CapState }
+export { CommandItem, Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, AppearanceState, ModelsState, ProvidersState, SystemState, CapAction, CapItem, CapState }
 
 export struct SessionItem {
     id: string,
@@ -68,10 +68,14 @@ export global AppState {
     // Composer draft, shared by the hero and docked composers (Enter on an empty draft
     // answers an open approval card instead of being swallowed).
     in-out property <string> draft;
-    changed draft => { AppState.save-draft(AppState.active-session, AppState.draft); }
+    changed draft => { AppState.completions = []; AppState.save-draft(AppState.active-session, AppState.draft); }
     callback save-draft(string, string);
     in-out property <bool> autoscroll;
 
+    in-out property <[CommandItem]> completions;
+    in-out property <int> queue-count;
+    callback inspect-queue();
+    callback queue(string);
     callback send(string);
     callback stop();
     callback new-chat();
@@ -461,6 +465,10 @@ export component AppWindow inherits Window {
                         centered: true;
                         text <=> AppState.draft;
                         running: AppState.running;
+                        completions: AppState.completions;
+                        queue-count: AppState.queue-count;
+                        queue(t) => { AppState.queue(t); self.text = ""; }
+                        inspect-queue => { AppState.inspect-queue(); }
                         model-label: AppState.model-label;
                         effort-label: AppState.effort-label;
                         cwd-label: AppState.cwd-label;
@@ -498,6 +506,10 @@ export component AppWindow inherits Window {
                 placeholder: "Reply to Hermes…";
                 text <=> AppState.draft;
                 running: AppState.running;
+                completions: AppState.completions;
+                queue-count: AppState.queue-count;
+                queue(t) => { AppState.queue(t); self.text = ""; }
+                        inspect-queue => { AppState.inspect-queue(); }
                 model-label: AppState.model-label;
                 effort-label: AppState.effort-label;
                 cwd-label: AppState.cwd-label;

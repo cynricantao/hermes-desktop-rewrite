@@ -32,6 +32,9 @@
 //! (`$HERMES_LIVE_HOME`, default `~/.cache/hermes-desktop-rs/live-home`, which
 //! `scripts/live-test-backend.sh` regenerates on every start).
 
+#[path = "live_backend/commands.rs"]
+mod commands;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -290,6 +293,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
         return;
     }
 
+    if want("commands") {
+        commands::section(&ui, &log).await;
+    }
     if want("failure_recovery") {
         failure_recovery_section(&ui, &log).await;
     }

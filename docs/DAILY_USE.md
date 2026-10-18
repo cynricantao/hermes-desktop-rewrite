@@ -19,10 +19,11 @@ palette, fonts, spacing, and software renderer. It is not full Electron Desktop 
 - **Ctrl+N** starts a chat. **Ctrl+Tab** / **Ctrl+Shift+Tab** switches between recent chats.
   **Enter** sends, **Shift+Enter** inserts a newline, and **Esc** stops a running turn
   when no dialog/menu has priority.
-- `/model`, `/reasoning`, `/new`, and `/stop` route through the client. Other slash
-  commands use `slash.exec` with `command.dispatch` fallback. Command aliases that
-  require another dispatch are not implemented. Expanded skill prompts are hidden
-  from restored transcripts; only the short command is shown when initially sent.
+- Slash commands and installed skills now have backend-driven suggestions. Native
+  handlers include `/bg`, `/btw`, `/queue`, `/steer`, `/help`, `/skills`, and
+  `/reload-skills` in addition to model/reasoning/new/stop. Registry and quick-command
+  aliases are resolved; expanded skill instructions stay hidden. See [Desktop
+  commands](COMMANDS.md) for current controls, verified scope and remaining gaps.
 
 ## Safety and limits
 
@@ -41,8 +42,8 @@ palette, fonts, spacing, and software renderer. It is not full Electron Desktop 
   overwrite the current chat's draft or busy state.
 - The existing top error banner can overlap the first message row. Its tested error text
   remains readable; reserving transcript space for the banner is a separate layout cleanup.
-- The existing controller is still a large shared file. Project and slash-command handling
-  would benefit from a later module split rather than an unrelated rewrite in this patch.
+- The existing controller remains a large shared file. Slash-command routing now lives
+  in `src/controller/slash.rs`; project/settings handling remains in the main controller.
 - Tests use an explicit isolated backend, no real auth/config/session store, and no model
   credentials. A successful metadata/settings test is not a model-inference test.
 

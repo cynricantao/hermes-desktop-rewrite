@@ -28,6 +28,7 @@ pub mod attachments;
 pub mod backend;
 pub mod browser;
 pub mod capabilities;
+pub mod commands;
 pub mod diff;
 pub mod highlight;
 pub mod http;
