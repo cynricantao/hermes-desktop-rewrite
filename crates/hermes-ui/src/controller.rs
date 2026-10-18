@@ -31,7 +31,7 @@ pub use inputs::{InputCmd, Secret};
 
 use crate::browser::BrowserCmd;
 use crate::capabilities::CapCmd;
-use crate::rows::{Ctx as RowCtx, hl_jobs, seg_block, to_row};
+use crate::rows::{Ctx as RowCtx, hl_job_id, hl_jobs, hl_result_id, seg_block, to_row};
 use crate::widgets::{self, Ctx, Outcome};
 use crate::{
     AppState, AppWindow, ApprovalInfo, CapState, ChatRow, EditModelRow, ModelItem, NavEntry, ProjectItem, ProjectState,
@@ -546,6 +546,8 @@ struct Controller {
     hl_items: HashMap<u64, Arc<Item>>,
     /// Content key last queued per segment id, so an unchanged block is not re-sent.
     hl_sent: HashMap<u64, u64>,
+    /// Bumped on every reset; tags highlight jobs so late results can be recognised.
+    hl_epoch: u16,
 }
 
 impl Controller {
@@ -629,6 +631,7 @@ impl Controller {
             hl_tx,
             hl_items: HashMap::new(),
             hl_sent: HashMap::new(),
+            hl_epoch: 0,
         };
         ui(&weak, |w| {
             let st = w.global::<AppState>();
@@ -702,10 +705,13 @@ impl Controller {
                         break;
                     }
                 },
-                Some((id, item)) = hl_rx.recv() => {
+                Some((job, item)) = hl_rx.recv() => {
                     // Results arrive off-thread; repaint the owning row on the next frame.
-                    c.hl_items.insert(id, item);
-                    c.dirty.push(seg_block(id));
+                    // A result from before the last reset belongs to another transcript.
+                    if let Some(id) = hl_result_id(job, c.hl_epoch) {
+                        c.hl_items.insert(id, item);
+                        c.dirty.push(seg_block(id));
+                    }
                 }
                 _ = tick.tick(), if c.reset || !c.dirty.is_empty() => c.flush(),
             }
@@ -720,6 +726,7 @@ impl Controller {
             // A reset is a new transcript (or theme): segment ids refer to other blocks now.
             self.hl_items.clear();
             self.hl_sent.clear();
+            self.hl_epoch = self.hl_epoch.wrapping_add(1);
             for i in 0..self.transcript.blocks.len() {
                 self.queue_highlight(i);
             }
@@ -805,7 +812,7 @@ impl Controller {
                     let _ = tx.send(done);
                 })
             });
-            hl.put(id, text, lang);
+            hl.put(hl_job_id(id, self.hl_epoch), text, lang);
         }
     }
 

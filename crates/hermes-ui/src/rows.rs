@@ -30,6 +30,21 @@ pub fn seg_block(id: u64) -> usize {
     (id >> 20) as usize
 }
 
+/// Highlight jobs carry the transcript epoch in their top 16 bits: segment ids repeat
+/// across transcripts, so a result that was in flight during a reset (chat switch, theme
+/// flip) must not land on the new transcript's block with the same id.
+const EPOCH_SHIFT: u32 = 48;
+
+/// Job id sent to the highlighter for segment `id` in transcript epoch `epoch`.
+pub fn hl_job_id(id: u64, epoch: u16) -> u64 {
+    (u64::from(epoch) << EPOCH_SHIFT) | (id & ((1 << EPOCH_SHIFT) - 1))
+}
+
+/// The segment id of a finished job, or `None` when it belongs to an older transcript.
+pub fn hl_result_id(job: u64, epoch: u16) -> Option<u64> {
+    ((job >> EPOCH_SHIFT) as u16 == epoch).then_some(job & ((1 << EPOCH_SHIFT) - 1))
+}
+
 /// Seg.kind values (see `ui/chat.slint`).
 const SEG_PROSE: i32 = 0;
 const SEG_CODE: i32 = 1;
@@ -128,8 +143,33 @@ fn push_verbatim(out: &mut String, text: &str, leading: &mut bool) {
 }
 
 /// One code line as styled text, coloured by its highlight spans (byte ranges + class).
+///
+/// While a reply streams, every delta rebuilds the whole row, but its earlier code lines
+/// are unchanged: parsed lines are memoised (UI thread only, bounded) so a delta costs
+/// only its new lines.
 pub fn code_line(line: &str, spans: &[(usize, usize, u8)], dark: bool) -> StyledText {
-    StyledText::from_markdown(&code_line_md(line, spans, dark)).unwrap_or_else(|_| StyledText::from_plain_text(line))
+    use std::cell::RefCell;
+    use std::hash::{Hash, Hasher};
+    const CAP: usize = 4096;
+    thread_local! {
+        static CACHE: RefCell<HashMap<u64, StyledText>> = RefCell::new(HashMap::new());
+    }
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    (line, spans, dark).hash(&mut h);
+    let key = h.finish();
+    if let Some(hit) = CACHE.with(|c| c.borrow().get(&key).cloned()) {
+        return hit;
+    }
+    let t = StyledText::from_markdown(&code_line_md(line, spans, dark))
+        .unwrap_or_else(|_| StyledText::from_plain_text(line));
+    CACHE.with(|c| {
+        let mut c = c.borrow_mut();
+        if c.len() >= CAP {
+            c.clear();
+        }
+        c.insert(key, t.clone());
+    });
+    t
 }
 
 /// The markdown source `code_line` parses: escaped verbatim text in `<font>` runs.
@@ -162,21 +202,23 @@ fn code_line_md(line: &str, spans: &[(usize, usize, u8)], dark: bool) -> String 
     s
 }
 
-/// Spans for line `i` of `text`, if the arrived highlight still matches that line.
-fn spans_for(item: Option<&Arc<Item>>, i: usize, line: &str) -> Vec<(usize, usize, u8)> {
+/// Spans for line `i`, if the arrived highlight still matches that line. `item_lines` is
+/// the highlighted text split once per segment (splitting per line was quadratic).
+fn spans_for(item: Option<&Arc<Item>>, item_lines: &[&str], i: usize, line: &str) -> Vec<(usize, usize, u8)> {
     match item {
-        Some(it) if it.text.split('\n').nth(i) == Some(line) => it.line_spans(i, line.len()),
+        Some(it) if item_lines.get(i) == Some(&line) => it.line_spans(i, line.len()),
         _ => vec![],
     }
 }
 
 fn code_seg(id: u64, code: &str, ctx: &Ctx) -> Seg {
     let item = ctx.hl.get(&id);
+    let item_lines: Vec<&str> = item.map(|it| it.text.split('\n').collect()).unwrap_or_default();
     let lines: Vec<CodeLine> = code
         .split('\n')
         .enumerate()
         .map(|(i, l)| CodeLine {
-            md: code_line(l, &spans_for(item, i, l), ctx.dark),
+            md: code_line(l, &spans_for(item, &item_lines, i, l), ctx.dark),
             ..Default::default()
         })
         .collect();
@@ -191,6 +233,7 @@ fn code_seg(id: u64, code: &str, ctx: &Ctx) -> Seg {
 fn diff_seg(id: u64, code: &str, ctx: &Ctx) -> Seg {
     let d = diff::parse(code);
     let item = ctx.hl.get(&id);
+    let item_lines: Vec<&str> = item.map(|it| it.text.split('\n').collect()).unwrap_or_default();
     let index = d.code_index();
     let num = |n: Option<u32>| n.map(|n| n.to_string()).unwrap_or_default();
     let lines: Vec<CodeLine> = d
@@ -208,7 +251,7 @@ fn diff_seg(id: u64, code: &str, ctx: &Ctx) -> Seg {
             old: num(l.old).into(),
             new: num(l.new).into(),
             md: match ci {
-                Some(ci) => code_line(&l.text, &spans_for(item, ci, &l.text), ctx.dark),
+                Some(ci) => code_line(&l.text, &spans_for(item, &item_lines, ci, &l.text), ctx.dark),
                 None => StyledText::from_plain_text(&l.text),
             },
         })
@@ -279,6 +322,8 @@ pub fn segments(block: usize, text: &str, streaming: bool, ctx: &Ctx) -> Vec<Seg
                 SEG_DIFF => Some(diff_seg(seg_id(block, i), code, ctx)),
                 SEG_PROSE_FENCE => Some(Seg {
                     kind: SEG_PROSE_FENCE,
+                    // Prose that the model fenced: render its markdown, keep the source for copy.
+                    md: markdown(code.trim_end(), false),
                     raw: code.trim_end().into(),
                     ..Default::default()
                 }),
@@ -589,6 +634,14 @@ mod tests {
     }
 
     #[test]
+    fn results_from_an_older_transcript_are_dropped() {
+        let id = seg_id(3, 2);
+        assert_eq!(hl_result_id(hl_job_id(id, 7), 7), Some(id));
+        assert_eq!(hl_result_id(hl_job_id(id, 6), 7), None, "in flight across a reset");
+        assert_eq!(seg_block(hl_result_id(hl_job_id(id, u16::MAX), u16::MAX).unwrap()), 3);
+    }
+
+    #[test]
     fn stale_highlight_is_ignored() {
         let item = Arc::new(Item {
             text: "let a = 1;".into(),
@@ -598,10 +651,24 @@ mod tests {
                 c: highlight::CLASS_KEYWORD,
             }]],
         });
+        let lines = ["let a = 1;"];
         assert_eq!(
-            spans_for(Some(&item), 0, "let a = 1;"),
+            spans_for(Some(&item), &lines, 0, "let a = 1;"),
             vec![(0, 3, highlight::CLASS_KEYWORD)]
         );
-        assert!(spans_for(Some(&item), 0, "let b = 2;").is_empty());
+        assert!(spans_for(Some(&item), &lines, 0, "let b = 2;").is_empty());
+    }
+
+    #[test]
+    fn memoised_code_lines_match_a_fresh_parse() {
+        let spans = [(0, 3, highlight::CLASS_KEYWORD)];
+        let first = code_line("let a = 1;", &spans, true);
+        assert_eq!(code_line("let a = 1;", &spans, true), first, "cache hit is identical");
+        assert_ne!(
+            code_line("let a = 1;", &spans, false),
+            first,
+            "theme is part of the key"
+        );
+        assert_ne!(code_line("let a = 1;", &[], true), first, "spans are part of the key");
     }
 }
