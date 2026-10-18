@@ -125,6 +125,28 @@ fn main() -> Result<(), slint::PlatformError> {
         ui.global::<hermes_ui::AppState>()
             .set_transcript_mode(mode.parse().unwrap_or(0));
     }
+    // Model-picker hooks: `HERMES_DESKTOP_OPEN_PICKER=1` opens the curated catalog menu
+    // (seed the search with `HERMES_DESKTOP_MODEL_QUERY=<text>`), and
+    // `HERMES_DESKTOP_OPEN_MODEL_EDITOR=1` opens the Edit models dialog. Both ask the
+    // controller for the catalog first, so the shot shows the real providers.
+    let on =
+        |v: Result<String, std::env::VarError>| v.map(|s| !s.trim().is_empty() && s.trim() != "0").unwrap_or(false);
+    if on(std::env::var("HERMES_DESKTOP_OPEN_PICKER")) {
+        let st = ui.global::<hermes_ui::AppState>();
+        if let Ok(q) = std::env::var("HERMES_DESKTOP_MODEL_QUERY")
+            && !q.trim().is_empty()
+        {
+            st.set_model_query(q.clone().into());
+            st.invoke_model_query_changed(q.into());
+        }
+        st.invoke_reload_models();
+        ui.set_picker_open(true);
+    }
+    if on(std::env::var("HERMES_DESKTOP_OPEN_MODEL_EDITOR")) {
+        let st = ui.global::<hermes_ui::AppState>();
+        st.invoke_refresh_models();
+        st.set_model_editor_open(true);
+    }
 
     ui.show()?;
     perf::mark("window shown (surface created)");

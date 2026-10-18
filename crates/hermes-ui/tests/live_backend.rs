@@ -5,8 +5,12 @@
 //! Always allow, by click and by keyboard), a long (600-message) conversation, and the
 //! settings panel (registry nav, "Applies to" profile scope, saving, persistence, search).
 //!
-//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings,settings_pages,capabilities` runs a subset. The
-//! `long` section
+//! `HERMES_LIVE_ONLY=keys,stop,model,approval,long,sessions,settings,settings_pages,capabilities,models` runs a subset.
+//! The `models` section covers the picker's catalog curation (visibility ticks, favourites,
+//! hand-typed ids, group folding, Reset, and the Edit models dialog) — device-local state,
+//! so it checks the scratch `prefs.json`; pass `HERMES_LIVE_SCREENSHOTS=<dir>` to also dump
+//! picker/dialog snapshots as `.ppm` next to the run.
+//! The `long` section
 //! needs a seeded session: `HERMES_HOME=<private home> scripts/seed-long-session.py 600`. The
 //! `sessions` section (open / switch / new chat / Ctrl+Tab, continue an old chat, switch while
 //! streaming) needs three small labelled ones:
@@ -310,6 +314,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("model") {
         model_section(&ui, &log).await;
+    }
+    if want("models") {
+        models_section(&ui, &log).await;
     }
     if want("approval") {
         approval_section(&ui, &log).await;
@@ -962,6 +969,387 @@ async fn model_section(ui: &AppWindow, log: &Log) {
             false,
             format!("no target model (current {c:?}, target {t:?})"),
         ),
+    }
+}
+
+/// The picker's catalog curation (`models`): every provider the backend reports, the
+/// visibility ticks, favourites, hand-typed ids, group folding, and Reset — plus the
+/// menu's own footer actions driving the dialog. The catalog is the backend's; the
+/// curation is device-local, so every write is checked in the scratch `prefs.json`
+/// (`HERMES_DESKTOP_PREFS`) rather than in any real config.
+async fn models_section(ui: &AppWindow, log: &Log) {
+    use serde_json::json;
+    let st = ui.global::<AppState>();
+    let prefs_path = std::env::var("HERMES_DESKTOP_PREFS").unwrap_or_default();
+    let prefs = || -> serde_json::Value {
+        std::fs::read_to_string(&prefs_path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_else(|| json!({}))
+    };
+    let stored_keys = |key: &str| -> Vec<String> {
+        prefs()
+            .get(key)
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(str::to_owned))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+    };
+
+    st.invoke_new_chat();
+    // The menu's own "Refresh models": re-probes every provider.
+    st.invoke_reload_models();
+    let loaded = wait_until(25, || {
+        st.get_models().iter().any(|m| !m.header) && st.get_model_edit_rows().iter().any(|r| !r.header)
+    })
+    .await;
+    let providers: Vec<String> = st
+        .get_model_edit_rows()
+        .iter()
+        .filter(|r| r.header)
+        .map(|r| r.provider_name.to_string())
+        .collect();
+    let shown = st.get_models().iter().filter(|m| !m.header).count();
+    record(
+        log,
+        "models: the picker lists the backend's providers and their models",
+        loaded && !providers.is_empty() && shown > 0,
+        format!(
+            "{} providers {:?}, {shown} model rows, {} of {} models shown",
+            providers.len(),
+            providers,
+            st.get_model_total_count() - st.get_model_hidden_count(),
+            st.get_model_total_count()
+        ),
+    );
+
+    // The list is the backend's, not the front end's: an independent RPC read agrees the
+    // catalog has providers with models.
+    let rpc = backend_request("model.options", json!({"include_unconfigured": true}))
+        .await
+        .unwrap_or_else(|_| json!({}));
+    let rpc_models: usize = rpc["providers"]
+        .as_array()
+        .map(|ps| {
+            ps.iter()
+                .map(|p| p["models"].as_array().map(Vec::len).unwrap_or(0))
+                .sum()
+        })
+        .unwrap_or(0);
+    record(
+        log,
+        "models: the catalog is the backend's (model.options)",
+        rpc_models > 0 && st.get_model_total_count() > 0,
+        format!(
+            "model.options reports {rpc_models} model ids over {} providers; the picker holds {}",
+            rpc["providers"].as_array().map(Vec::len).unwrap_or(0),
+            st.get_model_total_count()
+        ),
+    );
+
+    let Some((provider, model)) = st
+        .get_models()
+        .iter()
+        .find(|m| !m.header && !m.current)
+        .map(|m| (m.provider.to_string(), m.model.to_string()))
+    else {
+        record(
+            log,
+            "models: an unchecked model is available to test",
+            false,
+            "no model row",
+        );
+        return;
+    };
+    let key = format!("{provider}::{model}");
+
+    // Exactly the model the backend reports as current carries the tick.
+    let cur_provider = rpc["provider"].as_str().unwrap_or_default();
+    let cur_model = rpc["model"].as_str().unwrap_or_default();
+    let ticks: Vec<(String, String)> = st
+        .get_models()
+        .iter()
+        .filter(|m| m.current)
+        .map(|m| (m.provider.to_string(), m.model.to_string()))
+        .collect();
+    let ticked = ticks
+        .iter()
+        .filter(|(p, m)| p == cur_provider && (m == cur_model || m.as_str() == cur_model.trim_end_matches("-fast")))
+        .count();
+    record(
+        log,
+        "models: the menu ticks the model the backend is on",
+        cur_model.is_empty() || (ticks.len() == 1 && ticked == 1),
+        format!("backend current = {cur_provider}/{cur_model}, ticks = {ticks:?}"),
+    );
+    if std::env::var_os("HERMES_LIVE_SCREENSHOTS").is_some() && !cur_model.is_empty() {
+        ui.set_picker_open(true);
+        // The field owns its text, exactly as typing does: set it, then tell the controller.
+        st.set_model_query(cur_model.into());
+        st.invoke_model_query_changed(cur_model.into());
+        sleep(400).await;
+        screenshot(ui, "model-picker-current");
+        st.set_model_query("".into());
+        st.invoke_model_query_changed("".into());
+        ui.set_picker_open(false);
+        sleep(200).await;
+    }
+
+    // Search: a query narrows the rows and reaches past the shortlist. The match folds
+    // case and the `-_.` separators over id + provider, so the check does the same.
+    let fold = |s: &str| -> String {
+        s.to_lowercase()
+            .chars()
+            .map(|c| if matches!(c, '-' | '_' | '.') { ' ' } else { c })
+            .collect()
+    };
+    let q = fold(&model);
+    st.invoke_model_query_changed(model.as_str().into());
+    let filtered = wait_until(5, || {
+        let rows: Vec<_> = st.get_models().iter().filter(|m| !m.header).collect();
+        !rows.is_empty()
+            && rows
+                .iter()
+                .all(|m| fold(&format!("{} {} {}", m.model, m.provider_name, m.provider)).contains(&q))
+    })
+    .await;
+    record(
+        log,
+        "models: searching the menu filters the catalog",
+        filtered,
+        format!("query={model:?}, rows={}", st.get_models().row_count()),
+    );
+    st.invoke_model_query_changed("".into());
+    wait_until(5, || st.get_models().iter().any(|m| m.model == model.as_str())).await;
+
+    // Uncheck → hidden + recorded; re-check → back.
+    st.invoke_toggle_model(provider.as_str().into(), model.as_str().into());
+    let gone = wait_until(5, || {
+        !st.get_models()
+            .iter()
+            .any(|m| !m.header && m.provider == provider.as_str() && m.model == model.as_str())
+    })
+    .await;
+    let after_uncheck = stored_keys("hermes.desktop.visible-models");
+    record(
+        log,
+        "models: unchecking a model hides it and records the choice on this device",
+        gone && !after_uncheck.iter().any(|k| k == &key),
+        format!(
+            "hidden={gone}, visible-models entries={}, hidden-count={}",
+            after_uncheck.len(),
+            st.get_model_hidden_count()
+        ),
+    );
+    st.invoke_toggle_model(provider.as_str().into(), model.as_str().into());
+    let back = wait_until(5, || {
+        st.get_models()
+            .iter()
+            .any(|m| !m.header && m.provider == provider.as_str() && m.model == model.as_str())
+    })
+    .await;
+    record(
+        log,
+        "models: re-checking brings the model back",
+        back && stored_keys("hermes.desktop.visible-models").iter().any(|k| k == &key),
+        format!("visible again={back}, stored={key}"),
+    );
+
+    // Star → the Favorites section, and the star is remembered in star order. The UI only
+    // enqueues the intent, so every read waits for the controller to apply it.
+    st.invoke_favorite_model(provider.as_str().into(), model.as_str().into());
+    let pinned = wait_until(5, || {
+        st.get_models()
+            .iter()
+            .next()
+            .is_some_and(|m| m.header && m.provider_name == "Favorites")
+            && st.get_models().iter().any(|m| m.favorite && m.model == model.as_str())
+    })
+    .await;
+    let first = st
+        .get_models()
+        .iter()
+        .next()
+        .map(|m| (m.header, m.provider_name.to_string()));
+    let fav_stored = stored_keys("hermes.desktop.favorite-models");
+    record(
+        log,
+        "models: starring a model pins it to the Favorites section",
+        pinned && fav_stored.iter().any(|k| k == &key),
+        format!("first row={first:?}, pinned={pinned}, stored={fav_stored:?}"),
+    );
+    if std::env::var_os("HERMES_LIVE_SCREENSHOTS").is_some() {
+        ui.set_picker_open(true);
+        sleep(300).await;
+        screenshot(ui, "model-picker-favorites");
+        ui.set_picker_open(false);
+    }
+    st.invoke_favorite_model(provider.as_str().into(), model.as_str().into());
+    let unpinned = wait_until(5, || {
+        st.get_models()
+            .iter()
+            .next()
+            .is_some_and(|m| m.provider_name != "Favorites")
+            && !st.get_models().iter().any(|m| m.favorite)
+    })
+    .await;
+    record(
+        log,
+        "models: unstarring drops the Favorites section",
+        unpinned && stored_keys("hermes.desktop.favorite-models").is_empty(),
+        format!("gone={unpinned}"),
+    );
+
+    // A hand-typed id joins its provider, shows at once, and can be forgotten again.
+    let custom = format!("hermes-live-custom-{}", std::process::id());
+    st.invoke_add_custom_model(provider.as_str().into(), custom.as_str().into());
+    let added = wait_until(5, || {
+        st.get_models()
+            .iter()
+            .any(|m| !m.header && m.custom && m.model == custom.as_str() && m.provider == provider.as_str())
+    })
+    .await;
+    let custom_stored = prefs()["hermes.desktop.custom-models"].clone();
+    record(
+        log,
+        "models: a hand-typed id is added under its provider and shows at once",
+        added && custom_stored.to_string().contains(&custom),
+        format!("shown={added}, stored={custom_stored}"),
+    );
+    st.invoke_remove_custom_model(provider.as_str().into(), custom.as_str().into());
+    let forgot = wait_until(5, || !st.get_models().iter().any(|m| m.model == custom.as_str())).await;
+    record(
+        log,
+        "models: removing a hand-typed id forgets it",
+        forgot && !prefs()["hermes.desktop.custom-models"].to_string().contains(&custom),
+        format!("forgotten={forgot}"),
+    );
+
+    // Folding a provider group, then its master switch in Edit models, then Reset.
+    let before = st.get_models().row_count();
+    st.invoke_toggle_provider_collapse(provider.as_str().into());
+    let folded = wait_until(5, || {
+        st.get_models()
+            .iter()
+            .any(|m| m.header && m.provider == provider.as_str() && m.collapsed)
+            && st
+                .get_models()
+                .iter()
+                .all(|m| m.header || m.provider != provider.as_str())
+    })
+    .await;
+    record(
+        log,
+        "models: a provider group folds away and stays folded on this device",
+        folded && st.get_models().row_count() < before,
+        format!(
+            "folded={folded}, rows {before} -> {}, stored={:?}",
+            st.get_models().row_count(),
+            stored_keys("hermes.desktop.collapsed-providers")
+        ),
+    );
+    st.invoke_toggle_provider_collapse(provider.as_str().into());
+    wait_until(5, || {
+        st.get_models()
+            .iter()
+            .any(|m| !m.header && m.provider == provider.as_str())
+    })
+    .await;
+
+    let header = st
+        .get_model_edit_rows()
+        .iter()
+        .find(|r| r.header && r.provider == provider.as_str())
+        .map(|r| (r.visible, r.count, r.total));
+    record(
+        log,
+        "models: Edit models lists a provider's full row set with a master tick and counts",
+        header.is_some_and(|(visible, count, total)| visible && count == total && total > 0),
+        format!("header (visible, of, total) = {header:?}"),
+    );
+    st.invoke_toggle_provider_visible(provider.as_str().into());
+    let all_off = wait_until(5, || {
+        st.get_model_edit_rows()
+            .iter()
+            .find(|r| r.header && r.provider == provider.as_str())
+            .is_some_and(|r| r.count == 0)
+            && st
+                .get_models()
+                .iter()
+                .all(|m| m.header || m.provider != provider.as_str())
+    })
+    .await;
+    record(
+        log,
+        "models: a provider's master switch hides its whole group",
+        all_off,
+        format!(
+            "rows in menu={}, hidden-count={}",
+            st.get_models().iter().filter(|m| !m.header).count(),
+            st.get_model_hidden_count()
+        ),
+    );
+    st.invoke_reset_model_visibility();
+    let restored = wait_until(5, || {
+        st.get_model_edit_rows()
+            .iter()
+            .find(|r| r.header && r.provider == provider.as_str())
+            .is_some_and(|r| r.count > 0)
+            && prefs().get("hermes.desktop.visible-models").is_none()
+    })
+    .await;
+    record(
+        log,
+        "models: Reset to defaults restores the curated list and clears the allow-list",
+        restored,
+        format!(
+            "rows back={}, prefs key cleared={}",
+            st.get_model_edit_rows()
+                .iter()
+                .find(|r| r.header && r.provider == provider.as_str())
+                .map(|r| r.count)
+                .unwrap_or(0),
+            prefs().get("hermes.desktop.visible-models").is_none()
+        ),
+    );
+
+    // The menu's footer actions, clicked for real.
+    ui.set_picker_open(true);
+    st.invoke_refresh_models();
+    wait_until(10, || st.get_models().iter().any(|m| !m.header)).await;
+    sleep(400).await;
+    let clicked = click(ui, "Edit models…").await;
+    let opened = wait_until(5, || st.get_model_editor_open()).await;
+    record(
+        log,
+        "models: the menu's Edit models… action opens the dialog",
+        clicked && opened && !ui.get_picker_open(),
+        format!(
+            "clicked={clicked}, open={}, menu closed={}",
+            st.get_model_editor_open(),
+            !ui.get_picker_open()
+        ),
+    );
+    if std::env::var_os("HERMES_LIVE_SCREENSHOTS").is_some() {
+        sleep(300).await;
+        screenshot(ui, "model-editor");
+    }
+    let done = click(ui, "Done").await;
+    let closed = wait_until(5, || !st.get_model_editor_open()).await;
+    record(
+        log,
+        "models: Done closes the dialog",
+        done && closed,
+        format!("clicked={done}, closed={closed}"),
+    );
+    if std::env::var_os("HERMES_LIVE_SCREENSHOTS").is_some() {
+        ui.set_picker_open(true);
+        sleep(300).await;
+        screenshot(ui, "model-picker");
+        ui.set_picker_open(false);
     }
 }
 
