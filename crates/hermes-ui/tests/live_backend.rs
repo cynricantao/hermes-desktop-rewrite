@@ -5,7 +5,7 @@
 //! Always allow, by click and by keyboard), a long (600-message) conversation, and the
 //! settings panel (registry nav, "Applies to" profile scope, saving, persistence, search).
 //!
-//! `HERMES_LIVE_ONLY=rich_seeded,keys,stop,model,approval,long,sessions,settings,settings_pages,capabilities,models` runs a subset.
+//! `HERMES_LIVE_ONLY=rich_seeded,sidebar,keys,stop,model,approval,long,sessions,settings,settings_pages,capabilities,models` runs a subset.
 //! The `models` section covers the picker's catalog curation (visibility ticks, favourites,
 //! hand-typed ids, group folding, Reset, and the Edit models dialog) — device-local state,
 //! so it checks the scratch `prefs.json`; pass `HERMES_LIVE_SCREENSHOTS=<dir>` to also dump
@@ -40,6 +40,8 @@
 mod commands;
 #[path = "live_backend/rich_seeded.rs"]
 mod rich_seeded;
+#[path = "live_backend/sidebar.rs"]
+mod sidebar;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -301,6 +303,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
 
     if want("commands") {
         commands::section(&ui, &log).await;
+    }
+    if want("sidebar") {
+        sidebar::section(&ui, &log).await;
     }
     if want("failure_recovery") {
         failure_recovery_section(&ui, &log).await;

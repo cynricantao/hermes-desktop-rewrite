@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**69 done · 291 partial · 428 not started · 6 unsupported** (of 794).
+**72 done · 290 partial · 426 not started · 6 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -233,13 +233,13 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [x] Switch to next/prev session (⌃Tab / ⌃⇧Tab) — local — src/store/session-switcher.ts ⟶ live 2026-10-16, `tests/live_backend.rs` `sessions` section vs private backend (3 seeded chats): walks the sidebar order (this app has no tabs, unlike the Electron recent-tab switcher), wrapping at both ends; from a new chat ⌃Tab opens the first chat, ⌃⇧Tab the last. Order logic unit-tested (`sessions::tests::cycling`)
 - [ ] Jump to session slot N (⌃1…⌃9) — local — src/lib/keybinds/actions.ts
 - [~] Close session — RPC session.close — src/app/session/hooks/use-session-actions/index.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
-- [ ] Delete session — RPC session.delete — src/store/session-removal.ts
-- [~] Archive session — RPC session.archive — src/app/chat/sidebar/session-actions-menu.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
-- [~] Pin/unpin session — local + REST /api/sessions/{id} — src/store/session-pin-sync.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
-- [ ] Rename session / auto-title — RPC session.title — src/app/chat/sidebar/session-actions-menu.tsx
+- [x] Delete session — RPC session.delete — src/store/session-removal.ts ⟶ row actions › Delete, confirmed by a second click; stops/closes this window's runtime for the chat, then `DELETE /api/sessions/{id}` with the mutation-snapshot revision. Live 2026-10-18 `tests/live_backend.rs` sidebar: open chat deleted, REST read-back 404
+- [x] Archive session — RPC session.archive — src/app/chat/sidebar/session-actions-menu.tsx ⟶ row actions › Archive via `PATCH /api/sessions/{id}` {archived}; live 2026-10-18 sidebar section: hidden from Recents, REST read-back archived=1. Unarchive lives in Settings › Sessions
+- [x] Pin/unpin session — local + REST /api/sessions/{id} — src/store/session-pin-sync.ts ⟶ row actions › Pin/Unpin via `PATCH /api/sessions/{id}` {pinned}; pinned chats lead under "Pinned". Live 2026-10-18 sidebar section: REST read-back pinned=1. Pin flags read from the 100 most recent chats
+- [~] Rename session / auto-title — RPC session.title — src/app/chat/sidebar/session-actions-menu.tsx ⟶ inline rename (row actions › Rename, Enter saves, Esc cancels) via `PATCH /api/sessions/{id}` {title}; live 2026-10-18 REST read-back. Auto-title is the backend's; no regenerate-title action
 - [~] Hide session — RPC session.set_hidden — src/store/session-list-density.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [~] Session read/unread state — REST PATCH /api/sessions/{id} — src/store/session-unread-remote.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
-- [~] Session search (⌘⇧F) — REST /api/sessions/search — src/app/chat/sidebar/use-server-session-search.ts, src/lib/session-search.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [~] Session search (⌘⇧F) — REST /api/sessions/search — src/app/chat/sidebar/use-server-session-search.ts, src/lib/session-search.ts ⟶ sidebar search filters titles at once and adds backend full-text hits (`GET /api/sessions/search`) under "Found in messages"; live 2026-10-18 sidebar section. No ⌘⇧F shortcut or snippet highlight
 - [ ] Session sort (recent/title) — local — src/store/sidebar-sort.ts
 - [ ] Session list density (compact/comfortable/detailed) — local — src/store/session-list-density.ts
 - [ ] Sidebar grouping cycle — local — src/app/chat/sidebar/order.ts
