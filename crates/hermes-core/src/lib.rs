@@ -8,6 +8,7 @@
 //! * [`transcript`] — a pure reducer turning gateway events into a renderable transcript.
 //! * [`markdown`] — block-level splitting of assistant replies into prose / fenced code /
 //!   GFM tables, streaming-safe (a half-received table never flickers).
+//! * [`composer`] — ↑/↓ input history, edit-and-resend target resolution, file refs.
 //! * [`attachments`] — clipboard image read (wl-paste/xclip), base64, attach/detach calls.
 //! * [`styled`] — rewrites reply markdown into the subset Slint renders (tables/code as
 //!   aligned monospace, headings as bold) so a reply never falls back to raw text.
@@ -33,6 +34,7 @@ pub mod backend;
 pub mod browser;
 pub mod capabilities;
 pub mod commands;
+pub mod composer;
 pub mod diff;
 pub mod highlight;
 pub mod http;

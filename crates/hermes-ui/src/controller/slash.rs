@@ -38,7 +38,12 @@ impl Controller {
         if self.queue_paused.contains(&key) {
             return;
         }
-        if !self.attachments.is_empty() {
+        // An open edit holds the queue: a prompt sent now would sit between the edit's
+        // target and its send. Cancelling or sending the edit drains it.
+        if self.composer.editing() {
+            return;
+        }
+        if !self.attachments.is_empty() || !self.composer.files.is_empty() {
             self.queue_paused.insert(key);
             self.banner(
                 "Queue paused to preserve your staged attachment. Send or remove it, then /queue resume.".into(),
@@ -94,7 +99,7 @@ impl Controller {
             }
             // Attachments are staged on the backend, not bound to FIFO entries.
             // Refuse rather than attaching them to the wrong queued prompt.
-            if !self.attachments.is_empty() {
+            if !self.attachments.is_empty() || !self.composer.files.is_empty() {
                 self.banner(
                     "Send or remove staged attachments before queuing a prompt.".into(),
                     true,

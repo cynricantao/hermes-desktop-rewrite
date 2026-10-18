@@ -24,10 +24,12 @@ use serde_json::{Value, json};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
 use tokio::sync::mpsc;
 
+mod composer;
 mod inputs;
 mod sidebar;
 mod slash;
 
+pub use composer::ComposerCmd;
 pub use inputs::{InputCmd, Secret};
 
 use crate::browser::BrowserCmd;
@@ -117,6 +119,10 @@ pub enum Cmd {
     Caps(CapCmd),
     /// Agent question card (clarify / sudo / secret).
     Input(InputCmd),
+    /// Composer history, edit-and-resend and file attach (`controller/composer.rs`).
+    Composer(ComposerCmd),
+    /// Show a banner from a background task.
+    Banner(String, bool),
     /// The theme flipped: code colours are baked into rows, so rebuild them.
     Retheme,
 }
@@ -308,6 +314,7 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
         });
     });
     inputs::wire(ui, &tx);
+    composer::wire(ui, &tx);
     let t = tx.clone();
     st.on_retheme(move || {
         let _ = t.send(Cmd::Retheme);
@@ -553,6 +560,8 @@ struct Controller {
     caps: mpsc::UnboundedSender<CapCmd>,
     /// Images queued on the backend for the next turn of `session`.
     attachments: Vec<AttachedImage>,
+    /// Composer history/edit state and files staged for the next turn.
+    composer: composer::ComposerState,
     /// The in-app browser's own task (`crate::browser`).
     browser: mpsc::UnboundedSender<BrowserCmd>,
     /// Code highlighter, started on the first code block (never before first frame).
@@ -604,6 +613,7 @@ impl Controller {
             caps,
             browser,
             attachments: Vec::new(),
+            composer: composer::ComposerState::default(),
             weak: weak.clone(),
             commands,
             client,
@@ -867,6 +877,7 @@ impl Controller {
                 }
             }
             Cmd::SaveDraft { session, text } => {
+                self.composer_text_changed(&text);
                 self.drafts.insert(session, text.clone());
                 self.completions(text);
             }
@@ -912,6 +923,8 @@ impl Controller {
                 let _ = self.caps.send(cmd);
             }
             Cmd::Input(cmd) => self.input_cmd(cmd),
+            Cmd::Composer(cmd) => self.composer_cmd(cmd).await,
+            Cmd::Banner(text, error) => self.banner(text, error),
             Cmd::PasteImage => self.paste_image().await,
             Cmd::RemoveAttachment(i) => self.remove_attachment(i).await,
             Cmd::Retheme => self.reset = true,
@@ -930,6 +943,7 @@ impl Controller {
             }
             Cmd::NewChat => {
                 self.clear_attachments();
+                self.composer_reset();
                 self.draft_model = None;
                 self.draft_effort = None;
                 self.session = None;
@@ -1718,11 +1732,21 @@ impl Controller {
             ui(&self.weak, move |w| w.global::<AppState>().set_draft(display.into()));
             return;
         };
+        // A command's expansion is hidden from the transcript; staged files are not.
+        let hidden = text != display;
         // The backend sends its queued images with this turn; show which ones went.
         let mut display = display;
         for a in std::mem::take(&mut self.attachments) {
-            display.push_str(&format!("\n📎 {}", a.label()));
+            display.push_str(&format!("\n{}{}", hermes_core::composer::ATTACHMENT_MARK, a.label()));
         }
+        // Staged files travel as @file refs ahead of the message (Electron buildContextText).
+        let files = std::mem::take(&mut self.composer.files);
+        for f in &files {
+            display.push_str(&format!("\n{}{}", hermes_core::composer::ATTACHMENT_MARK, f.label));
+        }
+        let refs: Vec<String> = files.into_iter().map(|f| f.ref_text).collect();
+        let text = hermes_core::composer::with_refs(&refs, &text);
+        self.composer.browse_reset();
         self.publish_attachments();
         let ch = self.transcript.push_user(&display);
         self.mark(ch);
@@ -1735,7 +1759,7 @@ impl Controller {
             if let Err(e) = client
                 .request_with_timeout(
                     "prompt.submit",
-                    json!({"session_id": sid, "text": text.clone(), "title_preview": display, "display_kind": if text != display { json!("hidden") } else { Value::Null }}),
+                    json!({"session_id": sid, "text": text.clone(), "title_preview": display, "display_kind": if hidden { json!("hidden") } else { Value::Null }}),
                     Duration::from_secs(1800),
                 )
                 .await
@@ -1748,7 +1772,12 @@ impl Controller {
     // ── Attachments ─────────────────────────────────────────────────────────────
 
     fn publish_attachments(&self) {
-        let labels: Vec<SharedString> = self.attachments.iter().map(|a| a.label().into()).collect();
+        let labels: Vec<SharedString> = self
+            .attachments
+            .iter()
+            .map(|a| a.label().into())
+            .chain(self.composer.files.iter().map(|f| f.label.as_str().into()))
+            .collect();
         ui(&self.weak, move |w| {
             w.global::<AppState>()
                 .set_attachments(ModelRc::new(VecModel::from(labels)));
@@ -1756,8 +1785,9 @@ impl Controller {
     }
 
     fn clear_attachments(&mut self) {
-        if !self.attachments.is_empty() {
+        if !self.attachments.is_empty() || !self.composer.files.is_empty() {
             self.attachments.clear();
+            self.composer.files.clear();
             self.publish_attachments();
         }
     }
@@ -1797,9 +1827,15 @@ impl Controller {
     }
 
     async fn remove_attachment(&mut self, index: i32) {
-        let Some(i) = usize::try_from(index).ok().filter(|i| *i < self.attachments.len()) else {
+        let Some(i) = usize::try_from(index).ok() else { return };
+        // Chips list images first, then staged files (which need no backend call to drop).
+        if i >= self.attachments.len() {
+            if i - self.attachments.len() < self.composer.files.len() {
+                self.composer.files.remove(i - self.attachments.len());
+                self.publish_attachments();
+            }
             return;
-        };
+        }
         let (Some(sid), Some(path)) = (self.session.clone(), self.attachments[i].path.clone()) else {
             return;
         };
@@ -1825,6 +1861,7 @@ impl Controller {
     async fn open(&mut self, stored_id: String) {
         // Queued images belong to the chat they were pasted into.
         self.clear_attachments();
+        self.composer_reset();
         if self.stored.as_deref() == Some(stored_id.as_str()) {
             return;
         }
