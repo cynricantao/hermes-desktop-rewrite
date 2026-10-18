@@ -93,6 +93,8 @@ export global AppState {
     callback select-effort(string);
     callback approve(string, string);
     callback dismiss-banner();
+    // The effective theme flipped (code colours are baked into rows).
+    callback retheme();
     callback search-sessions(string);
     callback cycle-session(int);
     // Sidebar row actions. Only one row has its actions open (or is being renamed) at a time.
@@ -297,6 +299,8 @@ component ApprovalCard inherits Rectangle {
 }
 
 export component AppWindow inherits Window {
+    property <bool> dark: Theme.dark;
+    changed dark => { AppState.retheme(); }
     title: "Hermes";
     preferred-width: 1280px;
     preferred-height: 820px;
