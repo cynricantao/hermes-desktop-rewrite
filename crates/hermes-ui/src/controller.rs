@@ -1644,7 +1644,7 @@ impl Controller {
                     .cloned();
                 self.publish_project();
                 self.transcript = Transcript::new();
-                let open_requests = std::mem::take(&mut r.open_requests);
+                let open_requests = r.open_requests.take().unwrap_or_default();
                 let ch = self.transcript.load_history(&r.messages);
                 self.transcript.running = r.running.unwrap_or(r.info.running);
                 self.transcript.title = Some(r.info.title.clone()).filter(|t| !t.is_empty());

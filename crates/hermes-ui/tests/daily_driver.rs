@@ -177,6 +177,37 @@ async fn input_cards(ui: &AppWindow, port: u16, check: &mut impl FnMut(String, b
             && wait(|| !card.get_visible()).await,
     );
 
+    // Review regressions: a fast double click answers one question only, and text typed for
+    // one question does not carry over to the next.
+    let id = ask(port, "clarify", &sid).await;
+    wait(|| card.get_visible() && card.get_step() == "1 of 3").await;
+    sleep(150).await;
+    let double = match ElementHandle::find_by_accessible_label(ui, "Choose Large").next() {
+        Some(e) => {
+            e.single_click(PointerEventButton::Left).await;
+            e.single_click(PointerEventButton::Left).await;
+            true
+        }
+        None => false,
+    };
+    sleep(400).await;
+    check(
+        "double click answers only the question on screen".into(),
+        double && card.get_step() == "2 of 3" && card.get_choices().iter().all(|c| !c.selected),
+    );
+    let typed = set_field(ui, "Answer", "leftover text");
+    let picked = click(ui, "Choose B").await && click(ui, "Confirm choices").await;
+    check(
+        "typed text is cleared when the question changes".into(),
+        typed && picked && wait(|| card.get_step() == "3 of 3").await && card.get_value().is_empty(),
+    );
+    press(ui, Key::Escape);
+    let r = wait_reply(port, &id).await;
+    check(
+        format!("skipping after partial answers replies {{}}: {r:?}"),
+        r.as_ref().map(|r| &r["result"]) == Some(&json!({})),
+    );
+
     // Skip one question of a batch, then Esc declines a whole clarify.
     let id = ask(port, "clarify", &sid).await;
     wait(|| card.get_visible()).await;

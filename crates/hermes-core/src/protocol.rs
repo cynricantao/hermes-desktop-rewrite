@@ -120,7 +120,7 @@ pub struct SessionResumeResult {
     pub running: Option<bool>,
     /// Server→client requests still waiting for an answer (`{id, method, params}`), replayed
     /// so a reconnecting client can show their cards again.
-    pub open_requests: Vec<serde_json::Value>,
+    pub open_requests: Option<Vec<serde_json::Value>>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]

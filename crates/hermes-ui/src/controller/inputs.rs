@@ -18,15 +18,30 @@ impl std::fmt::Debug for Secret {
     }
 }
 
-/// Input-card intents. Each carries the request id the card showed when it was clicked,
-/// so an answer can never land on a request that replaced it in the meantime.
+/// Which card and question an intent was made on: the request id and the question id the
+/// card showed when it was clicked (empty for masked prompts). A double click or a stale
+/// press is dropped instead of answering the next question.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Shown {
+    pub request: String,
+    pub question: String,
+}
+
+/// Input-card intents.
 #[derive(Debug, Clone)]
 pub enum InputCmd {
-    Choose(String, i32),
-    Text(String, Secret),
-    Confirm(String),
-    Skip(String),
-    SkipQuestion(String),
+    Choose(Shown, i32),
+    Text(Shown, Secret),
+    Confirm(Shown),
+    Skip(Shown),
+    SkipQuestion(Shown),
+}
+
+fn shown(s: &InputState) -> Shown {
+    Shown {
+        request: s.get_request_id().into(),
+        question: s.get_question_id().into(),
+    }
 }
 
 /// Wire the card's callbacks (UI thread).
@@ -38,10 +53,7 @@ pub(super) fn wire(ui_handle: &crate::AppWindow, tx: &tokio::sync::mpsc::Unbound
     let (t, w) = (tx.clone(), ui_handle.as_weak());
     st.on_choose(move |i| {
         if let Some(w) = w.upgrade() {
-            send(
-                &t,
-                InputCmd::Choose(w.global::<InputState>().get_request_id().into(), i),
-            );
+            send(&t, InputCmd::Choose(shown(&w.global::<InputState>()), i));
         }
     });
     let (t, w) = (tx.clone(), ui_handle.as_weak());
@@ -53,13 +65,13 @@ pub(super) fn wire(ui_handle: &crate::AppWindow, tx: &tokio::sync::mpsc::Unbound
             }
             // Clear at once: a typed password must not linger in the field.
             s.set_value(SharedString::new());
-            send(&t, InputCmd::Text(s.get_request_id().into(), Secret(text.into())));
+            send(&t, InputCmd::Text(shown(&s), Secret(text.into())));
         }
     });
     let (t, w) = (tx.clone(), ui_handle.as_weak());
     st.on_confirm(move || {
         if let Some(w) = w.upgrade() {
-            send(&t, InputCmd::Confirm(w.global::<InputState>().get_request_id().into()));
+            send(&t, InputCmd::Confirm(shown(&w.global::<InputState>())));
         }
     });
     let (t, w) = (tx.clone(), ui_handle.as_weak());
@@ -67,16 +79,13 @@ pub(super) fn wire(ui_handle: &crate::AppWindow, tx: &tokio::sync::mpsc::Unbound
         if let Some(w) = w.upgrade() {
             let s = w.global::<InputState>();
             s.set_value(SharedString::new());
-            send(&t, InputCmd::Skip(s.get_request_id().into()));
+            send(&t, InputCmd::Skip(shown(&s)));
         }
     });
     let (t, w) = (tx.clone(), ui_handle.as_weak());
     st.on_skip_question(move || {
         if let Some(w) = w.upgrade() {
-            send(
-                &t,
-                InputCmd::SkipQuestion(w.global::<InputState>().get_request_id().into()),
-            );
+            send(&t, InputCmd::SkipQuestion(shown(&w.global::<InputState>())));
         }
     });
 }
@@ -102,10 +111,15 @@ impl Controller {
         if !input_requests::handles(method) {
             return false;
         }
-        if self.inputs.iter().any(|p| p.id == id) {
+        let parsed = input_requests::parse(id, method, params);
+        if let Some(existing) = self.inputs.iter_mut().find(|p| p.id == id) {
+            if let Some(replay) = &parsed {
+                existing.adopt_locks(replay);
+                self.publish_input();
+            }
             return true;
         }
-        let Some(p) = input_requests::parse(id, method, params) else {
+        let Some(p) = parsed else {
             // A clarify with no usable question: answer at once so the tool never stalls.
             self.client.respond(id, Ok(serde_json::json!({})));
             return true;
@@ -151,16 +165,21 @@ impl Controller {
     }
 
     pub(super) fn input_cmd(&mut self, cmd: InputCmd) {
-        let id = match &cmd {
-            InputCmd::Choose(id, _)
-            | InputCmd::Text(id, _)
-            | InputCmd::Confirm(id)
-            | InputCmd::Skip(id)
-            | InputCmd::SkipQuestion(id) => id.clone(),
+        let at = match &cmd {
+            InputCmd::Choose(s, _)
+            | InputCmd::Text(s, _)
+            | InputCmd::Confirm(s)
+            | InputCmd::Skip(s)
+            | InputCmd::SkipQuestion(s) => s.clone(),
         };
-        let Some(pos) = self.inputs.iter().position(|p| p.id == id) else {
+        let Some(pos) = self.inputs.iter().position(|p| p.id == at.request) else {
             return;
         };
+        // Per-question intents must target the question still on screen.
+        let current = self.inputs[pos].current().map(|q| q.qid.clone()).unwrap_or_default();
+        if !matches!(cmd, InputCmd::Skip(_)) && current != at.question {
+            return;
+        }
         if let InputCmd::Skip(_) = cmd {
             let p = self.inputs.remove(pos);
             self.client.respond(&p.id, Ok(input_requests::skip_response(&p)));
@@ -200,13 +219,17 @@ impl Controller {
             let Some(p) = shown else {
                 s.set_visible(false);
                 s.set_request_id(SharedString::new());
+                s.set_question_id(SharedString::new());
                 s.set_value(SharedString::new());
                 return;
             };
-            if s.get_request_id().as_str() != p.id {
+            let q = p.current();
+            let qid = q.map(|q| q.qid.as_str()).unwrap_or_default();
+            // A new request or a new question starts with an empty field.
+            if s.get_request_id().as_str() != p.id || s.get_question_id().as_str() != qid {
                 s.set_value(SharedString::new());
             }
-            let q = p.current();
+            s.set_question_id(qid.into());
             let choices: Vec<InputChoice> = q
                 .map(|q| {
                     q.choices

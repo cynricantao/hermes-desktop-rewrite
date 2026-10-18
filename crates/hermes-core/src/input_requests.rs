@@ -277,6 +277,17 @@ impl PendingInput {
         self.record(None)
     }
 
+    /// A replay of this same request: adopt the answers the server already locked.
+    pub fn adopt_locks(&mut self, replay: &PendingInput) {
+        let before = self.current_index();
+        for (qid, v) in &replay.answers {
+            self.answers.entry(qid.clone()).or_insert_with(|| v.clone());
+        }
+        if self.current_index() != before {
+            self.reset_selection();
+        }
+    }
+
     pub fn finished(&self) -> bool {
         self.kind == InputKind::Clarify && self.current_index().is_none()
     }
@@ -375,6 +386,27 @@ mod tests {
         .unwrap();
         assert_eq!(p.current().unwrap().qid, "q1");
         assert_eq!(p.answers.len(), 1);
+    }
+
+    #[test]
+    fn replay_locks_advance_an_open_card() {
+        let mut p = clarify();
+        p.choose(1);
+        let replay = parse(
+            "srq-1",
+            "clarify",
+            &json!({"session_id": "s1", "answers": {"q0": "Small", "q1": "[\"A\"]"}, "questions": [
+                {"qid": "q0", "question": "Scope?", "choices": ["Small", "Large"]},
+                {"qid": "q1", "question": "Which?", "choices": ["A", "B"], "multi_select": true},
+                {"qid": "q2", "question": "Anything else?"},
+            ]}),
+        )
+        .unwrap();
+        p.adopt_locks(&replay);
+        // A local answer stays; the server's lock fills the gap.
+        assert_eq!(p.answers["q0"].as_deref(), Some("Large"));
+        assert_eq!(p.current().unwrap().qid, "q2");
+        assert!(p.selected.is_empty());
     }
 
     #[test]

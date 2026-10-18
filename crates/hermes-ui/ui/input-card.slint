@@ -16,6 +16,8 @@ export global InputState {
     // Sudo / secret / vault: the field is a password field and choices are empty.
     in-out property <bool> masked;
     in-out property <string> request-id;
+    // Question on screen; every per-question intent is checked against it.
+    in-out property <string> question-id;
     in-out property <string> title;
     in-out property <string> detail;
     in-out property <string> question;
