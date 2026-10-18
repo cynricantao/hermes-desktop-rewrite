@@ -943,6 +943,7 @@ impl Controller {
             }
             Cmd::NewChat => {
                 self.clear_attachments();
+                self.composer_reset();
                 self.draft_model = None;
                 self.draft_effort = None;
                 self.session = None;

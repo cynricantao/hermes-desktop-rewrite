@@ -28,6 +28,47 @@ async fn open(ui: &AppWindow, id: &str, rows_at_least: usize) -> bool {
     wait_until(15, || st.get_rows().row_count() >= rows_at_least).await
 }
 
+/// Move the pointer over the message whose text starts with `text` (row actions show on
+/// hover only, and are not clickable while hidden).
+async fn hover_message(ui: &AppWindow, text: &str) -> bool {
+    sleep(150).await;
+    let Some(e) = ElementHandle::find_by_accessible_label(ui, text).next() else {
+        return false;
+    };
+    let (p, s) = (e.absolute_position(), e.size());
+    ui.window().dispatch_event(WindowEvent::PointerMoved {
+        position: slint::LogicalPosition::new(p.x + s.width / 2.0, p.y + s.height / 2.0),
+    });
+    sleep(200).await;
+    true
+}
+
+/// Sweep the pointer up the transcript's right side (where user bubbles sit) from the
+/// bottom until an "Edit message" action shows: hovers the newest user message.
+async fn hover_last_user_message(ui: &AppWindow) -> bool {
+    let size = ui.window().size().to_logical(ui.window().scale_factor());
+    let mut y = size.height - 160.0;
+    while y > 60.0 {
+        ui.window().dispatch_event(WindowEvent::PointerMoved {
+            position: slint::LogicalPosition::new(size.width * 0.72, y),
+        });
+        sleep(40).await;
+        if by_label(ui, "Edit message").is_some() {
+            return true;
+        }
+        y -= 16.0;
+    }
+    false
+}
+
+async fn stored_users(id: &str) -> Vec<String> {
+    backend_rest("GET", &format!("/api/sessions/{id}/messages"), None)
+        .await
+        .as_ref()
+        .map(user_texts)
+        .unwrap_or_default()
+}
+
 fn user_texts(v: &serde_json::Value) -> Vec<String> {
     v["messages"]
         .as_array()
@@ -132,13 +173,16 @@ pub(super) async fn section(ui: &AppWindow, log: &Log) {
     st.set_draft("".into());
 
     // ── Copy message ─────────────────────────────────────────────────────────────
+    // Actions are hidden (and not clickable) until the row is hovered.
+    let hidden_before = by_label(ui, "Copy message").is_none();
+    let hovered = hover_message(ui, &q2).await;
     // The testing backend's clipboard is in-process: nothing reaches the desktop's.
     let copied = click(ui, "Copy message").await && wait_until(3, || by_label(ui, "Copied").is_some()).await;
     record(
         log,
-        "composer: Copy message switches to Copied",
-        copied,
-        format!("copied={copied}"),
+        "composer: Copy message appears on hover and switches to Copied",
+        hidden_before && hovered && copied,
+        format!("hidden-before-hover={hidden_before} hovered={hovered} copied={copied}"),
     );
 
     // ── Edit and resend ─────────────────────────────────────────────────────────
@@ -149,8 +193,11 @@ pub(super) async fn section(ui: &AppWindow, log: &Log) {
     .await;
     let opened = open(ui, &edit_id, 4).await;
     let rows_before = st.get_rows().row_count();
-    // Row 0 is the first user turn; its Edit button is the first one listed.
-    let clicked = click(ui, "Edit message").await;
+    // Opening restores the chat's saved draft a moment later; type after that.
+    sleep(800).await;
+    st.set_draft("half typed".into());
+    sleep(200).await;
+    let clicked = hover_message(ui, &q1).await && click(ui, "Edit message").await;
     let editing = wait_until(3, || st.get_editing_row() == 0 && st.get_draft() == q1.as_str()).await;
     record(
         log,
@@ -158,20 +205,56 @@ pub(super) async fn section(ui: &AppWindow, log: &Log) {
         opened && clicked && editing,
         format!("editing-row={} draft={:?}", st.get_editing_row(), st.get_draft()),
     );
-    // Esc cancels.
+    // Esc cancels and gives back what was typed before.
     press(ui, Key::Escape);
-    let cancelled = wait_until(3, || st.get_editing_row() == -1 && st.get_draft().is_empty()).await;
+    let cancelled = wait_until(3, || st.get_editing_row() == -1 && st.get_draft() == "half typed").await;
     record(
         log,
-        "composer: Esc cancels editing",
+        "composer: Esc cancels editing and restores the earlier draft",
         cancelled,
-        format!("editing-row={}", st.get_editing_row()),
+        format!("editing-row={} draft={:?}", st.get_editing_row(), st.get_draft()),
     );
-    let _ = click(ui, "Edit message").await;
+    st.set_draft("".into());
+    // Enter on an unchanged message sends nothing and cuts nothing.
+    let _ = hover_message(ui, &q1).await && click(ui, "Edit message").await;
+    wait_until(3, || st.get_editing_row() == 0).await;
+    press(ui, Key::Return);
+    let ended = wait_until(3, || st.get_editing_row() == -1).await;
+    sleep(1000).await;
+    let users = stored_users(&edit_id).await;
+    record(
+        log,
+        "composer: an unchanged edit sends nothing",
+        ended && users == vec![q1.clone(), q2.clone()] && st.get_rows().row_count() == rows_before,
+        format!(
+            "ended={ended} stored users={users:?} rows={}",
+            st.get_rows().row_count()
+        ),
+    );
+    // A changed first turn also removes the later turn: the first Enter only explains.
+    let _ = hover_message(ui, &q1).await && click(ui, "Edit message").await;
     wait_until(3, || st.get_editing_row() == 0).await;
     let edited = format!("Edited first {tag}");
     st.set_draft(edited.clone().into());
     sleep(150).await;
+    press(ui, Key::Return);
+    let asked = wait_until(5, || st.get_edit_note().contains("1 later message")).await;
+    sleep(800).await;
+    let users_after_first = stored_users(&edit_id).await;
+    record(
+        log,
+        "composer: an edit that removes later turns asks first and sends nothing yet",
+        asked
+            && st.get_editing_row() == 0
+            && st.get_draft() == edited.as_str()
+            && users_after_first == vec![q1.clone(), q2.clone()],
+        format!(
+            "note={:?} draft={:?} stored users={users_after_first:?}",
+            st.get_edit_note(),
+            st.get_draft()
+        ),
+    );
+    screenshot(ui, "composer-edit-confirm");
     press(ui, Key::Return);
     let local_cut = wait_until(5, || {
         let r = st.get_rows();
@@ -180,16 +263,14 @@ pub(super) async fn section(ui: &AppWindow, log: &Log) {
     .await;
     // The backend has no model, so the reply fails; the cut and the new turn must persist.
     sleep(3000).await;
-    let stored = backend_rest("GET", &format!("/api/sessions/{edit_id}/messages"), None).await;
-    let users = stored.as_ref().map(user_texts).unwrap_or_default();
+    let users = stored_users(&edit_id).await;
     record(
         log,
-        "composer: edit-and-resend replaces the turn and what followed (backend read-back)",
+        "composer: the second Enter replaces the turn and what followed (backend read-back)",
         local_cut && users == vec![edited.clone()],
         format!(
-            "rows {rows_before}→{} local-cut={local_cut} stored users={users:?} err={:?}",
-            st.get_rows().row_count(),
-            stored.err()
+            "rows {rows_before}→{} local-cut={local_cut} stored users={users:?}",
+            st.get_rows().row_count()
         ),
     );
     screenshot(ui, "composer-edit");
@@ -243,7 +324,98 @@ pub(super) async fn section(ui: &AppWindow, log: &Log) {
         refs_ok && cleared,
         format!("last user turn={last:?} chips-cleared={cleared}"),
     );
-    for id in [long_id, hist_id, edit_id, file_id] {
+    // An edit the backend refuses (this turn failed without a model, so the runtime never
+    // kept it: 4018) must change nothing and give the text back.
+    wait_until(30, || !st.get_running()).await;
+    let before = stored_users(&file_id).await;
+    let clicked = hover_last_user_message(ui).await && click(ui, "Edit message").await;
+    let editing = wait_until(3, || {
+        st.get_editing_row() >= 0 && st.get_draft() == "Read the attached files"
+    })
+    .await;
+    let refused_text = format!("Refused edit {tag}");
+    st.set_draft(refused_text.clone().into());
+    sleep(150).await;
+    press(ui, Key::Return);
+    let restored = wait_until(10, || {
+        st.get_draft() == refused_text.as_str() && !st.get_banner().is_empty()
+    })
+    .await;
+    let after = stored_users(&file_id).await;
+    record(
+        log,
+        "composer: an edit the backend refuses cuts nothing and returns the text",
+        clicked && editing && restored && after == before,
+        format!(
+            "restored={restored} banner={:?} stored before={} after={}",
+            st.get_banner(),
+            before.len(),
+            after.len()
+        ),
+    );
+    st.set_draft("".into());
+
+    // A saved turn that carried a file: shown as words + 📎, matched to its stored refs.
+    let ref_turn = "@file:docs/fixture-notes.txt\n\nCheck the fixture notes";
+    let ref_id = seed(&format!("Composer ref edit {tag}"), &[(ref_turn, "Seeded answer.")]).await;
+    let opened = open(ui, &ref_id, 2).await;
+    sleep(800).await;
+    let shown = st
+        .get_rows()
+        .row_data(0)
+        .map(|r| r.text.to_string())
+        .unwrap_or_default();
+    let clicked = hover_last_user_message(ui).await && click(ui, "Edit message").await;
+    let editing = wait_until(3, || {
+        st.get_editing_row() == 0 && st.get_draft() == "Check the fixture notes"
+    })
+    .await;
+    let new_text = format!("Summarise the notes instead {tag}");
+    st.set_draft(new_text.clone().into());
+    sleep(150).await;
+    press(ui, Key::Return);
+    sleep(3000).await;
+    let users = stored_users(&ref_id).await;
+    record(
+        log,
+        "composer: a saved turn with a file ref shows 📎 and can be edited",
+        opened
+            && shown == "Check the fixture notes\n📎 fixture-notes.txt"
+            && clicked
+            && editing
+            && users == vec![new_text.clone()],
+        format!(
+            "shown={shown:?} editing={editing} stored users={users:?} banner={:?}",
+            st.get_banner()
+        ),
+    );
+
+    // Switching from a scrolled-up chat lands the next chat on its newest turn.
+    let opened = open(ui, &long_id, 28).await;
+    sleep(400).await;
+    let size = ui.window().size().to_logical(ui.window().scale_factor());
+    let at = slint::LogicalPosition::new(size.width * 0.6, size.height * 0.4);
+    ui.window().dispatch_event(WindowEvent::PointerMoved { position: at });
+    for _ in 0..8 {
+        ui.window().dispatch_event(WindowEvent::PointerScrolled {
+            position: at,
+            delta_x: 0.0,
+            delta_y: 400.0,
+        });
+        sleep(60).await;
+    }
+    let up = wait_until(3, || by_label(ui, "Scroll to bottom").is_some()).await;
+    let switched = open(ui, &hist_id, 4).await;
+    sleep(600).await;
+    let at_end = by_label(ui, "Scroll to bottom").is_none();
+    record(
+        log,
+        "composer: switching from a scrolled-up chat lands on the next chat's newest turn",
+        opened && up && switched && at_end,
+        format!("scrolled-up={up} switched={switched} at-end={at_end}"),
+    );
+
+    for id in [long_id, hist_id, edit_id, file_id, ref_id] {
         let _ = backend_rest("DELETE", &format!("/api/sessions/{id}"), None).await;
     }
 }

@@ -120,6 +120,8 @@ export global AppState {
     // Row index of the user message being edited (-1 = not editing). Sending while
     // editing replaces that message and everything after it.
     in-out property <int> editing-row: -1;
+    // Shown above the composer while editing (e.g. the later-turns confirmation).
+    in-out property <string> edit-note;
     callback edit-message(int, string);
     callback edit-send(int, string);
     callback cancel-edit();
@@ -511,6 +513,7 @@ export component AppWindow inherits Window {
                 transcript-mode: AppState.transcript-mode;
                 autoscroll <=> AppState.autoscroll;
                 edit(i, t) => { AppState.edit-message(i, t); }
+                session: AppState.active-session;
             }
             if !root.empty: dock := Composer {
                 x: (parent.width - self.width) / 2;
@@ -542,6 +545,7 @@ export component AppWindow inherits Window {
                     self.text = "";
                 }
                 editing: AppState.editing-row >= 0;
+                edit-note: AppState.edit-note;
                 cancel-edit => { AppState.cancel-edit(); }
                 stop => { AppState.stop(); }
                 pick-model => { root.effort-open = false; root.picker-open = !root.picker-open; AppState.refresh-models(); }

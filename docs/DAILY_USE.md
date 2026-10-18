@@ -44,9 +44,12 @@ palette, fonts, spacing, and software renderer. It is not full Electron Desktop 
   (zenity or kdialog): images are queued as images, other files (PDFs included) are staged
   in the chat's workspace and sent as `@file:` refs ahead of your message.
 - **Messages:** hover a message for **Copy**; hover one of your own for **Edit**. Editing
-  puts the text in the composer; **Enter** replaces that message and everything after it
-  (the backend archives what was cut), **Esc** cancels. Scrolled up? The round **↓** button
-  returns to the newest message.
+  puts the text in the composer; **Enter** replaces that message (an unchanged text sends
+  nothing). If later messages would be removed too, the first **Enter** says how many and a
+  second **Enter** confirms; the backend archives what was cut. **Esc** cancels and gives
+  back what you had typed. Editing waits while a reply runs or attachments are staged.
+  Scrolled up? The round **↓** button returns to the newest message, and opening a chat
+  always lands on its newest message.
 - Agent questions now get a card above the composer: clarify (choices, multi-select,
   free text, Skip question / Skip all) and masked sudo / secret / vault-unlock prompts.
   **Esc** declines the open card instead of stopping the turn. A question raised in

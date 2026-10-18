@@ -417,8 +417,8 @@ component MessageRow inherits Rectangle {
     animate opacity { duration: Motion.base; easing: Ease.out; }
 
     height: lay.preferred-height;
-    // Hover over the whole row reveals its actions (copy, edit); children keep their clicks.
-    hover := TouchArea { }
+    // Hover over the whole row (its children included) reveals its actions (copy, edit).
+    hover := TouchArea {
     lay := VerticalLayout {
         x: (root.width - min(root.width - 48px, root.column-w)) / 2;
         width: min(root.width - 48px, root.column-w);
@@ -506,15 +506,17 @@ component MessageRow inherits Rectangle {
             alignment: root.item.kind == 0 ? end : start;
             height: 26px;
             spacing: 2px;
-            opacity: hover.has-hover || root.copied ? 1 : 0;
-            animate opacity { duration: Motion.fast; }
+            // Hidden actions are not clickable either; the strip keeps its height.
+            property <bool> show: hover.has-hover || root.copied;
             IconButton {
+                visible: parent.show;
                 icon: root.copied ? @image-url("../../../assets/icons/check.svg") : @image-url("../../../assets/icons/copy.svg");
                 icon-size: 14px;
                 tooltip: root.copied ? "Copied" : "Copy message";
                 clicked => { root.copy(root.item.text); root.copied = true; copied-reset.running = true; }
             }
             if root.item.kind == 0 && !root.busy: IconButton {
+                visible: parent.show;
                 icon: @image-url("../../../assets/icons/pencil.svg");
                 icon-size: 14px;
                 tooltip: "Edit message";
@@ -522,6 +524,7 @@ component MessageRow inherits Rectangle {
             }
         }
 
+    }
     }
     copied-reset := Timer {
         interval: 1500ms;
@@ -536,6 +539,9 @@ export component Transcript inherits Rectangle {
     in property <bool> running;
     in property <int> transcript-mode;
     in-out property <bool> follow: true;
+    // The open chat; a switch lands on its newest turn even if the last one was scrolled up.
+    in property <string> session;
+    changed session => { root.follow = true; list.content-y = min(0px, list.visible-height - list.content-height); resnap.running = true; }
     // Dev/measurement hook (HERMES_DESKTOP_AUTOSCROLL): sweep to the top and back to the
     // bottom once, ~7500 px/s, then clear the flag. Used by the long-transcript checks.
     in-out property <bool> autoscroll;
@@ -671,6 +677,7 @@ export component Composer inherits Rectangle {
     callback history-forward();
     // Editing an earlier message: Enter replaces it (and what followed), Esc cancels.
     in property <bool> editing;
+    in property <string> edit-note;
     callback cancel-edit();
     // Bumped when the controller replaces the text (history, edit): caret to the end.
     in property <int> caret-end-tick;
@@ -805,7 +812,8 @@ export component Composer inherits Rectangle {
         }
     }
 
-    if root.editing: Rectangle {
+    // Hidden while the completion list holds the same slot.
+    if root.editing && !(root.completions.length > 0 && !root.dismissed): Rectangle {
         y: -self.height - 6px;
         x: 12px;
         height: 24px;
@@ -813,7 +821,7 @@ export component Composer inherits Rectangle {
         border-radius: Theme.r-sm;
         background: Theme.accent-soft;
         edit-note := Text {
-            text: "Editing a message: sending replaces it and everything after it. Esc cancels.";
+            text: root.edit-note != "" ? root.edit-note : "Editing a message: sending replaces it. Esc cancels.";
             color: Theme.text-2;
             font-size: Theme.fs-sm;
         }

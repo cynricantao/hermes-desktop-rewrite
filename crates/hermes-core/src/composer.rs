@@ -5,24 +5,56 @@
 //! from the chat's own user turns (newest first) on every keypress, and only the cursor and
 //! the draft typed before browsing are kept.
 //!
-//! Edit-and-resend follows `use-prompt-actions/rewind.ts`: the turn to replace is found by
-//! **content** against `session.history` (which carries each persisted row's `row_id`), and
-//! the cut is aimed by that durable row id. A missing or ambiguous match returns `None` and
-//! nothing is sent, so a guess can never delete the wrong part of a chat.
+//! Edit-and-resend follows `use-prompt-actions/rewind.ts`, stricter: the turn to replace
+//! must sit at the **same position** among the chat's user turns in `session.history` and
+//! every turn from it on must read the same as on screen. The cut is aimed by that turn's
+//! durable `row_id`. Any disagreement (another client wrote, a turn is missing, duplicates)
+//! refuses the edit and nothing is sent, so the backend can never cut a different turn
+//! than the one the user clicked.
 
 use serde_json::{Value, json};
 
 /// Marker the desktop appends to a user bubble for each attachment that went with it.
 pub const ATTACHMENT_MARK: &str = "📎 ";
 
-/// The user's own words in a bubble: attachment marker lines dropped, trimmed.
+/// Attachment refs the backend stores ahead of a prompt (`@file:…`, `@image:…`).
+fn is_ref_line(l: &str) -> bool {
+    ["@file:", "@image:", "@folder:", "@url:"]
+        .iter()
+        .any(|p| l.starts_with(p))
+}
+
+/// The user's own words in a bubble: attachment marker and ref lines dropped, trimmed.
 pub fn bubble_text(text: &str) -> String {
     text.lines()
-        .filter(|l| !l.starts_with(ATTACHMENT_MARK))
+        .filter(|l| !l.starts_with(ATTACHMENT_MARK) && !is_ref_line(l))
         .collect::<Vec<_>>()
         .join("\n")
         .trim()
         .to_owned()
+}
+
+/// A stored user turn as the desktop shows it: leading `@file:` refs become `📎 name`
+/// marker lines after the words (the shape a live turn has), so reopened chats match.
+pub fn display_user_text(text: &str) -> String {
+    let refs: Vec<String> = text
+        .lines()
+        .filter(|l| is_ref_line(l))
+        .map(|l| {
+            let v = l.split_once(':').map(|(_, v)| v).unwrap_or(l).trim_matches('`');
+            format!("{ATTACHMENT_MARK}{}", v.rsplit('/').next().unwrap_or(v))
+        })
+        .collect();
+    if refs.is_empty() {
+        return text.to_owned();
+    }
+    let words = bubble_text(text);
+    [words.as_str()]
+        .into_iter()
+        .chain(refs.iter().map(String::as_str))
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// User turns of a chat, newest first, as the ↑ key walks them.
@@ -101,8 +133,19 @@ pub struct EditTarget {
     pub row_id: i64,
     /// The turn is the first user turn, so the cut leaves an empty history.
     pub first: bool,
-    /// Later user turns exist and will be archived with the cut.
-    pub deep: bool,
+    /// User turns after it that the cut also removes (with their replies).
+    pub later: usize,
+}
+
+/// Why an edit was refused (nothing is sent).
+#[derive(Debug, Clone, PartialEq)]
+pub enum EditRefusal {
+    /// The saved chat does not line up with what is on screen.
+    OutOfSync,
+    /// The turn has no durable row id yet.
+    NotSaved,
+    /// A command, steer or other special turn; it cannot be edited.
+    NotEditable,
 }
 
 fn row_id(m: &Value) -> Option<i64> {
@@ -111,52 +154,58 @@ fn row_id(m: &Value) -> Option<i64> {
 
 fn message_text(m: &Value) -> String {
     match m.get("text").or_else(|| m.get("content")) {
-        Some(Value::String(s)) => s.trim().to_owned(),
+        Some(Value::String(s)) => s.clone(),
         Some(Value::Array(parts)) => parts
             .iter()
             .filter_map(|p| p.get("text").and_then(Value::as_str))
             .collect::<Vec<_>>()
-            .join("")
-            .trim()
-            .to_owned(),
+            .join(""),
         _ => String::new(),
     }
 }
 
-/// Find the persisted user turn whose text is `wanted` in `session.history` messages.
-/// A unique match wins; several matches resolve only when `newest` says the edited bubble
-/// is the chat's latest user turn and the latest persisted user turn matches. Anything
-/// else is `None`.
-pub fn resolve_edit_target(messages: &[Value], wanted: &str, newest: bool) -> Option<EditTarget> {
-    let wanted = wanted.trim();
-    if wanted.is_empty() {
-        return None;
-    }
-    let users: Vec<(i64, String)> = messages
+/// Resolve the edit of the user turn at `ordinal` (0 = first) among `local_users`, the
+/// texts of every user turn on screen, against `session.history` messages.
+pub fn resolve_edit_target(
+    messages: &[Value],
+    local_users: &[String],
+    ordinal: usize,
+) -> Result<EditTarget, EditRefusal> {
+    let durable: Vec<&Value> = messages
         .iter()
         .filter(|m| m.get("role").and_then(Value::as_str) == Some("user"))
-        .filter_map(|m| row_id(m).map(|id| (id, message_text(m))))
+        .filter(|m| m.get("display_kind").and_then(Value::as_str) != Some("hidden"))
         .collect();
-    let hits: Vec<usize> = users
+    if durable.len() != local_users.len() || ordinal >= durable.len() {
+        return Err(EditRefusal::OutOfSync);
+    }
+    let same = |d: &Value, l: &str| bubble_text(&message_text(d)) == bubble_text(l);
+    if !durable[ordinal..]
         .iter()
-        .enumerate()
-        .filter(|(_, (_, t))| t == wanted)
-        .map(|(i, _)| i)
-        .collect();
-    let at = match hits.as_slice() {
-        [one] => *one,
-        [.., last] if newest && *last + 1 == users.len() => *last,
-        _ => return None,
-    };
-    Some(EditTarget {
-        row_id: users[at].0,
-        first: at == 0,
-        deep: at + 2 <= users.len(),
+        .zip(&local_users[ordinal..])
+        .all(|(d, l)| same(d, l))
+    {
+        return Err(EditRefusal::OutOfSync);
+    }
+    let target = durable[ordinal];
+    if target
+        .get("display_kind")
+        .and_then(Value::as_str)
+        .is_some_and(|k| !k.is_empty())
+        || bubble_text(&message_text(target)).starts_with('/')
+    {
+        return Err(EditRefusal::NotEditable);
+    }
+    Ok(EditTarget {
+        row_id: row_id(target).ok_or(EditRefusal::NotSaved)?,
+        first: ordinal == 0,
+        later: durable.len() - ordinal - 1,
     })
 }
 
-/// `prompt.submit` params that replace the turn at `target` (and everything after it).
-pub fn edit_submit_params(session_id: &str, text: &str, target: &EditTarget) -> Value {
+/// `prompt.submit` params that replace the turn at `target`. `deep_confirmed` is the
+/// user's explicit consent to also remove the later turns; it is never assumed.
+pub fn edit_submit_params(session_id: &str, text: &str, target: &EditTarget, deep_confirmed: bool) -> Value {
     let mut p = json!({
         "session_id": session_id,
         "text": text,
@@ -166,7 +215,7 @@ pub fn edit_submit_params(session_id: &str, text: &str, target: &EditTarget) -> 
     if target.first {
         p["confirm_empty_truncate"] = json!(true);
     }
-    if target.deep {
+    if target.later > 0 && deep_confirmed {
         p["confirm_deep_truncate"] = json!(true);
     }
     p
@@ -253,90 +302,107 @@ mod tests {
         m
     }
 
-    #[test]
-    fn edit_target_unique_first_and_deep() {
-        let h = vec![
+    fn history() -> Vec<Value> {
+        vec![
             msg("user", "one", Some(10)),
             msg("assistant", "a", Some(11)),
             msg("user", "two", Some(12)),
             msg("assistant", "b", Some(13)),
             msg("user", "three", Some(14)),
-        ];
-        assert_eq!(
-            resolve_edit_target(&h, "one", false),
-            Some(EditTarget {
-                row_id: 10,
-                first: true,
-                deep: true
-            })
-        );
-        assert_eq!(
-            resolve_edit_target(&h, "two", false),
-            Some(EditTarget {
-                row_id: 12,
-                first: false,
-                deep: true
-            })
-        );
-        assert_eq!(
-            resolve_edit_target(&h, " three ", true),
-            Some(EditTarget {
-                row_id: 14,
-                first: false,
-                deep: false
-            })
-        );
-        assert_eq!(resolve_edit_target(&h, "missing", true), None);
-        assert_eq!(resolve_edit_target(&h, "", true), None);
+        ]
     }
 
     #[test]
-    fn ambiguous_edit_resolves_only_for_the_newest_turn() {
-        let h = vec![
-            msg("user", "same", Some(1)),
-            msg("user", "same", Some(2)),
-            msg("user", "unstamped", None),
-        ];
-        assert_eq!(resolve_edit_target(&h, "same", false), None);
+    fn edit_target_by_position_and_content() {
+        let local = ring(&["one", "two", "three"]);
         assert_eq!(
-            resolve_edit_target(&h, "same", true).map(|t| t.row_id),
-            Some(2),
-            "newest bubble + newest durable match"
+            resolve_edit_target(&history(), &local, 0),
+            Ok(EditTarget {
+                row_id: 10,
+                first: true,
+                later: 2
+            })
         );
-        let older_dup = vec![
+        assert_eq!(
+            resolve_edit_target(&history(), &local, 1).map(|t| (t.row_id, t.later)),
+            Ok((12, 1))
+        );
+        assert_eq!(
+            resolve_edit_target(&history(), &local, 2).map(|t| (t.row_id, t.later)),
+            Ok((14, 0))
+        );
+    }
+
+    #[test]
+    fn duplicates_resolve_by_position_never_by_last_match() {
+        let h = vec![
             msg("user", "same", Some(1)),
             msg("user", "same", Some(2)),
             msg("user", "x", Some(3)),
         ];
+        let local = ring(&["same", "same", "x"]);
+        assert_eq!(resolve_edit_target(&h, &local, 0).map(|t| t.row_id), Ok(1));
+        assert_eq!(resolve_edit_target(&h, &local, 1).map(|t| t.row_id), Ok(2));
+    }
+
+    #[test]
+    fn any_disagreement_refuses() {
+        // Another client added a turn the screen does not show.
+        let mut h = history();
+        h.push(msg("user", "four", Some(16)));
         assert_eq!(
-            resolve_edit_target(&older_dup, "same", true),
-            None,
-            "latest durable turn differs"
+            resolve_edit_target(&h, &ring(&["one", "two", "three"]), 1),
+            Err(EditRefusal::OutOfSync)
         );
-        assert_eq!(resolve_edit_target(&h, "unstamped", true), None, "no row id, no cut");
+        // A later turn differs from the screen.
+        assert_eq!(
+            resolve_edit_target(&history(), &ring(&["one", "two", "THREE"]), 0),
+            Err(EditRefusal::OutOfSync)
+        );
+        // Not yet saved.
+        let h = vec![msg("user", "one", None)];
+        assert_eq!(resolve_edit_target(&h, &ring(&["one"]), 0), Err(EditRefusal::NotSaved));
+        // Special turns.
+        let mut steer = msg("user", "go left", Some(3));
+        steer["display_kind"] = json!("steer");
+        assert_eq!(
+            resolve_edit_target(&[steer], &ring(&["go left"]), 0),
+            Err(EditRefusal::NotEditable)
+        );
+        assert_eq!(
+            resolve_edit_target(&[msg("user", "/model x", Some(4))], &ring(&["/model x"]), 0),
+            Err(EditRefusal::NotEditable)
+        );
     }
 
     #[test]
-    fn content_parts_are_matched_too() {
-        let h = vec![json!({"role": "user", "row_id": 5, "content": [{"type": "text", "text": "hi there"}]})];
-        assert_eq!(resolve_edit_target(&h, "hi there", true).map(|t| t.row_id), Some(5));
+    fn attachment_turns_match_their_stored_refs() {
+        let h = vec![msg("user", "@file:docs/notes.txt\n\nread this", Some(7))];
+        let local = ring(&["read this\n📎 notes.txt"]);
+        assert_eq!(resolve_edit_target(&h, &local, 0).map(|t| t.row_id), Ok(7));
+        assert_eq!(
+            display_user_text("@file:docs/notes.txt\n\nread this"),
+            "read this\n📎 notes.txt"
+        );
+        assert_eq!(display_user_text("plain"), "plain");
     }
 
     #[test]
-    fn edit_params_carry_consent_flags() {
-        let p = edit_submit_params(
-            "s1",
-            "new",
-            &EditTarget {
-                row_id: 7,
-                first: true,
-                deep: false,
-            },
-        );
+    fn deep_consent_is_never_assumed() {
+        let t = EditTarget {
+            row_id: 7,
+            first: true,
+            later: 2,
+        };
+        let p = edit_submit_params("s1", "new", &t, false);
         assert_eq!(p["truncate_before_row_id"], 7);
         assert_eq!(p["confirm_truncate"], true);
         assert_eq!(p["confirm_empty_truncate"], true);
-        assert!(p.get("confirm_deep_truncate").is_none());
+        assert!(
+            p.get("confirm_deep_truncate").is_none(),
+            "no consent without the confirm step"
+        );
+        assert_eq!(edit_submit_params("s1", "new", &t, true)["confirm_deep_truncate"], true);
         assert!(
             p.get("truncate_before_user_ordinal").is_none(),
             "row id alone aims the cut"

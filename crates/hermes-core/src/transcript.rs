@@ -164,7 +164,8 @@ impl Transcript {
             match m.role.as_str() {
                 "user" => self.blocks.push(Block::Text {
                     role: Role::User,
-                    text: m.display_text(),
+                    // Stored `@file:` refs show as 📎 lines, like a turn sent in this window.
+                    text: crate::composer::display_user_text(&m.display_text()),
                     reasoning: String::new(),
                     streaming: false,
                 }),

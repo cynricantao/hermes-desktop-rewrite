@@ -18,8 +18,9 @@ use crate::AppState;
 pub enum ComposerCmd {
     HistoryBack(String),
     HistoryForward,
-    /// Edit the user message at this row (the controller checks it is still one).
-    BeginEdit(i32),
+    /// Edit the user message at this row (the controller checks it is still one); carries
+    /// the composer's text at that moment, restored if the edit is cancelled.
+    BeginEdit(i32, String),
     /// Send the edited text in place of the message at this row.
     EditSend(i32, String),
     CancelEdit,
@@ -44,6 +45,12 @@ impl ComposerState {
     pub fn browse_reset(&mut self) {
         self.browse.reset();
     }
+
+    /// An edit is open: queued prompts wait, so they cannot land between the edit's
+    /// target and its send (and be cut by it).
+    pub fn editing(&self) -> bool {
+        self.editing.is_some()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -51,6 +58,11 @@ pub(super) struct ComposerState {
     browse: Browse,
     /// Row and original text of the message being edited.
     editing: Option<(usize, String)>,
+    /// What the composer held before Edit, restored on cancel.
+    pre_edit_draft: String,
+    /// The user saw "this also removes N later messages" for this (row, N, text); a second
+    /// Enter with the same edit is the explicit consent to that deeper cut.
+    deep_ack: Option<(usize, usize, String)>,
     pub files: Vec<StagedFile>,
 }
 
@@ -67,9 +79,13 @@ pub(super) fn wire(ui_handle: &crate::AppWindow, tx: &tokio::sync::mpsc::Unbound
         let _ = t.send(Cmd::Composer(ComposerCmd::HistoryBack(text.into())));
     });
     st.on_history_forward(send(ComposerCmd::HistoryForward));
-    let t = tx.clone();
+    let (t, weak) = (tx.clone(), ui_handle.as_weak());
     st.on_edit_message(move |row, _| {
-        let _ = t.send(Cmd::Composer(ComposerCmd::BeginEdit(row)));
+        let draft = weak
+            .upgrade()
+            .map(|w| w.global::<AppState>().get_draft().to_string())
+            .unwrap_or_default();
+        let _ = t.send(Cmd::Composer(ComposerCmd::BeginEdit(row, draft)));
     });
     let t = tx.clone();
     st.on_edit_send(move |row, text| {
@@ -81,8 +97,10 @@ pub(super) fn wire(ui_handle: &crate::AppWindow, tx: &tokio::sync::mpsc::Unbound
 
 /// Run the first file picker found on the desktop. `Ok(None)` = the user cancelled.
 fn run_picker() -> Result<Option<Vec<String>>, String> {
-    // Test/dev hook: newline-separated paths stand in for the picker (no dialog opens).
-    if let Ok(paths) = std::env::var("HERMES_DESKTOP_PICKER_PATHS") {
+    // Test hook (debug builds only): newline-separated paths stand in for the picker.
+    if cfg!(debug_assertions)
+        && let Ok(paths) = std::env::var("HERMES_DESKTOP_PICKER_PATHS")
+    {
         return Ok(Some(composer::picker_paths(&paths)));
     }
     let graphical = std::env::var_os("WAYLAND_DISPLAY").is_some() || std::env::var_os("DISPLAY").is_some();
@@ -109,8 +127,15 @@ fn run_picker() -> Result<Option<Vec<String>>, String> {
             Ok(out) if out.status.success() => {
                 return Ok(Some(composer::picker_paths(&String::from_utf8_lossy(&out.stdout))));
             }
-            // Exit 1 with no output = Cancel.
-            Ok(_) => return Ok(None),
+            // zenity and kdialog both exit 1 on Cancel; anything else is a failure.
+            Ok(out) if out.status.code() == Some(1) => return Ok(None),
+            Ok(out) => {
+                return Err(format!(
+                    "{bin} failed ({}): {}",
+                    out.status,
+                    String::from_utf8_lossy(&out.stderr).trim()
+                ));
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
             Err(e) => return Err(format!("{bin}: {e}")),
         }
@@ -134,14 +159,12 @@ impl Controller {
                     self.set_composer_text(text, browsing);
                 }
             }
-            ComposerCmd::BeginEdit(row) => self.begin_edit(row),
+            ComposerCmd::BeginEdit(row, draft) => self.begin_edit(row, draft),
             ComposerCmd::CancelEdit => {
-                self.composer.editing = None;
-                ui(&self.weak, |w| {
-                    let st = w.global::<AppState>();
-                    st.set_editing_row(-1);
-                    st.set_draft("".into());
-                });
+                self.end_edit();
+                let draft = std::mem::take(&mut self.composer.pre_edit_draft);
+                self.set_composer_text(draft, false);
+                Box::pin(self.drain_queue()).await;
             }
             ComposerCmd::EditSend(row, text) => self.edit_send(row, text).await,
             ComposerCmd::PickFiles => {
@@ -177,12 +200,30 @@ impl Controller {
     /// A chat was opened or closed: history browsing and editing belong to the old one.
     pub(super) fn composer_reset(&mut self) {
         self.composer.browse.reset();
+        self.end_edit();
+        ui(&self.weak, |w| w.global::<AppState>().set_browsing(false));
+    }
+
+    fn end_edit(&mut self) {
         self.composer.editing = None;
+        self.composer.deep_ack = None;
         ui(&self.weak, |w| {
             let st = w.global::<AppState>();
-            st.set_browsing(false);
             st.set_editing_row(-1);
+            st.set_edit_note("".into());
         });
+    }
+
+    /// Images or files are staged: an edit would carry them silently, so it waits.
+    fn staged_blocks_edit(&self) -> bool {
+        if self.attachments.is_empty() && self.composer.files.is_empty() {
+            return false;
+        }
+        self.banner(
+            "Send or remove the staged attachments before editing a message.".into(),
+            true,
+        );
+        true
     }
 
     fn user_ring(&self) -> Vec<String> {
@@ -212,16 +253,23 @@ impl Controller {
         }
     }
 
-    fn begin_edit(&mut self, row: i32) {
+    fn begin_edit(&mut self, row: i32, draft: String) {
         if self.transcript.running {
             return self.banner("Stop the current reply before editing a message.".into(), true);
+        }
+        if self.staged_blocks_edit() {
+            return;
         }
         let Some(row) = usize::try_from(row).ok() else { return };
         let Some(orig) = self.user_text_at(row).map(str::to_owned) else {
             return;
         };
         let text = composer::bubble_text(&orig);
+        if self.composer.editing.is_none() {
+            self.composer.pre_edit_draft = draft;
+        }
         self.composer.browse.reset();
+        self.composer.deep_ack = None;
         self.composer.editing = Some((row, orig));
         let r = row as i32;
         ui(&self.weak, move |w| {
@@ -237,49 +285,116 @@ impl Controller {
         ui(&self.weak, move |w| w.global::<AppState>().set_draft(text.into()));
     }
 
+    /// Keep the edit open with `text` in the composer and `note` above it.
+    fn keep_editing(&self, at: usize, text: String, note: String) {
+        let r = at as i32;
+        ui(&self.weak, move |w| {
+            let st = w.global::<AppState>();
+            st.set_editing_row(r);
+            st.set_edit_note(note.into());
+            st.set_draft(text.into());
+            st.set_caret_end_tick(st.get_caret_end_tick().wrapping_add(1));
+        });
+    }
+
     async fn edit_send(&mut self, row: i32, text: String) {
-        let editing = self.composer.editing.take();
         let row = usize::try_from(row).unwrap_or(usize::MAX);
-        let Some((at, orig)) = editing.filter(|(r, o)| *r == row && self.user_text_at(*r) == Some(o.as_str())) else {
+        let Some((at, orig)) = self
+            .composer
+            .editing
+            .clone()
+            .filter(|(r, o)| *r == row && self.user_text_at(*r) == Some(o.as_str()))
+        else {
+            self.end_edit();
             self.banner(
                 "The chat changed while you were editing, so nothing was sent. Your text is back in the box.".into(),
                 true,
             );
             return self.restore_draft(text);
         };
+        let words = text.trim().to_owned();
+        if words.is_empty() {
+            return self.keep_editing(at, text, "Type the new message, or press Esc to cancel.".into());
+        }
+        // Unchanged: nothing to replace (Electron's rewind is a no-op here too).
+        if words == composer::bubble_text(&orig) {
+            self.end_edit();
+            let draft = std::mem::take(&mut self.composer.pre_edit_draft);
+            return self.set_composer_text(draft, false);
+        }
+        if self.staged_blocks_edit() {
+            return self.keep_editing(at, text, String::new());
+        }
         if self.transcript.running {
             self.banner("Stop the current reply before editing a message.".into(), true);
-            return self.restore_draft(text);
+            return self.keep_editing(at, text, String::new());
         }
         let Some(sid) = self.session.clone() else {
+            self.end_edit();
             self.banner(
                 "This chat is not open on the backend, so nothing was sent.".into(),
                 true,
             );
             return self.restore_draft(text);
         };
-        let newest = !self.transcript.blocks[at + 1..]
+        let local_users: Vec<String> = self
+            .transcript
+            .blocks
             .iter()
-            .any(|b| matches!(b, Block::Text { role: Role::User, .. }));
+            .filter_map(|b| match b {
+                Block::Text {
+                    role: Role::User, text, ..
+                } => Some(text.clone()),
+                _ => None,
+            })
+            .collect();
+        let ordinal = self.transcript.blocks[..at]
+            .iter()
+            .filter(|b| matches!(b, Block::Text { role: Role::User, .. }))
+            .count();
         let history = self.client.request("session.history", json!({"session_id": sid})).await;
         let messages = history
             .ok()
             .and_then(|v| v.get("messages").and_then(Value::as_array).cloned())
             .unwrap_or_default();
-        let Some(target) = composer::resolve_edit_target(&messages, &composer::bubble_text(&orig), newest) else {
-            self.banner(
-                "Could not find that message in the saved chat, so nothing was replaced. Your text is back in the box."
-                    .into(),
-                true,
-            );
-            return self.restore_draft(text);
+        let target = match composer::resolve_edit_target(&messages, &local_users, ordinal) {
+            Ok(t) => t,
+            Err(why) => {
+                self.end_edit();
+                self.banner(
+                    match why {
+                        composer::EditRefusal::NotEditable => "That message cannot be edited (it was a command or a steer).",
+                        composer::EditRefusal::NotSaved => "That message is not saved yet, so it cannot be edited. Try again in a moment.",
+                        composer::EditRefusal::OutOfSync => "The saved chat does not match the screen (it may have changed elsewhere), so nothing was replaced. Reopen the chat and try again.",
+                    }
+                    .to_owned()
+                        + " Your text is back in the box.",
+                    true,
+                );
+                return self.restore_draft(text);
+            }
         };
+        // Cutting later turns needs explicit consent: the first Enter explains, the second
+        // (same edit, same number of later turns) confirms.
+        let deep_ok = target.later == 0 || self.composer.deep_ack.as_ref() == Some(&(at, target.later, words.clone()));
+        if !deep_ok {
+            self.composer.deep_ack = Some((at, target.later, words));
+            let n = target.later;
+            let note = format!(
+                "This also removes the {n} later message{} and {} replies. Press Enter again to send, Esc to cancel.",
+                if n == 1 { "" } else { "s" },
+                if n == 1 { "its" } else { "their" }
+            );
+            return self.keep_editing(at, text, note);
+        }
+        self.end_edit();
+        self.composer.pre_edit_draft.clear();
         // The backend cuts at the durable row; show the same cut locally.
         self.transcript.blocks.truncate(at);
         self.transcript.push_user(&text);
         self.mark(hermes_core::transcript::Change::Reset);
         self.flush();
-        let params = composer::edit_submit_params(&sid, &text, &target);
+        let params = composer::edit_submit_params(&sid, &text, &target, target.later > 0);
         let (client, commands) = (self.client.clone(), self.commands.clone());
         tokio::spawn(async move {
             if let Err(e) = client
