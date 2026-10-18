@@ -70,7 +70,9 @@ Docs: [ANALYSIS](docs/ANALYSIS.md) (how the current desktop talks to the backend
 
 Project selection, per-chat reasoning, slash routing, and settings readback are described
 in [Daily-use preview](docs/DAILY_USE.md). See its verification notes and remaining gaps;
-this is not full Electron feature parity.
+this is not full Electron feature parity. Command and skill discovery, queue controls,
+background work, steering, and the remaining default-command audit are documented in
+[Desktop commands](docs/COMMANDS.md).
 
 ## Benchmarks
 
