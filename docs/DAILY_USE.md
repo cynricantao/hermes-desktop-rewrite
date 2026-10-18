@@ -34,6 +34,14 @@ palette, fonts, spacing, and software renderer. It is not full Electron Desktop 
   controls the new chat's execution folder.
 - Guarded expensive-model selections display the backend's warning rather than silently
   confirming it. Their confirmation flow remains unbuilt.
+- **Composer:** **↑** on an empty composer brings back this chat's earlier messages (**↓**
+  goes forward and restores what you had typed). **+** opens the desktop file picker
+  (zenity or kdialog): images are queued as images, other files (PDFs included) are staged
+  in the chat's workspace and sent as `@file:` refs ahead of your message.
+- **Messages:** hover a message for **Copy**; hover one of your own for **Edit**. Editing
+  puts the text in the composer; **Enter** replaces that message and everything after it
+  (the backend archives what was cut), **Esc** cancels. Scrolled up? The round **↓** button
+  returns to the newest message.
 - Agent questions now get a card above the composer: clarify (choices, multi-select,
   free text, Skip question / Skip all) and masked sudo / secret / vault-unlock prompts.
   **Esc** declines the open card instead of stopping the turn. A question raised in

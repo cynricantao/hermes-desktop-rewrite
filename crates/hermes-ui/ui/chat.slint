@@ -400,10 +400,15 @@ component TableBlock inherits Rectangle {
 
 component MessageRow inherits Rectangle {
     in property <ChatRow> item;
+    in property <int> index;
+    // A reply is running: editing an earlier turn waits until it is done.
+    in property <bool> busy;
     in property <int> transcript-mode; // 0 normal, 1 thinking, 2 verbose
     in property <length> column-w;
     in property <length> window-h;
     callback copy(string);
+    callback edit(int, string);
+    property <bool> copied;
 
     // Fade+rise on insert (list item animate-in).
     property <float> appear: 0;
@@ -412,6 +417,8 @@ component MessageRow inherits Rectangle {
     animate opacity { duration: Motion.base; easing: Ease.out; }
 
     height: lay.preferred-height;
+    // Hover over the whole row reveals its actions (copy, edit); children keep their clicks.
+    hover := TouchArea { }
     lay := VerticalLayout {
         x: (root.width - min(root.width - 48px, root.column-w)) / 2;
         width: min(root.width - 48px, root.column-w);
@@ -439,7 +446,6 @@ component MessageRow inherits Rectangle {
                 }
             }
         }
-
         if root.item.kind == 1 && root.item.reasoning != "" && (root.transcript-mode >= 1 || (root.item.streaming && root.item.text == "")): ThinkingBlock {
             text: root.item.reasoning;
             live: root.item.streaming && root.item.text == "";
@@ -490,6 +496,32 @@ component MessageRow inherits Rectangle {
                 Text { text: root.item.text; wrap: word-wrap; color: root.item.error ? Theme.danger : Theme.text-2; font-size: Theme.fs-md; }
             }
         }
+        // Row actions, shown on hover; the space is kept so rows never jump.
+        if root.item.kind == 0 || (root.item.kind == 1 && !root.item.streaming && root.item.text != ""): HorizontalLayout {
+            alignment: root.item.kind == 0 ? end : start;
+            height: 26px;
+            spacing: 2px;
+            opacity: hover.has-hover || root.copied ? 1 : 0;
+            animate opacity { duration: Motion.fast; }
+            IconButton {
+                icon: root.copied ? @image-url("../../../assets/icons/check.svg") : @image-url("../../../assets/icons/copy.svg");
+                icon-size: 14px;
+                tooltip: root.copied ? "Copied" : "Copy message";
+                clicked => { root.copy(root.item.text); root.copied = true; copied-reset.running = true; }
+            }
+            if root.item.kind == 0 && !root.busy: IconButton {
+                icon: @image-url("../../../assets/icons/pencil.svg");
+                icon-size: 14px;
+                tooltip: "Edit message";
+                clicked => { root.edit(root.index, root.item.text); }
+            }
+        }
+
+    }
+    copied-reset := Timer {
+        interval: 1500ms;
+        running: false;
+        triggered => { root.copied = false; self.running = false; }
     }
 }
 
@@ -504,6 +536,7 @@ export component Transcript inherits Rectangle {
     in-out property <bool> autoscroll;
     property <int> sweep-dir: -1;
     callback copy(string);
+    callback edit(int, string);
 
     // Clipboard writes go through a hidden TextInput (Slint has no clipboard API).
     clipboard := TextInput { visible: false; width: 0; height: 0; }
@@ -513,12 +546,20 @@ export component Transcript inherits Rectangle {
     list := ListView {
         width: root.width;
         height: root.height - root.status-h;
+        // The list measures rows lazily, so its height settles after the rows arrive:
+        // keep the end in view while following (opening a chat lands on the newest turn).
+        changed content-height => {
+            if root.follow { self.content-y = min(0px, self.visible-height - self.content-height); resnap.running = true; }
+        }
         // Stick to bottom while streaming unless the user scrolled up.
         scrolled => {
             root.follow = self.content-y <= self.visible-height - self.content-height + 40px;
         }
-        for row in root.rows: MessageRow {
+        for row[i] in root.rows: MessageRow {
             item: row;
+            index: i;
+            busy: root.running;
+            edit(n, t) => { root.edit(n, t); }
             column-w: Theme.column-w;
             window-h: root.height;
             transcript-mode: root.transcript-mode;
@@ -563,8 +604,44 @@ export component Transcript inherits Rectangle {
         }
     }
 
+    // Scrolled up: a round button brings the newest message back into view.
+    if !root.follow && root.rows.length > 0: Rectangle {
+        x: (root.width - self.width) / 2;
+        y: root.height - root.status-h - self.height - 12px;
+        width: 34px;
+        height: 34px;
+        border-radius: 17px;
+        background: down-ta.has-hover ? Theme.hover : Theme.raised;
+        border-width: 1px;
+        border-color: Theme.border-strong;
+        drop-shadow-blur: 10px;
+        drop-shadow-offset-y: 2px;
+        drop-shadow-color: Theme.dark ? #00000055 : #0000001a;
+        accessible-role: button;
+        accessible-label: "Scroll to bottom";
+        accessible-action-default => { root.scroll-to-end(); }
+        Image {
+            width: 16px; height: 16px;
+            source: @image-url("../../../assets/icons/arrow-up.svg");
+            transform-rotation: 180deg;
+            colorize: Theme.text-2;
+        }
+        down-ta := TouchArea { mouse-cursor: pointer; clicked => { root.scroll-to-end(); } }
+    }
+
+    // Rows measured during the jump can still grow the list: snap once more shortly after.
+    // One-shot (stops itself), so an idle window runs no timer.
+    resnap := Timer {
+        interval: 80ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            if root.follow { list.content-y = min(0px, list.visible-height - list.content-height); }
+        }
+    }
+
     // Keep the tail in view when new content arrives and follow is on.
-    changed rows => { if root.follow { list.content-y = min(0px, list.visible-height - list.content-height); } }
+    changed rows => { if root.follow { list.content-y = min(0px, list.visible-height - list.content-height); resnap.running = true; } }
     public function scroll-to-end() {
         root.follow = true;
         list.content-y = min(0px, list.visible-height - list.content-height);
@@ -583,6 +660,16 @@ export component Composer inherits Rectangle {
     in property <string> cwd-label;
     in property <[CommandItem]> completions;
     in property <int> queue-count;
+    // ↑/↓ walk this chat's earlier messages (the controller owns the ring).
+    in property <bool> browsing;
+    callback history-back(string);
+    callback history-forward();
+    // Editing an earlier message: Enter replaces it (and what followed), Esc cancels.
+    in property <bool> editing;
+    callback cancel-edit();
+    // Bumped when the controller replaces the text (history, edit): caret to the end.
+    in property <int> caret-end-tick;
+    changed caret-end-tick => { input.set-selection-offsets(2147483647, 2147483647); }
     property <bool> dismissed;
     changed text => { root.dismissed = false; }
     callback inspect-queue();
@@ -629,7 +716,16 @@ export component Composer inherits Rectangle {
                     root.paste-image();
                     reject
                 }
+                if e.text == Key.Escape && root.editing { root.cancel-edit(); return accept; }
                 if e.text == Key.Escape { root.dismissed = true; return reject; }
+                if e.text == Key.UpArrow && !e.modifiers.shift && (root.text == "" || root.browsing) && (root.completions.length == 0 || root.dismissed) {
+                    root.history-back(root.text);
+                    return accept;
+                }
+                if e.text == Key.DownArrow && !e.modifiers.shift && root.browsing {
+                    root.history-forward();
+                    return accept;
+                }
                 if e.text == Key.Tab && root.completions.length > 0 && !root.dismissed {
                     root.text = root.completions[0].text;
                     root.dismissed = true;
@@ -701,6 +797,20 @@ export component Composer inherits Rectangle {
                     clicked => { if root.running { root.stop(); } else if root.text != "" { root.send(root.text); } }
                 }
             }
+        }
+    }
+
+    if root.editing: Rectangle {
+        y: -self.height - 6px;
+        x: 12px;
+        height: 24px;
+        width: edit-note.preferred-width + 20px;
+        border-radius: Theme.r-sm;
+        background: Theme.accent-soft;
+        edit-note := Text {
+            text: "Editing a message: sending replaces it and everything after it. Esc cancels.";
+            color: Theme.text-2;
+            font-size: Theme.fs-sm;
         }
     }
 

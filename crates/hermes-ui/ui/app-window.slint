@@ -107,6 +107,20 @@ export global AppState {
     in-out property <[string]> attachments;
     callback paste-image();
     callback remove-attachment(int);
+    // "+" in the composer: pick files (images queue as images, the rest as @file refs).
+    callback attach-files();
+    // ↑/↓ composer history; the controller derives the ring from this chat's user turns.
+    in-out property <bool> browsing;
+    // Bumped by the controller after it replaces the draft, so the caret lands at the end.
+    in-out property <int> caret-end-tick;
+    callback history-back(string);
+    callback history-forward();
+    // Row index of the user message being edited (-1 = not editing). Sending while
+    // editing replaces that message and everything after it.
+    in-out property <int> editing-row: -1;
+    callback edit-message(int, string);
+    callback edit-send(int, string);
+    callback cancel-edit();
 }
 
 component Sidebar inherits Rectangle {
@@ -445,7 +459,11 @@ export component AppWindow inherits Window {
                         pick-model => { root.effort-open = false; root.picker-open = !root.picker-open; AppState.refresh-models(); }
                         pick-effort => { root.picker-open = false; root.effort-open = !root.effort-open; }
                         pick-folder => { ProjectState.open = true; ProjectState.refresh(); }
-                        attach => { AppState.banner = "Paste an image with Ctrl+V. A file picker is not available in this preview yet; include a local file path in your message."; AppState.banner-error = false; }
+                        attach => { AppState.attach-files(); }
+                        browsing: AppState.browsing;
+                        caret-end-tick: AppState.caret-end-tick;
+                        history-back(t) => { AppState.history-back(t); }
+                        history-forward => { AppState.history-forward(); }
                         attachments: AppState.attachments;
                         paste-image => { AppState.paste-image(); }
                         remove-attachment(i) => { AppState.remove-attachment(i); }
@@ -462,12 +480,15 @@ export component AppWindow inherits Window {
                 status: AppState.status;
                 transcript-mode: AppState.transcript-mode;
                 autoscroll <=> AppState.autoscroll;
+                edit(i, t) => { AppState.edit-message(i, t); }
             }
             if !root.empty: dock := Composer {
                 x: (parent.width - self.width) / 2;
                 y: parent.height - self.height - 8px;
                 // The hero composer is destroyed when the first row appears; keep typing focus.
                 init => { root.dock-h = self.height; self.focus(); }
+                // Editing a message puts its text here; type straight into it.
+                changed editing => { if self.editing { self.focus(); } }
                 changed height => { root.dock-h = self.height; }
                 width: min(parent.width - 48px, Theme.column-w);
                 centered: false;
@@ -481,12 +502,26 @@ export component AppWindow inherits Window {
                 model-label: AppState.model-label;
                 effort-label: AppState.effort-label;
                 cwd-label: AppState.cwd-label;
-                send(t) => { AppState.send(t); self.text = ""; }
+                send(t) => {
+                    if AppState.editing-row >= 0 {
+                        AppState.edit-send(AppState.editing-row, t);
+                        AppState.editing-row = -1;
+                    } else {
+                        AppState.send(t);
+                    }
+                    self.text = "";
+                }
+                editing: AppState.editing-row >= 0;
+                cancel-edit => { AppState.cancel-edit(); }
                 stop => { AppState.stop(); }
                 pick-model => { root.effort-open = false; root.picker-open = !root.picker-open; AppState.refresh-models(); }
                 pick-effort => { root.picker-open = false; root.effort-open = !root.effort-open; }
                 pick-folder => { ProjectState.open = true; ProjectState.refresh(); }
-                attach => { AppState.banner = "Paste an image with Ctrl+V. A file picker is not available in this preview yet; include a local file path in your message."; AppState.banner-error = false; }
+                attach => { AppState.attach-files(); }
+                        browsing: AppState.browsing;
+                        caret-end-tick: AppState.caret-end-tick;
+                        history-back(t) => { AppState.history-back(t); }
+                        history-forward => { AppState.history-forward(); }
                         attachments: AppState.attachments;
                         paste-image => { AppState.paste-image(); }
                         remove-attachment(i) => { AppState.remove-attachment(i); }

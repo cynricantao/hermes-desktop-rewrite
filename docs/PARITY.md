@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**69 done · 291 partial · 428 not started · 6 unsupported** (of 794).
+**72 done · 294 partial · 422 not started · 6 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -92,7 +92,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Send next queued message (⌘⇧K) — local — src/store/composer-queue.ts, src/lib/keybinds/actions.ts
 - [x] Interrupt / stop the active turn — RPC session.interrupt — src/app/chat/session-tile-actions.ts ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: Stop clicked mid-stream → reply stops growing (30 of 300 lines, unchanged 3 s later), running=false, no spinner, button back to Send, next prompt answered. **Esc** (global shortcut, focus in composer) verified the same way: stopped at 24 of 300 lines, unchanged 3 s later, next prompt answered
 - [~] Redirect a running turn — RPC session.redirect — src/app/chat/session-tile-actions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
-- [~] Rewind / edit-and-resend a prior user turn — RPC session.history + prompt.submit — src/app/session/hooks/use-prompt-actions/rewind.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
+- [x] Rewind / edit-and-resend a prior user turn — RPC session.history + prompt.submit — src/app/session/hooks/use-prompt-actions/rewind.ts ⟶ hover a user message › Edit: its text goes to the composer (edit strip, Esc cancels); Enter resolves the turn's durable `row_id` by exact content in `session.history` (ambiguous/missing → nothing sent) and sends `prompt.submit` with `confirm_truncate` + `truncate_before_row_id` (+ empty/deep consent flags); a failed submit reloads the backend's transcript. live 2026-10-18 `tests/live_backend.rs` composer section (isolated backend, no model): REST read-back shows only the edited turn
 - [x] Newline without sending (⇧Enter) — local — src/lib/keybinds/actions.ts (KEYBIND_READONLY) ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: Shift+Enter → composer `hello\n`, nothing sent; Enter sends and clears; IME preedit+commit (`日本`) inserts text without sending
 - [ ] Cancel composer / dismiss (Esc) — local — src/app/chat/composer/hooks/use-composer-esc-cancel.ts
 - [ ] Rich text editor with markdown affordances — local — src/app/chat/composer/rich-editor.tsx
@@ -103,12 +103,12 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] @-mention path completion — RPC complete.path — src/app/chat/composer/hooks/use-at-completions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Emoji completion (:name) — local — src/app/chat/composer/hooks/use-emoji-completions.ts
 - [ ] Slash help hint (?) — local — src/app/chat/composer/help-hint.tsx
-- [ ] Composer input history (↑/↓) — local — src/store/composer-input-history.ts
+- [x] Composer input history (↑/↓) — local — src/store/composer-input-history.ts ⟶ ↑ on an empty composer walks this chat's own user turns newest-first (Electron's derived ring), ↓ returns and restores the draft, typing ends browsing, caret lands at the end. hermes_core::composer unit tests + live 2026-10-18 `tests/live_backend.rs` composer section (isolated backend, no model)
 - [ ] Undo/redo history in composer — local — src/app/chat/composer/undo-history.ts, hooks/use-composer-undo.ts
-- [~] Attach image (paste / drop / picker) — RPC image.attach, image.attach_bytes — src/app/chat/composer/attachments.tsx ⟶ Ctrl+V paste done: desktop reads wl-paste/xclip, uploads with image.attach_bytes (falls back to clipboard.paste); live 2026-10-17, tests/live_attachments.rs vs private backend (image.attach_bytes → count 1, image.detach → count 0). Drop and file picker not yet; the wl-paste read itself needs a real session (not run headlessly)
+- [~] Attach image (paste / drop / picker) — RPC image.attach, image.attach_bytes — src/app/chat/composer/attachments.tsx ⟶ Ctrl+V paste (wl-paste/xclip, else backend clipboard.paste) and the + picker (image files → `image.attach`). No drag-and-drop
 - [x] Detach an image attachment — RPC image.detach — src/app/chat/hooks/use-composer-actions.ts ⟶ click the 📎 chip; live 2026-10-17, tests/live_attachments.rs vs private backend (image.attach_bytes → count 1, image.detach → count 0)
-- [ ] Attach file — RPC file.attach — src/app/session/hooks/use-prompt-actions/index.ts
-- [ ] Attach PDF — RPC pdf.attach — src/lib/desktop-slash-commands.ts
+- [~] Attach file — RPC file.attach — src/app/session/hooks/use-prompt-actions/index.ts ⟶ + opens the desktop picker (zenity, else kdialog); non-image files go through `file.attach` and their `@file:` refs lead the next turn (Electron buildContextText); chips show and remove them. live 2026-10-18 `tests/live_backend.rs` composer section (isolated backend, no model) via the `HERMES_DESKTOP_PICKER_PATHS` hook: refs read back from the stored turn. Gap: the real zenity/kdialog dialog was not opened (headless)
+- [~] Attach PDF — RPC pdf.attach — src/lib/desktop-slash-commands.ts ⟶ a picked PDF is staged like any file (`file.attach` → `@file:` ref), as Electron's picker does; `pdf.attach` page rendering is not used. Live-verified with a fixture PDF in the composer section
 - [~] Large-paste collapse to attachment — RPC paste.collapse — src/app/chat/composer/large-paste.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Drag-and-drop file onto chat — local drop zone — src/app/chat/hooks/use-file-drop-zone.ts
 - [ ] Drag-over affordance overlay — local — src/app/chat/chat-drop-overlay.tsx
@@ -168,11 +168,11 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] SVG / listing / frame embeds — local — src/components/assistant-ui/embeds/svg-embed.tsx, listing-embed.tsx, frame-embed.tsx
 - [ ] Interrupted-reply banner + resume — local — src/app/session/hooks/use-message-stream/interrupted-reply.tsx
 - [~] Transcript windowing / retention (perf) — local — src/app/chat/transcript-window.ts, transcript-retention.ts ⟶ windowing verified live 2026-10-16 (600-message session, `tests/live_backend.rs` long section): 6–7 `MessageRow` instances alive while sweeping all 600 rows, RSS 27.0 → 27.1 → 27.1 MiB over two full sweeps; release binary on the hidden display: idle 0 % CPU, sweep 12 % (1×) / 24 % (2×), RSS flat (docs/PERF.md). No retention cap (all rows' data stays in the model)
-- [ ] Transcript scroll restore + scroll-to-bottom — local — src/store/thread-scroll.ts, src/app/chat/scroll-to-bottom-button.tsx
+- [~] Transcript scroll restore + scroll-to-bottom — local — src/store/thread-scroll.ts, src/app/chat/scroll-to-bottom-button.tsx ⟶ round ↓ button when scrolled up returns to the newest turn; opening a chat lands on the end. live 2026-10-18 `tests/live_backend.rs` composer section (isolated backend, no model). Gap: per-chat scroll position is not restored
 - [ ] Find in transcript (⌘F, ⌘G/⌘⇧G) — local — src/lib/find-in-page.ts, src/store/find-in-page.ts
 - [ ] Selection-to-composer context (⌘/Ctrl+L on selection) — local — src/lib/keybinds/actions.ts (view.selectionToComposer)
 - [ ] Transcript text scale — local — src/store/chat-text-scale.ts
-- [ ] Copy message / selection color handling — local — src/lib/selection-copy-colors.ts
+- [~] Copy message / selection color handling — local — src/lib/selection-copy-colors.ts ⟶ hover a message › Copy (raw markdown for replies), Copied state. live 2026-10-18 `tests/live_backend.rs` composer section (isolated backend, no model). Gap: selection colour handling
 - [x] Assistant-ui thread list + virtualization — local — src/components/assistant-ui/thread/list.tsx ⟶ Slint `ListView` instantiates only visible rows; verified live 2026-10-16 on a 600-message session (≤7 rows alive, memory flat; see windowing item)
 - [ ] Message render error boundary — local — src/components/assistant-ui/message-render-boundary.tsx
 - [ ] Timeline index/history (jump history) — local — src/components/assistant-ui/thread/use-timeline-history.ts
@@ -582,7 +582,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Steer (Enter) / queue (⌘Enter) — RPC session.steer / prompt.submit — src/lib/keybinds/actions.ts ⟶ Enter executes `/steer`/`/queue` while busy; Ctrl+Enter queues plain text. Gateway-simulation keyboard and routing checks pass 2026-10-18. Bare Enter on busy plain text explains the limit and retains the draft; live tool-boundary delivery and macOS Cmd chord unverified.
 - [ ] Send queued (⌘⇧K) — local — src/lib/keybinds/actions.ts
 - [ ] Mention (@) / slash (/) / help (?) — local — src/lib/keybinds/actions.ts
-- [ ] Input history (↑/↓) — local — src/lib/keybinds/actions.ts
+- [x] Input history (↑/↓) — local — src/lib/keybinds/actions.ts ⟶ same as Composer input history (↑/↓) above
 - [ ] Cancel composer (Esc) — local — src/lib/keybinds/actions.ts
 - [ ] Focus composer (⌘/Ctrl+L) — local — src/lib/keybinds/actions.ts
 - [ ] Selection to composer (⌘/Ctrl+L) — local — src/lib/keybinds/actions.ts
