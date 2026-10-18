@@ -217,7 +217,7 @@ export component ModelPicker inherits Rectangle {
                 spacing: 1px;
                 padding-top: 3px;
                 padding-bottom: 3px;
-                if root.items.length == 0 && root.query != "": HorizontalLayout {
+                if root.items.length == 0: HorizontalLayout {
                     height: hint.preferred-height + 16px;
                     padding-left: 10px;
                     padding-right: 10px;
@@ -456,7 +456,7 @@ export component ModelEditorModal inherits Rectangle {
                     padding-right: 12px;
                     padding-top: 6px;
                     spacing: 1px;
-                    if root.rows.length == 0 && root.query != "": HorizontalLayout {
+                    if root.rows.length == 0: HorizontalLayout {
                         height: msg.preferred-height + 16px;
                         padding-left: 6px;
                         padding-right: 6px;

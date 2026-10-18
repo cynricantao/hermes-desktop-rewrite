@@ -2036,11 +2036,11 @@ impl Controller {
     /// (`model.options` `refresh`), which is what the menu's "Refresh models" asks for;
     /// merely opening the picker uses the backend's cached answer.
     ///
-    /// `include_unconfigured` is deliberate: the picker lists every provider the backend
-    /// knows (an unconfigured one carries a "not signed in" note), and the visibility
-    /// shortlist is what keeps the list readable.
+    /// `include_unconfigured` lists configured providers that are signed out (with a note);
+    /// `explicit_only` keeps out providers found only through ambient credentials (e.g.
+    /// GitHub CLI -> Copilot), as the Electron chat pickers do (`lib/model-options.ts`).
     async fn refresh_models(&mut self, force: bool) {
-        let mut params = json!({ "include_unconfigured": true });
+        let mut params = json!({ "include_unconfigured": true, "explicit_only": true });
         if force {
             params["refresh"] = json!(true);
         }
@@ -2056,7 +2056,10 @@ impl Controller {
                     .providers
                     .iter()
                     .filter(|p| p.authenticated == Some(false))
-                    .map(|p| (p.slug.clone(), "not signed in".to_owned()))
+                    .map(|p| {
+                        let note = p.warning.clone().filter(|w| !w.trim().is_empty());
+                        (p.slug.clone(), note.unwrap_or_else(|| "not signed in".to_owned()))
+                    })
                     .collect();
                 // Snapshot the catalog as judged, so a model that shows up later is not
                 // silently hidden by a shortlist chosen before it existed.
