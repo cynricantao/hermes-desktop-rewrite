@@ -24,10 +24,28 @@ fn is_ref_line(l: &str) -> bool {
         .any(|p| l.starts_with(p))
 }
 
-/// The user's own words in a bubble: attachment marker and ref lines dropped, trimmed.
+/// Split the leading block of attachment refs the backend stores ahead of a prompt
+/// (`with_refs`) from the words after it. A ref-looking line later in the text is words.
+pub fn split_refs(text: &str) -> (Vec<String>, &str) {
+    let mut refs = Vec::new();
+    let mut rest = text;
+    while let Some(line) = rest.lines().next() {
+        if !is_ref_line(line) {
+            break;
+        }
+        refs.push(line.to_owned());
+        rest = rest[line.len()..].strip_prefix('\n').unwrap_or("");
+    }
+    (refs, rest)
+}
+
+/// The user's own words in a bubble: leading stored refs and trailing `📎` marker lines
+/// dropped, trimmed.
 pub fn bubble_text(text: &str) -> String {
-    text.lines()
-        .filter(|l| !l.starts_with(ATTACHMENT_MARK) && !is_ref_line(l))
+    let (_, words) = split_refs(text);
+    words
+        .lines()
+        .filter(|l| !l.starts_with(ATTACHMENT_MARK))
         .collect::<Vec<_>>()
         .join("\n")
         .trim()
@@ -37,9 +55,9 @@ pub fn bubble_text(text: &str) -> String {
 /// A stored user turn as the desktop shows it: leading `@file:` refs become `📎 name`
 /// marker lines after the words (the shape a live turn has), so reopened chats match.
 pub fn display_user_text(text: &str) -> String {
-    let refs: Vec<String> = text
-        .lines()
-        .filter(|l| is_ref_line(l))
+    let refs: Vec<String> = split_refs(text)
+        .0
+        .iter()
         .map(|l| {
             let v = l.split_once(':').map(|(_, v)| v).unwrap_or(l).trim_matches('`');
             format!("{ATTACHMENT_MARK}{}", v.rsplit('/').next().unwrap_or(v))
@@ -131,6 +149,8 @@ impl Browse {
 #[derive(Debug, Clone, PartialEq)]
 pub struct EditTarget {
     pub row_id: i64,
+    /// Attachment refs the turn was sent with; the replacement carries them again.
+    pub refs: Vec<String>,
     /// The turn is the first user turn, so the cut leaves an empty history.
     pub first: bool,
     /// User turns after it that the cut also removes (with their replies).
@@ -176,18 +196,24 @@ pub fn resolve_edit_target(
         .filter(|m| m.get("role").and_then(Value::as_str) == Some("user"))
         .filter(|m| m.get("display_kind").and_then(Value::as_str) != Some("hidden"))
         .collect();
-    if durable.len() != local_users.len() || ordinal >= durable.len() {
-        return Err(EditRefusal::OutOfSync);
-    }
+    // Align from the end: the clicked turn and every turn after it must be the last turns
+    // of the saved chat, in order. Earlier turns may differ (e.g. a /steer the screen shows
+    // as a notice), since the cut never reaches them.
+    let tail = local_users
+        .len()
+        .checked_sub(ordinal)
+        .filter(|n| *n > 0)
+        .ok_or(EditRefusal::OutOfSync)?;
+    let at = durable.len().checked_sub(tail).ok_or(EditRefusal::OutOfSync)?;
     let same = |d: &Value, l: &str| bubble_text(&message_text(d)) == bubble_text(l);
-    if !durable[ordinal..]
+    if !durable[at..]
         .iter()
         .zip(&local_users[ordinal..])
         .all(|(d, l)| same(d, l))
     {
         return Err(EditRefusal::OutOfSync);
     }
-    let target = durable[ordinal];
+    let target = durable[at];
     if target
         .get("display_kind")
         .and_then(Value::as_str)
@@ -198,8 +224,9 @@ pub fn resolve_edit_target(
     }
     Ok(EditTarget {
         row_id: row_id(target).ok_or(EditRefusal::NotSaved)?,
-        first: ordinal == 0,
-        later: durable.len() - ordinal - 1,
+        refs: split_refs(&message_text(target)).0,
+        first: at == 0,
+        later: tail - 1,
     })
 }
 
@@ -208,7 +235,7 @@ pub fn resolve_edit_target(
 pub fn edit_submit_params(session_id: &str, text: &str, target: &EditTarget, deep_confirmed: bool) -> Value {
     let mut p = json!({
         "session_id": session_id,
-        "text": text,
+        "text": with_refs(&target.refs, text),
         "confirm_truncate": true,
         "truncate_before_row_id": target.row_id,
     });
@@ -319,6 +346,7 @@ mod tests {
             resolve_edit_target(&history(), &local, 0),
             Ok(EditTarget {
                 row_id: 10,
+                refs: vec![],
                 first: true,
                 later: 2
             })
@@ -343,6 +371,23 @@ mod tests {
         let local = ring(&["same", "same", "x"]);
         assert_eq!(resolve_edit_target(&h, &local, 0).map(|t| t.row_id), Ok(1));
         assert_eq!(resolve_edit_target(&h, &local, 1).map(|t| t.row_id), Ok(2));
+    }
+
+    #[test]
+    fn earlier_turns_the_screen_lacks_do_not_block_the_edit() {
+        // A /steer before the edited turn is in history but shown as a notice.
+        let mut h = vec![msg("user", "steered", Some(5))];
+        h.extend(history());
+        let local = ring(&["one", "two", "three"]);
+        assert_eq!(
+            resolve_edit_target(&h, &local, 1).map(|t| (t.row_id, t.first, t.later)),
+            Ok((12, false, 1))
+        );
+        assert_eq!(
+            resolve_edit_target(&h, &local, 0).map(|t| t.first),
+            Ok(false),
+            "the steer stays"
+        );
     }
 
     #[test]
@@ -379,18 +424,34 @@ mod tests {
     fn attachment_turns_match_their_stored_refs() {
         let h = vec![msg("user", "@file:docs/notes.txt\n\nread this", Some(7))];
         let local = ring(&["read this\n📎 notes.txt"]);
-        assert_eq!(resolve_edit_target(&h, &local, 0).map(|t| t.row_id), Ok(7));
+        let t = resolve_edit_target(&h, &local, 0).unwrap();
+        assert_eq!((t.row_id, t.refs.clone()), (7, ring(&["@file:docs/notes.txt"])));
+        // The replacement keeps the file.
+        assert_eq!(
+            edit_submit_params("s", "read it again", &t, false)["text"],
+            "@file:docs/notes.txt\n\nread it again"
+        );
         assert_eq!(
             display_user_text("@file:docs/notes.txt\n\nread this"),
             "read this\n📎 notes.txt"
         );
         assert_eq!(display_user_text("plain"), "plain");
+        // A ref-looking line inside the words is words, not an attachment.
+        assert_eq!(
+            display_user_text("see\n@file:src/main.rs please"),
+            "see\n@file:src/main.rs please"
+        );
+        assert_eq!(
+            bubble_text("see\n@file:src/main.rs please"),
+            "see\n@file:src/main.rs please"
+        );
     }
 
     #[test]
     fn deep_consent_is_never_assumed() {
         let t = EditTarget {
             row_id: 7,
+            refs: vec![],
             first: true,
             later: 2,
         };

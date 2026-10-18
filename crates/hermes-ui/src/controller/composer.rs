@@ -166,7 +166,14 @@ impl Controller {
                 self.set_composer_text(draft, false);
                 Box::pin(self.drain_queue()).await;
             }
-            ComposerCmd::EditSend(row, text) => self.edit_send(row, text).await,
+            ComposerCmd::EditSend(row, text) => {
+                self.edit_send(row, text).await;
+                // Prompts queued during the edit go once it has ended (sent, unchanged or
+                // refused) and nothing is running.
+                if !self.composer.editing() && !self.transcript.running {
+                    Box::pin(self.drain_queue()).await;
+                }
+            }
             ComposerCmd::PickFiles => {
                 let tx = self.commands.clone();
                 tokio::task::spawn_blocking(move || match run_picker() {
@@ -271,6 +278,7 @@ impl Controller {
         self.composer.browse.reset();
         self.composer.deep_ack = None;
         self.composer.editing = Some((row, orig));
+        ui(&self.weak, |w| w.global::<AppState>().set_edit_note("".into()));
         let r = row as i32;
         ui(&self.weak, move |w| {
             let st = w.global::<AppState>();
@@ -357,6 +365,21 @@ impl Controller {
             .ok()
             .and_then(|v| v.get("messages").and_then(Value::as_array).cloned())
             .unwrap_or_default();
+        // The chat may have moved on while the history was read (new chat, another edit,
+        // a turn started): only the edit still on screen may be sent.
+        if self.composer.editing.as_ref().map(|(r, _)| *r) != Some(at)
+            || self.session.as_deref() != Some(sid.as_str())
+            || self.transcript.running
+            || self.user_text_at(at) != Some(orig.as_str())
+        {
+            self.end_edit();
+            self.banner(
+                "The chat changed while the edit was being checked, so nothing was sent. Your text is back in the box."
+                    .into(),
+                true,
+            );
+            return self.restore_draft(text);
+        }
         let target = match composer::resolve_edit_target(&messages, &local_users, ordinal) {
             Ok(t) => t,
             Err(why) => {
@@ -391,7 +414,9 @@ impl Controller {
         self.composer.pre_edit_draft.clear();
         // The backend cuts at the durable row; show the same cut locally.
         self.transcript.blocks.truncate(at);
-        self.transcript.push_user(&text);
+        // The replacement carries the turn's files again; show them as the original did.
+        self.transcript
+            .push_user(&composer::display_user_text(&composer::with_refs(&target.refs, &text)));
         self.mark(hermes_core::transcript::Change::Reset);
         self.flush();
         let params = composer::edit_submit_params(&sid, &text, &target, target.later > 0);

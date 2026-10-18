@@ -378,12 +378,12 @@ pub(super) async fn section(ui: &AppWindow, log: &Log) {
     let users = stored_users(&ref_id).await;
     record(
         log,
-        "composer: a saved turn with a file ref shows 📎 and can be edited",
+        "composer: a saved turn with a file ref shows 📎 and its edit keeps the file",
         opened
             && shown == "Check the fixture notes\n📎 fixture-notes.txt"
             && clicked
             && editing
-            && users == vec![new_text.clone()],
+            && users == vec![format!("@file:docs/fixture-notes.txt\n\n{new_text}")],
         format!(
             "shown={shown:?} editing={editing} stored users={users:?} banner={:?}",
             st.get_banner()
