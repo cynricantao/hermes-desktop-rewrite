@@ -37,6 +37,9 @@ use crate::{
     ScopeChip, SearchHit, SessionItem, SettingRowUI, SettingsState, Theme,
 };
 
+/// Chats the sidebar lists (`session.list`); pinned flags are read for the same window.
+pub(crate) const SESSION_LIST_LIMIT: u32 = 200;
+
 /// Commands from the UI thread to the controller.
 #[derive(Debug, Clone)]
 pub enum Cmd {
@@ -59,6 +62,8 @@ pub enum Cmd {
     RenameSession(String, String),
     ArchiveSession(String),
     Search(String),
+    /// Backend message-search hits for search generation `.0` (sidebar.rs).
+    SearchResults(u64, Result<Vec<hermes_core::api::sessions::SessionSearchHit>, String>),
     /// Open the chat this many places away in sidebar order (Ctrl+Tab = 1, Ctrl+Shift+Tab = -1).
     Cycle(i32),
     RefreshModels,
@@ -493,6 +498,8 @@ struct Controller {
     /// Stored ids in the order the sidebar shows them (after search + grouping).
     visible_ids: Vec<String>,
     query: String,
+    /// Bumped per sidebar query; background searches compare it before and after.
+    search_gen: std::sync::Arc<std::sync::atomic::AtomicU64>,
     drafts: std::collections::HashMap<String, String>,
     dirty: Vec<usize>,
     reset: bool,
@@ -606,6 +613,7 @@ impl Controller {
             search_hits: vec![],
             visible_ids: vec![],
             query: String::new(),
+            search_gen: Default::default(),
             drafts: std::collections::HashMap::new(),
             dirty: vec![],
             reset: false,
@@ -871,7 +879,8 @@ impl Controller {
             Cmd::PinSession(id, on) => self.pin_session(id, on).await,
             Cmd::RenameSession(id, title) => self.rename_session(id, title).await,
             Cmd::ArchiveSession(id) => self.archive_session(id).await,
-            Cmd::Search(q) => self.search_sessions(q).await,
+            Cmd::Search(q) => self.search_sessions(q),
+            Cmd::SearchResults(generation, hits) => self.search_results(generation, hits),
             Cmd::Cycle(step) => {
                 if let Some(i) = cycle_index(&self.visible_ids, self.stored.as_deref(), step) {
                     let id = self.visible_ids[i].clone();
@@ -1972,7 +1981,7 @@ impl Controller {
     async fn refresh_sessions(&mut self) {
         match self
             .client
-            .call::<SessionListResult>("session.list", json!({"limit": 200}))
+            .call::<SessionListResult>("session.list", json!({"limit": SESSION_LIST_LIMIT}))
             .await
         {
             Ok(r) => {

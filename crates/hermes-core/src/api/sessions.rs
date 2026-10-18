@@ -463,7 +463,9 @@ fn mutation_id() -> String {
 /// Delete one stored session (`DELETE /api/sessions/{id}`, identity in the query).
 pub fn session_delete_request(session_id: &str, request_id: &str, snap: &MutationSnapshot) -> Request {
     let rev = snap.runtime_revision.to_string();
-    let generation = snap.runtime_generation.map(|g| g.to_string());
+    // The backend requires a generation for deletes; an absent row has none, and quoting 0
+    // lets it answer its idempotent "already absent" success instead of 400.
+    let generation = Some(snap.runtime_generation.unwrap_or(0).to_string());
     let pairs = [
         ("request_id", request_id),
         ("expected_revision", rev.as_str()),
@@ -2047,6 +2049,28 @@ mod tests {
     fn assert_call(c: &Call, method: &str, params: Value) {
         assert_eq!(c.method, method);
         assert_eq!(c.params, params);
+    }
+
+    #[test]
+    fn deleting_an_absent_row_quotes_generation_zero() {
+        let absent = MutationSnapshot {
+            session_id: "gone".into(),
+            exists: false,
+            runtime_revision: 0,
+            runtime_generation: None,
+        };
+        let r = session_delete_request("gone", "rid-1", &absent);
+        assert!(r.path.contains("expected_generation=0"), "{}", r.path);
+        let live = MutationSnapshot {
+            runtime_generation: Some(4),
+            exists: true,
+            ..absent
+        };
+        assert!(
+            session_delete_request("gone", "rid-2", &live)
+                .path
+                .contains("expected_generation=4")
+        );
     }
 
     #[test]

@@ -196,7 +196,9 @@ component Sidebar inherits Rectangle {
                             AppState.renaming-session = s.id;
                             AppState.session-menu = "";
                         }
-                        commit-rename(t) => { AppState.renaming-session = ""; AppState.rename-session(s.id, t); }
+                        // An empty title keeps the field open (the controller would refuse it).
+                        commit-rename(t) => { if t != "" { AppState.renaming-session = ""; AppState.rename-session(s.id, t); } }
+                        cancel-rename => { if AppState.renaming-session == s.id { AppState.renaming-session = ""; } }
                         archive => { AppState.session-menu = ""; AppState.archive-session(s.id); }
                         delete => {
                             if AppState.confirm-delete {
@@ -355,7 +357,8 @@ export component AppWindow inherits Window {
             // Not while a modal has focus: Enter in its text fields must not answer the card.
             if AppState.approval.visible && !root.settings-open && !CapState.open && !ProjectState.open && !e.modifiers.shift && !e.modifiers.control && !e.modifiers.alt {
                 if e.text == Key.Escape { AppState.approve(AppState.approval.request-id, "deny"); return accept; }
-                if e.text == Key.Return && AppState.draft == "" { AppState.approve(AppState.approval.request-id, "once"); return accept; }
+                // Enter in the sidebar's rename field saves the title, it never approves.
+                if e.text == Key.Return && AppState.draft == "" && AppState.renaming-session == "" { AppState.approve(AppState.approval.request-id, "once"); return accept; }
             }
             // An agent question (clarify / sudo / secret): Esc declines it instead of stopping
             // the turn, matching the approval card. Enter belongs to the card's own field.

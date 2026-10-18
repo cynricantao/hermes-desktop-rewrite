@@ -21,6 +21,30 @@ async fn open_actions(ui: &AppWindow, title: &str, id: &str) -> bool {
     false
 }
 
+/// The app's own REST delete (snapshot + quoted identity), run outside the UI.
+async fn core_delete(id: &str) -> Result<serde_json::Value, String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let id = id.to_owned();
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(async {
+            let backend = hermes_core::backend::discover_or_spawn(None)
+                .await
+                .map_err(|e| e.to_string())?;
+            let e = &backend.endpoint;
+            let rest = hermes_core::http::Rest::new(e.host.clone(), e.port, e.token.clone());
+            hermes_core::api::sessions::session_delete_rest(&rest, &id)
+                .await
+                .map_err(|e| e.to_string())
+        });
+        let _ = tx.send(result);
+    });
+    rx.await.map_err(|e| e.to_string())?
+}
+
 async fn detail(id: &str) -> Result<serde_json::Value, String> {
     backend_rest("GET", &format!("/api/sessions/{id}"), None).await
 }
@@ -86,6 +110,40 @@ pub(super) async fn section(ui: &AppWindow, log: &Log) {
     );
     screenshot(ui, "sidebar-actions");
 
+    // Unpin from the same menu (the pinned flag is exact for every listed chat).
+    let opened = open_actions(ui, &alpha, &alpha_id).await;
+    let clicked = opened && click(ui, "Unpin chat").await;
+    let unpinned_ui = wait_until(10, || {
+        st.get_sessions()
+            .iter()
+            .any(|i| i.id == alpha_id && !i.pinned && i.group != "Pinned")
+    })
+    .await;
+    let read = detail(&alpha_id).await.unwrap_or_default();
+    record(
+        log,
+        "sidebar: unpin persists",
+        clicked && unpinned_ui && !truthy(&read["pinned"]),
+        format!("opened={opened} ui={unpinned_ui} rest pinned={}", read["pinned"]),
+    );
+
+    // Esc cancels a rename without saving.
+    let opened = open_actions(ui, &alpha, &alpha_id).await && click(ui, "Rename chat").await;
+    sleep(150).await;
+    let typed = by_label(ui, "Chat title")
+        .map(|e| e.set_accessible_value("Not saved"))
+        .is_some();
+    press(ui, Key::Escape);
+    let closed = wait_until(5, || st.get_renaming_session().is_empty()).await;
+    sleep(300).await;
+    let read = detail(&alpha_id).await.unwrap_or_default();
+    record(
+        log,
+        "sidebar: Esc cancels a rename without saving",
+        opened && typed && closed && read["title"] == alpha.as_str(),
+        format!("closed={closed} rest title={}", read["title"]),
+    );
+
     // Inline rename.
     let renamed = format!("Sidebar renamed {tag}");
     let opened = open_actions(ui, &alpha, &alpha_id).await && click(ui, "Rename chat").await;
@@ -140,23 +198,68 @@ pub(super) async fn section(ui: &AppWindow, log: &Log) {
                 .collect::<Vec<_>>()
         ),
     );
-    if let Some(search) = by_label(ui, "Search chats") {
-        search.set_accessible_value("");
-    }
-    wait_until(10, || st.get_sessions().iter().any(|i| i.id == alpha_id)).await;
-
-    // Archive.
-    let opened = open_actions(ui, &beta, &beta_id).await && click(ui, "Archive chat").await;
+    // Archive the chat straight from its "Found in messages" hit (its row shows the title
+    // with the matching snippet).
+    let hit_title = st
+        .get_sessions()
+        .iter()
+        .find(|i| i.id == beta_id)
+        .map(|i| i.title.to_string())
+        .unwrap_or_else(|| beta.clone());
+    let opened = open_actions(ui, &hit_title, &beta_id).await && click(ui, "Archive chat").await;
     let gone = wait_until(10, || !st.get_sessions().iter().any(|i| i.id == beta_id)).await;
     let read = detail(&beta_id).await.unwrap_or_default();
     record(
         log,
-        "sidebar: archive hides the chat and is persisted",
+        "sidebar: archive (from a search hit) hides the chat and is persisted",
         opened && gone && truthy(&read["archived"]),
         format!(
             "opened={opened} gone={gone} menu={:?} search={:?} rest archived={}",
             st.get_session_menu(),
             st.get_session_search(),
+            read["archived"]
+        ),
+    );
+
+    if let Some(search) = by_label(ui, "Search chats") {
+        search.set_accessible_value("");
+    }
+    wait_until(10, || st.get_sessions().iter().any(|i| i.id == alpha_id)).await;
+
+    // Archiving the open chat leaves it and closes this window's runtime for it.
+    let gamma = format!("Sidebar fixture gamma {tag}");
+    let r = backend_request(
+        "session.create",
+        json!({"source": "desktop", "title": gamma, "messages": [
+            {"role": "user", "content": "Seeded gamma question"},
+            {"role": "assistant", "content": "Seeded fixture answer, not a model response."}
+        ]}),
+    )
+    .await
+    .unwrap_or_default();
+    let gamma_id = r["stored_session_id"].as_str().unwrap_or_default().to_owned();
+    let _ = backend_request("session.close", json!({"session_id": r["session_id"]})).await;
+    wait_until(15, || st.get_sessions().iter().any(|i| i.id == gamma_id)).await;
+    st.invoke_open_session(gamma_id.clone().into());
+    let open_here = wait_until(10, || {
+        st.get_active_session() == gamma_id && !st.get_runtime_session().is_empty()
+    })
+    .await;
+    let runtime = st.get_runtime_session().to_string();
+    let opened = open_here && open_actions(ui, &gamma, &gamma_id).await && click(ui, "Archive chat").await;
+    let left = wait_until(10, || st.get_active_session().is_empty()).await;
+    sleep(500).await;
+    let probe = backend_request("session.interrupt", json!({"session_id": runtime})).await;
+    let read = detail(&gamma_id).await.unwrap_or_default();
+    record(
+        log,
+        "sidebar: archiving the open chat leaves it and closes its runtime",
+        opened && left && probe.is_err() && truthy(&read["archived"]),
+        format!(
+            "open={open_here} left={left} runtime {runtime} after archive: {:?} rest archived={}",
+            probe
+                .map(|_| "still live")
+                .map_err(|e| e.chars().take(60).collect::<String>()),
             read["archived"]
         ),
     );
@@ -185,6 +288,16 @@ pub(super) async fn section(ui: &AppWindow, log: &Log) {
             read_after.err().unwrap_or_else(|| "still present".into())
         ),
     );
-    // Clean up the archived fixture.
-    let _ = backend_request("session.delete", json!({"session_id": beta_id})).await;
+    // Deleting a chat that is already gone is an idempotent success, not an error.
+    let again = core_delete(&alpha_id).await;
+    record(
+        log,
+        "sidebar: deleting an already-deleted chat succeeds",
+        again.is_ok(),
+        format!("{again:?}"),
+    );
+    // Clean up the archived fixtures.
+    for id in [&beta_id, &gamma_id] {
+        let _ = core_delete(id).await;
+    }
 }

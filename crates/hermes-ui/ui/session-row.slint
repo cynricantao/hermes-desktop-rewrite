@@ -43,6 +43,8 @@ export component SessionRow inherits Rectangle {
     callback pin(bool);
     callback start-rename();
     callback commit-rename(string);
+    // Focus left the rename field without Enter: drop the edit (no stale field lingers).
+    callback cancel-rename();
     callback archive();
     callback delete();
     height: col.preferred-height;
@@ -88,6 +90,7 @@ export component SessionRow inherits Rectangle {
                 accessible-label: "Chat title";
                 init => { self.focus(); self.select-all(); }
                 accepted => { root.commit-rename(self.text); }
+                changed has-focus => { if !self.has-focus { root.cancel-rename(); } }
             }
         }
         if root.menu-open && !root.renaming: HorizontalLayout {
