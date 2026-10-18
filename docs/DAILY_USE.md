@@ -34,6 +34,11 @@ palette, fonts, spacing, and software renderer. It is not full Electron Desktop 
   controls the new chat's execution folder.
 - Guarded expensive-model selections display the backend's warning rather than silently
   confirming it. Their confirmation flow remains unbuilt.
+- **Sidebar chats:** hover a chat and click **⋯** for **Pin**/**Unpin**, **Rename** (inline,
+  Enter saves, Esc cancels), **Archive** and **Delete** (asks for a second click). Pinned
+  chats lead under **Pinned**. Search filters titles at once and adds chats whose messages
+  match under **Found in messages**. Every action is saved through the backend
+  (`PATCH`/`DELETE /api/sessions/{id}`); archived chats are restored from Settings › Sessions.
 - **Composer:** **↑** on an empty composer brings back this chat's earlier messages (**↓**
   goes forward and restores what you had typed). **+** opens the desktop file picker
   (zenity or kdialog): images are queued as images, other files (PDFs included) are staged

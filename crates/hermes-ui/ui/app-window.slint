@@ -14,17 +14,9 @@ import { ModelPicker, ModelEditorModal, ModelItem, EditModelRow } from "models.s
 import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
 import { CapAction, CapItem, CapState, CapabilitiesModal } from "capabilities.slint";
 import { InputCard, InputChoice, InputState } from "input-card.slint";
+import { SessionItem, SessionRow } from "session-row.slint";
 
-export { CommandItem, Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, AppearanceState, ModelsState, ProvidersState, SystemState, CapAction, CapItem, CapState, InputChoice, InputState, ModelItem, EditModelRow }
-
-export struct SessionItem {
-    id: string,
-    title: string,
-    group: string,
-    first-in-group: bool,
-    pinned: bool,
-    running: bool,
-}
+export { CommandItem, Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, AppearanceState, ModelsState, ProvidersState, SystemState, CapAction, CapItem, CapState, InputChoice, InputState, ModelItem, EditModelRow, SessionItem }
 
 export struct ApprovalInfo {
     visible: bool,
@@ -68,6 +60,8 @@ export global AppState {
     in-out property <int> transcript-mode: 0;
     in-out property <ApprovalInfo> approval;
     in-out property <string> session-search;
+    // Any change (typing, paste, clearing) re-runs the sidebar search.
+    changed session-search => { AppState.search-sessions(AppState.session-search); }
     // Composer draft, shared by the hero and docked composers (Enter on an empty draft
     // answers an open approval card instead of being swallowed).
     in-out property <string> draft;
@@ -103,6 +97,14 @@ export global AppState {
     callback retheme();
     callback search-sessions(string);
     callback cycle-session(int);
+    // Sidebar row actions. Only one row has its actions open (or is being renamed) at a time.
+    in-out property <string> session-menu;
+    in-out property <string> renaming-session;
+    in-out property <string> rename-text;
+    in-out property <bool> confirm-delete;
+    callback pin-session(string, bool);
+    callback rename-session(string, string);
+    callback archive-session(string);
     // Images queued for the next message (labels), pasted with Ctrl+V in the composer.
     in-out property <[string]> attachments;
     callback paste-image();
@@ -154,7 +156,6 @@ component Sidebar inherits Rectangle {
                     vertical-alignment: center;
                     single-line: true;
                     accessible-label: "Search chats";
-                    edited => { AppState.search-sessions(self.text); }
                     Text {
                         visible: parent.text == "";
                         text: "Search";
@@ -193,11 +194,37 @@ component Sidebar inherits Rectangle {
                 spacing: 1px;
                 for s in AppState.sessions: VerticalLayout {
                     if s.first-in-group: SectionHeader { text: s.group; height: 26px; }
-                    item := NavItem {
-                        has-icon: false;
-                        text: s.title;
+                    SessionRow {
+                        item: s;
                         selected: s.id == AppState.active-session;
-                        clicked => { AppState.open-session(s.id); }
+                        menu-open: AppState.session-menu == s.id;
+                        renaming: AppState.renaming-session == s.id;
+                        confirm-delete: AppState.confirm-delete;
+                        rename-text <=> AppState.rename-text;
+                        open => { AppState.session-menu = ""; AppState.open-session(s.id); }
+                        toggle-menu => {
+                            AppState.confirm-delete = false;
+                            AppState.session-menu = AppState.session-menu == s.id ? "" : s.id;
+                        }
+                        pin(on) => { AppState.session-menu = ""; AppState.pin-session(s.id, on); }
+                        start-rename => {
+                            AppState.rename-text = s.title;
+                            AppState.renaming-session = s.id;
+                            AppState.session-menu = "";
+                        }
+                        // An empty title keeps the field open (the controller would refuse it).
+                        commit-rename(t) => { if t != "" { AppState.renaming-session = ""; AppState.rename-session(s.id, t); } }
+                        cancel-rename => { if AppState.renaming-session == s.id { AppState.renaming-session = ""; } }
+                        archive => { AppState.session-menu = ""; AppState.archive-session(s.id); }
+                        delete => {
+                            if AppState.confirm-delete {
+                                AppState.confirm-delete = false;
+                                AppState.session-menu = "";
+                                AppState.delete-session(s.id);
+                            } else {
+                                AppState.confirm-delete = true;
+                            }
+                        }
                     }
                 }
                 if AppState.sessions.length == 0 && AppState.connection == "open": Text {
@@ -331,6 +358,8 @@ export component AppWindow inherits Window {
             if e.modifiers.control && e.text == Key.Backtab { AppState.cycle-session(-1); return accept; }
             if e.modifiers.control && e.text == Key.Tab { AppState.cycle-session(e.modifiers.shift ? -1 : 1); return accept; }
             if e.text == Key.Escape {
+                if AppState.renaming-session != "" { AppState.renaming-session = ""; return accept; }
+                if AppState.session-menu != "" { AppState.session-menu = ""; AppState.confirm-delete = false; return accept; }
                 if ProjectState.open { ProjectState.open = false; return accept; }
                 if CapState.open {
                     if CapState.detail-open { CapState.detail-open = false; } else { CapState.open = false; }
@@ -346,7 +375,8 @@ export component AppWindow inherits Window {
             // Not while a modal has focus: Enter in its text fields must not answer the card.
             if AppState.approval.visible && !root.settings-open && !CapState.open && !ProjectState.open && !e.modifiers.shift && !e.modifiers.control && !e.modifiers.alt {
                 if e.text == Key.Escape { AppState.approve(AppState.approval.request-id, "deny"); return accept; }
-                if e.text == Key.Return && AppState.draft == "" { AppState.approve(AppState.approval.request-id, "once"); return accept; }
+                // Enter in the sidebar's rename field saves the title, it never approves.
+                if e.text == Key.Return && AppState.draft == "" && AppState.renaming-session == "" { AppState.approve(AppState.approval.request-id, "once"); return accept; }
             }
             // An agent question (clarify / sudo / secret): Esc declines it instead of stopping
             // the turn, matching the approval card. Enter belongs to the card's own field.

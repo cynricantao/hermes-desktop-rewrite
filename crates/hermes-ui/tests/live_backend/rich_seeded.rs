@@ -117,5 +117,40 @@ pub(super) async fn section(ui: &AppWindow, log: &Log) {
         format!("clicked={clicked} copied={copied}"),
     );
     screenshot(ui, "rich-seeded");
+    // Theme flip: colours are baked into rows, so a flip must repaint the code card: the
+    // first line changes from its coloured rendering in the old palette to a coloured one
+    // (not plain) in the new palette.
+    let theme = ui.global::<hermes_ui::Theme>();
+    let before = theme.get_mode();
+    let was_dark = theme.get_dark();
+    let first_line = |ui: &AppWindow| {
+        rows(ui).iter().rev().find(|r| r.kind == 1).and_then(|r| {
+            r.segs.iter().find(|s| s.kind == 1).and_then(|s| {
+                s.lines
+                    .row_data(0)
+                    .map(|l| (s.raw.lines().next().unwrap_or_default().to_owned(), l.md))
+            })
+        })
+    };
+    let old_md = first_line(ui).map(|(_, md)| md);
+    theme.set_mode(if was_dark {
+        hermes_ui::ThemeMode::Light
+    } else {
+        hermes_ui::ThemeMode::Dark
+    });
+    let recoloured = wait_until(10, || {
+        first_line(ui).is_some_and(|(line, md)| {
+            Some(&md) != old_md.as_ref() && md != hermes_ui::rows::code_line(&line, &[], !was_dark)
+        })
+    })
+    .await;
+    record(
+        log,
+        "rich (seeded): a theme flip re-colours the code card",
+        old_md.is_some() && recoloured,
+        format!("dark {was_dark} -> {} recoloured={recoloured}", theme.get_dark()),
+    );
+    screenshot(ui, "rich-seeded-flipped");
+    theme.set_mode(before);
     let _ = backend_rest("DELETE", &format!("/api/sessions/{id}"), None).await;
 }

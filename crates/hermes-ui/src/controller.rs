@@ -16,7 +16,7 @@ use hermes_core::projects::{self, Project, ProjectList};
 use hermes_core::protocol::{
     ModelOptionsResult, SessionCreateResult, SessionListResult, SessionListRow, SessionResumeResult,
 };
-use hermes_core::sessions::{cycle_index, display_title, group_by_age};
+use hermes_core::sessions::{cycle_index, display_title, sidebar_groups};
 use hermes_core::settings::{self, Store};
 use hermes_core::transcript::{Change, Transcript};
 use hermes_core::{Client, ClientEvent};
@@ -26,6 +26,7 @@ use tokio::sync::mpsc;
 
 mod composer;
 mod inputs;
+mod sidebar;
 mod slash;
 
 pub use composer::ComposerCmd;
@@ -33,12 +34,15 @@ pub use inputs::{InputCmd, Secret};
 
 use crate::browser::BrowserCmd;
 use crate::capabilities::CapCmd;
-use crate::rows::{Ctx as RowCtx, hl_jobs, seg_block, to_row};
+use crate::rows::{Ctx as RowCtx, hl_job_id, hl_jobs, hl_result_id, seg_block, to_row};
 use crate::widgets::{self, Ctx, Outcome};
 use crate::{
     AppState, AppWindow, ApprovalInfo, CapState, ChatRow, EditModelRow, ModelItem, NavEntry, ProjectItem, ProjectState,
     ScopeChip, SearchHit, SessionItem, SettingRowUI, SettingsState, Theme,
 };
+
+/// Chats the sidebar lists (`session.list`); pinned flags are read for the same window.
+pub(crate) const SESSION_LIST_LIMIT: u32 = 200;
 
 /// Commands from the UI thread to the controller.
 #[derive(Debug, Clone)]
@@ -58,7 +62,12 @@ pub enum Cmd {
     NewChat,
     Open(String),
     Delete(String),
+    PinSession(String, bool),
+    RenameSession(String, String),
+    ArchiveSession(String),
     Search(String),
+    /// Backend message-search hits for search generation `.0` (sidebar.rs).
+    SearchResults(u64, Result<Vec<hermes_core::api::sessions::SessionSearchHit>, String>),
     /// Open the chat this many places away in sidebar order (Ctrl+Tab = 1, Ctrl+Shift+Tab = -1).
     Cycle(i32),
     RefreshModels,
@@ -310,6 +319,7 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
     st.on_retheme(move || {
         let _ = t.send(Cmd::Retheme);
     });
+    sidebar::wire(ui, &tx);
     let w = ui.as_weak();
     st.on_dismiss_banner(move || {
         if let Some(ui) = w.upgrade() {
@@ -496,9 +506,15 @@ struct Controller {
     /// Stored id of the open chat (sidebar highlight / delete).
     stored: Option<String>,
     all_sessions: Vec<SessionListRow>,
+    /// Stored ids the backend marks pinned (shown first under "Pinned").
+    pinned: std::collections::HashSet<String>,
+    /// Message-content matches for `query` that the title filter did not already show.
+    search_hits: Vec<SessionListRow>,
     /// Stored ids in the order the sidebar shows them (after search + grouping).
     visible_ids: Vec<String>,
     query: String,
+    /// Bumped per sidebar query; background searches compare it before and after.
+    search_gen: std::sync::Arc<std::sync::atomic::AtomicU64>,
     drafts: std::collections::HashMap<String, String>,
     dirty: Vec<usize>,
     reset: bool,
@@ -555,6 +571,8 @@ struct Controller {
     hl_items: HashMap<u64, Arc<Item>>,
     /// Content key last queued per segment id, so an unchanged block is not re-sent.
     hl_sent: HashMap<u64, u64>,
+    /// Bumped on every reset; tags highlight jobs so late results can be recognised.
+    hl_epoch: u16,
 }
 
 impl Controller {
@@ -619,8 +637,11 @@ impl Controller {
             projects: vec![],
             project: None,
             all_sessions: vec![],
+            pinned: Default::default(),
+            search_hits: vec![],
             visible_ids: vec![],
             query: String::new(),
+            search_gen: Default::default(),
             drafts: std::collections::HashMap::new(),
             dirty: vec![],
             reset: false,
@@ -639,6 +660,7 @@ impl Controller {
             hl_tx,
             hl_items: HashMap::new(),
             hl_sent: HashMap::new(),
+            hl_epoch: 0,
         };
         ui(&weak, |w| {
             let st = w.global::<AppState>();
@@ -712,10 +734,13 @@ impl Controller {
                         break;
                     }
                 },
-                Some((id, item)) = hl_rx.recv() => {
+                Some((job, item)) = hl_rx.recv() => {
                     // Results arrive off-thread; repaint the owning row on the next frame.
-                    c.hl_items.insert(id, item);
-                    c.dirty.push(seg_block(id));
+                    // A result from before the last reset belongs to another transcript.
+                    if let Some(id) = hl_result_id(job, c.hl_epoch) {
+                        c.hl_items.insert(id, item);
+                        c.dirty.push(seg_block(id));
+                    }
                 }
                 _ = tick.tick(), if c.reset || !c.dirty.is_empty() => c.flush(),
             }
@@ -730,6 +755,7 @@ impl Controller {
             // A reset is a new transcript (or theme): segment ids refer to other blocks now.
             self.hl_items.clear();
             self.hl_sent.clear();
+            self.hl_epoch = self.hl_epoch.wrapping_add(1);
             for i in 0..self.transcript.blocks.len() {
                 self.queue_highlight(i);
             }
@@ -815,7 +841,7 @@ impl Controller {
                     let _ = tx.send(done);
                 })
             });
-            hl.put(id, text, lang);
+            hl.put(hl_job_id(id, self.hl_epoch), text, lang);
         }
     }
 
@@ -940,19 +966,12 @@ impl Controller {
                 self.refresh_effort().await;
             }
             Cmd::Open(id) => self.open(id).await,
-            Cmd::Delete(id) => match self.client.request("session.delete", json!({"session_id": id})).await {
-                Ok(_) => {
-                    if self.stored.as_deref() == Some(id.as_str()) {
-                        Box::pin(self.handle_cmd(Cmd::NewChat)).await;
-                    }
-                    self.refresh_sessions().await;
-                }
-                Err(e) => self.banner(format!("Could not delete chat: {e}"), true),
-            },
-            Cmd::Search(q) => {
-                self.query = q;
-                self.publish_sessions();
-            }
+            Cmd::Delete(id) => self.delete_session(id).await,
+            Cmd::PinSession(id, on) => self.pin_session(id, on).await,
+            Cmd::RenameSession(id, title) => self.rename_session(id, title).await,
+            Cmd::ArchiveSession(id) => self.archive_session(id).await,
+            Cmd::Search(q) => self.search_sessions(q),
+            Cmd::SearchResults(generation, hits) => self.search_results(generation, hits),
             Cmd::Cycle(step) => {
                 if let Some(i) = cycle_index(&self.visible_ids, self.stored.as_deref(), step) {
                     let id = self.visible_ids[i].clone();
@@ -2076,11 +2095,12 @@ impl Controller {
     async fn refresh_sessions(&mut self) {
         match self
             .client
-            .call::<SessionListResult>("session.list", json!({"limit": 200}))
+            .call::<SessionListResult>("session.list", json!({"limit": SESSION_LIST_LIMIT}))
             .await
         {
             Ok(r) => {
                 self.all_sessions = r.sessions;
+                self.refresh_pins().await;
                 self.publish_sessions();
             }
             Err(e) => tracing::warn!("session.list failed: {e}"),
@@ -2100,7 +2120,7 @@ impl Controller {
             .map(|d| d.as_secs_f64())
             .unwrap_or_default();
         let mut items = Vec::with_capacity(rows.len());
-        for g in group_by_age(&rows, now) {
+        for g in sidebar_groups(&rows, &self.pinned, now) {
             for (k, &i) in g.indices.iter().enumerate() {
                 let r = &rows[i];
                 items.push(SessionItem {
@@ -2108,10 +2128,36 @@ impl Controller {
                     title: display_title(r).into(),
                     group: g.label.as_str().into(),
                     first_in_group: k == 0,
-                    pinned: false,
+                    pinned: self.pinned.contains(&r.id),
                     running: false,
                 });
             }
+        }
+        // Content matches the title filter missed, labelled with their snippet.
+        let shown: std::collections::HashSet<&str> = rows.iter().map(|r| r.id.as_str()).collect();
+        let extra: Vec<&SessionListRow> = self
+            .search_hits
+            .iter()
+            .filter(|h| !shown.contains(h.id.as_str()))
+            .collect();
+        for (k, h) in extra.into_iter().enumerate() {
+            let title = if h.title.trim().is_empty() {
+                display_title(h)
+            } else {
+                format!(
+                    "{} · {}",
+                    h.title.trim(),
+                    h.preview.chars().take(60).collect::<String>()
+                )
+            };
+            items.push(SessionItem {
+                id: h.id.as_str().into(),
+                title: title.into(),
+                group: "Found in messages".into(),
+                first_in_group: k == 0,
+                pinned: self.pinned.contains(&h.id),
+                running: false,
+            });
         }
         self.visible_ids = items.iter().map(|s| s.id.to_string()).collect();
         ui(&self.weak, move |w| {

@@ -245,7 +245,7 @@ component CodeBlock inherits Rectangle {
     callback copy(string);
     property <bool> expanded;
     property <length> content-h: lines.preferred-height;
-    property <bool> overflowing: root.content-h > 121px;
+    property <bool> overflowing: root.content-h > 120px;
     property <length> cap: root.expanded ? max(121px, root.window-h * 0.4) : 120px;
     border-radius: 10px;
     background: Theme.code-bg;
@@ -472,11 +472,16 @@ component MessageRow inherits Rectangle {
                     copy(t) => { root.copy(t); }
                 }
                 if s.kind == 3: TableBlock { seg: s; }
-                if s.kind == 4: Text {
-                    text: s.raw;
-                    wrap: word-wrap;
-                    color: Theme.text;
-                    font-size: Theme.fs-body;
+                if s.kind == 4: Rectangle {
+                    height: fence-prose.preferred-height;
+                    fence-prose := StyledText {
+                        width: parent.width;
+                        text: s.md;
+                        default-color: Theme.text;
+                        default-font-size: Theme.fs-body;
+                        default-font-family: Theme.ui-font;
+                        link-color: Theme.link;
+                    }
                 }
             }
         }
