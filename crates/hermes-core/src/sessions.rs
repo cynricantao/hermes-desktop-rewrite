@@ -39,6 +39,29 @@ pub fn group_by_age(rows: &[SessionListRow], now_unix: f64) -> Vec<SessionGroup>
 /// Index of the chat `step` places away from `current` in sidebar order, wrapping at both
 /// ends (Ctrl+Tab / Ctrl+Shift+Tab). With no open chat (or one not in the list), a forward
 /// step lands on the first chat and a backward step on the last.
+/// Sidebar groups: a "Pinned" group first (in list order), then the rest by age.
+/// `indices` point into `rows` as in [`group_by_age`].
+pub fn sidebar_groups(
+    rows: &[SessionListRow],
+    pinned: &std::collections::HashSet<String>,
+    now_unix: f64,
+) -> Vec<SessionGroup> {
+    let (pins, rest): (Vec<usize>, Vec<usize>) = (0..rows.len()).partition(|&i| pinned.contains(&rows[i].id));
+    let others: Vec<SessionListRow> = rest.iter().map(|&i| rows[i].clone()).collect();
+    let mut groups = Vec::new();
+    if !pins.is_empty() {
+        groups.push(SessionGroup {
+            label: "Pinned".into(),
+            indices: pins,
+        });
+    }
+    for mut g in group_by_age(&others, now_unix) {
+        g.indices = g.indices.into_iter().map(|i| rest[i]).collect();
+        groups.push(g);
+    }
+    groups
+}
+
 pub fn cycle_index(ids: &[String], current: Option<&str>, step: i32) -> Option<usize> {
     if ids.is_empty() {
         return None;
@@ -76,6 +99,23 @@ mod tests {
             started_at: now - age_days * 86_400.0,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn pinned_rows_lead_and_keep_order() {
+        let now = 1_000_000.0;
+        let rows = vec![row(0.1, now), row(3.0, now), row(0.2, now), row(20.0, now)];
+        let pinned: std::collections::HashSet<String> = [rows[3].id.clone(), rows[2].id.clone()].into();
+        let g = sidebar_groups(&rows, &pinned, now);
+        let shape: Vec<(&str, Vec<usize>)> = g.iter().map(|g| (g.label.as_str(), g.indices.clone())).collect();
+        assert_eq!(
+            shape,
+            vec![("Pinned", vec![2, 3]), ("Today", vec![0]), ("Previous 7 days", vec![1])]
+        );
+        assert_eq!(
+            sidebar_groups(&rows, &Default::default(), now).len(),
+            group_by_age(&rows, now).len()
+        );
     }
 
     #[test]

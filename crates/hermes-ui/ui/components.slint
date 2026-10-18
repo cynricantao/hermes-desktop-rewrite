@@ -65,6 +65,7 @@ export component IconButton inherits Rectangle {
     in property <bool> active: false;
     in property <string> tooltip;
     in property <color> tint: active ? Theme.text : Theme.text-3;
+    out property <bool> hovered: ta.has-hover;
     callback clicked();
     width: 30px;
     height: 30px;
@@ -96,6 +97,7 @@ export component NavItem inherits Rectangle {
     in property <bool> selected: false;
     in property <bool> emphasized: false;
     in property <bool> dim: false;
+    out property <bool> hovered: ta.has-hover;
     callback clicked();
     height: 32px;
     border-radius: Theme.r-md;
