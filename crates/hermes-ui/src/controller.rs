@@ -662,7 +662,11 @@ impl Controller {
     async fn handle_cmd(&mut self, cmd: Cmd) {
         match cmd {
             Cmd::Send(text) => self.send(text).await,
-            Cmd::Queue(text) => self.queue_command(&format!("add {text}")).await,
+            Cmd::Queue(text) => {
+                if !self.queue_command(&format!("add {text}")).await {
+                    self.restore_rejected_queue(&text);
+                }
+            }
             Cmd::SaveDraft { session, text } => {
                 self.drafts.insert(session, text.clone());
                 self.completions(text);

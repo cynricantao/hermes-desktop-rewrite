@@ -54,9 +54,23 @@ impl Controller {
         }
     }
 
-    pub(super) async fn queue_command(&mut self, arg: &str) {
+    pub(super) fn restore_rejected_queue(&mut self, draft: &str) {
+        // Keep the rejected request recoverable even if typing has already resumed.
+        self.notice(format!("Queue request not accepted:\n{draft}"), true);
+        let key = self.stored.clone().unwrap_or_default();
+        let draft = draft.to_owned();
+        ui(&self.weak, move |w| {
+            let st = w.global::<AppState>();
+            if st.get_active_session().as_str() == key && st.get_draft().is_empty() {
+                st.set_draft(draft.into());
+            }
+        });
+    }
+
+    /// Return whether the request was accepted; callers recover rejected drafts.
+    pub(super) async fn queue_command(&mut self, arg: &str) -> bool {
         if self.ensure_session().await.is_none() {
-            return;
+            return false;
         }
         let sid = self.queue_key().unwrap_or_default().to_owned();
         let (verb, rest) = arg.split_once(char::is_whitespace).unwrap_or((arg, ""));
@@ -66,25 +80,31 @@ impl Controller {
         } else if matches!(verb, "" | "list" | "edit" | "rm" | "move" | "clear") {
             match self.queues.manage(&sid, arg) {
                 Ok(text) => self.notice(text, false),
-                Err(e) => self.banner(e, true),
+                Err(e) => {
+                    self.banner(e, true);
+                    return false;
+                }
             }
             self.publish_queue();
         } else {
             let text = if verb == "add" { rest.trim() } else { arg.trim() };
             if text.is_empty() {
-                return self.banner("Usage: /queue <prompt>".into(), true);
+                self.banner("Usage: /queue <prompt>".into(), true);
+                return false;
             }
             // Attachments are staged on the backend, not bound to FIFO entries.
             // Refuse rather than attaching them to the wrong queued prompt.
             if !self.attachments.is_empty() {
-                return self.banner(
+                self.banner(
                     "Send or remove staged attachments before queuing a prompt.".into(),
                     true,
                 );
+                return false;
             }
             self.enqueue(text.into(), text.into());
             self.drain_queue().await;
         }
+        true
     }
 
     async fn steer(&mut self, text: &str) {
@@ -222,10 +242,10 @@ impl Controller {
 impl Controller {
     /// Slash commands never fall through to a model prompt as ordinary text.
     pub(super) async fn slash(&mut self, text: String) {
-        self.slash_depth(text, 0).await;
+        self.slash_depth(text.clone(), 0, &text).await;
     }
 
-    async fn slash_depth(&mut self, text: String, depth: usize) {
+    async fn slash_depth(&mut self, text: String, depth: usize, original: &str) {
         if depth >= 8 {
             return self.banner("Command alias loop or excessive nesting.".into(), true);
         }
@@ -237,7 +257,7 @@ impl Controller {
             && canonical != command
         {
             match hermes_core::commands::alias(canonical, arg) {
-                Ok(text) => Box::pin(self.slash_depth(text, depth + 1)).await,
+                Ok(text) => Box::pin(self.slash_depth(text, depth + 1, original)).await,
                 Err(e) => self.banner(e, true),
             }
             return;
@@ -271,7 +291,9 @@ impl Controller {
                 return;
             }
             "queue" | "q" => {
-                self.queue_command(arg).await;
+                if !self.queue_command(arg).await {
+                    self.restore_rejected_queue(original);
+                }
                 return;
             }
             "steer" => {
@@ -449,7 +471,7 @@ impl Controller {
                         result.get("target").and_then(Value::as_str).unwrap_or_default(),
                         arg,
                     ) {
-                        Ok(text) => Box::pin(self.slash_depth(text, depth + 1)).await,
+                        Ok(text) => Box::pin(self.slash_depth(text, depth + 1, original)).await,
                         Err(e) => self.banner(e, true),
                     }
                 }

@@ -16,6 +16,9 @@ CLIENTS = []
 CALLS = []
 SESSIONS = 0
 PENDING_FAILURES = {}
+REJECT_NEXT_CREATE = False
+PENDING_CREATE_FAILURE = None
+CREATE_REJECTION = threading.Event()
 
 
 def frame(conn, value):
@@ -50,7 +53,7 @@ def exact(stream, n):
 
 class Handler(socketserver.StreamRequestHandler):
     def handle(self):
-        global SESSIONS
+        global SESSIONS, REJECT_NEXT_CREATE, PENDING_CREATE_FAILURE
         request = self.rfile.readline().decode().split()
         if len(request) < 2:
             return
@@ -63,6 +66,21 @@ class Handler(socketserver.StreamRequestHandler):
             if url.path == '/api/test/state':
                 with LOCK:
                     body = json.dumps(CALLS).encode()
+            elif url.path == '/api/test/reject-create':
+                with LOCK:
+                    REJECT_NEXT_CREATE = True
+                    CREATE_REJECTION.clear()
+                body = b'{}'
+            elif url.path == '/api/test/wait-create':
+                body = json.dumps({'pending': CREATE_REJECTION.wait(8)}).encode()
+            elif url.path == '/api/test/fail-create':
+                with LOCK:
+                    pending, PENDING_CREATE_FAILURE = PENDING_CREATE_FAILURE, None
+                if pending:
+                    conn, request_id = pending
+                    frame(conn, {'jsonrpc': '2.0', 'id': request_id, 'error': {
+                        'code': 5031, 'message': 'Simulated session creation failure'}})
+                body = b'{}'
             elif url.path == '/api/test/finish':
                 sid = parse_qs(url.query)['sid'][0]
                 status = parse_qs(url.query).get('status', ['complete'])[0]
@@ -108,6 +126,11 @@ class Handler(socketserver.StreamRequestHandler):
                 result, error = {}, None
                 if method == 'session.create':
                     with LOCK:
+                        if REJECT_NEXT_CREATE:
+                            REJECT_NEXT_CREATE = False
+                            PENDING_CREATE_FAILURE = (self.request, msg['id'])
+                            CREATE_REJECTION.set()
+                            continue
                         SESSIONS += 1
                         sid = f's{SESSIONS}'
                     result = {'session_id': sid, 'stored_session_id': 'stored-' + sid}

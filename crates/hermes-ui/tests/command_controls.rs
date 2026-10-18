@@ -303,6 +303,41 @@ async fn script(ui: &AppWindow, port: u16, log: &Rc<RefCell<Vec<bool>>>) {
         wait(|| s.get_attachments().row_count() == 1).await
     );
     let before_attachment = submissions(&fixture_get(port, "/api/test/state").await).len();
+    for command in [
+        "/queue important prompt",
+        "/q alias prompt",
+        "/quick quick-alias prompt",
+    ] {
+        send(ui, command);
+        check!(
+            format!("rejected attachment queue retains original {command}"),
+            wait(|| s.get_banner().contains("before queuing a prompt") && s.get_draft().as_str() == command).await
+                && s.get_queue_count() == 1
+                && s.get_attachments().row_count() == 1
+        );
+    }
+    input(ui, "important keyboard queue prompt");
+    ui.window().dispatch_event(WindowEvent::KeyPressed {
+        text: Key::Control.into(),
+    });
+    press(ui, Key::Return);
+    ui.window().dispatch_event(WindowEvent::KeyReleased {
+        text: Key::Control.into(),
+    });
+    check!(
+        "rejected Ctrl+Enter retains literal draft and never submits",
+        wait(|| s.get_draft().as_str() == "important keyboard queue prompt").await
+            && s.get_banner().contains("before queuing a prompt")
+            && s.get_queue_count() == 1
+            && s.get_attachments().row_count() == 1
+            && submissions(&fixture_get(port, "/api/test/state").await).len() == before_attachment
+    );
+    send(ui, "/queue edit 99 replacement");
+    check!(
+        "invalid queue management retains its invocation",
+        wait(|| s.get_draft().as_str() == "/queue edit 99 replacement" && s.get_banner_error()).await
+            && s.get_queue_count() == 1
+    );
     fixture_get(port, "/api/test/finish?sid=s1").await;
     check!(
         "drain preserves later attachment and pauses",
@@ -393,6 +428,46 @@ async fn script(ui: &AppWindow, port: u16, log: &Rc<RefCell<Vec<bool>>>) {
         "alias cycle stops with clear error",
         wait(|| s.get_banner().contains("alias loop")).await
     );
+    send(ui, "/new");
+    check!(
+        "queue failure probe starts in an observed clean chat",
+        wait(|| s.get_runtime_session().is_empty() && s.get_rows().row_count() == 0).await
+    );
+    for (draft, keyboard, newer) in [
+        ("queue create failure", true, false),
+        ("/queue slash create failure", false, false),
+        ("queue create failure while typing", true, true),
+    ] {
+        fixture_get(port, "/api/test/reject-create").await;
+        if keyboard {
+            input(ui, draft);
+            ui.window().dispatch_event(WindowEvent::KeyPressed {
+                text: Key::Control.into(),
+            });
+            press(ui, Key::Return);
+            ui.window().dispatch_event(WindowEvent::KeyReleased {
+                text: Key::Control.into(),
+            });
+        } else {
+            send(ui, draft);
+        }
+        let pending = fixture_get(port, "/api/test/wait-create").await;
+        if newer {
+            input(ui, "newer draft must survive");
+        }
+        fixture_get(port, "/api/test/fail-create").await;
+        let expected = if newer { "newer draft must survive" } else { draft };
+        check!(
+            format!("session-create queue failure recovers original without replacing newer input: {draft}"),
+            pending["pending"] == true
+                && wait(|| s.get_banner().contains("Simulated session creation failure")
+                    && output(ui).contains(draft)
+                    && s.get_draft().as_str() == expected)
+                .await
+                && s.get_runtime_session().is_empty()
+                && s.get_queue_count() == 0
+        );
+    }
 }
 
 #[test]
