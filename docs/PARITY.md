@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**65 done · 282 partial · 441 not started · 6 unsupported** (of 794).
+**65 done · 288 partial · 435 not started · 6 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -209,15 +209,15 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [x] Respond to approval (allow/deny/always) — RPC approval.respond / approval.received — src/lib/keybinds/approval-keys.ts ⟶ live 2026-10-16, `tests/live_backend.rs` (14/14) vs private backend: Deny/Allow once by click; **Esc denies** and **Enter (empty composer) allows once**, same keys as approval-keys.ts; **Allow for session** → next `rm -r` in that chat runs with no card, a new chat asks again; **Always allow** → `command_allowlist` written to the private config.yaml, a new chat runs it with no card
 - [ ] Approval mode selector (manual/smart/off) — config approvals.mode (config.set) — src/app/shell/approval-mode-menu.tsx
 - [~] Pending approvals list — RPC approval.pending — src/store/approval-mode.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
-- [ ] Clarify questions (1–5) render + submit — SRV clarify — src/components/assistant-ui/clarify/index.tsx
-- [ ] Clarify choice rows / confirm bar — local — src/components/assistant-ui/clarify/core/choice-row.tsx, confirm-bar.tsx
+- [~] Clarify questions (1–5) render + submit — SRV clarify — src/components/assistant-ui/clarify/index.tsx ⟶ input card (`ui/input-card.slint`, `hermes_core::input_requests`): 1–5 questions stepped one at a time, choices, multi-select, free text, Skip question / Skip all, reply `{answers}`. 2026-10-18 `tests/daily_driver.rs` gateway simulation (pointer clicks + keys); a model-raised clarify against a live backend is unverified
+- [~] Clarify choice rows / confirm bar — local — src/components/assistant-ui/clarify/core/choice-row.tsx, confirm-bar.tsx ⟶ choice rows with Recommended tag, multi-select check boxes and Confirm choices; gateway simulation only
 - [ ] Clarify keyboard handlers (1–9, Enter) — local — src/components/assistant-ui/clarify/core/use-clarify-keys.ts
-- [ ] Clarify pending/settled states — local — src/components/assistant-ui/clarify/pending.tsx, settled.tsx
+- [~] Clarify pending/settled states — local — src/components/assistant-ui/clarify/pending.tsx, settled.tsx ⟶ pending card only; no settled transcript row after answering
 - [ ] Setup-clarify (onboarding picks) — SRV setup_choose — src/components/assistant-ui/clarify/setup-pending.tsx, setup-rows.ts
 - [ ] Undelivered clarify notice — local — src/components/assistant-ui/clarify/undelivered-notice.tsx
-- [ ] Restore pending approval/clarify on resume — local — src/app/session/hooks/use-session-actions/restore-pending-approval.ts, restore-pending-clarify.ts
-- [ ] Secret request (masked value) — SRV secret — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts
-- [ ] Sudo request (terminal/display) — SRV sudo, display.install.sudo — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts
+- [~] Restore pending approval/clarify on resume — local — src/app/session/hooks/use-session-actions/restore-pending-approval.ts, restore-pending-clarify.ts ⟶ `session.resume.open_requests` replayed (approval + input prompts), resumes at the first unlocked question; gateway simulation only
+- [~] Secret request (masked value) — SRV secret — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts ⟶ masked card, `{value}` reply, field cleared at once and never echoed; Esc/Skip sends an empty value. Gateway simulation only
+- [~] Sudo request (terminal/display) — SRV sudo, display.install.sudo — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts ⟶ masked card for `sudo` and `display.install.sudo` (and `vault.unlock_prompt`); gateway simulation only
 - [~] Connection request (remote OAuth/pairing) — SRV connection.request, RPC connection.respond — src/store/connection-request.ts ⟶ backend client ready in `api::plugins` (see docs/api/); UI not wired
 - [ ] Free-tier challenge prompt — WS free_tier.challenge — src/store/free-tier-challenge.ts
 - [~] Clarify lock (single-flight) — RPC clarify.lock — src/store/clarify.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
