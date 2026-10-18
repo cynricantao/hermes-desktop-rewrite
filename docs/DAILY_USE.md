@@ -34,6 +34,11 @@ palette, fonts, spacing, and software renderer. It is not full Electron Desktop 
   controls the new chat's execution folder.
 - Guarded expensive-model selections display the backend's warning rather than silently
   confirming it. Their confirmation flow remains unbuilt.
+- **Sidebar chats:** hover a chat and click **⋯** for **Pin**/**Unpin**, **Rename** (inline,
+  Enter saves, Esc cancels), **Archive** and **Delete** (asks for a second click). Pinned
+  chats lead under **Pinned**. Search filters titles at once and adds chats whose messages
+  match under **Found in messages**. Every action is saved through the backend
+  (`PATCH`/`DELETE /api/sessions/{id}`); archived chats are restored from Settings › Sessions.
 - Agent questions now get a card above the composer: clarify (choices, multi-select,
   free text, Skip question / Skip all) and masked sudo / secret / vault-unlock prompts.
   **Esc** declines the open card instead of stopping the turn. A question raised in

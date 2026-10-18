@@ -396,6 +396,127 @@ pub async fn session_detail(rest: &Rest, session_id: &str, profile: &str) -> Res
     send_as(rest, &session_detail_request(session_id, profile)).await
 }
 
+// ── REST: sidebar edits (title, pin, archive, hide, unread) ────────────────────
+
+/// Fields for `PATCH /api/sessions/{id}`; `None` leaves a field untouched.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SessionPatch {
+    pub title: Option<String>,
+    pub archived: Option<bool>,
+    pub pinned: Option<bool>,
+    pub hidden: Option<bool>,
+    pub unread: Option<bool>,
+}
+
+/// The optimistic-concurrency identity a mutation must quote
+/// (`GET /api/sessions/{id}/mutation-snapshot`).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct MutationSnapshot {
+    pub session_id: String,
+    pub exists: bool,
+    pub runtime_revision: i64,
+    pub runtime_generation: Option<i64>,
+}
+
+pub fn session_mutation_snapshot_request(session_id: &str) -> Request {
+    req(
+        Method::Get,
+        format!("/api/sessions/{}/mutation-snapshot", seg(session_id)),
+        None,
+    )
+}
+
+/// One sidebar edit. `request_id` must be unique per attempt (the backend keeps a receipt per
+/// id); the revision/generation come from [`MutationSnapshot`].
+pub fn session_patch_request(session_id: &str, request_id: &str, snap: &MutationSnapshot, p: &SessionPatch) -> Request {
+    let mut body = json!({"request_id": request_id, "expected_revision": snap.runtime_revision});
+    if let Some(g) = snap.runtime_generation {
+        body["expected_generation"] = json!(g);
+    }
+    if let Some(t) = &p.title {
+        body["title"] = json!(t);
+    }
+    for (key, v) in [
+        ("archived", p.archived),
+        ("pinned", p.pinned),
+        ("hidden", p.hidden),
+        ("unread", p.unread),
+    ] {
+        if let Some(v) = v {
+            body[key] = json!(v);
+        }
+    }
+    req(Method::Patch, format!("/api/sessions/{}", seg(session_id)), Some(body))
+}
+
+fn mutation_id() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static N: AtomicU64 = AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    format!("desktop-rs-{nanos:x}-{}", N.fetch_add(1, Ordering::Relaxed))
+}
+
+/// Delete one stored session (`DELETE /api/sessions/{id}`, identity in the query).
+pub fn session_delete_request(session_id: &str, request_id: &str, snap: &MutationSnapshot) -> Request {
+    let rev = snap.runtime_revision.to_string();
+    // The backend requires a generation for deletes; an absent row has none, and quoting 0
+    // lets it answer its idempotent "already absent" success instead of 400.
+    let generation = Some(snap.runtime_generation.unwrap_or(0).to_string());
+    let pairs = [
+        ("request_id", request_id),
+        ("expected_revision", rev.as_str()),
+        ("expected_generation", generation.as_deref().unwrap_or("")),
+    ];
+    req(
+        Method::Delete,
+        with_query(&format!("/api/sessions/{}", seg(session_id)), &pairs),
+        None,
+    )
+}
+
+/// Snapshot the row's identity, then send the mutation `build` makes from it. A concurrent
+/// edit (`409` naming the revision/generation) is retried once with a fresh snapshot.
+async fn mutate_session(
+    rest: &Rest,
+    session_id: &str,
+    build: impl Fn(&str, &MutationSnapshot) -> Request,
+) -> Result<Value, ApiError> {
+    let mut last = None;
+    for _ in 0..2 {
+        let snap: MutationSnapshot = send_as(rest, &session_mutation_snapshot_request(session_id)).await?;
+        match send_as::<Value>(rest, &build(&mutation_id(), &snap)).await {
+            Err(ApiError::Http(crate::http::HttpError::Status { status: 409, body }))
+                if body.contains("revision") || body.contains("generation") =>
+            {
+                last = Some(ApiError::Http(crate::http::HttpError::Status { status: 409, body }));
+            }
+            other => return other,
+        }
+    }
+    Err(last.unwrap_or_else(|| ApiError::Decode("revision conflict".into())))
+}
+
+/// Edit a stored session's sidebar fields. **Writes** the session store.
+pub async fn session_patch(rest: &Rest, session_id: &str, p: &SessionPatch) -> Result<Value, ApiError> {
+    mutate_session(rest, session_id, |rid, snap| {
+        session_patch_request(session_id, rid, snap, p)
+    })
+    .await
+}
+
+/// Delete a stored session and its transcript. **Destructive.** The backend refuses a chat
+/// with a live runtime, so close the runtime first. An already-absent row counts as deleted.
+pub async fn session_delete_rest(rest: &Rest, session_id: &str) -> Result<Value, ApiError> {
+    mutate_session(rest, session_id, |rid, snap| {
+        session_delete_request(session_id, rid, snap)
+    })
+    .await
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SessionMessagesQuery {
     pub profile: String,
@@ -1931,6 +2052,28 @@ mod tests {
     }
 
     #[test]
+    fn deleting_an_absent_row_quotes_generation_zero() {
+        let absent = MutationSnapshot {
+            session_id: "gone".into(),
+            exists: false,
+            runtime_revision: 0,
+            runtime_generation: None,
+        };
+        let r = session_delete_request("gone", "rid-1", &absent);
+        assert!(r.path.contains("expected_generation=0"), "{}", r.path);
+        let live = MutationSnapshot {
+            runtime_generation: Some(4),
+            exists: true,
+            ..absent
+        };
+        assert!(
+            session_delete_request("gone", "rid-2", &live)
+                .path
+                .contains("expected_generation=4")
+        );
+    }
+
+    #[test]
     fn rest_list_builders() {
         let r = sessions_list_request(&SessionListQuery::default());
         assert_eq!(
@@ -2532,5 +2675,50 @@ mod tests {
         .unwrap();
         assert!(ig.success && ig.image_data.is_none());
         assert_eq!(decode::<ImageGenerated>(json!({})).unwrap(), ImageGenerated::default());
+    }
+
+    #[test]
+    fn session_patch_sends_only_set_fields() {
+        let p = SessionPatch {
+            title: Some("New name".into()),
+            pinned: Some(true),
+            ..Default::default()
+        };
+        let snap = MutationSnapshot {
+            runtime_revision: 7,
+            runtime_generation: Some(2),
+            ..Default::default()
+        };
+        let r = session_patch_request("a b", "rid-1", &snap, &p);
+        assert_eq!(r.method, Method::Patch);
+        assert_eq!(r.path, "/api/sessions/a%20b");
+        assert_eq!(
+            r.body,
+            Some(
+                json!({"request_id": "rid-1", "expected_revision": 7, "expected_generation": 2,
+                        "title": "New name", "pinned": true})
+            )
+        );
+        let archive = SessionPatch {
+            archived: Some(false),
+            ..Default::default()
+        };
+        let r = session_patch_request("s1", "rid-2", &MutationSnapshot::default(), &archive);
+        assert_eq!(
+            r.body,
+            Some(json!({"request_id": "rid-2", "expected_revision": 0, "archived": false}))
+        );
+        let d = session_delete_request("s1", "rid-3", &snap);
+        assert_eq!(d.method, Method::Delete);
+        assert_eq!(
+            d.path,
+            "/api/sessions/s1?request_id=rid-3&expected_revision=7&expected_generation=2"
+        );
+        assert_eq!(d.body, None);
+        assert_eq!(
+            session_mutation_snapshot_request("s 1").path,
+            "/api/sessions/s%201/mutation-snapshot"
+        );
+        assert_ne!(mutation_id(), mutation_id());
     }
 }

@@ -1,0 +1,115 @@
+// One chat in the sidebar: open on click, an actions button on hover (pin, rename, archive,
+// delete with a confirming second click) and inline rename. State lives in AppState; this
+// component only reports intents through callbacks.
+
+import { Theme, Motion } from "theme.slint";
+import { IconButton, NavItem } from "components.slint";
+
+export struct SessionItem {
+    id: string,
+    title: string,
+    group: string,
+    first-in-group: bool,
+    pinned: bool,
+    running: bool,
+}
+
+// Small text action under an open row.
+component RowAction inherits Rectangle {
+    in property <string> text;
+    in property <string> label;
+    in property <bool> danger;
+    callback clicked();
+    height: 26px;
+    width: t.preferred-width + 16px;
+    border-radius: Theme.r-sm;
+    background: ta.has-hover ? (danger ? Theme.danger.with-alpha(0.15) : Theme.hover) : transparent;
+    accessible-role: button;
+    accessible-label: label;
+    accessible-action-default => { root.clicked(); }
+    t := Text { text: root.text; font-size: Theme.fs-sm; color: root.danger ? Theme.danger : Theme.text-2; }
+    ta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+export component SessionRow inherits Rectangle {
+    in property <SessionItem> item;
+    in property <bool> selected;
+    in property <bool> menu-open;
+    in property <bool> renaming;
+    in property <bool> confirm-delete;
+    in-out property <string> rename-text;
+    callback open();
+    callback toggle-menu();
+    callback pin(bool);
+    callback start-rename();
+    callback commit-rename(string);
+    // Focus left the rename field without Enter: drop the edit (no stale field lingers).
+    callback cancel-rename();
+    callback archive();
+    callback delete();
+    height: col.preferred-height;
+
+    col := VerticalLayout {
+        spacing: 2px;
+        if !root.renaming: Rectangle {
+            height: 32px;
+            nav := NavItem {
+                has-icon: root.item.pinned;
+                icon: @image-url("../../../assets/icons/pin.svg");
+                text: root.item.title;
+                selected: root.selected;
+                clicked => { root.open(); }
+            }
+            more := IconButton {
+                x: parent.width - self.width - 1px;
+                y: 1px;
+                visible: nav.hovered || self.hovered || root.menu-open;
+                icon: @image-url("../../../assets/icons/ellipsis.svg");
+                icon-size: 14px;
+                tooltip: "Chat actions: " + root.item.title;
+                active: root.menu-open;
+                clicked => { root.toggle-menu(); }
+            }
+        }
+        if root.renaming: Rectangle {
+            height: 32px;
+            border-radius: Theme.r-md;
+            border-width: 1px;
+            border-color: Theme.border-strong;
+            background: Theme.bg.with-alpha(0.4);
+            field := TextInput {
+                x: 10px;
+                width: parent.width - 20px;
+                height: parent.height;
+                single-line: true;
+                vertical-alignment: center;
+                text <=> root.rename-text;
+                font-size: Theme.fs-md;
+                color: Theme.text;
+                selection-background-color: Theme.accent-soft;
+                accessible-label: "Chat title";
+                init => { self.focus(); self.select-all(); }
+                accepted => { root.commit-rename(self.text); }
+                changed has-focus => { if !self.has-focus { root.cancel-rename(); } }
+            }
+        }
+        if root.menu-open && !root.renaming: HorizontalLayout {
+            padding-left: 6px;
+            spacing: 2px;
+            alignment: start;
+            RowAction {
+                text: root.item.pinned ? "Unpin" : "Pin";
+                label: root.item.pinned ? "Unpin chat" : "Pin chat";
+                clicked => { root.pin(!root.item.pinned); }
+            }
+            RowAction { text: "Rename"; label: "Rename chat"; clicked => { root.start-rename(); } }
+            RowAction { text: "Archive"; label: "Archive chat"; clicked => { root.archive(); } }
+            RowAction {
+                text: root.confirm-delete ? "Confirm delete" : "Delete";
+                label: root.confirm-delete ? "Confirm delete chat" : "Delete chat";
+                danger: true;
+                clicked => { root.delete(); }
+            }
+        }
+    }
+}
