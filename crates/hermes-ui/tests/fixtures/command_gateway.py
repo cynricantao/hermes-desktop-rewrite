@@ -44,6 +44,36 @@ def event(kind, sid, payload):
                 CLIENTS.remove(conn)
 
 
+ASKS = 0
+QUESTIONS = {
+    'clarify': [
+        {'qid': 'q0', 'question': 'Which scope?', 'choices': ['Small (Recommended)', 'Large'], 'multi_select': False},
+        {'qid': 'q1', 'question': 'Which parts?', 'choices': ['A', 'B', 'C'], 'multi_select': True},
+        {'qid': 'q2', 'question': 'Anything else?', 'choices': None, 'multi_select': False},
+    ],
+    'clarify-one': [{'qid': 'q0', 'question': 'Proceed?', 'choices': ['Yes', 'No'], 'multi_select': False}],
+    'clarify-empty': [{'qid': '', 'question': ''}],
+}
+
+
+def ask(kind, sid):
+    """Send one server->client request to every connected client; return its id."""
+    global ASKS
+    with LOCK:
+        ASKS += 1
+        rid = f'srq-fixture{ASKS}'
+    if kind.startswith('clarify'):
+        method, params = 'clarify', {'questions': QUESTIONS[kind]}
+    elif kind == 'sudo':
+        method, params = 'sudo', {'command': 'sudo pacman -S fixture'}
+    else:
+        method, params = 'secret', {'prompt': 'Fixture API key', 'env_var': 'FIXTURE_KEY'}
+    with LOCK:
+        for conn in CLIENTS[:]:
+            frame(conn, {'jsonrpc': '2.0', 'id': rid, 'method': method, 'params': {'session_id': sid, **params}})
+    return rid
+
+
 def exact(stream, n):
     data = stream.read(n)
     if len(data) != n:
@@ -92,6 +122,13 @@ class Handler(socketserver.StreamRequestHandler):
                     conn, request_id = PENDING_FAILURES.pop(sid)
                 frame(conn, {'jsonrpc': '2.0', 'id': request_id, 'error': {'code': 4001, 'message': 'Simulated late submission failure'}})
                 body = b'{}'
+            elif url.path == '/api/test/ask':
+                q = parse_qs(url.query)
+                body = json.dumps({'id': ask(q['kind'][0], q['sid'][0])}).encode()
+            elif url.path == '/api/test/cancel':
+                q = parse_qs(url.query)
+                event('request.cancel', q['sid'][0], {'id': q['id'][0], 'method': 'clarify', 'reason': 'interrupted'})
+                body = b'{}'
             elif url.path == '/api/test/side':
                 sid = parse_qs(url.query)['sid'][0]
                 event('background.complete', sid, {'task_id': 'bg_fixture', 'text': 'Simulated background answer.'})
@@ -120,6 +157,11 @@ class Handler(socketserver.StreamRequestHandler):
                 mask = exact(self.rfile, 4) if second & 128 else bytes(4)
                 data = bytes(c ^ mask[i % 4] for i, c in enumerate(exact(self.rfile, size)))
                 msg = json.loads(data)
+                if 'method' not in msg:
+                    # The client's answer to a server->client request.
+                    with LOCK:
+                        CALLS.append({'method': '<response>', 'params': msg})
+                    continue
                 method, params = msg['method'], msg.get('params', {})
                 with LOCK:
                     CALLS.append({'method': method, 'params': params})
@@ -134,6 +176,10 @@ class Handler(socketserver.StreamRequestHandler):
                         SESSIONS += 1
                         sid = f's{SESSIONS}'
                     result = {'session_id': sid, 'stored_session_id': 'stored-' + sid}
+                elif method == 'session.resume' and params['session_id'] == 'stored-replay':
+                    result = {'session_id': 'resumed-replay', 'stored_session_id': 'stored-replay', 'messages': [{'role': 'user', 'text': 'replayed chat'}],
+                              'open_requests': [{'id': 'srq-replayed', 'method': 'clarify', 'params': {
+                                  'session_id': 'resumed-replay', 'answers': {'q0': 'Small'}, 'questions': QUESTIONS['clarify'][:2]}}]}
                 elif method == 'session.resume':
                     result = {'session_id': 'resumed-' + params['session_id'], 'stored_session_id': params['session_id'], 'messages': [{'role': 'user', 'text': 'PRIVATE_SKILL_BODY', 'display_kind': 'hidden'}, {'role': 'user', 'text': '/fixture-skill'}]}
                 elif method == 'command.resolve':

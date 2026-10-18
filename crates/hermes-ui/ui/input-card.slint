@@ -1,0 +1,142 @@
+// Agent questions raised mid-turn: clarify (1–5 questions, choices or free text) and the
+// masked single-value prompts (sudo, secret/API key, vault unlock). The controller owns the
+// state (`hermes_core::input_requests`); this card only renders it and reports intents.
+
+import { Theme, Motion } from "theme.slint";
+import { PrimaryButton, GhostButton } from "components.slint";
+
+export struct InputChoice {
+    label: string,
+    recommended: bool,
+    selected: bool,
+}
+
+export global InputState {
+    in-out property <bool> visible;
+    // Sudo / secret / vault: the field is a password field and choices are empty.
+    in-out property <bool> masked;
+    in-out property <string> request-id;
+    // Question on screen; every per-question intent is checked against it.
+    in-out property <string> question-id;
+    in-out property <string> title;
+    in-out property <string> detail;
+    in-out property <string> question;
+    // "2 of 3" for batches.
+    in-out property <string> step;
+    in-out property <[InputChoice]> choices;
+    in-out property <bool> multi;
+    in-out property <bool> batch;
+    // Text field contents; the controller clears it after every accepted answer.
+    in-out property <string> value;
+    callback choose(int);
+    callback submit-text(string);
+    callback confirm();
+    // Decline the whole request (Esc).
+    callback skip();
+    callback skip-question();
+}
+
+export component InputCard inherits Rectangle {
+    border-radius: Theme.r-lg;
+    background: Theme.raised;
+    border-width: 1px;
+    border-color: Theme.accent.with-alpha(0.5);
+    drop-shadow-blur: 20px;
+    drop-shadow-color: #00000055;
+    height: lay.preferred-height;
+    init => { field.focus(); }
+
+    lay := VerticalLayout {
+        padding: 14px;
+        spacing: 10px;
+        HorizontalLayout {
+            spacing: 8px;
+            Image {
+                source: InputState.masked ? @image-url("../../../assets/icons/key-round.svg") : @image-url("../../../assets/icons/message-circle.svg");
+                width: 16px; height: 16px;
+                colorize: Theme.accent;
+            }
+            Text { text: InputState.title; color: Theme.text; font-size: Theme.fs-md; font-weight: 600; wrap: word-wrap; horizontal-stretch: 1; }
+            if InputState.step != "": Text { text: InputState.step; color: Theme.text-3; font-size: Theme.fs-sm; }
+        }
+        if InputState.detail != "": Rectangle {
+            border-radius: Theme.r-md;
+            background: Theme.code-bg;
+            height: det.preferred-height + 16px;
+            det := Text { x: 10px; width: parent.width - 20px; text: InputState.detail; font-family: Theme.mono-font; font-size: Theme.fs-sm; color: Theme.text-2; wrap: char-wrap; }
+        }
+        if InputState.question != "": Text { text: InputState.question; color: Theme.text; font-size: Theme.fs-body; wrap: word-wrap; }
+        for c[i] in InputState.choices: Rectangle {
+            height: row.preferred-height;
+            border-radius: Theme.r-md;
+            border-width: 1px;
+            border-color: c.selected ? Theme.accent : Theme.border;
+            background: c.selected ? Theme.accent-soft : choice-ta.has-hover ? Theme.hover : transparent;
+            animate background { duration: Motion.fast; }
+            accessible-role: button;
+            accessible-label: "Choose " + c.label;
+            accessible-action-default => { InputState.choose(i); }
+            row := HorizontalLayout {
+                padding: 8px;
+                padding-left: 12px;
+                spacing: 8px;
+                if InputState.multi: Rectangle {
+                    width: 16px; height: 16px;
+                    y: (parent.height - 16px) / 2;
+                    border-radius: 4px;
+                    border-width: 1px;
+                    border-color: c.selected ? Theme.accent : Theme.border-strong;
+                    background: c.selected ? Theme.accent : transparent;
+                    if c.selected: Image { source: @image-url("../../../assets/icons/check.svg"); width: 12px; height: 12px; colorize: Theme.on-accent; }
+                }
+                Text { text: (i + 1) + ".  " + c.label; color: Theme.text; font-size: Theme.fs-md; wrap: word-wrap; horizontal-stretch: 1; }
+                if c.recommended: Text { text: "Recommended"; color: Theme.accent; font-size: Theme.fs-xs; vertical-alignment: center; }
+            }
+            choice-ta := TouchArea { mouse-cursor: pointer; clicked => { InputState.choose(i); } }
+        }
+        Rectangle {
+            height: 34px;
+            border-radius: Theme.r-md;
+            border-width: 1px;
+            border-color: field.has-focus ? Theme.border-strong : Theme.border;
+            background: Theme.bg.with-alpha(0.4);
+            animate border-color { duration: Motion.fast; }
+            field := TextInput {
+                x: 10px;
+                width: parent.width - 20px;
+                height: parent.height;
+                single-line: true;
+                vertical-alignment: center;
+                input-type: InputState.masked ? InputType.password : InputType.text;
+                text <=> InputState.value;
+                font-size: Theme.fs-md;
+                color: Theme.text;
+                selection-background-color: Theme.accent-soft;
+                accessible-label: "Answer";
+                accepted => { InputState.submit-text(self.text); }
+            }
+            if InputState.value == "": Text {
+                x: 10px;
+                height: parent.height;
+                vertical-alignment: center;
+                text: InputState.masked ? "Password or value (never shown in the chat)" : InputState.choices.length > 0 ? "Or type another answer" : "Type your answer";
+                color: Theme.text-4;
+                font-size: Theme.fs-md;
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: "Enter to submit · Esc to skip";
+                color: Theme.text-4;
+                font-size: Theme.fs-xs;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            if InputState.batch: GhostButton { text: "Skip question"; clicked => { InputState.skip-question(); } }
+            GhostButton { text: InputState.masked ? "Skip" : "Skip all"; clicked => { InputState.skip(); } }
+            if InputState.multi: PrimaryButton { text: "Confirm choices"; clicked => { InputState.confirm(); } }
+            if !InputState.multi: PrimaryButton { text: "Submit"; clicked => { InputState.submit-text(InputState.value); } }
+        }
+    }
+}

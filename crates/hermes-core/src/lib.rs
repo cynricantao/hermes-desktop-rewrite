@@ -15,6 +15,7 @@
 //! * [`highlight`] — syntect-backed code highlighting on a background thread, with a
 //!   bounded content-keyed cache and per-stream checkpoint resume.
 //! * [`sessions`] — session-list grouping helpers.
+//! * [`input_requests`] — clarify / sudo / secret prompts the agent raises mid-turn.
 //! * [`api`] — typed client for every backend feature area (REST + JSON-RPC), UI-free.
 //! * [`remote`], [`artifacts`], [`notify`], [`keybinds`], [`browser`] — desktop logic with no UI
 //!   (remote gateway connections, artifact detection, notification rules, shortcut map,
@@ -32,6 +33,7 @@ pub mod commands;
 pub mod diff;
 pub mod highlight;
 pub mod http;
+pub mod input_requests;
 pub mod keybinds;
 pub mod markdown;
 pub mod notify;

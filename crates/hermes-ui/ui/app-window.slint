@@ -12,8 +12,9 @@ import { SystemState } from "w-system.slint";
 
 import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
 import { CapAction, CapItem, CapState, CapabilitiesModal } from "capabilities.slint";
+import { InputCard, InputChoice, InputState } from "input-card.slint";
 
-export { CommandItem, Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, AppearanceState, ModelsState, ProvidersState, SystemState, CapAction, CapItem, CapState }
+export { CommandItem, Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, AppearanceState, ModelsState, ProvidersState, SystemState, CapAction, CapItem, CapState, InputChoice, InputState }
 
 export struct SessionItem {
     id: string,
@@ -372,6 +373,12 @@ export component AppWindow inherits Window {
                 if e.text == Key.Escape { AppState.approve(AppState.approval.request-id, "deny"); return accept; }
                 if e.text == Key.Return && AppState.draft == "" { AppState.approve(AppState.approval.request-id, "once"); return accept; }
             }
+            // An agent question (clarify / sudo / secret): Esc declines it instead of stopping
+            // the turn, matching the approval card. Enter belongs to the card's own field.
+            if InputState.visible && !AppState.approval.visible && !root.settings-open && !CapState.open && !ProjectState.open && e.text == Key.Escape {
+                InputState.skip();
+                return accept;
+            }
             if e.text == Key.Escape && AppState.running { AppState.stop(); return accept; }
             reject
         }
@@ -528,6 +535,13 @@ export component AppWindow inherits Window {
                 x: (parent.width - self.width) / 2;
                 // Above the docked composer and the 40 px live status line.
                 y: parent.height - self.height - root.dock-h - 8px - 48px;
+                width: min(parent.width - 48px, Theme.column-w);
+            }
+
+            // Shown only when no approval card is up (an approval answers first).
+            if InputState.visible && !AppState.approval.visible: InputCard {
+                x: (parent.width - self.width) / 2;
+                y: max(Theme.titlebar-h + 8px, parent.height - self.height - root.dock-h - 8px - 48px);
                 width: min(parent.width - 48px, Theme.column-w);
             }
 

@@ -21,7 +21,10 @@ use serde_json::{Value, json};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
 use tokio::sync::mpsc;
 
+mod inputs;
 mod slash;
+
+pub use inputs::{InputCmd, Secret};
 
 use crate::browser::BrowserCmd;
 use crate::capabilities::CapCmd;
@@ -77,6 +80,8 @@ pub enum Cmd {
     RemoveAttachment(i32),
     /// Capabilities-screen intents, forwarded to its own task (`capabilities.rs`).
     Caps(CapCmd),
+    /// Agent question card (clarify / sudo / secret).
+    Input(InputCmd),
 }
 
 /// Settings-panel intents from the UI (see `ui/settings.slint`).
@@ -211,6 +216,7 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
             choice: choice.into(),
         });
     });
+    inputs::wire(ui, &tx);
     let w = ui.as_weak();
     st.on_dismiss_banner(move || {
         if let Some(ui) = w.upgrade() {
@@ -404,6 +410,8 @@ struct Controller {
     dirty: Vec<usize>,
     reset: bool,
     pending_approval: Option<String>,
+    /// Open clarify / sudo / secret requests, oldest first (parked per chat).
+    inputs: Vec<hermes_core::input_requests::PendingInput>,
     /// Model picked on the new-chat screen before a session exists: (provider, model).
     /// Sent with `session.create` (as the Electron app does); `config.set model` needs a
     /// live session and answers 4001 without one.
@@ -497,6 +505,7 @@ impl Controller {
             dirty: vec![],
             reset: false,
             pending_approval: None,
+            inputs: Vec::new(),
             rest: None,
             profiles: Vec::new(),
             scope: String::new(),
@@ -712,6 +721,7 @@ impl Controller {
             Cmd::Caps(cmd) => {
                 let _ = self.caps.send(cmd);
             }
+            Cmd::Input(cmd) => self.input_cmd(cmd),
             Cmd::PasteImage => self.paste_image().await,
             Cmd::RemoveAttachment(i) => self.remove_attachment(i).await,
             Cmd::Stop => {
@@ -746,6 +756,7 @@ impl Controller {
                     st.set_draft(SharedString::new());
                     st.set_approval(ApprovalInfo::default());
                 });
+                self.publish_input();
                 self.publish_project();
                 self.refresh_model_label().await;
                 self.refresh_effort().await;
@@ -1617,7 +1628,7 @@ impl Controller {
             .call::<SessionResumeResult>("session.resume", json!({"session_id": stored_id, "source": "desktop"}))
             .await
         {
-            Ok(r) => {
+            Ok(mut r) => {
                 self.draft_model = None;
                 self.draft_effort = None;
                 self.session = Some(r.session_id.clone());
@@ -1633,6 +1644,7 @@ impl Controller {
                     .cloned();
                 self.publish_project();
                 self.transcript = Transcript::new();
+                let open_requests = r.open_requests.take().unwrap_or_default();
                 let ch = self.transcript.load_history(&r.messages);
                 self.transcript.running = r.running.unwrap_or(r.info.running);
                 self.transcript.title = Some(r.info.title.clone()).filter(|t| !t.is_empty());
@@ -1658,6 +1670,8 @@ impl Controller {
                     st.set_cwd_label(short_path(&info.cwd).into());
                 });
                 self.refresh_effort().await;
+                self.replay_open_requests(&open_requests);
+                self.publish_input();
                 if let Some(key) = self.queue_key().map(str::to_owned) {
                     for result in self.side_results.remove(&key).unwrap_or_default() {
                         self.notice(result, false);
@@ -1695,6 +1709,7 @@ impl Controller {
                 }
                 if e.kind == "request.cancel" {
                     let id = e.payload.get("id").and_then(Value::as_str).unwrap_or_default();
+                    self.cancel_input(id);
                     if self.pending_approval.as_deref() == Some(id) {
                         self.pending_approval = None;
                         ui(&self.weak, |w| {
@@ -1819,8 +1834,9 @@ impl Controller {
                     !sid.is_empty() && (self.session.as_deref() == Some(sid) || self.stored.as_deref() == Some(sid));
                 let _ = self.browser.send(BrowserCmd::Act { id, params, active });
             }
+            other if self.input_request(&id, other, &params) => {}
             other => {
-                // Not yet implemented in this build (clarify, secret, sudo): decline
+                // Not implemented in this build (tour, window reads, vault logins): decline
                 // explicitly so the agent never hangs waiting. Tracked in docs/PARITY.md.
                 tracing::warn!(method = other, "declining unsupported server request");
                 self.client.respond(

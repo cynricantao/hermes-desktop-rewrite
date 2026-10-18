@@ -34,9 +34,15 @@ palette, fonts, spacing, and software renderer. It is not full Electron Desktop 
   controls the new chat's execution folder.
 - Guarded expensive-model selections display the backend's warning rather than silently
   confirming it. Their confirmation flow remains unbuilt.
-- Attachments, artifacts, scheduled-job UI, clarify/secret/sudo cards, embedded previews,
-  and other unported Electron features are not available. The visible unsupported
-  buttons now explain the limit instead of ignoring clicks.
+- Agent questions now get a card above the composer: clarify (choices, multi-select,
+  free text, Skip question / Skip all) and masked sudo / secret / vault-unlock prompts.
+  **Esc** declines the open card instead of stopping the turn. A question raised in
+  another chat waits there (a banner says so) and reappears when you open that chat,
+  using the open requests `session.resume` returns. Masked values are cleared from the
+  field immediately and never enter the transcript or draft.
+- Attachments, artifacts, scheduled-job UI, embedded previews, and other unported
+  Electron features are not available. The visible unsupported buttons now explain the
+  limit instead of ignoring clicks.
 - Send failures reported by `prompt.submit` restore the typed message and clear the busy
   state. Failed Stop requests display an error. A failure in a background chat must not
   overwrite the current chat's draft or busy state.
