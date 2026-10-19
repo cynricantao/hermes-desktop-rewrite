@@ -161,7 +161,9 @@ pub fn new_idempotency_key() -> String {
 
 /// Refuse a blank idempotency key before sending: the gateway mints a fresh key when the param
 /// is missing or empty, so a retry with `""` would not be de-duplicated (a double charge).
-fn require_idempotency_key(key: &str) -> Result<(), ApiError> {
+/// The async wrappers call this; a caller that sends [`billing_charge_call`] or
+/// [`subscription_upgrade_call`] itself must call it first.
+pub fn require_idempotency_key(key: &str) -> Result<(), ApiError> {
     if key.trim().is_empty() {
         return Err(ApiError::Invalid(
             "idempotency_key must be a non-empty key reused across retries".into(),
@@ -262,6 +264,7 @@ pub struct BillingState {
     /// Preset top-up amounts as wire strings (money-safe), plus their display labels.
     #[serde(deserialize_with = "crate::api::null_default")]
     pub charge_presets: Vec<String>,
+    #[serde(deserialize_with = "crate::api::null_default")]
     pub charge_presets_display: Vec<String>,
     pub min_usd: Option<String>,
     pub max_usd: Option<String>,
@@ -590,7 +593,9 @@ pub async fn billing_auto_reload(
 /// [`billing_charge_status`] says `settled`.
 ///
 /// **Charges money.** Pass a stable `idempotency_key` (e.g. [`new_idempotency_key`]) and reuse it
-/// when retrying, or a timed-out retry can charge twice. Builder + unit test only.
+/// when retrying, or a timed-out retry can charge twice. A blank key is omitted here, so check it
+/// with [`require_idempotency_key`] when not going through [`billing_charge`]. Builder + unit
+/// test only.
 pub fn billing_charge_call(amount_usd: &str, idempotency_key: &str, profile: &str) -> Call {
     call_of(
         "billing.charge",
@@ -763,7 +768,8 @@ pub async fn subscription_resume(client: &Client, profile: &str) -> Result<Subsc
 /// `recovery_url`; only `ok` means the plan changed.
 ///
 /// **Charges money and changes the plan.** Reuse `idempotency_key` on a retry
-/// ([`new_idempotency_key`]). Builder + unit test only.
+/// ([`new_idempotency_key`]); check a caller-supplied key with [`require_idempotency_key`] when
+/// not going through [`subscription_upgrade`]. Builder + unit test only.
 pub fn subscription_upgrade_call(subscription_type_id: &str, idempotency_key: &str, profile: &str) -> Call {
     call_of(
         "subscription.upgrade",

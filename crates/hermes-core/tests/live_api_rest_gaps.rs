@@ -139,7 +139,7 @@ async fn rest_gaps_live() {
             // not enabled" while the platform is off (a configuration state). Any other error
             // (wrong path, body, auth, decode) is a failure.
             let text = e.to_string();
-            let platform_off = text.contains("not enabled");
+            let platform_off = text.contains("HTTP 400") && text.contains("not enabled");
             checks.check(
                 "webhook-create",
                 platform_off,

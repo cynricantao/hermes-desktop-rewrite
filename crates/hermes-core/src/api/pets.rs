@@ -103,6 +103,7 @@ pub struct PetSprite {
     pub loop_ms: Option<i64>,
     pub scale: Option<f64>,
     /// The state-row taxonomy: row index → state name.
+    #[serde(deserialize_with = "crate::api::null_default")]
     pub state_rows: Vec<String>,
 }
 

@@ -48,7 +48,18 @@ async fn display_status_thumbnail_observe() {
 
     // ── display.status: read-only snapshot ──────────────────────────────────────
     let status = display::display_status(&client, "").await;
-    c.ok("display.status", &status);
+    // Summarise rather than print the whole snapshot: the lease carries a viewer id.
+    c.check(
+        "display.status",
+        status.is_ok(),
+        match &status {
+            Ok(s) => format!(
+                "supported={} installed={} running={}",
+                s.supported, s.installed, s.running
+            ),
+            Err(e) => e.to_string(),
+        },
+    );
     let Some(status) = status.ok() else {
         c.finish();
         return;
