@@ -13,12 +13,20 @@
 use hermes_core::Client;
 use hermes_core::http::Rest;
 
+/// Fail unless `HERMES_DESKTOP_PORT` names a port. Discovery ignores an unparsable value and
+/// would fall back to the everyday backend (or spawn one on the real `HERMES_HOME`).
+pub fn require_private_port() -> u16 {
+    std::env::var("HERMES_DESKTOP_PORT")
+        .ok()
+        // No trim: discovery (`backend.rs`) parses the raw value, so " 40361" must fail here too.
+        .and_then(|p| p.parse::<u16>().ok())
+        .filter(|p| *p != 0)
+        .expect("set HERMES_DESKTOP_PORT to a private test backend's port (scripts/live-test-backend.sh)")
+}
+
 /// REST + RPC handles to the backend named by `HERMES_DESKTOP_PORT` (required).
 pub async fn backend() -> (Rest, Client) {
-    assert!(
-        std::env::var_os("HERMES_DESKTOP_PORT").is_some(),
-        "set HERMES_DESKTOP_PORT to a private test backend (scripts/live-test-backend.sh)"
-    );
+    require_private_port();
     let b = hermes_core::backend::discover_or_spawn(None).await.expect("backend");
     let e = &b.endpoint;
     let rest = Rest::new(e.host.clone(), e.port, e.token.clone());

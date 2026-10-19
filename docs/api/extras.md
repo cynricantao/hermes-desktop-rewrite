@@ -70,6 +70,7 @@ is `#[serde(default)]` so older/newer backends never fail to decode.
 |---|---|---|---|
 | Catalog | `mcp_catalog` | `GET /api/mcp/catalog[?profile=]` | Local manifests + diagnostics; entries carry `required_env` rows, transport details, `needs_install`, installed/enabled |
 | Install preset | `mcp_catalog_install` | `POST /api/mcp/catalog/install[?profile=]` `{name, env, enable}` | **Spawns a process / network**; writes declared secrets to `.env` |
+| Server configs | `mcp_servers` | `GET /api/mcp/servers[?profile=]` | Raw per-server config map (the mcp.json editor's source); read-only. Ran live |
 | Replace servers | `mcp_servers_replace` | `PUT /api/mcp/servers[?profile=]` `{servers}` | **Destructive** whole-map replace (mcp.json editor save); omitted servers are deleted |
 | Server list | `mcp_servers_list` | RPC `mcp.servers.list` `{profile?}` | Secrets reduced to env-key names; `source` = config/plugin |
 | Runtime status | `mcp_servers_status` | RPC `mcp.servers.status` `{profile?}` | Cached only — never connects or probes; `checked_at` in ms |

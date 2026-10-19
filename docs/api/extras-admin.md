@@ -97,8 +97,10 @@ provider's model listing.`
 * Profile create / rename / delete / soul and cron create / pause / resume / trigger / delete
   — covered by `capabilities` (REST). The `profiles.create` RPC twin is implemented here for
   API-surface parity (builder + unit tests); the REST path keeps the live coverage.
-* `GET /api/cron/jobs/{id}/runs` (run history) and `POST /api/cron/fire` (NAS gateway
-  webhook) exist but are outside this module's scope.
+* `GET /api/cron/jobs/{id}/runs` (run history: `cron_job_runs`, ran live with an unknown id)
+  and `POST /api/cron/jobs/{id}/trigger` (`cron_job_trigger`, **runs the job now: spends
+  model calls**, builder-only) are wrapped. `POST /api/cron/fire` (NAS gateway webhook) is
+  out of scope.
 * No `GET /api/profiles/{name}/description` (only PUT); no separate avatar route (use
   `set_asset` with `clear`).
 * Memory providers have no list route of their own (`GET /api/memory` lists them —

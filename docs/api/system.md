@@ -13,7 +13,7 @@ spawn trees, wake word, diagnostics and `cli.exec`.
 HERMES_DESKTOP_PORT=37273 cargo test -p hermes-core --test live_api_system -- --ignored --nocapture
 ```
 
-42 endpoints: 15 REST + 27 JSON-RPC.
+46 endpoints: 19 REST + 27 JSON-RPC.
 
 ## REST
 
@@ -34,6 +34,10 @@ HERMES_DESKTOP_PORT=37273 cargo test -p hermes-core --test live_api_system -- --
 | Usage analytics | `usage_analytics` / `usage_analytics_request` | `GET /api/analytics/usage?days&profile` | `days` 1–365; `daily`/`by_model`/`by_task`/`totals` (nullable)/`skills`/`tools`. Read-only SQL. Ran live. |
 | Local media | `media` / `media_request` | `GET /api/media?path` | Base64 `data_url` inside the backend's media roots; 400/403/404/413/415. Ran live as an error-path check only. |
 | Remote media | `media_proxy` / `media_proxy_request` | `GET /api/media/proxy?url` | **Network** (allowlisted image CDNs). Builder-only. |
+| Process liveness | `health` / `health_request` | `GET /api/health` | `{ok, version, displayVersion, commit, auth_required}`; `commit` is the boot commit (the desktop refuses a stale backend). Read-only. Ran live. |
+| WS upgrade ticket | `ws_ticket` / `ws_ticket_request` | `POST /api/auth/ws-ticket` | `{ticket, ttl_seconds}` (30 s, single use). **Reveals a credential** — `WsTicket`'s `Debug` prints only its length. Builder-only. |
+| Shell hooks | `ops_hooks` / `ops_hooks_request` | `GET /api/ops/hooks?profile` | `hooks[]` (event, matcher, command, timeout, allowlist `allowed`/`approved_at`, `executable`) + `valid_events`. Read-only. Ran live. |
+| Prune checkpoints | `checkpoints_prune` / `checkpoints_prune_request` | `POST /api/ops/checkpoints/prune?profile=` | **Destructive** — spawns the `checkpoints-prune` action; poll `action_status`. Profile always named. Builder-only. |
 
 ## JSON-RPC
 

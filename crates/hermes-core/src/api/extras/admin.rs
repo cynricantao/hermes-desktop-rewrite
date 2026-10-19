@@ -1528,3 +1528,125 @@ mod tests {
         assert_eq!(decode::<ProfileCreated>(json!({})).unwrap(), ProfileCreated::default());
     }
 }
+
+// ── Cron run history and manual trigger ───────────────────────────────────────
+
+/// One execution row of `GET /api/cron/jobs/{id}/runs`. Agent runs carry the
+/// session fields; script-only fires carry the output-doc fields, so most are
+/// optional. `is_active` is true for a run that started <300 s ago and has not
+/// ended; `scheduler_owned` says the running scheduler holds the execution.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct CronJobRun {
+    /// Session id (agent run) or output-doc id (script-only fire).
+    pub id: String,
+    pub title: Option<String>,
+    pub status: Option<String>,
+    pub started_at: Option<f64>,
+    pub ended_at: Option<f64>,
+    pub last_active: Option<f64>,
+    pub message_count: Option<u64>,
+    pub cron_job_id: Option<String>,
+    pub cron_execution_id: Option<String>,
+    pub profile: Option<String>,
+    pub is_active: bool,
+    pub scheduler_owned: bool,
+    pub archived: bool,
+}
+
+/// `GET /api/cron/jobs/{id}/runs` reply, newest first. `limit` is the clamped
+/// value the backend actually used (1–100).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct CronJobRuns {
+    pub runs: Vec<CronJobRun>,
+    pub limit: u32,
+}
+
+pub fn cron_job_runs_request(id: &str, profile: &str, limit: u32) -> Request {
+    let limit = limit.to_string();
+    req(
+        Method::Get,
+        with_query(
+            &format!("/api/cron/jobs/{}/runs", seg(id)),
+            &[("limit", &limit), ("profile", profile)],
+        ),
+        None,
+    )
+}
+
+/// Run history for one job: agent sessions plus script-only fires, reconciled
+/// per execution (read-only). Unknown ids answer an empty list.
+pub async fn cron_job_runs(rest: &Rest, id: &str, profile: &str, limit: u32) -> Result<CronJobRuns, ApiError> {
+    send_as(rest, &cron_job_runs_request(id, profile, limit)).await
+}
+
+pub fn cron_job_trigger_request(id: &str, profile: &str) -> Request {
+    req(
+        Method::Post,
+        format!("/api/cron/jobs/{}/trigger{}", seg(id), profile_query(profile)),
+        None,
+    )
+}
+
+/// Run a job now. **Spends model calls and may deliver to a chat platform** —
+/// the backend claims the execution atomically, answers 409 when it is already
+/// running, and returns the refreshed job row. Builder-only.
+pub async fn cron_job_trigger(rest: &Rest, id: &str, profile: &str) -> Result<CronJob, ApiError> {
+    send_as(rest, &cron_job_trigger_request(id, profile)).await
+}
+
+#[cfg(test)]
+mod rest_gap_tests {
+    use super::*;
+    use crate::api::decode;
+
+    #[test]
+    fn cron_runs_and_trigger_builders() {
+        let r = cron_job_runs_request("a b", "", 20);
+        assert_eq!(
+            (r.method, r.path.as_str(), r.body),
+            (Method::Get, "/api/cron/jobs/a%20b/runs?limit=20", None)
+        );
+        assert_eq!(
+            cron_job_runs_request("abc", "swe", 5).path,
+            "/api/cron/jobs/abc/runs?limit=5&profile=swe"
+        );
+        let runs: CronJobRuns = decode(json!({
+            "runs": [
+                {"id": "cron_abc_1", "title": "Nightly", "started_at": 1.0,
+                 "ended_at": null, "last_active": 2.0, "cron_job_id": "abc",
+                 "cron_execution_id": "e1", "profile": "swe", "is_active": true,
+                 "scheduler_owned": true, "archived": false},
+                {"id": "out-2", "title": "script fire", "status": "failed",
+                 "started_at": 0.5, "is_active": false}
+            ],
+            "limit": 20
+        }))
+        .unwrap();
+        assert_eq!(runs.runs.len(), 2);
+        assert!(runs.runs[0].is_active);
+        assert_eq!(runs.runs[1].status.as_deref(), Some("failed"));
+        assert_eq!(runs.limit, 20);
+        assert_eq!(decode::<CronJobRuns>(json!({})).unwrap(), CronJobRuns::default());
+
+        let r = cron_job_trigger_request("abc", "");
+        assert_eq!(
+            (r.method, r.path.as_str(), r.body),
+            (Method::Post, "/api/cron/jobs/abc/trigger", None)
+        );
+        assert_eq!(
+            cron_job_trigger_request("a b", "swe").path,
+            "/api/cron/jobs/a%20b/trigger?profile=swe"
+        );
+        let job: CronJob = decode(json!({
+            "id": "abc", "name": "Nightly", "prompt": "go", "schedule": "0 9 * * *",
+            "schedule_display": "daily 09:00", "enabled": true, "state": "active",
+            "last_run_at": "2026-10-19T03:30:00Z"
+        }))
+        .unwrap();
+        assert_eq!(job.id, "abc");
+        assert!(job.enabled);
+        assert_eq!(decode::<CronJob>(json!({})).unwrap(), CronJob::default());
+    }
+}
