@@ -904,6 +904,43 @@ pub async fn mcp_servers_replace(rest: &Rest, servers: Value, profile: &str) -> 
     send_as(rest, &mcp_servers_replace_request(servers, profile)).await
 }
 
+/// One configured MCP server from `GET /api/mcp/servers`. Secrets are reduced
+/// to redacted previews; `tools: null` means every tool the server exposes.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct McpServerConfigEntry {
+    pub name: String,
+    /// `http` | `stdio` | `unknown`.
+    pub transport: String,
+    pub url: Option<String>,
+    pub command: Option<String>,
+    pub args: Vec<String>,
+    /// Redacted env map (values are previews, never the secret).
+    pub env: Value,
+    pub auth: Option<String>,
+    pub enabled: bool,
+    pub tools: Option<Vec<String>>,
+    /// `config` or `plugin`.
+    pub source: String,
+    pub plugin: Option<String>,
+}
+
+/// `GET /api/mcp/servers` reply.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct McpServerConfigs {
+    pub servers: Vec<McpServerConfigEntry>,
+}
+
+pub fn mcp_servers_request(profile: &str) -> Request {
+    req(Method::Get, format!("/api/mcp/servers{}", profile_query(profile)), None)
+}
+
+/// List the profile's configured MCP servers (read-only; env values redacted).
+pub async fn mcp_servers(rest: &Rest, profile: &str) -> Result<McpServerConfigs, ApiError> {
+    send_as(rest, &mcp_servers_request(profile)).await
+}
+
 // ── MCP: RPCs ─────────────────────────────────────────────────────────────────
 
 /// One configured MCP server; secrets are reduced to env-var key names.
@@ -2253,6 +2290,43 @@ mod tests {
         assert_eq!(
             crate::api::decode::<BrowserManaged>(json!({})).unwrap(),
             BrowserManaged::default()
+        );
+    }
+}
+
+#[cfg(test)]
+mod rest_gap_tests {
+    use super::*;
+    use crate::api::decode;
+
+    #[test]
+    fn mcp_servers_list_builder() {
+        assert_eq!(mcp_servers_request("").path, "/api/mcp/servers");
+        let r = mcp_servers_request("swe");
+        assert_eq!(
+            (r.method, r.path.as_str(), r.body),
+            (Method::Get, "/api/mcp/servers?profile=swe", None)
+        );
+        let list: McpServerConfigs = decode(json!({
+            "servers": [
+                {"name": "fs", "transport": "stdio", "url": null, "command": "npx",
+                 "args": ["-y", "server-fs"], "env": {"TOKEN": "«redacted»"},
+                 "auth": null, "enabled": true, "tools": null, "source": "config",
+                 "plugin": null},
+                {"name": "remote", "transport": "http", "url": "https://mcp.test/sse",
+                 "command": null, "args": [], "env": {}, "auth": "header",
+                 "enabled": false, "tools": ["search"], "source": "plugin", "plugin": "web"}
+            ]
+        }))
+        .unwrap();
+        assert_eq!(list.servers.len(), 2);
+        assert_eq!(list.servers[0].transport, "stdio");
+        assert!(list.servers[0].enabled);
+        assert_eq!(list.servers[1].tools.as_deref(), Some(&["search".to_string()][..]));
+        assert_eq!(list.servers[1].source, "plugin");
+        assert_eq!(
+            decode::<McpServerConfigs>(json!({})).unwrap(),
+            McpServerConfigs::default()
         );
     }
 }
