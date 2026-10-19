@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**75 done · 293 partial · 420 not started · 6 unsupported** (of 794).
+**75 done · 353 partial · 358 not started · 8 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -112,7 +112,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Large-paste collapse to attachment — RPC paste.collapse — src/app/chat/composer/large-paste.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] Drag-and-drop file onto chat — local drop zone — src/app/chat/hooks/use-file-drop-zone.ts
 - [ ] Drag-over affordance overlay — local — src/app/chat/chat-drop-overlay.tsx
-- [ ] Screenshot attach from OS shortcut — local (Electron) + RPC image.attach_bytes — src/app/chat/composer/hooks/use-composer-screenshot.ts
+- [~] Screenshot attach from OS shortcut — local (Electron) + RPC image.attach_bytes — src/app/chat/composer/hooks/use-composer-screenshot.ts ⟶ upload path ready (`attachments`, `image.attach_bytes`); the OS screenshot shortcut itself is not built
 - [~] Inline references (/file, @path) in composer — local + RPC complete.path — src/app/chat/composer/inline-refs.ts, path-refs.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [ ] URL reference chips — local — src/app/chat/composer/url-refs.ts, url-dialog.tsx
 - [x] Model pill (per-composer model switcher) — REST /api/model/set, /api/model/options — src/app/chat/composer/model-pill.tsx ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: mid-session deepseek-v4.1-flash → glm-5.3-flash via `config.set model` (session-scoped); label updates; next reply answered by the new model. Re-verified 2026-10-16 (PR #3): a pick on the **new-chat screen** is kept and sent with `session.create` (`model`/`provider`, as the Electron app does), because `config.set model` answers 4001 without a live session. This was a real bug: the pick was silently ignored. Then switching back mid-session also works
@@ -187,13 +187,13 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Tool generating/in-progress shimmer — WS tool.generating — src/components/chat/status-pending-icon.tsx ⟶ status line shimmer; per-row shimmer on running group
 - [ ] Tool dismiss / collapse — local — src/store/tool-dismiss.ts
 - [ ] Tool drafting (in-progress args) — local — src/store/tool-drafting.ts
-- [ ] Tool activity store + risk surfacing — WS tool.output_risk — src/store/tool-activity.ts
-- [ ] Delegate (subagent) tool card — WS subagent.* — src/components/assistant-ui/tool/delegate.tsx
+- [~] Tool activity store + risk surfacing — WS tool.output_risk — src/store/tool-activity.ts ⟶ backend client ready in `api::events` (`tool.output_risk` payload) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
+- [~] Delegate (subagent) tool card — WS subagent.* — src/components/assistant-ui/tool/delegate.tsx ⟶ backend client ready in `api::events` (`subagent.*` payloads) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [ ] Fallback-model tool card (provider fallback) — local — src/components/assistant-ui/tool/fallback.tsx, fallback-model/*
 - [ ] Skill-activity tool row — local — src/components/assistant-ui/tool/skill-activity.ts
 - [ ] MCP setup tool card — local — src/components/assistant-ui/mcp-setup-tool.tsx
 - [ ] Catalog install tool card — local — src/components/assistant-ui/catalog-install-tool.tsx
-- [ ] Connector tool / directory cards — RPC connectors.* — src/components/assistant-ui/connector-tool.tsx, connector-directory-card.tsx
+- [~] Connector tool / directory cards — RPC connectors.* — src/components/assistant-ui/connector-tool.tsx, connector-directory-card.tsx ⟶ backend client ready in `api::plugins` (`connectors.*`, found by the 2026-10-19 audit) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [ ] Start-chat tool (agent-spawned chat) — RPC session.create — src/components/assistant-ui/start-chat-tool.tsx
 - [ ] Agent delivery status rows — local — src/components/assistant-ui/thread/agent-delivery.tsx
 - [ ] Tool run continuity / collapse duplicate finals — local — src/lib/tool-run-continuity.ts, session/hooks/use-message-stream/collapse-duplicate-final.ts
@@ -205,7 +205,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 ## Approvals / clarify
 
 - [x] Approval request card (dangerous command) — SRV approval — src/components/assistant-ui/tool/approval.tsx ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: `rm -r <scratch dir>` raised the card; Deny → dir kept, agent reports denial; Allow once → dir removed, agent reports success; card closes, no spinner. Needed `client.capabilities {server_requests:true}` (fixed) and `request.cancel` handling (added). Card shows only the choices the backend offers (`choices` / `allow_session` / `allow_permanent`, unit-tested); screenshot docs/screenshots/rs-dark-approval-card.png
-- [ ] Approval activity feed — WS approval.* — src/components/assistant-ui/tool/approval-activity.ts
+- [~] Approval activity feed — WS approval.* — src/components/assistant-ui/tool/approval-activity.ts ⟶ backend client ready in `api::events` (`approval.cancelled`) and `api::sessions` (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [x] Respond to approval (allow/deny/always) — RPC approval.respond / approval.received — src/lib/keybinds/approval-keys.ts ⟶ live 2026-10-16, `tests/live_backend.rs` (14/14) vs private backend: Deny/Allow once by click; **Esc denies** and **Enter (empty composer) allows once**, same keys as approval-keys.ts; **Allow for session** → next `rm -r` in that chat runs with no card, a new chat asks again; **Always allow** → `command_allowlist` written to the private config.yaml, a new chat runs it with no card
 - [ ] Approval mode selector (manual/smart/off) — config approvals.mode (config.set) — src/app/shell/approval-mode-menu.tsx
 - [~] Pending approvals list — RPC approval.pending — src/store/approval-mode.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
@@ -213,13 +213,13 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Clarify choice rows / confirm bar — local — src/components/assistant-ui/clarify/core/choice-row.tsx, confirm-bar.tsx ⟶ choice rows with Recommended tag, multi-select check boxes and Confirm choices; gateway simulation only
 - [ ] Clarify keyboard handlers (1–9, Enter) — local — src/components/assistant-ui/clarify/core/use-clarify-keys.ts
 - [~] Clarify pending/settled states — local — src/components/assistant-ui/clarify/pending.tsx, settled.tsx ⟶ pending card only; no settled transcript row after answering
-- [ ] Setup-clarify (onboarding picks) — SRV setup_choose — src/components/assistant-ui/clarify/setup-pending.tsx, setup-rows.ts
+- [~] Setup-clarify (onboarding picks) — SRV setup_choose — src/components/assistant-ui/clarify/setup-pending.tsx, setup-rows.ts ⟶ the backend now sends SRV `setup_beat` (no `setup_choose` in the contract); params + reply builders in `api::events`, unit-tested only; UI not wired
 - [ ] Undelivered clarify notice — local — src/components/assistant-ui/clarify/undelivered-notice.tsx
 - [~] Restore pending approval/clarify on resume — local — src/app/session/hooks/use-session-actions/restore-pending-approval.ts, restore-pending-clarify.ts ⟶ `session.resume.open_requests` replayed (approval + input prompts), resumes at the first unlocked question; gateway simulation only
 - [~] Secret request (masked value) — SRV secret — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts ⟶ masked card, `{value}` reply, field cleared at once and never echoed; Esc/Skip sends an empty value. Gateway simulation only
 - [~] Sudo request (terminal/display) — SRV sudo, display.install.sudo — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts ⟶ masked card for `sudo` and `display.install.sudo` (and `vault.unlock_prompt`); gateway simulation only
 - [~] Connection request (remote OAuth/pairing) — SRV connection.request, RPC connection.respond — src/store/connection-request.ts ⟶ backend client ready in `api::plugins` (see docs/api/); UI not wired
-- [ ] Free-tier challenge prompt — WS free_tier.challenge — src/store/free-tier-challenge.ts
+- [~] Free-tier challenge prompt — WS free_tier.challenge — src/store/free-tier-challenge.ts ⟶ backend client ready in `api::billing` (`free_tier.challenge` payload) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [~] Clarify lock (single-flight) — RPC clarify.lock — src/store/clarify.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 
 ## Sessions & sidebar
@@ -303,11 +303,11 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Auxiliary (task) model rows — REST /api/model/auxiliary — src/app/settings/aux-task-rows.tsx
 - [ ] MoA (mixture-of-agents) models — REST /api/model/moa — src/app/settings/model-settings.tsx
 - [ ] Fallback models — REST /api/model/options + config fallback_providers — src/app/settings/fallback-models-field.tsx
-- [ ] Recommended default per provider — REST /api/model/recommended-default — src/app/settings/model-settings.tsx
+- [~] Recommended default per provider — REST /api/model/recommended-default — src/app/settings/model-settings.tsx ⟶ backend client ready in `api::models` (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [ ] Provider accounts view (OAuth sign-in) — REST /api/providers/oauth/* — src/app/settings/providers-settings.tsx
 - [~] Provider API keys view — REST /api/env, /api/env/reveal — src/app/settings/keys-settings.tsx, env-credentials.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
-- [ ] Custom endpoints (OpenAI/Anthropic-compatible) — REST /api/providers/custom-endpoints — src/app/settings/custom-endpoints-settings.tsx
-- [ ] Validate provider/endpoint — REST /api/providers/validate, /api/providers/custom-endpoints/validate — src/app/settings/helpers.ts
+- [~] Custom endpoints (OpenAI/Anthropic-compatible) — REST /api/providers/custom-endpoints — src/app/settings/custom-endpoints-settings.tsx ⟶ Settings › Providers widget calls the routes (hermes-ui `widgets/providers.rs`); typed client in `api::models`; not live-verified
+- [~] Validate provider/endpoint — REST /api/providers/validate, /api/providers/custom-endpoints/validate — src/app/settings/helpers.ts ⟶ backend client ready in `api::models` (builder + unit test only: contacts the provider with a key); UI not wired
 - [x] Favorite models — local — src/store/favorite-models.ts ⟶ the star on every picker row pins the model into a Favorites section above the provider groups (star order preserved, section off while searching); stored in `prefs.json` (`hermes.desktop.favorite-models`). Verified by the live `models` section (2026-10-17).
 - [x] Model visibility (hide models) — local — src/store/model-visibility.ts, src/app/model-visibility-overlay.tsx ⟶ "Edit models…" opens the tick dialog: per-model ticks, a provider master tick (indeterminate when partial), fold state, add/forget custom ids and "Reset to defaults" — stored in `prefs.json` (`hermes.desktop.visible-models` / `-known-models`), never in backend config. Verified by the live `models` section (2026-10-17).
 - [~] Model picker overlay (⌘⇧M) — REST /api/model/options — src/app/model-picker-overlay.tsx ⟶ the composer's model chip opens the curated catalog menu (`model.options`, every provider the backend reports, search, favourites) and a pick switches the model. No global ⌘⇧M overlay and no MoA/pricing rows.
@@ -317,15 +317,15 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Per-profile model assignment — local — src/store/model-assignment.ts
 - [ ] Model menu (titlebar model switcher) — local — src/app/shell/model-menu-panel.tsx, use-model-menu-controller.ts
 - [~] Model catalog menu — local — src/app/shell/model-catalog-menu.tsx ⟶ search (case/separator folding), provider groups with fold state, Favorites section, footer (Refresh models / Add custom model… / Edit models…) are built and live-verified; MoA presets, pricing/usage rows, per-model reasoning/fast submenus and "Use Settings default" are not.
-- [ ] Disconnect a model/provider — RPC model.disconnect — src/hermes.ts
+- [~] Disconnect a model/provider — RPC model.disconnect — src/hermes.ts ⟶ backend client ready in `api::models` (builder + unit test only: removes credentials); UI not wired
 - [ ] Provider wait (in-flight model selection) — local — src/store/provider-wait.ts
 - [~] Guarded model switch (warn mid-turn) — local — src/lib/guarded-model-switch.ts ⟶ deferred model changes and backend confirmation warnings are surfaced. Expensive-model confirmation UI remains unbuilt; no automatic confirmation.
-- [ ] Local models (hardware/runtime/download) — REST /api/local-models/* — src/app/settings/local-models-settings.tsx
-- [ ] Local model quickstart — REST /api/local-models/quickstart — src/app/settings/local-models-quickstart.tsx
-- [ ] Local model runtime install — REST /api/local-models/runtime/install — src/app/settings/local-models-runtime-section.tsx
-- [ ] Local model download/pause/resume — REST /api/local-models/download, jobs — src/app/settings/local-model-download-progress.tsx
-- [ ] Local model activate/eject — REST /api/local-models/activate, /eject — src/app/settings/local-models-actions.ts
-- [ ] Local model search + sideload (HF) — REST /api/local-models/search, /sideload — src/app/settings/local-models-browse.tsx
+- [~] Local models (hardware/runtime/download) — REST /api/local-models/* — src/app/settings/local-models-settings.tsx ⟶ status/hardware/server/activate/eject wired in hermes-ui `widgets/providers.rs`; full typed client in `api::models`; not live-verified
+- [~] Local model quickstart — REST /api/local-models/quickstart — src/app/settings/local-models-quickstart.tsx ⟶ backend client ready in `api::models` (builder + unit test only: downloads + installs); UI not wired
+- [~] Local model runtime install — REST /api/local-models/runtime/install — src/app/settings/local-models-runtime-section.tsx ⟶ backend client ready in `api::models` (builder + unit test only: installs a runtime); UI not wired
+- [~] Local model download/pause/resume — REST /api/local-models/download, jobs — src/app/settings/local-model-download-progress.tsx ⟶ backend client ready in `api::models` (builder + unit test only: network download); UI not wired
+- [~] Local model activate/eject — REST /api/local-models/activate, /eject — src/app/settings/local-models-actions.ts ⟶ wired in hermes-ui `widgets/providers.rs`; typed client in `api::models` (builder-only: starts/stops a local server); not live-verified
+- [~] Local model search + sideload (HF) — REST /api/local-models/search, /sideload — src/app/settings/local-models-browse.tsx ⟶ backend client ready in `api::models` (builder + unit test only: Hugging Face network); UI not wired
 - [ ] Local models feature flag — local — src/store/local-models-flag.ts
 - [ ] Service tier / API retries / max turns — config agent.* — src/app/settings/constants.ts
 
@@ -378,10 +378,10 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [x] Toolsets list — REST /api/tools/toolsets — src/app/capabilities/toolsets/toolsets-tab.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): Capabilities › Tools lists toolsets with tool counts / needs-setup badge
 - [~] Toolset detail — REST /api/tools/toolsets/{name} — src/app/capabilities/toolsets/toolset-detail.tsx ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
 - [x] Toggle toolset enabled — REST /api/tools/toolsets/{name} (POST) — src/app/capabilities/toolsets/toolsets-data.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): `terminal` off/on read back from GET /api/tools/toolsets; a post-setup install start is surfaced as a notice (not exercised: test avoids install toolsets)
-- [ ] Toolset config — REST /api/tools/toolsets/{name}/config — src/app/settings/toolset-config-panel.tsx
-- [ ] Toolset model/provider selection — REST /api/tools/toolsets/{name}/model, /provider — src/app/settings/toolset-config-panel.tsx
+- [~] Toolset config — REST /api/tools/toolsets/{name}/config — src/app/settings/toolset-config-panel.tsx ⟶ backend client ready in `api::extras` (found by the 2026-10-19 audit) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
+- [~] Toolset model/provider selection — REST /api/tools/toolsets/{name}/model, /provider — src/app/settings/toolset-config-panel.tsx ⟶ backend client ready in `api::extras` (found by the 2026-10-19 audit) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [~] Toolset model list — REST /api/tools/toolsets/{name}/models — src/app/settings/toolset-config-panel.tsx ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
-- [ ] Toolset post-setup — REST /api/tools/toolsets/{name}/post-setup — src/app/settings/toolset-config-panel.tsx
+- [~] Toolset post-setup — REST /api/tools/toolsets/{name}/post-setup — src/app/settings/toolset-config-panel.tsx ⟶ backend client ready in `api::extras` (builder + unit test only: may install/spawn); UI not wired
 - [ ] Tool calls view (per-toolset) — local — src/app/capabilities/toolsets/tool-calls.ts
 - [~] Tools list (agent tools) — RPC tools.list — src/hermes.ts ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
 - [~] Configure tools — RPC tools.configure — src/hermes.ts ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
@@ -400,12 +400,12 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 - [x] MCP servers list — REST /api/mcp/servers + RPC mcp.servers.list — src/app/capabilities/mcp/use-mcp-servers.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): REST /api/mcp/servers; plugin-provided servers shown read-only
 - [x] Add MCP server — REST /api/mcp/servers (POST) + RPC mcp.servers.add — src/app/capabilities/mcp/mcp-editor.tsx ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): stdio add saved as command `echo` args [live-test] (whitespace split, no shell); http(s) URL form unit-tested only
-- [ ] Edit MCP server — REST /api/mcp/servers/{name} — src/app/capabilities/mcp/mcp-editor.tsx
+- [~] Edit MCP server — REST /api/mcp/servers/{name} — src/app/capabilities/mcp/mcp-editor.tsx ⟶ the backend has no per-server route; editing is `PUT /api/mcp/servers` (`api::extras::mcp_servers_replace`) with `mcp_servers` for the current map; UI not wired
 - [x] Remove MCP server — RPC mcp.servers.remove — src/app/capabilities/mcp/use-mcp-servers.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): two-click Remove → backend read-back gone
 - [x] Enable/disable MCP server — REST /api/mcp/servers/{name}/enabled — src/app/capabilities/mcp/use-mcp-servers.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): switch → GET enabled=false
 - [~] Test MCP server — REST /api/mcp/servers/{name}/test + RPC mcp.servers.test — src/app/capabilities/mcp/use-mcp-servers.ts ⟶ implemented (POST …/test, 60 s timeout, runs off the chat loop) but not run live: it spawns/connects the server
 - [~] MCP server status/health — RPC mcp.servers.status — src/store/mcp-health.ts ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
-- [ ] MCP OAuth start/poll/callback/cancel — RPC mcp.servers.oauth.* — src/lib/mcp-dashboard-oauth.ts
+- [~] MCP OAuth start/poll/callback/cancel — RPC mcp.servers.oauth.* — src/lib/mcp-dashboard-oauth.ts ⟶ backend client ready in `api::extras` (builder + unit test only: network sign-in; found by the 2026-10-19 audit); UI not wired
 - [~] MCP API key — RPC mcp.servers.set_api_key — src/hermes.ts ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
 - [~] MCP catalog (Nous-approved) — RPC mcp.catalog, REST /api/mcp/catalog — src/app/capabilities/mcp/install-catalog-entry.ts ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
 - [~] Install MCP from catalog — REST /api/mcp/catalog/install — src/app/capabilities/mcp/install-catalog-entry.ts ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
@@ -465,16 +465,16 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 - [~] Messaging platforms list — REST /api/messaging/platforms — src/app/messaging/index.tsx ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
 - [~] Platform detail/config — REST /api/messaging/platforms/{id} — src/app/messaging/index.tsx ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
-- [ ] Test a platform — REST /api/messaging/platforms/{id}/test — src/app/messaging/index.tsx
+- [~] Test a platform — REST /api/messaging/platforms/{id}/test — src/app/messaging/index.tsx ⟶ backend client ready in `api::messaging` (found by the 2026-10-19 audit) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [~] Telegram QR onboarding — REST /api/messaging/telegram/onboarding/* — src/app/messaging/telegram-qr-setup.tsx ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
 - [~] Pairing status — REST /api/pairing — src/api/messaging.ts ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
 - [~] Approve pairing — REST /api/pairing/approve — src/api/messaging.ts ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
 - [~] Revoke pairing — REST /api/pairing/revoke — src/api/messaging.ts ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
 - [ ] Allowlist field (per-platform users) — local — src/app/messaging/allowlist-field.tsx
-- [ ] Bot relay (outbox/reply/roster) — RPC bot_relay.* — src/plugins/hermes-bots/*
-- [ ] Platform changed events — WS platforms.changed / pairing.changed — src/store/notifications.ts
+- [~] Bot relay (outbox/reply/roster) — RPC bot_relay.* — src/plugins/hermes-bots/* ⟶ backend client ready in `api::groups` (builder + unit test only: delivers to other profiles/platforms); UI not wired
+- [~] Platform changed events — WS platforms.changed / pairing.changed — src/store/notifications.ts ⟶ backend client ready in `api::events` (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [ ] Bot/group chat scope — local — src/store/bot-chat-scope.ts
-- [ ] Group chat orchestration — RPC groups.* — src/plugins/hermes-bots/group-turns.ts
+- [~] Group chat orchestration — RPC groups.* — src/plugins/hermes-bots/group-turns.ts ⟶ backend client ready in `api::groups` (list/capabilities/state/log live-verified; create/send/approve builder-only: spends model calls); UI not wired
 
 ## Scheduled / cron
 
@@ -483,13 +483,13 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [x] Delete cron job — REST /api/cron/jobs/{id} (DELETE) — src/store/cron.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): two-click Delete → backend read-back gone
 - [x] Pause/resume cron job — REST /api/cron/jobs/{id}/pause|resume — src/app/cron/cron-actions.ts ⟶ live 2026-10-17, `tests/live_backend.rs` `capabilities` section vs private backend (pointer clicks + independent REST read-back): switch → state paused, then scheduled
 - [~] Trigger cron job now — REST /api/cron/jobs/{id}/trigger — src/app/cron/cron-actions.ts ⟶ Run now implemented behind a confirm click (30 min timeout, off the chat loop); live test checks only that one click runs nothing (last_run_at null) — a real run spends model calls
-- [ ] Cron runs history — REST /api/cron/jobs/{id}/runs — src/app/cron/job-state.ts
+- [~] Cron runs history — REST /api/cron/jobs/{id}/runs — src/app/cron/job-state.ts ⟶ backend client ready in `api::extras::admin` (`cron_job_runs`) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [~] Cron delivery targets — REST /api/cron/delivery-targets — src/api/cron.ts ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
 - [~] Cron blueprints — REST /api/cron/blueprints — src/app/cron/blueprints.tsx ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
 - [~] Instantiate blueprint — REST /api/cron/blueprints/instantiate — src/app/cron/blueprints.tsx ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
 - [~] Cron jobs section in sidebar — local — src/app/chat/sidebar/cron-jobs-section.tsx ⟶ sidebar Scheduled opens the Scheduled tab (verified live); jobs are not listed inline in the sidebar
 - [ ] Open cron run in chat — local — src/app/cron/open-cron-run.ts
-- [ ] Cron changed event — WS cron.changed — src/store/cron.ts
+- [~] Cron changed event — WS cron.changed — src/store/cron.ts ⟶ backend client ready in `api::events` (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 
 ## Artifacts / preview
 
@@ -527,8 +527,8 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Review churn bar (additions/deletions) — local — src/app/right-sidebar/review/churn-bar.tsx
 - [ ] Review scope row (staged/unstaged/PR) — local — src/app/right-sidebar/review/scope-row.tsx
 - [ ] Review ship bar (commit/push actions) — local (Electron git-ipc) — src/app/right-sidebar/review/ship-bar.tsx
-- [ ] Review summary (agent-produced) — WS review.summary — src/store/review.ts
-- [ ] Pull-requests list — REST /api/profiles/sessions/pull-requests — src/store/pull-requests.ts
+- [~] Review summary (agent-produced) — WS review.summary — src/store/review.ts ⟶ backend client ready in `api::events` (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
+- [~] Pull-requests list — REST /api/profiles/sessions/pull-requests — src/store/pull-requests.ts ⟶ backend client ready in `api::workspace` (builder + unit test only: reads every profile's sessions); UI not wired
 - [~] GitHub auth probe — REST /api/git/gh-auth — src/store/suggestion-providers/github.ts ⟶ backend client ready in `api::workspace` (live-verified calls listed in docs/api/workspace.md); UI not wired
 - [ ] Terminal pane (persistent PTY) — local (Electron terminal-ipc) — src/app/right-sidebar/terminal/instance.tsx
 - [ ] Terminal tabs rail — local — src/app/right-sidebar/terminal/rail.tsx
@@ -540,7 +540,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Terminal backend warning — local — src/store/terminal-backend-warning.ts
 - [ ] Terminal toggle (⌃`) / new (⌃⇧`) / next/prev / close hotkeys — local — src/lib/keybinds/actions.ts
 - [ ] Review toggle (⌘G) / files hotkey — local — src/lib/keybinds/actions.ts
-- [ ] Terminal read (agent reads visible buffer) — SRV terminal.read — src/app/session/hooks/*
+- [~] Terminal read (agent reads visible buffer) — SRV terminal.read — src/app/session/hooks/* ⟶ SRV `terminal.read` params + reply builders in `api::events` (unit-tested); the pane buffer read and the reply wiring are not built
 
 ## Voice
 
@@ -551,7 +551,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Dictation hotkey (unbound) — local — src/lib/keybinds/actions.ts (composer.dictate)
 - [ ] Speech-to-text enable — config stt.enabled — src/app/settings/constants.ts
 - [ ] STT provider select — config stt.provider — src/app/settings/constants.ts
-- [ ] STT streaming (live transcript) — config stt.streaming + WS voice.partial — src/app/settings/constants.ts
+- [~] STT streaming (live transcript) — config stt.streaming + WS voice.partial — src/app/settings/constants.ts ⟶ backend client ready in `api::events` (`voice.partial`/`voice.transcript`) and `api::voice` (socket wire format) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [ ] STT echo transcripts — config stt.echo_transcripts — src/app/settings/constants.ts
 - [ ] Local STT model/language — config stt.local.* — src/app/settings/constants.ts
 - [ ] Provider STT models (OpenAI/Groq/Mistral/xAI/DeepInfra/ElevenLabs) — config stt.* — src/app/settings/constants.ts
@@ -561,7 +561,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Read responses aloud — config voice.auto_tts — src/app/settings/constants.ts
 - [~] Voice playback + queue — local + REST /api/audio/speak — src/lib/voice-playback.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
 - [ ] Voice stream (live PCM sibling WS) — local WS /api/voice — src/lib/voice-stream.ts
-- [ ] Voice barge-in / interrupted — WS voice.interrupted — src/lib/voice-barge-in.ts
+- [~] Voice barge-in / interrupted — WS voice.interrupted — src/lib/voice-barge-in.ts ⟶ backend client ready in `api::events` (`voice.interrupted`) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [~] Wake word (always-listening) — RPC wake.start|stop|status|feed|pause|resume — src/store/wake-word.ts ⟶ backend client ready in `api::system` (see docs/api/); UI not wired
 - [ ] Wake indicator window — local (Electron wake-indicator) — src/app/wake-indicator/wake-indicator-app.tsx
 - [~] TTS lease (warm engine) — REST /api/audio/tts-lease — src/lib/tts-lease.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
@@ -901,7 +901,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
   ⟶ no row in the settings registry yet (re-audited 2026-10-17)
 - [ ] Quick entry shortcut — local (Electron) — src/app/settings/quick-entry-settings.tsx
   ⟶ no row in the settings registry yet (re-audited 2026-10-17)
-- [ ] Reset onboarding (developer) — local + RPC onboarding.reset_setup_profile — src/app/settings/developer-settings.tsx
+- [-] Reset onboarding (developer) — local + RPC onboarding.reset_setup_profile — src/app/settings/developer-settings.tsx ⟶ no `onboarding.reset_setup_profile` in the current gateway contract or desktop (checked hermes-agent 8f5693af418)
   ⟶ no row in the settings registry yet (re-audited 2026-10-17)
 
 ## Settings — Gateway / Connections page
@@ -1000,11 +1000,11 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 - [~] Billing overview (plan/credits) — RPC billing.state — src/app/settings/billing/index.tsx
   ⟶ `billing.overview` is read-only and reads what the REST API has: account/plan state from GET /api/portal (incl. the feature list and the portal/subscription URLs) and usage totals from GET /api/analytics/usage — widgets live test: 30-day window, token/cost/session totals (docs/screenshots/rs-widget-billing-overview.png); the credit purchase/charge RPCs are not part of this client
-- [ ] Plans view (upgrade/change) — RPC subscription.* — src/app/settings/billing/plans-view.tsx
-- [ ] Auto-reload credits — RPC billing.auto_reload — src/app/settings/billing/auto-reload-row.tsx
-- [ ] Charge / charge status — RPC billing.charge, billing.charge_status — src/app/settings/billing/use-charge-poller.ts
-- [ ] Step-up verification — RPC billing.step_up — src/app/settings/billing/use-step-up.ts
-- [ ] Subscription change/preview/resume/upgrade — RPC subscription.change|preview|resume|upgrade — src/app/settings/billing/use-subscription-change.ts
+- [~] Plans view (upgrade/change) — RPC subscription.* — src/app/settings/billing/plans-view.tsx ⟶ backend client ready in `api::billing` (builder + unit test only: changes the plan / charges money); UI not wired
+- [~] Auto-reload credits — RPC billing.auto_reload — src/app/settings/billing/auto-reload-row.tsx ⟶ backend client ready in `api::billing` (builder + unit test only: charges money); UI not wired
+- [~] Charge / charge status — RPC billing.charge, billing.charge_status — src/app/settings/billing/use-charge-poller.ts ⟶ backend client ready in `api::billing` (builder + unit test only: charges money); UI not wired
+- [~] Step-up verification — RPC billing.step_up — src/app/settings/billing/use-step-up.ts ⟶ backend client ready in `api::billing` (builder + unit test only: portal device flow); UI not wired
+- [~] Subscription change/preview/resume/upgrade — RPC subscription.change|preview|resume|upgrade — src/app/settings/billing/use-subscription-change.ts ⟶ backend client ready in `api::billing` (builder + unit test only: changes the plan / charges money); UI not wired
 
 ## Settings — About page
 
@@ -1021,7 +1021,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 - [ ] Built-in themes (light/dark/system) — local — src/themes/*
 - [ ] Theme marketplace (browse themes) — local — src/app/command-palette/marketplace-theme-page.tsx
-- [ ] Skin changed event (gateway-driven skin) — WS skin.changed — src/store/notifications.ts
+- [~] Skin changed event (gateway-driven skin) — WS skin.changed — src/store/notifications.ts ⟶ backend client ready in `api::events` (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [ ] Local skin override — local (Electron local-skin) — electron/local-skin.ts
 - [ ] Translucency / glass effects — local (Electron translucency) — src/store/translucency.ts
 - [ ] Backdrop blur — local — src/store/backdrop.ts
@@ -1040,9 +1040,9 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Native OS notifications — local (Electron notification-ipc) — src/store/native-notifications.ts ⟶ rules in `hermes-core::notify` (kinds, settings defaults, when to toast / notify, copy, throttling; 36 unit tests); not delivered to the OS or shown yet
 - [ ] Notification click actions — local (Electron notification-actions) — electron/notification-actions.ts
 - [ ] Notification registry (native) — local (Electron) — electron/notification-registry.ts
-- [ ] Agent notices (in-chat notice rows) — WS notice — src/store/agent-notices.ts
-- [ ] Notification clearing — WS notification.clear — src/store/notifications.ts
-- [ ] Tip popups — WS tip.show — src/store/tips.ts, src/components/tips/*
+- [~] Agent notices (in-chat notice rows) — WS notice — src/store/agent-notices.ts ⟶ backend client ready in `api::sessions` (`notice`, found by the 2026-10-19 audit) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
+- [~] Notification clearing — WS notification.clear — src/store/notifications.ts ⟶ backend client ready in `api::events` (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
+- [~] Tip popups — WS tip.show — src/store/tips.ts, src/components/tips/* ⟶ backend client ready in `api::events` (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [ ] Completion sound — local — src/lib/completion-sound.ts
 - [ ] Notifications settings page — local — src/app/settings/notifications-settings.tsx
 
@@ -1074,13 +1074,13 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] HUD game overlay — local (Electron) — src/app/hud/game-overlay.ts, electron/hud-game-overlay.ts
 - [ ] Quick Entry mini composer (global shortcut) — local (Electron) (platform) — src/app/quick-entry/quick-entry-app.tsx
 - [ ] Quick Entry default shortcut (⌘⇧Space) — local — src/store/quick-entry.ts
-- [ ] Pet overlay (desktop companion) — RPC pet.info, pet.select + local — src/app/pet-overlay/pet-overlay-app.tsx
+- [~] Pet overlay (desktop companion) — RPC pet.info, pet.select + local — src/app/pet-overlay/pet-overlay-app.tsx ⟶ backend client ready in `api::pets` (`pet.info`/`pet.cells` live-verified) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [ ] Pet roam / roam behavior — local — src/components/pet/use-pet-roam.ts, roam-behavior.ts
-- [ ] Pet hatch from egg — RPC pet.hatch — src/components/pet/pet-egg-hatch.tsx
-- [ ] Pet gallery — RPC pet.gallery — src/app/pet-generate/pet-generate-content.tsx
-- [ ] Pet generation (AI) — RPC pet.generate, pet.generate.status — src/store/pet-generate.ts
-- [ ] Pet scale / rename / remove — RPC pet.scale|rename|remove — src/store/pet-generate.ts
-- [ ] Pet info bubbles / reactions — RPC pet.info — src/components/pet/pet-bubble.tsx
+- [~] Pet hatch from egg — RPC pet.hatch — src/components/pet/pet-egg-hatch.tsx ⟶ backend client ready in `api::pets` (builder + unit test only: spends model calls); UI not wired
+- [~] Pet gallery — RPC pet.gallery — src/app/pet-generate/pet-generate-content.tsx ⟶ backend client ready in `api::pets` (builder + unit test only: fetches the remote Petdex manifest); UI not wired
+- [~] Pet generation (AI) — RPC pet.generate, pet.generate.status — src/store/pet-generate.ts ⟶ backend client ready in `api::pets` (builder + unit test only: spends model calls); UI not wired
+- [~] Pet scale / rename / remove — RPC pet.scale|rename|remove — src/store/pet-generate.ts ⟶ backend client ready in `api::pets` (builder + unit test only: changes or deletes the user's pet); UI not wired
+- [~] Pet info bubbles / reactions — RPC pet.info — src/components/pet/pet-bubble.tsx ⟶ backend client ready in `api::pets` (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [ ] Pet zoom gesture / star shower — local — src/components/pet/use-pet-zoom-gesture.ts, pet-star-shower.tsx
 - [ ] Wake indicator window (always-listening cue) — local (Electron) — src/app/wake-indicator/wake-indicator-app.tsx
 - [ ] Solve-in-page challenge window (free-tier captcha) — local (Electron) — electron/challenge-window.ts
@@ -1093,20 +1093,20 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] First-run setup gate (local install vs connect) — local (Electron) — src/components/onboarding/*, electron/first-run-setup-gate.ts
 - [ ] Bootstrap runner (provision bundled/source runtime) — local (Electron) (platform) — electron/bootstrap-runner.ts
 - [~] Onboarding state — RPC onboarding.state, onboarding.mark_seen — src/store/onboarding.ts ⟶ backend client ready in `api::system` (see docs/api/); UI not wired
-- [ ] Ensure setup profile/session — RPC onboarding.ensure_setup_profile|ensure_setup_session — src/app/contrib/onboarding-kickoff.ts
+- [-] Ensure setup profile/session — RPC onboarding.ensure_setup_profile|ensure_setup_session — src/app/contrib/onboarding-kickoff.ts ⟶ no `onboarding.ensure_setup_*` in the current gateway contract or desktop (checked hermes-agent 8f5693af418); `onboarding.state/start/skip/set_run` are in `api::system`/`api::billing`
 - [ ] Onboarding chat (setup assistant) — local + RPC — src/components/onboarding-chat/gate.tsx
-- [ ] Provider OAuth sign-in — REST /api/providers/oauth/* — src/store/onboarding.ts
+- [~] Provider OAuth sign-in — REST /api/providers/oauth/* — src/store/onboarding.ts ⟶ Settings › Providers widget drives the routes (hermes-ui `widgets/providers.rs`, accounts list live-verified by the `widgets` section); typed client in `api::models`; sign-in itself not live-verified (network)
 - [ ] Native OAuth window — local (Electron) (platform) — electron/native-oauth.ts, electron/native-oauth-login.ts
-- [ ] Free-tier offer / provision — RPC free_tier.provision, free_tier.status — src/store/free-tier.ts
-- [ ] Free-tier sign-in — RPC free_tier.claim_nudge — src/store/free-tier-sign-in.ts
-- [ ] Free-tier challenge — WS free_tier.challenge + RPC free_tier.challenge_result — src/store/free-tier-challenge.ts
-- [ ] Model confirmation step — REST /api/model/set, /api/providers/validate — src/store/onboarding.ts
+- [~] Free-tier offer / provision — RPC free_tier.provision, free_tier.status — src/store/free-tier.ts ⟶ backend client ready in `api::billing` (builder + unit test only: Nous portal network); UI not wired
+- [~] Free-tier sign-in — RPC free_tier.claim_nudge — src/store/free-tier-sign-in.ts ⟶ backend client ready in `api::billing` (builder + unit test only: one-shot local write); UI not wired
+- [~] Free-tier challenge — WS free_tier.challenge + RPC free_tier.challenge_result — src/store/free-tier-challenge.ts ⟶ backend client ready in `api::billing` (builder + unit test only: one-shot local write); UI not wired
+- [~] Model confirmation step — REST /api/model/set, /api/providers/validate — src/store/onboarding.ts ⟶ backend client ready in `api::models` (builder + unit test only: writes the model config / contacts the provider); UI not wired
 - [~] Setup runtime check — RPC setup.runtime_check, setup.status — src/plugins/hermes-bots/create-dialog.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [ ] Billing gate (credit exhausted block) — local — src/store/billing-block.ts
-- [ ] Billing state + plans — RPC billing.state, subscription.* — src/app/settings/billing/use-billing-state.ts
+- [~] Billing state + plans — RPC billing.state, subscription.* — src/app/settings/billing/use-billing-state.ts ⟶ backend client ready in `api::billing` (builder + unit test only: Nous portal network); UI not wired
 - [ ] Cloud team change — local — src/app/settings/cloud-team-change.ts
 - [ ] Intro splash / first-run product tour — local — src/lib/tour/*, src/app/chat/built-in-tour.ts
-- [ ] Onboarding kill/skip metrics — RPC shared_metrics.desktop_onboarding — src/app/contrib/hooks/desktop-onboarding-metrics.ts
+- [~] Onboarding kill/skip metrics — RPC shared_metrics.desktop_onboarding — src/app/contrib/hooks/desktop-onboarding-metrics.ts ⟶ backend client ready in `api::metrics` (builder + unit test only: records telemetry); UI not wired
 
 ## Remote connections
 
@@ -1136,7 +1136,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Webhooks list — REST /api/webhooks — src/app/webhooks/index.tsx ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
 - [~] Enable webhook — REST /api/webhooks/enable — src/api/messaging.ts ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
 - [~] Delete webhook — REST /api/webhooks/{name} (DELETE) — src/app/webhooks/index.tsx ⟶ backend client ready in `api::messaging` (live-verified calls listed in docs/api/messaging.md); UI not wired
-- [ ] Webhook enabled toggle — REST /api/webhooks/{name}/enabled — src/api/messaging.ts
+- [~] Webhook enabled toggle — REST /api/webhooks/{name}/enabled — src/api/messaging.ts ⟶ backend client ready in `api::messaging` (found by the 2026-10-19 audit; success path not live: the test backend has the webhook platform off) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [~] Session import (foreign agent sessions) — RPC session.foreign.list|preview|import — src/app/session-import/index.tsx, src/app/session-import/api.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [~] Subagents list — RPC subagent.list — src/store/subagents.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [~] Subagent tail — RPC subagent.tail — src/store/subagents.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
@@ -1153,11 +1153,11 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Starmap share code + controls — local — src/app/starmap/share-code.ts, src/app/starmap/share-controls.tsx
 - [~] Command center (command dispatch console) — RPC command.dispatch, command.resolve — src/app/command-center/index.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [~] Command center maintenance (doctor/audit/backup) — REST /api/ops/* — src/app/command-center/maintenance.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
-- [ ] Desktop telemetry (feature use/daily) — RPC shared_metrics.* — src/store/desktop-metrics.ts
-- [ ] Startup latency reporting — RPC shared_metrics.startup_latency — src/app/gateway/report-startup-latency.ts
-- [ ] Friction/dislike reporting — RPC shared_metrics.desktop_friction|desktop_dislike — src/store/shared-metrics.ts
+- [~] Desktop telemetry (feature use/daily) — RPC shared_metrics.* — src/store/desktop-metrics.ts ⟶ backend client ready in `api::metrics` (builder + unit test only: records telemetry); UI not wired
+- [~] Startup latency reporting — RPC shared_metrics.startup_latency — src/app/gateway/report-startup-latency.ts ⟶ backend client ready in `api::metrics` (builder + unit test only: records telemetry); UI not wired
+- [~] Friction/dislike reporting — RPC shared_metrics.desktop_friction|desktop_dislike — src/store/shared-metrics.ts ⟶ backend client ready in `api::metrics` (builder + unit test only: records telemetry); UI not wired
 - [~] Diagnostics share (Nous) — RPC diagnostics.share_nous — src/store/send-diagnostics.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
-- [ ] i18n backend language packs — RPC i18n.languages, i18n.catalog — src/i18n/backend-packs.ts
+- [~] i18n backend language packs — RPC i18n.languages, i18n.catalog — src/i18n/backend-packs.ts ⟶ backend client ready in `api::system` (found by the 2026-10-19 audit) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [x] Slash command catalog (desktop) — local registry — src/lib/desktop-slash-commands.ts, src/lib/desktop-slash-registry.json ⟶ `/help`/`/commands` consume commands.catalog rather than copying registry data. Live 2026-10-18 commands subset checks every advertised entry against rendered notice text. This is a text catalog, not the still-unbuilt command-palette/command-center overlay.
 - [ ] Electron preload bridge (native API surface) — local (Electron) — electron/preload.ts
 - [ ] CDP / dev inspector — local (Electron) (platform) — electron/dev-cdp.ts
