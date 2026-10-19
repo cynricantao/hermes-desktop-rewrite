@@ -18,7 +18,8 @@ use hermes_core::http::Rest;
 pub fn require_private_port() -> u16 {
     std::env::var("HERMES_DESKTOP_PORT")
         .ok()
-        .and_then(|p| p.trim().parse::<u16>().ok())
+        // No trim: discovery (`backend.rs`) parses the raw value, so " 40361" must fail here too.
+        .and_then(|p| p.parse::<u16>().ok())
         .filter(|p| *p != 0)
         .expect("set HERMES_DESKTOP_PORT to a private test backend's port (scripts/live-test-backend.sh)")
 }

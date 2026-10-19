@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**75 done · 353 partial · 358 not started · 8 unsupported** (of 794).
+**76 done · 357 partial · 353 not started · 8 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -298,13 +298,13 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Models & providers
 
-- [ ] Main model selector / settings — REST /api/model/set, /api/model/options, /api/model/info — src/app/settings/model-settings.tsx
+- [x] Main model selector / settings — REST /api/model/set, /api/model/options, /api/model/info — src/app/settings/model-settings.tsx ⟶ Settings › Model › Main (hermes-ui `widgets/models.rs`) lists providers/models and sets the default through /api/model/set; verified by the live `widgets` section of tests/live_backend.rs vs the private backend (2026-10-19), read back via /api/model/options. Typed client also in `api::models`
 - [ ] Model context-length override — config model_context_length — src/app/settings/constants.ts
-- [ ] Auxiliary (task) model rows — REST /api/model/auxiliary — src/app/settings/aux-task-rows.tsx
-- [ ] MoA (mixture-of-agents) models — REST /api/model/moa — src/app/settings/model-settings.tsx
-- [ ] Fallback models — REST /api/model/options + config fallback_providers — src/app/settings/fallback-models-field.tsx
+- [~] Auxiliary (task) model rows — REST /api/model/auxiliary — src/app/settings/aux-task-rows.tsx ⟶ Settings › Model › Auxiliary lists every backend task (verified by the live `widgets` section of tests/live_backend.rs vs the private backend (2026-10-19)); editing a task slot is not live-verified. Typed client in `api::models`
+- [~] MoA (mixture-of-agents) models — REST /api/model/moa — src/app/settings/model-settings.tsx ⟶ Settings › Model › MoA loads presets, references and the aggregator (verified by the live `widgets` section of tests/live_backend.rs vs the private backend (2026-10-19)); saving is not live-verified. Typed client in `api::models`
+- [~] Fallback models — REST /api/model/options + config fallback_providers — src/app/settings/fallback-models-field.tsx ⟶ Settings › Model › Fallbacks shows the config list (verified by the live `widgets` section of tests/live_backend.rs vs the private backend (2026-10-19) with an empty list only); editing not live-verified
 - [~] Recommended default per provider — REST /api/model/recommended-default — src/app/settings/model-settings.tsx ⟶ backend client ready in `api::models` (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
-- [ ] Provider accounts view (OAuth sign-in) — REST /api/providers/oauth/* — src/app/settings/providers-settings.tsx
+- [~] Provider accounts view (OAuth sign-in) — REST /api/providers/oauth/* — src/app/settings/providers-settings.tsx ⟶ Settings › Providers › Accounts lists every OAuth provider with its sign-in state (verified by the live `widgets` section of tests/live_backend.rs vs the private backend (2026-10-19)); sign-in itself not live-verified (network). Typed client in `api::models`
 - [~] Provider API keys view — REST /api/env, /api/env/reveal — src/app/settings/keys-settings.tsx, env-credentials.tsx ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [~] Custom endpoints (OpenAI/Anthropic-compatible) — REST /api/providers/custom-endpoints — src/app/settings/custom-endpoints-settings.tsx ⟶ Settings › Providers widget calls the routes (hermes-ui `widgets/providers.rs`); typed client in `api::models`; not live-verified
 - [~] Validate provider/endpoint — REST /api/providers/validate, /api/providers/custom-endpoints/validate — src/app/settings/helpers.ts ⟶ backend client ready in `api::models` (builder + unit test only: contacts the provider with a key); UI not wired

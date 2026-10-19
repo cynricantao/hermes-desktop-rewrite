@@ -83,6 +83,9 @@ pub fn set_call(profile: &str, enabled: bool, send: bool, first_run: bool) -> Ca
     )
 }
 
+/// `shared_metrics.set` deadline: the pooled handler waits on the metrics store's write lock.
+pub const CONSENT_WRITE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
+
 /// Write the profile's consent (see [`set_call`]). **Changes telemetry consent.**
 pub async fn set(
     client: &Client,
@@ -95,7 +98,7 @@ pub async fn set(
     // lock, which can outlast the 30 s default under contention.
     let c = set_call(profile, enabled, send, first_run);
     let v = client
-        .request_with_timeout(c.method, c.params, std::time::Duration::from_secs(90))
+        .request_with_timeout(c.method, c.params, CONSENT_WRITE_TIMEOUT)
         .await?;
     crate::api::decode(v)
 }
