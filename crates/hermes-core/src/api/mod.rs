@@ -32,8 +32,15 @@ use crate::http::{HttpError, Rest};
 pub use crate::http::{Method, Request, req};
 use crate::rpc::{Client, RpcError};
 
+pub mod billing;
+pub mod display;
+pub mod events;
 pub mod extras;
+pub mod groups;
 pub mod messaging;
+pub mod metrics;
+pub mod models;
+pub mod pets;
 pub mod plugins;
 pub mod sessions;
 pub mod system;
