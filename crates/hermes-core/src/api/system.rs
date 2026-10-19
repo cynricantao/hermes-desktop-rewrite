@@ -8,7 +8,10 @@ use std::fmt;
 
 use serde_json::{Value, json};
 
-use crate::api::{ApiError, Call, Method, Request, call_as, call_of, profile_query, req, seg, send_as, with_query};
+use crate::api::{
+    ApiError, Call, Method, Request, call_as, call_of, explicit_profile_query, profile_query, req, seg, send_as,
+    with_query,
+};
 use crate::http::Rest;
 use crate::rpc::Client;
 
@@ -2454,5 +2457,174 @@ mod tests {
         assert!(!ostarted.resumed);
         let oskip: OnboardingSkipped = decode(json!({"skipped": false})).unwrap();
         assert!(!oskip.skipped);
+    }
+}
+
+// ── Process liveness, WS ticket, ops hooks, checkpoints ───────────────────────
+
+/// `GET /api/health`: the desktop's readiness probe. `commit` is the code the
+/// process **booted** from, so the caller rejects a backend left over from an
+/// older checkout. Public (no token) on a normal loopback backend.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct Health {
+    pub ok: bool,
+    pub version: String,
+    /// The backend spells this `displayVersion`.
+    #[serde(rename = "displayVersion")]
+    pub display_version: String,
+    pub commit: String,
+    pub auth_required: bool,
+}
+
+pub fn health_request() -> Request {
+    req(Method::Get, "/api/health", None)
+}
+
+/// Lightweight process liveness, version and boot commit (read-only).
+pub async fn health(rest: &Rest) -> Result<Health, ApiError> {
+    send_as(rest, &health_request()).await
+}
+
+/// `POST /api/auth/ws-ticket` reply. `ticket` is a single-use 30 s credential
+/// passed as `?ticket=` on the WebSocket upgrade. `Debug` prints only its length.
+#[derive(Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct WsTicket {
+    pub ticket: String,
+    pub ttl_seconds: u64,
+}
+
+impl fmt::Debug for WsTicket {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WsTicket")
+            .field("ticket", &format!("<{} chars>", self.ticket.len()))
+            .field("ttl_seconds", &self.ttl_seconds)
+            .finish()
+    }
+}
+
+impl WsTicket {
+    /// Length of the credential, for logs that must never print it.
+    pub fn ticket_len(&self) -> usize {
+        self.ticket.len()
+    }
+}
+
+pub fn ws_ticket_request() -> Request {
+    req(Method::Post, "/api/auth/ws-ticket", None)
+}
+
+/// Mint a single-use WebSocket upgrade ticket (gated mode only). **Reveals a
+/// credential** — never log the value; pass it straight to the WS URL.
+pub async fn ws_ticket(rest: &Rest) -> Result<WsTicket, ApiError> {
+    send_as(rest, &ws_ticket_request()).await
+}
+
+/// One configured shell hook (`GET /api/ops/hooks`).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct HookSpec {
+    pub event: String,
+    pub matcher: Option<String>,
+    pub command: String,
+    pub timeout: Option<f64>,
+    /// Present in the allowlist (`hermes hooks allow`).
+    pub allowed: bool,
+    pub approved_at: Option<String>,
+    /// The script is currently executable on the backend host.
+    pub executable: bool,
+}
+
+/// `GET /api/ops/hooks`: configured hooks plus the valid event names for the form.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct OpsHooks {
+    pub hooks: Vec<HookSpec>,
+    pub valid_events: Vec<String>,
+}
+
+pub fn ops_hooks_request(profile: &str) -> Request {
+    req(Method::Get, format!("/api/ops/hooks{}", profile_query(profile)), None)
+}
+
+/// Read the profile's configured shell hooks and consent status (read-only).
+pub async fn ops_hooks(rest: &Rest, profile: &str) -> Result<OpsHooks, ApiError> {
+    send_as(rest, &ops_hooks_request(profile)).await
+}
+
+pub fn checkpoints_prune_request(profile: &str) -> Request {
+    req(
+        Method::Post,
+        format!("/api/ops/checkpoints/prune{}", explicit_profile_query(profile)),
+        None,
+    )
+}
+
+/// Prune `/rollback` checkpoints. **Destructive** — spawned as a background
+/// action (`checkpoints-prune`); poll [`action_status`]. Builder-only.
+pub async fn checkpoints_prune(rest: &Rest, profile: &str) -> Result<ActionStarted, ApiError> {
+    send_as(rest, &checkpoints_prune_request(profile)).await
+}
+
+#[cfg(test)]
+mod rest_gap_tests {
+    use super::*;
+    use crate::api::decode;
+
+    #[test]
+    fn health_and_ticket_builders() {
+        let r = health_request();
+        assert_eq!((r.method, r.path.as_str(), r.body), (Method::Get, "/api/health", None));
+        let h: Health = decode(json!({
+            "ok": true, "version": "0.19.1", "displayVersion": "0.19.1 (abc)",
+            "commit": "abc123", "auth_required": false
+        }))
+        .unwrap();
+        assert!(h.ok);
+        assert_eq!(h.display_version, "0.19.1 (abc)");
+        assert_eq!(h.commit, "abc123");
+        assert_eq!(decode::<Health>(json!({})).unwrap(), Health::default());
+
+        let r = ws_ticket_request();
+        assert_eq!(
+            (r.method, r.path.as_str(), r.body),
+            (Method::Post, "/api/auth/ws-ticket", None)
+        );
+        let t: WsTicket = decode(json!({"ticket": "abc", "ttl_seconds": 30})).unwrap();
+        assert_eq!(t.ticket_len(), 3);
+        assert_eq!(format!("{t:?}"), "WsTicket { ticket: \"<3 chars>\", ttl_seconds: 30 }");
+        assert_eq!(decode::<WsTicket>(json!({})).unwrap(), WsTicket::default());
+    }
+
+    #[test]
+    fn hooks_and_prune_builders() {
+        assert_eq!(ops_hooks_request("").path, "/api/ops/hooks");
+        assert_eq!(ops_hooks_request("swe").path, "/api/ops/hooks?profile=swe");
+        let h: OpsHooks = decode(json!({
+            "hooks": [{"event": "pre_tool", "matcher": null, "command": "~/hook.sh",
+                       "timeout": 5.5, "allowed": true, "approved_at": "2026-10-01T00:00:00Z",
+                       "executable": true}],
+            "valid_events": ["pre_tool", "post_tool"]
+        }))
+        .unwrap();
+        assert_eq!(h.hooks.len(), 1);
+        assert_eq!(h.hooks[0].timeout, Some(5.5));
+        assert!(h.hooks[0].allowed);
+        assert_eq!(h.valid_events, vec!["pre_tool", "post_tool"]);
+        assert_eq!(decode::<OpsHooks>(json!({})).unwrap(), OpsHooks::default());
+
+        let r = checkpoints_prune_request("");
+        assert_eq!(
+            (r.method, r.path.as_str()),
+            (Method::Post, "/api/ops/checkpoints/prune?profile=default")
+        );
+        assert_eq!(
+            checkpoints_prune_request("swe").path,
+            "/api/ops/checkpoints/prune?profile=swe"
+        );
+        let a: ActionStarted = decode(json!({"ok": true, "pid": 42, "name": "checkpoints-prune"})).unwrap();
+        assert!(a.ok);
+        assert_eq!(a.pid, Some(42));
     }
 }

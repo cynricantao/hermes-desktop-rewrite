@@ -1952,3 +1952,242 @@ mod tests {
         );
     }
 }
+
+// ── Managed files: listing, streaming, upload, image paste, PR scan ───────────
+
+/// `GET /api/files?path=`: one managed-folder listing. `parent` is `null` at the
+/// managed root; `root`/`locked_root` mirror the server policy.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct ManagedListing {
+    /// Display path (may be relative to the managed root).
+    pub path: String,
+    pub parent: Option<String>,
+    pub entries: Vec<ManagedEntry>,
+    pub root: Option<String>,
+    pub locked_root: Option<String>,
+    pub can_change_path: bool,
+}
+
+pub fn managed_list_request(path: &str) -> Request {
+    req(Method::Get, with_query("/api/files", &[("path", path)]), None)
+}
+
+/// List a managed folder (read-only). Paths outside the managed root are a 403.
+pub async fn managed_list(rest: &Rest, path: &str) -> Result<ManagedListing, ApiError> {
+    send_as(rest, &managed_list_request(path)).await
+}
+
+/// Builder only: `GET /api/files/stream` answers **raw media bytes** with Range
+/// support and inline `Content-Disposition`; the JSON [`Rest`] client cannot
+/// carry that, so the controller should issue this request outside [`Rest`].
+pub fn managed_stream_request(path: &str) -> Request {
+    req(Method::Get, with_query("/api/files/stream", &[("path", path)]), None)
+}
+
+/// `POST /api/files/upload`: write one base64 `data_url` into the managed root.
+/// `overwrite` follows the backend model default (`true`).
+pub fn managed_upload_request(path: &str, data_url: &str, overwrite: bool) -> Request {
+    req(
+        Method::Post,
+        "/api/files/upload",
+        Some(json!({ "path": path, "data_url": data_url, "overwrite": overwrite })),
+    )
+}
+
+/// Write a base64 `data_url` to a managed path. **Writes a file**; the caller
+/// must confirm the target (and should reuse the downloaded bytes, not re-encode).
+pub async fn managed_upload(
+    rest: &Rest,
+    path: &str,
+    data_url: &str,
+    overwrite: bool,
+) -> Result<ManagedWrite, ApiError> {
+    send_as(rest, &managed_upload_request(path, data_url, overwrite)).await
+}
+
+pub fn managed_delete_request(path: &str, recursive: bool) -> Request {
+    req(
+        Method::Delete,
+        "/api/files",
+        Some(json!({ "path": path, "recursive": recursive })),
+    )
+}
+
+/// Delete a managed file or folder. **Destructive** — the backend refuses the
+/// managed root and the filesystem root; a non-empty folder needs `recursive`.
+pub async fn managed_delete(rest: &Rest, path: &str, recursive: bool) -> Result<OkResult, ApiError> {
+    send_as(rest, &managed_delete_request(path, recursive)).await
+}
+
+/// `POST /api/chat/image-upload`: persist clipboard bytes under `HERMES_HOME/images/`.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct ChatImageUploaded {
+    pub ok: bool,
+    /// Gateway-visible path to feed to `/image`.
+    pub path: String,
+    pub name: String,
+    pub bytes: u64,
+    pub mime_type: String,
+}
+
+pub fn chat_image_upload_request(data_url: &str, filename: &str, profile: &str) -> Request {
+    req(
+        Method::Post,
+        with_query("/api/chat/image-upload", &[("profile", profile)]),
+        Some(json!({ "data_url": data_url, "filename": filename })),
+    )
+}
+
+/// Persist a pasted/dropped image for the embedded terminal. **Writes a file**
+/// under the profile's `images/` dir; there is no delete route for it.
+pub async fn chat_image_upload(
+    rest: &Rest,
+    data_url: &str,
+    filename: &str,
+    profile: &str,
+) -> Result<ChatImageUploaded, ApiError> {
+    send_as(rest, &chat_image_upload_request(data_url, filename, profile)).await
+}
+
+/// One PR recovered from a session transcript.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct PullRequestRef {
+    pub number: u64,
+    pub url: String,
+}
+
+/// `POST /api/profiles/sessions/pull-requests` reply: session id → PR. `scanned`
+/// lists every id looked at, so the caller can cache "nothing there".
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct SessionPullRequests {
+    pub pull_requests: std::collections::HashMap<String, PullRequestRef>,
+    pub scanned: Vec<String>,
+}
+
+pub fn session_pull_requests_request(ids: &[String], profile: &str) -> Request {
+    req(
+        Method::Post,
+        with_query("/api/profiles/sessions/pull-requests", &[("profile", profile)]),
+        Some(json!({ "ids": ids })),
+    )
+}
+
+/// Recover the PR each session opened from its own transcript (read-only DB
+/// scan across profiles, capped at 2000 ids). **Builder-only** here because it
+/// reaches every profile's store; the UI calls it from the right panel.
+pub async fn session_pull_requests(
+    rest: &Rest,
+    ids: &[String],
+    profile: &str,
+) -> Result<SessionPullRequests, ApiError> {
+    send_as(rest, &session_pull_requests_request(ids, profile)).await
+}
+
+#[cfg(test)]
+mod rest_gap_tests {
+    use super::*;
+    use crate::api::decode;
+
+    #[test]
+    fn managed_file_builders() {
+        let r = managed_list_request("/data/a b");
+        assert_eq!(
+            (r.method, r.path.as_str(), r.body),
+            (Method::Get, "/api/files?path=%2Fdata%2Fa%20b", None)
+        );
+        assert_eq!(managed_list_request("").path, "/api/files");
+        let l: ManagedListing = decode(json!({
+            "path": "/data", "parent": null,
+            "entries": [
+                {"name": "a.txt", "path": "/data/a.txt", "is_directory": false,
+                 "broken_link": false, "size": 12, "mtime": 1.5, "mime_type": "text/plain"},
+                {"name": "sub", "path": "/data/sub", "is_directory": true,
+                 "size": null, "mtime": null, "mime_type": null}
+            ],
+            "root": "/data", "locked_root": "/data", "can_change_path": false
+        }))
+        .unwrap();
+        assert_eq!(l.entries.len(), 2);
+        assert!(l.entries[1].is_directory);
+        assert_eq!(l.entries[0].size, Some(12));
+        assert_eq!(decode::<ManagedListing>(json!({})).unwrap(), ManagedListing::default());
+
+        let r = managed_stream_request("/m/clip.mp4");
+        assert_eq!(
+            (r.method, r.path.as_str(), r.body),
+            (Method::Get, "/api/files/stream?path=%2Fm%2Fclip.mp4", None)
+        );
+
+        let r = managed_upload_request("/m/a.txt", "data:text/plain;base64,aGk=", true);
+        assert_eq!((r.method, r.path.as_str()), (Method::Post, "/api/files/upload"));
+        assert_eq!(
+            r.body,
+            Some(json!({"path": "/m/a.txt", "data_url": "data:text/plain;base64,aGk=", "overwrite": true}))
+        );
+        let w: ManagedWrite = decode(json!({
+            "ok": true, "path": "/m/a.txt", "root": "/m", "locked_root": null,
+            "can_change_path": true,
+            "entry": {"name": "a.txt", "path": "/m/a.txt", "is_directory": false, "size": 2}
+        }))
+        .unwrap();
+        assert!(w.ok);
+        assert_eq!(w.entry.unwrap().name, "a.txt");
+
+        let r = managed_delete_request("/m/a.txt", false);
+        assert_eq!((r.method, r.path.as_str()), (Method::Delete, "/api/files"));
+        assert_eq!(r.body, Some(json!({"path": "/m/a.txt", "recursive": false})));
+        let ok: OkResult = decode(json!({"ok": true})).unwrap();
+        assert!(ok.ok);
+    }
+
+    #[test]
+    fn image_upload_and_pr_scan() {
+        let r = chat_image_upload_request("data:image/png;base64,aGk=", "shot.png", "swe");
+        assert_eq!(
+            (r.method, r.path.as_str()),
+            (Method::Post, "/api/chat/image-upload?profile=swe")
+        );
+        assert_eq!(
+            r.body,
+            Some(json!({"data_url": "data:image/png;base64,aGk=", "filename": "shot.png"}))
+        );
+        let up: ChatImageUploaded = decode(json!({
+            "ok": true, "path": "/h/images/dashboard_1_ab_shot.png",
+            "name": "dashboard_1_ab_shot.png", "bytes": 42, "mime_type": "image/png"
+        }))
+        .unwrap();
+        assert_eq!(up.bytes, 42);
+        assert_eq!(up.mime_type, "image/png");
+        assert_eq!(
+            decode::<ChatImageUploaded>(json!({})).unwrap(),
+            ChatImageUploaded::default()
+        );
+
+        let ids = vec!["s1".to_string(), "s2".to_string()];
+        let r = session_pull_requests_request(&ids, "");
+        assert_eq!(
+            (r.method, r.path.as_str()),
+            (Method::Post, "/api/profiles/sessions/pull-requests")
+        );
+        assert_eq!(r.body, Some(json!({"ids": ["s1", "s2"]})));
+        assert_eq!(
+            session_pull_requests_request(&ids, "swe").path,
+            "/api/profiles/sessions/pull-requests?profile=swe"
+        );
+        let prs: SessionPullRequests = decode(json!({
+            "pull_requests": {"s1": {"number": 12, "url": "https://github.com/o/r/pull/12"}},
+            "scanned": ["s1", "s2"]
+        }))
+        .unwrap();
+        assert_eq!(prs.pull_requests["s1"].number, 12);
+        assert_eq!(prs.scanned.len(), 2);
+        assert_eq!(
+            decode::<SessionPullRequests>(json!({})).unwrap(),
+            SessionPullRequests::default()
+        );
+    }
+}

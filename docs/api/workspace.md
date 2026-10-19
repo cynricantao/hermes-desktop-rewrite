@@ -33,6 +33,12 @@ The desktop passes the selected profile name for non-default profiles.
 | Feature | Function | Backend call | Notes |
 |---|---|---|---|
 | Create a managed folder | `managed_mkdir_request`, `managed_mkdir` | `POST /api/files/mkdir` body `{path}` | **Destructive**: creates parents. Reply carries `entry` plus the policy metadata (`root`, `locked_root`, `can_change_path`); 403 when a locked managed-files root would be escaped |
+| List a managed folder | `managed_list_request`, `managed_list` | `GET /api/files?path` | Read-only; unit-tested (not run live: depends on the managed-root policy) |
+| Stream a managed file | `managed_stream_request` | `GET /api/files/stream?path` | Raw media bytes, so builder only (the JSON client cannot decode it) |
+| Upload a managed file | `managed_upload_request`, `managed_upload` | `POST /api/files/upload` `{path, data_url, overwrite}` | **Writes a file**. Builder-only |
+| Delete a managed path | `managed_delete_request`, `managed_delete` | `DELETE /api/files` body `{path, recursive}` | **Destructive**. Builder-only |
+| Chat image upload | `chat_image_upload_request`, `chat_image_upload` | `POST /api/chat/image-upload?profile` `{data_url, filename}` | **Writes** into the profile's images dir (no delete route). Builder-only |
+| Session pull requests | `session_pull_requests_request`, `session_pull_requests` | `POST /api/profiles/sessions/pull-requests` `{ids}` | Reads the PRs linked to sessions across profiles. Builder-only |
 
 ## Git / coding rail — `/api/git/*`
 
@@ -155,9 +161,8 @@ false), `projects.record_repos`, `projects.delete`.
   taken from a backend handler (`web_routers/files.py`, `web_git.py`, `web_server_files.py`,
   `methods_projects.py`, `methods_config.py`, and the gateway's session/tools method
   modules); no endpoint was invented.
-* Deliberately not wrapped: `GET /api/files`, `POST /api/files/upload`,
-  `POST /api/files/upload-stream` and `DELETE /api/files` (multipart/binary bodies outside
-  the JSON client; only `mkdir` is in this module), and `GET /api/fs/download` has a request
-  builder but no async wrapper for the same reason.
+* Deliberately not wrapped: `POST /api/files/upload-stream` (multipart body outside the
+  JSON client). `GET /api/files/stream` and `GET /api/fs/download` have request builders but
+  no async wrapper for the same reason (binary replies).
 * Basic project CRUD (`projects.list`, `projects.create`, `projects.update`,
   `projects.set_active`) is not in this module.
