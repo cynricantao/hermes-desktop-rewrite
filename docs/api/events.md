@@ -61,7 +61,7 @@ password. Read it out with `expose()` only inside a reply builder.
 
 ## Run live (private test backend)
 
-`crates/hermes-core/tests/live_api_events.rs` — 2 checks against `HERMES_DESKTOP_PORT=<private>`:
+`crates/hermes-core/tests/live_api_events.rs` — up to 2 checks (the `gateway.ready` one only when the backend sends it) against `HERMES_DESKTOP_PORT=<private>`:
 
 * the first notification after connect parses as `KnownEvent::GatewayReady` (real
   `change_events` / `replay_epoch` / `skin` from the backend; skipped with a note if a build

@@ -46,7 +46,7 @@ Reply types are lenient (`#[serde(default)]`): `SharedMetricsConsent`, `OkReply`
 ## Run live (private test backend)
 
 `crates/hermes-core/tests/live_api_metrics.rs` — 2 checks, run against
-`HERMES_DESKTOP_PORT=40361` (`scripts/live-test-backend.sh`):
+`HERMES_DESKTOP_PORT=<port>` (`scripts/live-test-backend.sh`):
 
 * RPC `shared_metrics.status` → decodes, and `send` is never true while `enabled` is false
   (logged: `enabled=false send=false decided=true reask=false`).

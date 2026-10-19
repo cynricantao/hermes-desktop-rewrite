@@ -207,8 +207,9 @@ pub struct DisplayStop {
 }
 
 /// [`display_observe`] reply: a single-use ticket for [`DISPLAY_WS_PATH`], the path itself, the
-/// viewer id this connection must present to the lease calls, and a status snapshot.
-#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+/// viewer id this connection must present to the lease calls, and a status snapshot. `ticket`
+/// and `viewer_id` are capabilities, so `Debug` prints only their lengths.
+#[derive(Clone, Default, PartialEq, serde::Deserialize)]
 #[serde(default)]
 pub struct DisplayObserve {
     pub ticket: String,
@@ -217,6 +218,17 @@ pub struct DisplayObserve {
     pub viewer_id: String,
     #[serde(flatten)]
     pub status: DisplayStatus,
+}
+
+impl std::fmt::Debug for DisplayObserve {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DisplayObserve")
+            .field("ticket", &format_args!("<{} chars>", self.ticket.len()))
+            .field("path", &self.path)
+            .field("viewer_id", &format_args!("<{} chars>", self.viewer_id.len()))
+            .field("status", &self.status)
+            .finish()
+    }
 }
 
 /// [`display_install`] reply: the package manager started in the background. Progress arrives
@@ -327,7 +339,8 @@ pub fn display_thumbnail_call(profile: &str) -> Call {
     call_of("display.thumbnail", params(profile))
 }
 
-/// `display.start` — start Xvnc + Xfce (idempotent; blocks until published).
+/// `display.start` — start Xvnc + Xfce (idempotent; blocks until published). **Spawns
+/// processes** (see [`display_start`]).
 pub fn display_start_call(profile: &str) -> Call {
     call_of("display.start", params(profile))
 }
@@ -353,7 +366,8 @@ pub fn display_observe_call(profile: &str, viewer_id: &str) -> Call {
     call_of("display.observe", p)
 }
 
-/// `display.install` — run the distro package install on the gateway host.
+/// `display.install` — run the distro package install on the gateway host. **Installs system
+/// packages as root** (see [`display_install`]).
 pub fn display_install_call(profile: &str) -> Call {
     call_of("display.install", params(profile))
 }
@@ -413,7 +427,7 @@ pub async fn display_thumbnail(client: &Client, profile: &str) -> Result<Display
 
 /// Start this profile's Xvnc + Xfce (idempotent) and return the new snapshot.
 ///
-/// **Spans up processes**: Xvnc, Xfce and (for a sandbox placement) a container. Blocks until
+/// **Spawns processes**: Xvnc, Xfce and (for a sandbox placement) a container. Blocks until
 /// the display is published, hence [`DISPLAY_START_TIMEOUT`]; confirm with the user first.
 pub async fn display_start(client: &Client, profile: &str) -> Result<DisplayStatus, ApiError> {
     decode(call_with_timeout(client, &display_start_call(profile), DISPLAY_START_TIMEOUT).await?)
@@ -496,6 +510,18 @@ pub async fn display_lease_release(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn observe_debug_hides_capabilities() {
+        let o = DisplayObserve {
+            ticket: "tkt-SECRET".into(),
+            viewer_id: "vw-SECRET".into(),
+            ..Default::default()
+        };
+        let shown = format!("{o:?}");
+        assert!(!shown.contains("SECRET"), "{shown}");
+        assert!(shown.contains("<10 chars>") && shown.contains("<9 chars>"), "{shown}");
+    }
 
     fn status_json() -> Value {
         json!({

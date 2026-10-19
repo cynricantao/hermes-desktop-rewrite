@@ -59,7 +59,7 @@ a decode. `PetSprite` is shared by `pet.info` and `pet.hatch`'s `pet` preview.
 
 ## Run live (private test backend)
 
-`crates/hermes-core/tests/live_api_pets.rs` — 6 checks against `HERMES_DESKTOP_PORT=40361`
+`crates/hermes-core/tests/live_api_pets.rs` — 6 checks against `HERMES_DESKTOP_PORT=<port>`
 (`scripts/live-test-backend.sh`): `pet.info`, `pet.info.meta`, `pet.cells`,
 `pet.generate.status`, `pet.thumb` (unknown slug, no url → local miss) and `pet.cancel`
 (random token → documented no-op). All six PASS on a fresh private backend (pet display

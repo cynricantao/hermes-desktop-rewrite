@@ -21,10 +21,11 @@
 //! # Safety
 //! Read-only: `model/info`, `model/options`, `model/auxiliary`, `model/moa` (GET),
 //! `model/recommended-default`, `providers/oauth` (GET), `providers/custom-endpoints` (GET),
-//! `local-models/{status,hardware,jobs,jobs/{id}}` and `local-models/catalog`.
-//! Everything else **writes config, contacts a provider, downloads, spawns or deletes** and
-//! is documented individually — the UI must confirm first. `local-models/search*` reach
-//! Hugging Face; `providers/validate` and the OAuth routes reach the provider itself.
+//! `local-models/{hardware,jobs,jobs/{id}}`, and `local-models/status` (which may move a
+//! legacy models folder into place once). `local-models/catalog` also starts a TTL-gated
+//! background **network** refresh, so do not poll it. Everything else **writes config,
+//! contacts a provider, downloads, spawns or deletes** and is documented individually — the
+//! UI must confirm first. `local-models/search*` reach Hugging Face; `providers/validate` and the OAuth routes reach the provider itself.
 
 use std::collections::BTreeMap;
 use std::time::Duration;
@@ -205,7 +206,7 @@ impl ModelScope {
 /// `reasoning_effort` keeps the backend's three-way meaning: `None` leaves the task's
 /// override alone, `Some(None)` clears it (inherit the main agent's effort), and
 /// `Some(Some(level))` sets it.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Default, PartialEq)]
 pub struct ModelAssignment {
     pub scope: ModelScope,
     pub provider: String,
@@ -294,7 +295,13 @@ pub struct ModelAssignmentReply {
     pub scope: String,
     pub provider: String,
     pub model: String,
-    pub task: Option<String>,
+    /// Auxiliary saves: the task slots written (`__all__` expands to every task).
+    pub tasks: Vec<String>,
+    /// Auxiliary `__reset__`: every task slot went back to `auto`.
+    pub reset: bool,
+    /// Main saves: the endpoint now in force and the auxiliary slots left on the old one.
+    pub base_url: Option<String>,
+    pub stale_aux: Option<Value>,
     pub confirm_required: bool,
     pub confirm_message: Option<String>,
 }
@@ -502,7 +509,7 @@ pub async fn recommended_default(rest: &Rest, profile: &str, provider: &str) -> 
 
 /// Login state of one OAuth provider card. **`token_preview` is the truncated tail of a
 /// token** — never log it, never show more than the backend already truncated.
-#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[derive(Clone, Default, PartialEq, serde::Deserialize)]
 #[serde(default)]
 pub struct OAuthStatus {
     pub logged_in: bool,
@@ -726,7 +733,7 @@ pub async fn oauth_disconnect(rest: &Rest, profile: &str, provider_id: &str) -> 
 /// (`OPENAI_API_KEY`, `GEMINI_API_KEY`, …). Special case: `key: "OPENAI_BASE_URL"` validates
 /// a custom endpoint's connectivity and lists its model ids; `api_key` is the optional bearer
 /// for that probe.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Default, PartialEq)]
 pub struct CredentialProbe {
     pub key: String,
     pub value: String,
@@ -850,7 +857,7 @@ pub async fn custom_endpoints(rest: &Rest, profile: &str) -> Result<CustomEndpoi
 /// Create or update a custom endpoint (`CustomEndpointUpdate`). `id` empty creates one;
 /// `api_key` is tri-state: `None` leaves the stored key alone, `Some("")` clears it,
 /// `Some(key)` stores it in the profile's `.env`.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Default, PartialEq)]
 pub struct CustomEndpointUpdate {
     pub id: String,
     pub name: String,
@@ -1021,15 +1028,12 @@ pub async fn custom_endpoint_validate(
 #[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
 #[serde(default)]
 pub struct StagedModel {
-    /// The staged `.gguf` stem — the id `/activate` and `/eject` take.
-    pub model_id: String,
-    pub display_name: Option<String>,
+    /// The staged `.gguf` stem — the id `/activate` and `/eject` take. Sent as `id`
+    /// (`local_models.py::_staged_row` emits only `id`, `size_bytes`, `size_label`); load
+    /// state lives in [`LocalModelsStatus::loaded_models`].
+    pub id: String,
     pub size_bytes: Option<i64>,
     pub size_label: Option<String>,
-    pub quant: Option<String>,
-    /// `false` for a sideloaded/browsed file with no catalog entry.
-    pub verified: Option<bool>,
-    pub loaded: Option<bool>,
 }
 
 /// Cheap runtime/config state. `tag` is the installed engine build, `configured_tag` the
@@ -1211,6 +1215,9 @@ pub async fn local_job(rest: &Rest, job_id: &str) -> Result<LocalJob, ApiError> 
 pub struct JobAccepted {
     pub job_id: Option<String>,
     pub model_id: Option<String>,
+    /// `runtime/install` only: the engine build chosen (`cuda`, `vulkan`, …) and its tag.
+    pub backend: Option<String>,
+    pub tag: Option<String>,
     pub already_downloaded: Option<bool>,
     pub ok: Option<bool>,
 }
@@ -1574,6 +1581,80 @@ pub async fn model_save_key(
     call_as(client, &model_save_key_call(slug, api_key, session_id)).await
 }
 
+// ── Redacted `Debug` for credential-bearing types ───────────────────────────────
+// These hold API keys or token tails; `{:?}` (logs, panics, test output) shows only whether
+// a secret is present and its length.
+
+fn secret_len(s: &str) -> String {
+    if s.is_empty() {
+        "<empty>".into()
+    } else {
+        format!("<redacted, {} chars>", s.chars().count())
+    }
+}
+
+impl std::fmt::Debug for ModelAssignment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ModelAssignment")
+            .field("scope", &self.scope)
+            .field("provider", &self.provider)
+            .field("model", &self.model)
+            .field("task", &self.task)
+            .field("reasoning_effort", &self.reasoning_effort)
+            .field("base_url", &self.base_url)
+            .field("api_key", &secret_len(&self.api_key))
+            .field("confirm_expensive_model", &self.confirm_expensive_model)
+            .field("profile", &self.profile)
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for CredentialProbe {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CredentialProbe")
+            .field("key", &self.key)
+            .field("value", &secret_len(&self.value))
+            .field("api_key", &secret_len(&self.api_key))
+            .field("profile", &self.profile)
+            .field("provider_setup", &self.provider_setup)
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for CustomEndpointUpdate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CustomEndpointUpdate")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("base_url", &self.base_url)
+            .field("model", &self.model)
+            .field("api_key", &self.api_key.as_deref().map(secret_len))
+            .field("api_mode", &self.api_mode)
+            .field("context_length", &self.context_length)
+            .field("discover_models", &self.discover_models)
+            .field("make_default", &self.make_default)
+            .field("models", &self.models)
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for OAuthStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OAuthStatus")
+            .field("logged_in", &self.logged_in)
+            .field("source", &self.source)
+            .field("source_label", &self.source_label)
+            .field("token_preview", &self.token_preview.as_deref().map(secret_len))
+            .field("expires_at", &self.expires_at)
+            .field("has_refresh_token", &self.has_refresh_token)
+            .field("last_refresh", &self.last_refresh)
+            .field("free_tier", &self.free_tier)
+            .field("account_tier", &self.account_tier)
+            .field("error", &self.error)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1714,11 +1795,34 @@ mod tests {
         );
 
         let saved: ModelAssignmentReply = decode(json!({
-            "ok": true, "scope": "auxiliary", "task": "vision", "provider": "local", "model": "qwen-vl"
+            "ok": true, "scope": "auxiliary", "tasks": ["vision"], "provider": "local", "model": "qwen-vl"
         }))
         .unwrap();
         assert!(saved.ok);
-        assert_eq!(saved.task.as_deref(), Some("vision"));
+        assert_eq!(saved.tasks, ["vision"]);
+        let reset_check: ModelAssignmentReply =
+            decode(json!({"ok": true, "scope": "auxiliary", "reset": true})).unwrap();
+        assert!(reset_check.reset && reset_check.tasks.is_empty());
+    }
+
+    #[test]
+    fn credential_types_redact_debug() {
+        let mut a = ModelAssignment::main("custom", "m");
+        a.api_key = "fake-SECRET-123".into();
+        let mut p = CredentialProbe::new("OPENAI_API_KEY", "fake-SECRET-123");
+        p.api_key = "fake-SECRET-123".into();
+        let e = CustomEndpointUpdate {
+            api_key: Some("fake-SECRET-123".into()),
+            ..Default::default()
+        };
+        let o = OAuthStatus {
+            token_preview: Some("…SECRET-123".into()),
+            ..Default::default()
+        };
+        for shown in [format!("{a:?}"), format!("{p:?}"), format!("{e:?}"), format!("{o:?}")] {
+            assert!(!shown.contains("SECRET"), "leaked: {shown}");
+            assert!(shown.contains("redacted"), "{shown}");
+        }
         assert_eq!(
             decode::<ModelAssignmentReply>(json!({})).unwrap(),
             ModelAssignmentReply::default()
@@ -2119,14 +2223,13 @@ mod tests {
             "update_available": false, "runtime_installed": true, "runtime_backend": "vulkan",
             "server_running": false, "server_base_url": null, "active_model_id": null,
             "loaded_models": {}, "loading": {}, "placement": {},
-            "models": [{ "model_id": "Qwen3-8B-Q4_K_M", "display_name": "Qwen3 8B",
-                         "size_bytes": 5000000000i64, "size_label": "4.7 GB",
-                         "quant": "Q4_K_M", "verified": true, "loaded": false }],
+            "models": [{ "id": "Qwen3-8B-Q4_K_M", "size_bytes": 5000000000i64,
+                         "size_label": "4.7 GB" }],
             "models_dir": "/home/u/.hermes/models"
         }))
         .unwrap();
         assert!(status.runtime_installed);
-        assert_eq!(status.models[0].model_id, "Qwen3-8B-Q4_K_M");
+        assert_eq!(status.models[0].id, "Qwen3-8B-Q4_K_M");
         assert_eq!(
             decode::<LocalModelsStatus>(json!({})).unwrap(),
             LocalModelsStatus::default()

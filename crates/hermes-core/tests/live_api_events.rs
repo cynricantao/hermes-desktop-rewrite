@@ -35,10 +35,8 @@ use tokio::time::{Instant, timeout};
 #[tokio::test]
 #[ignore]
 async fn startup_notifications_and_harmless_read() {
-    assert!(
-        std::env::var_os("HERMES_DESKTOP_PORT").is_some(),
-        "set HERMES_DESKTOP_PORT to a private test backend (scripts/live-test-backend.sh)"
-    );
+    // Needs the event receiver, which `common::backend` drops; same port guard.
+    common::require_private_port();
     let mut checks = common::Checks::default();
 
     let b = hermes_core::backend::discover_or_spawn(None).await.expect("backend");

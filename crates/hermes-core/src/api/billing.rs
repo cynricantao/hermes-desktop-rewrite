@@ -22,8 +22,10 @@
 //! `session_revoked`, `remote_spending_revoked`, `rate_limited`, `payment_failed`, …) and branch.
 //! Only a broken pipe / unknown method surfaces as [`ApiError`].
 //!
-//! Money crosses the wire as **strings** (`balance_usd`, `threshold_usd`, `charge_presets`, …) to
-//! keep decimals exact; the pre-formatted `*_display` fields are what a UI can show as-is.
+//! Money crosses the gateway wire as **strings** (`balance_usd`, `threshold_usd`,
+//! `charge_presets`, …); the backend converts them to floats before calling the portal, so the
+//! strings avoid client-side rounding only. The pre-formatted `*_display` fields are what a UI
+//! can show as-is.
 
 use std::time::Duration;
 
@@ -38,14 +40,16 @@ use crate::rpc::Client;
 // The gateway default is 30 s (`rpc::DEFAULT_TIMEOUT`). Portal round-trips can exceed it, and
 // `billing.step_up` deliberately blocks for minutes while the user finishes a browser flow.
 
-/// `billing.state`, `billing.charge`, `billing.charge_status`, `billing.auto_reload` and the
-/// `subscription.*` routes — one portal round-trip, which the portal itself bounds in tens of
-/// seconds.
+/// `billing.state`, `billing.charge`, `billing.charge_status`, `billing.auto_reload`,
+/// `free_tier.provision` and the `subscription.*` routes. Each is a few portal requests
+/// (`billing.state` also fetches usage), each bounded by the portal client in tens of seconds.
 pub const BILLING_PORTAL_TIMEOUT: Duration = Duration::from_secs(60);
 
-/// `billing.step_up` — the device flow waits for the user in a browser (the handler is pooled and
-/// explicitly "blocks for minutes"), so the RPC deadline must be far past the default.
-pub const BILLING_STEP_UP_TIMEOUT: Duration = Duration::from_secs(300);
+/// `billing.step_up` — the device flow polls until the user approves in a browser or the
+/// portal's `expires_in` passes (`hermes_cli/auth_device_flow.py`; typically 10–15 minutes).
+/// A shorter client deadline would abandon a flow that can still succeed, so this covers the
+/// device-code maximum. If it does time out, treat the outcome as unknown, not as denied.
+pub const BILLING_STEP_UP_TIMEOUT: Duration = Duration::from_secs(900);
 
 /// Send a prepared [`Call`] with an explicit timeout and decode the result.
 async fn call_timed_as<T: DeserializeOwned>(client: &Client, c: &Call, timeout: Duration) -> Result<T, ApiError> {
@@ -64,7 +68,10 @@ fn params(pairs: &[(&str, Value)]) -> Value {
     Value::Object(map)
 }
 
-/// The `profile` param every method here accepts; the launch profile when empty.
+/// The contract's optional `profile` param. The local billing handlers are not profile-scoped
+/// (plain `@method` in `tui_gateway/methods_session.py`): they always answer for the account the
+/// backend was launched with. The param only matters to a shared remote gateway that routes by
+/// it, so a UI must not present it as "this profile's billing". Omitted when empty.
 fn profile_param(profile: &str) -> Value {
     if profile.is_empty() {
         Value::Null
@@ -113,19 +120,54 @@ impl BillingScalar {
 
 /// Mint an idempotency key for a charge / upgrade. **Reuse the same key when retrying** that
 /// operation: the portal de-duplicates on it, so a retry after a timeout cannot charge twice.
-/// Time-ordered (nanoseconds) + pid + a per-process counter, so it needs no extra crate.
+///
+/// UUID v4 shaped, like every other caller (`agent/billing_view.py` uses `uuid.uuid4()`, the
+/// Electron desktop `crypto.randomUUID()`), in case the portal validates the format. The 128
+/// bits come from std's randomly seeded hasher mixed with time, pid and a counter, so no extra
+/// crate is needed; uniqueness, not secrecy, is what the key requires.
 pub fn new_idempotency_key() -> String {
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hasher};
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQ: AtomicU64 = AtomicU64::new(0);
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
+    let seq = SEQ.fetch_add(1, Ordering::Relaxed);
+    let half = |salt: u64| {
+        let mut h = RandomState::new().build_hasher();
+        h.write_u128(nanos);
+        h.write_u32(std::process::id());
+        h.write_u64(seq);
+        h.write_u64(salt);
+        h.finish()
+    };
+    let mut b = [0u8; 16];
+    b[..8].copy_from_slice(&half(1).to_be_bytes());
+    b[8..].copy_from_slice(&half(2).to_be_bytes());
+    b[6] = (b[6] & 0x0f) | 0x40; // version 4
+    b[8] = (b[8] & 0x3f) | 0x80; // RFC 4122 variant
+    let hex: String = b.iter().map(|x| format!("{x:02x}")).collect();
     format!(
-        "hermes-{nanos:x}-{:x}-{:x}",
-        std::process::id(),
-        SEQ.fetch_add(1, Ordering::Relaxed)
+        "{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
     )
+}
+
+/// Refuse a blank idempotency key before sending: the gateway mints a fresh key when the param
+/// is missing or empty, so a retry with `""` would not be de-duplicated (a double charge).
+fn require_idempotency_key(key: &str) -> Result<(), ApiError> {
+    if key.trim().is_empty() {
+        return Err(ApiError::Invalid(
+            "idempotency_key must be a non-empty key reused across retries".into(),
+        ));
+    }
+    Ok(())
 }
 
 // ── Shared billing types ─────────────────────────────────────────────────────
@@ -218,6 +260,7 @@ pub struct BillingState {
     pub balance_display: Option<String>,
     pub cli_billing_enabled: Option<bool>,
     /// Preset top-up amounts as wire strings (money-safe), plus their display labels.
+    #[serde(deserialize_with = "crate::api::null_default")]
     pub charge_presets: Vec<String>,
     pub charge_presets_display: Vec<String>,
     pub min_usd: Option<String>,
@@ -336,6 +379,7 @@ pub struct SubscriptionState {
     /// `personal` | `team`.
     pub context: Option<String>,
     pub current: Option<CurrentSubscription>,
+    #[serde(deserialize_with = "crate::api::null_default")]
     pub tiers: Vec<SubscriptionTierOption>,
     pub portal_url: Option<String>,
     pub error: Option<String>,
@@ -565,6 +609,7 @@ pub async fn billing_charge(
     idempotency_key: &str,
     profile: &str,
 ) -> Result<BillingCharge, ApiError> {
+    require_idempotency_key(idempotency_key)?;
     call_timed_as(
         client,
         &billing_charge_call(amount_usd, idempotency_key, profile),
@@ -737,6 +782,7 @@ pub async fn subscription_upgrade(
     idempotency_key: &str,
     profile: &str,
 ) -> Result<SubscriptionUpgrade, ApiError> {
+    require_idempotency_key(idempotency_key)?;
     call_timed_as(
         client,
         &subscription_upgrade_call(subscription_type_id, idempotency_key, profile),
@@ -772,7 +818,8 @@ pub fn free_tier_provision_call(profile: &str) -> Call {
 
 /// Retry the welcome-trial claim. **Network + writes the identity**; never run this in a test.
 pub async fn free_tier_provision(client: &Client, profile: &str) -> Result<FreeTierProvision, ApiError> {
-    call_as(client, &free_tier_provision_call(profile)).await
+    // Pooled blocking portal claim (`_LONG_HANDLERS`); the 30 s default can expire mid-claim.
+    call_timed_as(client, &free_tier_provision_call(profile), BILLING_PORTAL_TIMEOUT).await
 }
 
 /// `free_tier.claim_nudge`: claim the due post-task sign-in offer, so two windows never both show
@@ -1278,12 +1325,31 @@ mod tests {
     }
 
     #[test]
-    fn idempotency_keys_are_unique() {
+    fn idempotency_keys_are_unique_uuid_v4() {
         let a = new_idempotency_key();
         let b = new_idempotency_key();
         assert_ne!(a, b);
-        assert!(a.starts_with("hermes-"));
-        assert!(a.len() > 20);
+        let parts: Vec<&str> = a.split('-').collect();
+        assert_eq!(parts.iter().map(|p| p.len()).collect::<Vec<_>>(), [8, 4, 4, 4, 12]);
+        assert!(a.chars().all(|c| c == '-' || c.is_ascii_hexdigit()));
+        assert!(parts[2].starts_with('4'), "version nibble: {a}");
+        assert!(matches!(&parts[3][..1], "8" | "9" | "a" | "b"), "variant: {a}");
+    }
+
+    #[test]
+    fn blank_idempotency_key_is_refused_locally() {
+        // The gateway would mint a fresh key for "", so a retry could charge twice.
+        assert!(matches!(require_idempotency_key(""), Err(ApiError::Invalid(_))));
+        assert!(matches!(require_idempotency_key("  "), Err(ApiError::Invalid(_))));
+        assert!(require_idempotency_key("k-1").is_ok());
+    }
+
+    #[test]
+    fn nullable_lists_decode_as_empty() {
+        let state: BillingState = decode(json!({"charge_presets": null})).unwrap();
+        assert!(state.charge_presets.is_empty());
+        let subs: SubscriptionState = decode(json!({"tiers": null})).unwrap();
+        assert!(subs.tiers.is_empty());
     }
 
     #[test]

@@ -12,8 +12,15 @@ rather than a JSON-RPC error, so a wrapper returns `Ok(..)` even when the portal
 `rate_limited`, `session_revoked`, `remote_spending_revoked`, …). Refusals may also carry
 `portal_url`, `retry_after`, `actor`, `code`, `recovery`.
 
-Money is sent and received as **strings** (`"12.34"`) to keep decimals exact; `*_display` fields
-are pre-formatted labels a UI can render unchanged.
+Money crosses the gateway wire as **strings** (`"12.34"`), so the client never rounds it; the
+backend converts to floats before calling the portal. `*_display` fields are pre-formatted labels
+a UI can render unchanged.
+
+**Retries:** pass a non-empty `idempotency_key` to `billing_charge` / `subscription_upgrade`
+(e.g. `new_idempotency_key()`, UUID v4 shaped) and reuse it on a retry. A blank key is refused
+locally (`ApiError::Invalid`), because the gateway would mint a fresh one and a retry could
+charge twice. `billing_step_up` allows 900 s (the device-code lifetime); a timeout means the
+outcome is unknown, not denied.
 
 | # | Rule |
 |---|---|
@@ -44,8 +51,10 @@ are pre-formatted labels a UI can render unchanged.
 | Acknowledge notice | `free_tier_ack_notice_call` / `free_tier_ack_notice` → `FreeTierAck` | `free_tier.ack_notice` (local write) | builder-only — one-shot write |
 | Onboarding run flag | `onboarding_set_run_call` / `onboarding_set_run` → `OnboardingState` | `onboarding.set_run` (root config write) | builder-only — writes config |
 
-`billing.state`, `subscription.state`, `billing.auto_reload` and the free-tier methods accept
-`profile` (`""` = the launch profile). `onboarding.set_run` is unscoped on purpose: it writes the
+The billing, subscription and free-tier builders send the contract's optional `profile`
+(`""` = omitted), but the local handlers are **not profile-scoped**: they always answer for the
+account the backend was launched with. Only a shared remote gateway routes on it, so a UI must
+not label the result as a specific profile's billing. `onboarding.set_run` is unscoped on purpose: it writes the
 root profile's `config.yaml` whichever profile the backend serves.
 
 ## Types worth knowing

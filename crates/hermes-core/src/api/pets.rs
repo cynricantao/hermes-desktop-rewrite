@@ -95,8 +95,10 @@ pub struct PetSprite {
     /// The canvas' static fallback when `frames_by_state` is empty.
     pub frames_per_state: Option<i64>,
     /// Real (padding-trimmed) frame count per state.
+    #[serde(deserialize_with = "crate::api::null_default")]
     pub frames_by_state: HashMap<String, i64>,
     /// Frame count per spritesheet row, keyed by row name.
+    #[serde(deserialize_with = "crate::api::null_default")]
     pub frames_by_row: HashMap<String, i64>,
     pub loop_ms: Option<i64>,
     pub scale: Option<f64>,

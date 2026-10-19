@@ -81,7 +81,15 @@ async fn display_status_thumbnail_observe() {
 
     // ── display.thumbnail: read-only grab ───────────────────────────────────────
     let thumb = display::display_thumbnail(&client, "").await;
-    c.ok("display.thumbnail", &thumb);
+    // Never print the frame itself (a live screen grab): presence and size only.
+    c.check(
+        "display.thumbnail",
+        thumb.is_ok(),
+        match &thumb {
+            Ok(t) => format!("data_url_len={:?}", t.data_url.as_ref().map(|d| d.len())),
+            Err(e) => e.to_string(),
+        },
+    );
     if let Ok(t) = &thumb {
         let consistent = if status.running {
             true // a stopped lease holder can still get nothing, both outcomes are valid
@@ -108,9 +116,9 @@ async fn display_status_thumbnail_observe() {
                 "display.observe.ticket",
                 !o.ticket.is_empty() && !o.viewer_id.is_empty(),
                 format!(
-                    "path={:?} viewer_id={:?} ticket_len={}",
+                    "path={:?} viewer_id_len={} ticket_len={}",
                     o.path,
-                    o.viewer_id,
+                    o.viewer_id.len(),
                     o.ticket.len()
                 ),
             );

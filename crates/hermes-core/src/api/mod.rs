@@ -55,6 +55,9 @@ pub enum ApiError {
     Rpc(#[from] RpcError),
     #[error("unexpected response: {0}")]
     Decode(String),
+    /// Refused locally before anything was sent (a required argument was unusable).
+    #[error("invalid argument: {0}")]
+    Invalid(String),
 }
 
 /// One JSON-RPC call: method + params.
@@ -98,6 +101,18 @@ pub async fn call(client: &Client, c: &Call) -> Result<Value, ApiError> {
 /// Send a JSON-RPC call and decode the result.
 pub async fn call_as<T: DeserializeOwned>(client: &Client, c: &Call) -> Result<T, ApiError> {
     decode(call(client, c).await?)
+}
+
+/// `#[serde(deserialize_with = "crate::api::null_default")]`: treat an explicit `null` like a
+/// missing field (`#[serde(default)]` alone only covers absence). For fields the contract marks
+/// nullable but that the code wants as a plain collection.
+pub(crate) fn null_default<'de, D, T>(d: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Default + serde::Deserialize<'de>,
+{
+    use serde::Deserialize;
+    Ok(Option::<T>::deserialize(d)?.unwrap_or_default())
 }
 
 /// Percent-encode one path segment or query value.

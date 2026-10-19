@@ -70,6 +70,9 @@ pub struct Skin {
     pub banner_hero: String,
     pub tool_prefix: String,
     pub help_header: String,
+    /// Raw user CSS for the desktop GUI (32 KiB cap in the skin engine).
+    #[serde(rename = "customCSS")]
+    pub custom_css: String,
 }
 
 // ── gateway lifecycle ─────────────────────────────────────────────────────────
@@ -381,8 +384,10 @@ pub struct ConnectionTarget {
     pub connect_url: Option<String>,
     pub connection_id: Option<String>,
     pub alias: Option<String>,
-    pub attempt: Option<i64>,
-    pub required_env: Option<Vec<String>>,
+    /// Opaque per-attempt handle (`tools/connectors/operation.py`: `Optional[str]`).
+    pub attempt: Option<String>,
+    /// Credentials an MCP install still needs; the card draws a field per entry.
+    pub required_env: Option<Vec<ConnectionTargetEnvField>>,
     pub tools: Option<Vec<String>>,
     pub hint: Option<String>,
     pub description: Option<String>,
@@ -390,9 +395,21 @@ pub struct ConnectionTarget {
     pub platforms: Option<Vec<String>>,
     pub repo: Option<String>,
     pub phase: Option<String>,
-    pub approved: Option<bool>,
+    /// `CatalogApproved {force, enable, ref}` on a catalog row; kept loose.
+    pub approved: Option<Value>,
     pub enabled: Option<bool>,
     pub already_installed: Option<bool>,
+}
+
+/// One credential field of an MCP install (`ConnectionTargetEnvField`).
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct ConnectionTargetEnvField {
+    pub name: String,
+    pub required: bool,
+    pub secret: bool,
+    pub default: String,
+    pub prompt: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
@@ -570,6 +587,8 @@ pub struct HeartbeatSnapshot {
 #[serde(default)]
 pub struct SessionControl {
     pub goal: Option<GoalSnapshot>,
+    /// Sent as `loop` (a Rust keyword).
+    #[serde(rename = "loop")]
     pub loop_state: Option<LoopSnapshot>,
     pub heartbeat: Option<HeartbeatSnapshot>,
     pub revision: String,
@@ -1111,6 +1130,43 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    /// Wire names that differ from the Rust field names, and fields whose type the emitter
+    /// fixes (review findings): `loop`, string `attempt`, object `required_env`, `customCSS`.
+    #[test]
+    fn wire_names_and_types_from_emitters() {
+        let all = samples();
+        let get = |name: &str| all.iter().find(|(n, _)| *n == name).unwrap().1.clone();
+
+        let Some(KnownEvent::SessionControlUpdate(u)) =
+            KnownEvent::parse("session.control.update", &get("session.control.update"))
+        else {
+            panic!("session.control.update did not parse");
+        };
+        assert_eq!(
+            u.control.loop_state.as_ref().map(|l| l.prompt.as_str()),
+            Some("check ci")
+        );
+
+        let Some(KnownEvent::ConnectionRequest(r)) =
+            KnownEvent::parse("connection.request", &get("connection.request"))
+        else {
+            panic!("connection.request did not parse");
+        };
+        let target = &r.targets[0];
+        assert_eq!(target.attempt.as_deref(), Some("att-1"));
+        let env = target.required_env.as_ref().unwrap();
+        assert_eq!(
+            (env[0].name.as_str(), env[0].required, env[0].secret),
+            ("API_KEY", true, true)
+        );
+
+        let skin = json!({"name": "mine", "customCSS": ".x{}"});
+        let Some(KnownEvent::SkinChanged(s)) = KnownEvent::parse("skin.changed", &skin) else {
+            panic!("skin.changed did not parse");
+        };
+        assert_eq!(s.custom_css, ".x{}");
+    }
+
     /// One realistic payload per notification, taken from the emitter / contract example.
     /// Keys are the wire names; `KnownEvent::parse` must accept every one.
     fn samples() -> Vec<(&'static str, Value)> {
@@ -1134,7 +1190,8 @@ mod tests {
                 json!({"op_id": "op-1", "seq": 4, "deadline_at": 1760000000.5, "timeout_seconds": 300.0,
                        "targets": [{"name": "github", "kind": "connector", "action": "authorize",
                                     "state": "pending", "connect_url": "https://example.test/oauth",
-                                    "attempt": 1}],
+                                    "attempt": "att-1",
+                                    "required_env": [{"name": "API_KEY", "required": true, "secret": true, "default": "", "prompt": "Key"}]}],
                        "tool_call_id": "call-1",
                        "display": {"suggested": ["github", "linear"]}}),
             ),

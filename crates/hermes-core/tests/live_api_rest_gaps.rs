@@ -2,7 +2,7 @@
 //! against a PRIVATE test backend.
 //!
 //! ```sh
-//! HERMES_DESKTOP_PORT=40361 cargo test -p hermes-core --test live_api_rest_gaps -- --ignored --nocapture
+//! HERMES_DESKTOP_PORT=<port> cargo test -p hermes-core --test live_api_rest_gaps -- --ignored --nocapture
 //! ```
 //!
 //! Only safe reads and one reversible write run here: health, ops hooks, cron run
@@ -116,7 +116,12 @@ async fn rest_gaps_live() {
                 .unwrap_or(false);
             checks.check("webhook-enable-readback", shows_on, format!("{read_back:?}"));
 
-            let deleted = messaging::webhook_delete(&rest, &name, "").await;
+            // No `?`/unwrap above, so this cleanup always runs once the route exists; one retry
+            // covers a transient failure (the name is unique to this run's pid).
+            let mut deleted = messaging::webhook_delete(&rest, &name, "").await;
+            if !matches!(&deleted, Ok(v) if v.ok) {
+                deleted = messaging::webhook_delete(&rest, &name, "").await;
+            }
             checks.check(
                 "webhook-delete",
                 matches!(&deleted, Ok(v) if v.ok),
@@ -130,9 +135,23 @@ async fn rest_gaps_live() {
             checks.check("webhook-gone", gone, "independent read after delete");
         }
         Err(e) => {
-            // The route is rejected with 400 while the webhook platform is off; that
-            // is a configuration state, not a client bug. Report it as a skip.
-            checks.check("webhook-create", true, format!("skipped (platform state): {e}"));
+            // Only the documented refusal is a skip: the route answers 400 "Webhook platform is
+            // not enabled" while the platform is off (a configuration state). Any other error
+            // (wrong path, body, auth, decode) is a failure.
+            let text = e.to_string();
+            let platform_off = text.contains("not enabled");
+            checks.check(
+                "webhook-create",
+                platform_off,
+                format!(
+                    "{}: {text}",
+                    if platform_off {
+                        "skipped (platform off)"
+                    } else {
+                        "unexpected error"
+                    }
+                ),
+            );
         }
     }
 

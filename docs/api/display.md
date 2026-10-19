@@ -66,7 +66,7 @@ Constants: `DISPLAY_WS_PATH`, `DISPLAY_WS_TICKET_PARAM`,
 
 ## Run live (private test backend)
 
-`crates/hermes-core/tests/live_api_display.rs` — 10 checks against `HERMES_DESKTOP_PORT=40361`
+`crates/hermes-core/tests/live_api_display.rs` — 10 checks against `HERMES_DESKTOP_PORT=<port>`
 (`scripts/live-test-backend.sh`): `display.status` (decodes; `profile_key` non-empty;
 `placement` valid; `holder` ∈ {agent, human}; `viewer_id` redacted; `running` ⇒ `display`),
 `display.thumbnail` (decodes; `data_url` null while stopped), `display.observe` (refused

@@ -91,7 +91,13 @@ pub async fn set(
     send: bool,
     first_run: bool,
 ) -> Result<SharedMetricsConsent, ApiError> {
-    call_as(client, &set_call(profile, enabled, send, first_run)).await
+    // Pooled handler (`_LONG_HANDLERS`): consent reconcile waits on the metrics store's write
+    // lock, which can outlast the 30 s default under contention.
+    let c = set_call(profile, enabled, send, first_run);
+    let v = client
+        .request_with_timeout(c.method, c.params, std::time::Duration::from_secs(90))
+        .await?;
+    crate::api::decode(v)
 }
 
 /// `{ok: true}` reply of every report below except [`desktop_daily`]. A missing `ok` decodes as
@@ -275,7 +281,9 @@ pub async fn desktop_onboarding(client: &Client, profile: &str, step: &str, even
 /// and the key **only** — the saved value is compared to the default by the backend, never sent.
 pub fn desktop_dislike_call(profile: &str, signal: &str, target: &str, setting: Option<&str>) -> Call {
     let mut params = json!({ "signal": signal });
-    match setting.filter(|s| !s.is_empty()) {
+    // The backend reads `setting` only for `setting_off_default`; any other signal keeps its
+    // own target (shared_metrics_desktop.py), so `setting` is dropped there.
+    match setting.filter(|s| !s.is_empty() && signal == "setting_off_default") {
         Some(key) => {
             params["setting"] = json!(key);
             params["target"] = json!("setting");
@@ -501,6 +509,11 @@ mod tests {
         assert_eq!(
             desktop_dislike_call("", "undo", "message", Some("")).params,
             json!({ "signal": "undo", "target": "message" })
+        );
+        // `setting` belongs to `setting_off_default` only; other signals keep their target.
+        assert_eq!(
+            desktop_dislike_call("", "undo", "closed_tab", Some("display.x")).params,
+            json!({ "signal": "undo", "target": "closed_tab" })
         );
     }
 
