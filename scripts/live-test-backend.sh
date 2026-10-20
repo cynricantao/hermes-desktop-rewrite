@@ -24,6 +24,10 @@ real_root="$(realpath -m "$HOME/.hermes")"
 case "$(realpath -m "$home")/" in
   "$real_root"/*) echo "refusing: HERMES_LIVE_HOME ($home) is inside ~/.hermes" >&2; exit 2 ;;
 esac
+if [ "$(realpath -m "$src")" = "$(realpath -m "$home")" ]; then
+  # Copying a home onto itself truncates its .env before reading it, losing the model key.
+  echo "refusing: source home ($src) is the live-test home; unset HERMES_HOME" >&2; exit 2
+fi
 mkdir -p "$home"
 chmod 700 "$home"
 python3 - "$src/config.yaml" "$home/config.yaml" <<'PY'
@@ -31,6 +35,9 @@ import re, sys
 s = open(sys.argv[1]).read()
 s = re.sub(r'(?m)^(approvals:\n  mode:) .*$', r'\1 "manual"', s)
 s = re.sub(r"(?m)^(memory:\n  provider:) .*$", r"\1 ''", s)
+# The approval checks need an empty allowlist, and the reasoning checks a known default.
+s = re.sub(r"(?m)^command_allowlist:.*\n(?:(?:[ \t]+|-).*\n)*", "", s)
+s = re.sub(r"(?m)^(\s*reasoning_effort:) .*$", r"\1 medium", s)
 open(sys.argv[2], "w").write(s)
 PY
 grep -E '^(COMMANDCODE_API_KEY|OPENCODE_GO_API_KEY)=' "$src/.env" > "$home/.env" || true
@@ -44,5 +51,8 @@ for spec in "swe:Software Engineer" "ea:Executive Assistant"; do
   printf 'model:\n  default: test-model\n' > "$dir/config.yaml"
   printf 'ui_meta:\n  hermes-bots:\n    title: %s\n' "$title" > "$dir/profile.yaml"
 done
-echo "# private backend home: $home (approvals.mode=manual, profiles: swe, ea)" >&2
-HERMES_HOME="$home" exec hermes serve --isolated --host 127.0.0.1 --port 0 --skip-build
+# A private HOME too: the backend writes profile alias wrappers to $HOME/.local/bin and
+# other per-user files under $HOME, which must not land in the real home directory.
+mkdir -p "$home/home"
+echo "# private backend home: $home (approvals.mode=manual, profiles: swe, ea, HOME=$home/home)" >&2
+HOME="$home/home" HERMES_HOME="$home" exec hermes serve --isolated --host 127.0.0.1 --port 0 --skip-build
