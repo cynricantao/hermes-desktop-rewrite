@@ -500,6 +500,14 @@ struct Controller {
     queue_paused: std::collections::HashSet<String>,
     side_results: std::collections::HashMap<String, Vec<String>>,
     runtime_stores: std::collections::HashMap<String, String>,
+    /// Queue / failed-prompt / background-result state, scoped to this backend
+    /// and stored chat id. `None` after a refused load (corrupt/newer/oversized):
+    /// the file is preserved and persistence stays off for this session.
+    durable: Option<hermes_core::durable::DurableState>,
+    durable_path: std::path::PathBuf,
+    /// Last save failure, so a failing disk produces one banner, not one per edit.
+    durable_save_error: Option<String>,
+    shown_durable_results: std::collections::HashSet<(String, String)>,
     completion_task: Option<tokio::task::JoinHandle<()>>,
     /// Runtime session id of the open chat (None = new-chat screen).
     session: Option<String>,
@@ -609,6 +617,52 @@ impl Controller {
         };
         let browser = crate::browser::spawn(client.clone(), weak.clone());
         let (hl_tx, mut hl_rx) = mpsc::unbounded_channel::<highlight::Done>();
+        // Load durable queue state before the window is usable. `spawn_blocking`
+        // keeps the fsync out of the controller's async loop.
+        let durable_path = hermes_core::durable::default_path();
+        // An explicit port or host-ledger attach may serve a different data root
+        // than this process's HERMES_HOME. Never restore from a guessed namespace.
+        let endpoint = &backend.endpoint;
+        let identity_rest = Rest::new(endpoint.host.clone(), endpoint.port, endpoint.token.clone());
+        let durable_backend = match identity_rest.get("/api/status").await {
+            Ok(status) => status["hermes_home"]
+                .as_str()
+                .filter(|home| std::path::Path::new(home).is_absolute())
+                .map(|home| hermes_core::durable::backend_id(std::path::Path::new(home), None)),
+            Err(_) => None,
+        };
+        let (durable, durable_error) = if let Some(durable_backend) = durable_backend {
+            let path = durable_path.clone();
+            match tokio::task::spawn_blocking(move || {
+                match hermes_core::durable::DurableState::open(&path, &durable_backend) {
+                    Ok(mut state) => {
+                        let changed = match state.force_recovery_pauses() {
+                            Ok(changed) => changed,
+                            Err(e) => return (None, Some(e.to_string())),
+                        };
+                        // Persist recovery pauses immediately, but do not fsync an
+                        // unchanged or empty state on every application launch.
+                        let save_error = if changed {
+                            state.save().err().map(|e| e.to_string())
+                        } else {
+                            None
+                        };
+                        (Some(state), save_error)
+                    }
+                    Err(e) => (None, Some(e.to_string())),
+                }
+            })
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => (None, Some("state writer task failed".to_owned())),
+            }
+        } else {
+            (
+                None,
+                Some("the backend did not provide a stable data-root identity".to_owned()),
+            )
+        };
         let mut c = Controller {
             caps,
             browser,
@@ -623,6 +677,10 @@ impl Controller {
             queue_paused: Default::default(),
             side_results: Default::default(),
             runtime_stores: Default::default(),
+            durable,
+            durable_path,
+            durable_save_error: None,
+            shown_durable_results: Default::default(),
             completion_task: None,
             session: None,
             stored: None,
@@ -662,6 +720,17 @@ impl Controller {
             hl_sent: HashMap::new(),
             hl_epoch: 0,
         };
+        c.restore_durable_startup();
+        if let Some(error) = durable_error {
+            c.banner(
+                format!(
+                    "Saved queue state at {} could not be used: {error}. The file was left untouched; \
+                     queues and background results will not persist this session.",
+                    c.durable_path.display()
+                ),
+                true,
+            );
+        }
         ui(&weak, |w| {
             let st = w.global::<AppState>();
             st.set_connection("open".into());
@@ -891,6 +960,26 @@ impl Controller {
                     .get(&session_id)
                     .cloned()
                     .unwrap_or_else(|| session_id.clone());
+                let durable =
+                    self.runtime_stores.contains_key(&session_id) || self.stored.as_deref() == Some(key.as_str());
+                if durable {
+                    // Keep the expanded text recorded at submit time; only attach the
+                    // failure. The payload here carries the short display form.
+                    let prompt = self
+                        .durable
+                        .as_ref()
+                        .and_then(|store| store.pending(&key))
+                        .map(|p| p.prompt)
+                        .unwrap_or_else(|| hermes_core::commands::PendingPrompt {
+                            text: text.clone(),
+                            display: text.clone(),
+                        });
+                    if let Some(store) = self.durable.as_mut()
+                        && let Err(e) = store.record_pending(&key, prompt, Some(&message))
+                    {
+                        self.banner(format!("Could not record the failed prompt: {e}"), true);
+                    }
+                }
                 self.queue_paused.insert(key.clone());
                 let draft = self.drafts.entry(key.clone()).or_default();
                 if draft.is_empty() {
@@ -905,19 +994,25 @@ impl Controller {
                     }
                     self.notice(notice, true);
                     self.banner(format!("Message failed: {message}"), true);
+                    let draft_text = text.clone();
+                    let ui_key = key.clone();
                     ui(&self.weak, move |w| {
                         let st = w.global::<AppState>();
-                        if st.get_active_session().as_str() == key && st.get_draft().is_empty() {
-                            st.set_draft(text.into());
+                        if st.get_active_session().as_str() == ui_key && st.get_draft().is_empty() {
+                            st.set_draft(draft_text.into());
                         }
                     });
                 } else {
-                    self.side_results.entry(key).or_default().push(notice);
+                    if !durable {
+                        self.side_results.entry(key.clone()).or_default().push(notice);
+                    }
                     self.banner(
                         "A message failed in another chat. Reopen it to recover the unsent prompt.".into(),
                         true,
                     );
                 }
+                self.sync_pause(&key);
+                self.persist_durable().await;
             }
             Cmd::Caps(cmd) => {
                 let _ = self.caps.send(cmd);
@@ -930,7 +1025,9 @@ impl Controller {
             Cmd::Retheme => self.reset = true,
             Cmd::Stop => {
                 if let Some(key) = self.queue_key().map(str::to_owned) {
-                    self.queue_paused.insert(key);
+                    self.queue_paused.insert(key.clone());
+                    self.sync_queue(&key);
+                    self.persist_durable().await;
                 }
                 if let Some(sid) = self.session.clone()
                     && let Err(e) = self
@@ -950,6 +1047,7 @@ impl Controller {
                 self.stored = None;
                 self.publish_queue();
                 self.transcript = Transcript::new();
+                self.shown_durable_results.clear();
                 self.reset = true;
                 self.flush();
                 ui(&self.weak, |w| {
@@ -1651,6 +1749,160 @@ impl Controller {
         });
     }
 
+    /// Restore the per-chat queues read at startup. Nothing is submitted here:
+    /// every restored queue is paused and waits for an explicit `/queue resume`.
+    fn restore_durable_startup(&mut self) {
+        let Some(store) = &self.durable else { return };
+        let saved: Vec<(String, Vec<hermes_core::commands::PendingPrompt>, bool, bool)> = store
+            .chat_ids()
+            .into_iter()
+            .map(|chat| {
+                let entries = store.entries(&chat);
+                (
+                    chat.clone(),
+                    entries,
+                    store.paused(&chat),
+                    store.pending(&chat).is_some(),
+                )
+            })
+            .collect();
+        let mut recovered = 0usize;
+        for (chat, entries, paused, pending) in saved {
+            if !entries.is_empty() {
+                self.queues.set_entries(&chat, entries);
+            }
+            if paused || pending || !self.queues.is_empty(&chat) {
+                self.queue_paused.insert(chat.clone());
+            }
+            if !self.queues.is_empty(&chat) || pending {
+                recovered += 1;
+            }
+        }
+        if recovered > 0 {
+            self.banner(
+                format!("Restored {recovered} saved chat queue(s) as paused. Use /queue resume in a chat to continue."),
+                false,
+            );
+        }
+    }
+
+    /// Save a snapshot off the async controller loop. A failure leaves the old
+    /// file in place and is shown once, not once per keystroke/edit.
+    async fn persist_durable(&mut self) -> bool {
+        let Some(store) = self.durable.clone() else {
+            return false;
+        };
+        let error = match tokio::task::spawn_blocking(move || store.save()).await {
+            Ok(Ok(())) => None,
+            Ok(Err(error)) => Some(error.to_string()),
+            Err(_) => Some("state writer task failed".into()),
+        };
+        let saved = error.is_none();
+        match error {
+            None => self.durable_save_error = None,
+            Some(message) => {
+                if self.durable_save_error.as_deref() != Some(message.as_str()) {
+                    self.durable_save_error = Some(message.clone());
+                    self.banner(
+                        format!(
+                            "Could not save queue/background state: {message}. Automatic queue delivery is paused."
+                        ),
+                        true,
+                    );
+                }
+            }
+        }
+        saved
+    }
+
+    /// Mirror one stored chat's FIFO + paused bit into the durable snapshot.
+    /// Runtime ids are intentionally skipped: they are not durable identities.
+    fn sync_queue(&mut self, key: &str) -> bool {
+        if self.stored.as_deref() != Some(key) {
+            return false;
+        }
+        let entries = self.queues.entries(key);
+        let paused = self.queue_paused.contains(key);
+        let Some(store) = self.durable.as_mut() else {
+            return false;
+        };
+        if let Err(error) = store.set_queue(key, entries, paused) {
+            self.banner(format!("Could not record queue state: {error}"), true);
+            return false;
+        }
+        true
+    }
+
+    fn sync_pause(&mut self, key: &str) {
+        if self.stored.as_deref() == Some(key) {
+            self.sync_queue(key);
+            return;
+        }
+        let known_stored = self.runtime_stores.values().any(|stored| stored == key)
+            || self
+                .durable
+                .as_ref()
+                .is_some_and(|store| store.chat_ids().iter().any(|chat| chat == key));
+        if !known_stored {
+            return;
+        }
+        let paused = self.queue_paused.contains(key);
+        let Some(store) = self.durable.as_mut() else { return };
+        if let Err(e) = store.set_paused(key, paused) {
+            self.banner(format!("Could not record queue pause state: {e}"), true);
+        }
+    }
+
+    fn clear_durable_pending(&mut self, key: &str) {
+        let Some(store) = self.durable.as_mut() else { return };
+        if let Err(e) = store.clear_pending(key) {
+            self.banner(format!("Could not clear saved prompt state: {e}"), true);
+        }
+    }
+
+    /// Rebuild this chat's recoverable local notices after transcript hydration.
+    /// Rendering never consumes the durable result: opening another chat or crashing
+    /// between a disk write and a UI repaint must not erase the only saved copy.
+    async fn restore_durable_chat(&mut self, chat: &str) {
+        self.deliver_durable_results(chat).await;
+        let pending = self.durable.as_ref().and_then(|store| store.pending(chat));
+        if let Some(pending) = pending.filter(|_| !self.transcript.running) {
+            self.queue_paused.insert(chat.to_owned());
+            if let Some(store) = self.durable.as_mut() {
+                let _ = store.set_paused(chat, true);
+            }
+            let display = pending.prompt.display.clone();
+            if self.drafts.get(chat).is_none_or(String::is_empty) {
+                self.drafts.insert(chat.to_owned(), display.clone());
+                let key = chat.to_owned();
+                ui(&self.weak, move |window| {
+                    let state = window.global::<AppState>();
+                    if state.get_active_session().as_str() == key && state.get_draft().is_empty() {
+                        state.set_draft(display.into());
+                    }
+                });
+            }
+            self.notice(format!("A saved submission has an unknown outcome and was not resent. Check this chat before sending it again.\nSaved draft: {}", pending.prompt.display), true);
+            self.persist_durable().await;
+        }
+    }
+
+    async fn deliver_durable_results(&mut self, chat: &str) {
+        let results = self
+            .durable
+            .as_ref()
+            .map(|store| store.results(chat))
+            .unwrap_or_default();
+        for result in results {
+            if self.shown_durable_results.insert((chat.to_owned(), result.id.clone())) {
+                self.notice(
+                    format!("{}: {}", result.task, result.text),
+                    result.error || result.text.starts_with("error:"),
+                );
+            }
+        }
+    }
+
     async fn ensure_session(&mut self) -> Option<String> {
         if let Some(s) = &self.session {
             return Some(s.clone());
@@ -1748,6 +2000,26 @@ impl Controller {
         let text = hermes_core::composer::with_refs(&refs, &text);
         self.composer.browse_reset();
         self.publish_attachments();
+        // Keep the exact submitted text as an uncertain in-flight entry until the
+        // turn's completion arrives. A crash therefore recovers a draft instead of
+        // silently resending it or forgetting that it may have run.
+        if let Some(key) = self.stored.clone().filter(|s| !s.is_empty())
+            && let Some(store) = self.durable.as_mut()
+        {
+            match store.record_pending(
+                &key,
+                hermes_core::commands::PendingPrompt {
+                    text: text.clone(),
+                    display: display.clone(),
+                },
+                None,
+            ) {
+                Ok(()) => {
+                    let _ = self.persist_durable().await;
+                }
+                Err(e) => self.banner(format!("Could not record the in-flight prompt: {e}"), true),
+            }
+        }
         let ch = self.transcript.push_user(&display);
         self.mark(ch);
         self.flush();
@@ -1886,6 +2158,7 @@ impl Controller {
                     .cloned();
                 self.publish_project();
                 self.transcript = Transcript::new();
+                self.shown_durable_results.clear();
                 let open_requests = r.open_requests.take().unwrap_or_default();
                 let ch = self.transcript.load_history(&r.messages);
                 self.transcript.running = r.running.unwrap_or(r.info.running);
@@ -1919,6 +2192,9 @@ impl Controller {
                         self.notice(result, false);
                     }
                     self.publish_queue();
+                }
+                if let Some(chat) = self.stored.clone() {
+                    self.restore_durable_chat(&chat).await;
                 }
             }
             Err(e) => self.banner(format!("Could not open chat: {e}"), true),
@@ -1966,7 +2242,12 @@ impl Controller {
                 }
                 if matches!(e.kind.as_str(), "background.complete" | "btw.complete") {
                     let sid = e.session_id.clone().unwrap_or_default();
-                    let key = self.runtime_stores.get(&sid).cloned().unwrap_or_else(|| sid.clone());
+                    let mapped = self.runtime_stores.get(&sid).cloned().or_else(|| {
+                        // Some backend paths address the stored id directly.
+                        (self.stored.as_deref() == Some(sid.as_str()) || self.all_sessions.iter().any(|s| s.id == sid))
+                            .then(|| sid.clone())
+                    });
+                    let key = mapped.clone().unwrap_or_else(|| sid.clone());
                     let text = e
                         .payload
                         .get("text")
@@ -1975,10 +2256,44 @@ impl Controller {
                     let error = e.payload.get("error").and_then(Value::as_str).unwrap_or_default();
                     let task = e.payload.get("task_id").and_then(Value::as_str).unwrap_or("task");
                     let output = format!("{task}: {}", if error.is_empty() { text } else { error });
+                    let id = hermes_core::durable::result_id(task, e.seq, text, error);
+                    let mut fresh = true;
+                    let mut saved = false;
+                    if let Some(chat) = mapped.as_deref() {
+                        if let Some(store) = self.durable.as_mut() {
+                            match store.record_result(
+                                chat,
+                                &id,
+                                task,
+                                if error.is_empty() { text } else { error },
+                                !error.is_empty(),
+                            ) {
+                                Ok(recorded) => {
+                                    fresh = recorded;
+                                    saved = recorded;
+                                }
+                                Err(e) => self.banner(format!("Could not save the background result: {e}"), true),
+                            }
+                        }
+                        if saved {
+                            self.persist_durable().await;
+                        }
+                    }
+                    if !fresh {
+                        return;
+                    }
                     if self.queue_key() == Some(key.as_str()) {
-                        self.notice(output, !error.is_empty() || text.starts_with("error:"));
+                        if saved {
+                            // Even a result for the open chat is persisted first, then
+                            // delivered and removed so a restart cannot repeat it.
+                            self.deliver_durable_results(&key).await;
+                        } else {
+                            self.notice(output, !error.is_empty() || text.starts_with("error:"));
+                        }
                     } else {
-                        self.side_results.entry(key).or_default().push(output);
+                        if !saved {
+                            self.side_results.entry(key).or_default().push(output);
+                        }
                         self.banner("Background result ready in its original chat.".into(), false);
                     }
                     return;
@@ -2032,17 +2347,27 @@ impl Controller {
                 }
                 if e.kind == "message.complete" {
                     self.flush();
-                    if e.payload.get("error").is_some_and(|v| !v.is_null())
+                    let key = self.queue_key().map(str::to_owned);
+                    if let Some(key) = &key {
+                        // The turn ended (success or error): its prompt is no longer
+                        // uncertain, so a restart must not offer it as an unsent draft.
+                        self.clear_durable_pending(key);
+                    }
+                    let failed = e.payload.get("error").is_some_and(|v| !v.is_null())
                         || matches!(
                             e.payload.get("status").and_then(Value::as_str),
                             Some("error" | "failed" | "interrupted" | "cancelled")
-                        )
-                    {
-                        if let Some(key) = self.queue_key().map(str::to_owned) {
-                            self.queue_paused.insert(key);
+                        );
+                    if failed {
+                        if let Some(key) = &key {
+                            self.queue_paused.insert(key.clone());
+                            self.sync_queue(key);
                         }
+                        self.persist_durable().await;
                     } else {
                         self.drain_queue().await;
+                        // Nothing queued: still commit the cleared pending record.
+                        self.persist_durable().await;
                     }
                 }
             }

@@ -6,6 +6,8 @@
 //! Auth mirrors `apps/desktop/electron/api-transport.ts`: the session token goes in
 //! `X-Hermes-Session-Token`.
 
+pub mod transfer;
+
 use std::time::Duration;
 
 use serde_json::Value;
@@ -18,6 +20,10 @@ pub enum HttpError {
     Io(String),
     #[error("request timed out")]
     Timeout,
+    #[error("local file transfer failed: {0}")]
+    Local(String),
+    #[error("upload source failed: {0}")]
+    Source(String),
     #[error("HTTP {status}: {body}")]
     Status { status: u16, body: String },
     #[error("bad response: {0}")]

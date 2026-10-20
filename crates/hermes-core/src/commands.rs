@@ -1,11 +1,27 @@
 //! UI-free slash helpers and a per-chat FIFO. Queue entries keep expanded skill
 //! text separate from the short invocation displayed in the transcript.
 use std::collections::{HashMap, VecDeque};
+use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+/// One queued prompt: `text` is what the backend receives (a skill dispatch is
+/// already expanded), `display` is the short form the transcript may show.
+///
+/// `Debug` is deliberately redacted: queued text can contain a private skill body.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PendingPrompt {
     pub text: String,
     pub display: String,
+}
+
+impl fmt::Debug for PendingPrompt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PendingPrompt")
+            .field("text_len", &self.text.len())
+            .field("display_len", &self.display.len())
+            .finish()
+    }
 }
 
 #[derive(Default)]
@@ -17,6 +33,23 @@ impl PromptQueues {
             .get(session)
             .map(|q| q.iter().cloned().collect())
             .unwrap_or_default()
+    }
+
+    /// Replace a chat's FIFO, e.g. with a queue restored from disk.
+    pub fn set_entries(&mut self, session: &str, entries: Vec<PendingPrompt>) {
+        if entries.is_empty() {
+            self.0.remove(session);
+        } else {
+            self.0.insert(session.into(), entries.into());
+        }
+    }
+
+    pub fn len(&self, session: &str) -> usize {
+        self.0.get(session).map(VecDeque::len).unwrap_or(0)
+    }
+
+    pub fn is_empty(&self, session: &str) -> bool {
+        self.len(session) == 0
     }
 
     pub fn push(&mut self, session: &str, prompt: PendingPrompt) {

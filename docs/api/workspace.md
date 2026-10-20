@@ -24,7 +24,7 @@ The desktop passes the selected profile name for non-default profiles.
 | Read a text file | `fs_read_text_request`, `fs_read_text` | `GET /api/fs/read-text?path=…&profile=…` | Up to 512 KiB decoded text; `binary`, `truncated`, `language`, `mimeType` |
 | Write a text file | `fs_write_text_request`, `fs_write_text` | `POST /api/fs/write-text?profile=…` body `{path, content}` | **Destructive**: overwrite/create; parent must exist, staged to a sibling temp file then renamed |
 | Read as data URL | `fs_read_data_url_request`, `fs_read_data_url` | `GET /api/fs/read-data-url?path=…&profile=…` | Inline images/media (`data:<mime>;base64,…`), size-capped by the backend |
-| Download a file | `fs_download_request` | `GET /api/fs/download?path=…&profile=…&session_id=…` | **Builder only** — the body is the raw file, which the JSON `Rest` client cannot carry; hand the `Request` to a body-preserving HTTP client. `session_id` scopes a relative path to a session cwd (`""` omits it) |
+| Download a file | `fs_download_request`, `fs_download_to` | `GET /api/fs/download?path=…&profile=…&session_id=…` | Streams raw bytes with explicit byte/time limits. `Rest::download_file` adds atomic local publication. `session_id` scopes relative paths to the session cwd. Live isolated upload/download read-back passed; see [FILE_TRANSFERS.md](../FILE_TRANSFERS.md) |
 | Repo root for a path | `fs_git_root_request`, `fs_git_root` | `GET /api/fs/git-root?path=…&profile=…` | `root: null` outside a repo |
 | Default working directory | `fs_default_cwd_request`, `fs_default_cwd` | `GET /api/fs/default-cwd?profile=…` | Config `terminal.cwd`, else the server process cwd; `branch` is `""` outside a repo |
 
@@ -34,7 +34,8 @@ The desktop passes the selected profile name for non-default profiles.
 |---|---|---|---|
 | Create a managed folder | `managed_mkdir_request`, `managed_mkdir` | `POST /api/files/mkdir` body `{path}` | **Destructive**: creates parents. Reply carries `entry` plus the policy metadata (`root`, `locked_root`, `can_change_path`); 403 when a locked managed-files root would be escaped |
 | List a managed folder | `managed_list_request`, `managed_list` | `GET /api/files?path` | Read-only; unit-tested (not run live: depends on the managed-root policy) |
-| Stream a managed file | `managed_stream_request` | `GET /api/files/stream?path` | Raw media bytes, so builder only (the JSON client cannot decode it) |
+| Stream a managed file | `managed_stream_request`, `managed_stream_to` | `GET /api/files/stream?path` | Byte-preserving stream with validated inclusive ranges. WAV range exercised against the isolated backend |
+| Multipart upload | `managed_upload_stream` | `POST /api/files/upload-stream` | Bounded binary upload with explicit overwrite choice and no automatic retry. Exact file bytes and no-overwrite conflict verified against the isolated backend |
 | Upload a managed file | `managed_upload_request`, `managed_upload` | `POST /api/files/upload` `{path, data_url, overwrite}` | **Writes a file**. Builder-only |
 | Delete a managed path | `managed_delete_request`, `managed_delete` | `DELETE /api/files` body `{path, recursive}` | **Destructive**. Builder-only |
 | Chat image upload | `chat_image_upload_request`, `chat_image_upload` | `POST /api/chat/image-upload?profile` `{data_url, filename}` | **Writes** into the profile's images dir (no delete route). Builder-only |

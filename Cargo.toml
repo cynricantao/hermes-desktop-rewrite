@@ -12,7 +12,7 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/cynricantao/hermes-desktop-rewrite"
-rust-version = "1.88"
+rust-version = "1.89"
 
 [workspace.dependencies]
 hermes-core = { path = "crates/hermes-core" }

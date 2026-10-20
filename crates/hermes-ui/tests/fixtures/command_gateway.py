@@ -66,6 +66,8 @@ def ask(kind, sid):
         method, params = 'clarify', {'questions': QUESTIONS[kind]}
     elif kind == 'sudo':
         method, params = 'sudo', {'command': 'sudo pacman -S fixture'}
+    elif kind == 'vault.code':
+        method, params = 'vault.code', {'site': 'example.test', 'hint': 'Fixture one-time code'}
     else:
         method, params = 'secret', {'prompt': 'Fixture API key', 'env_var': 'FIXTURE_KEY'}
     with LOCK:
@@ -93,7 +95,11 @@ class Handler(socketserver.StreamRequestHandler):
             headers[key.lower()] = value.strip()
         if headers.get('upgrade', '').lower() != 'websocket':
             url = urlsplit(request[1])
-            if url.path == '/api/test/state':
+            if url.path == '/api/status':
+                # Deliberately differs from the app's HERMES_HOME. Recovery must
+                # use the attached backend's identity, not the launch environment.
+                body = json.dumps({'hermes_home': '/fixture/backend'}).encode()
+            elif url.path == '/api/test/state':
                 with LOCK:
                     body = json.dumps(CALLS).encode()
             elif url.path == '/api/test/reject-create':

@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**76 done · 357 partial · 353 not started · 8 unsupported** (of 794).
+**76 done · 358 partial · 352 not started · 8 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Summary
@@ -88,7 +88,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 - [x] Send message / submit turn — RPC prompt.submit — src/app/session/hooks/use-prompt-actions/submit.ts ⟶ live: `HERMES_DESKTOP_AUTOSEND` run, screenshots rs-dark-chat-*.png
 - [~] Steer a running turn — RPC session.steer — src/app/chat/session-tile-actions.ts ⟶ `/steer` and registry aliases wired; 2026-10-18 `tests/command_controls.rs` verifies exact live-runtime RPC, no interrupt, accepted/rejected/unknown-status handling against a gateway simulation. Provider/tool-boundary delivery remains unverified.
-- [~] Queue a message while busy (⌘Enter) — local + RPC prompt.submit (queue drain) — src/store/composer-queue.ts ⟶ `/queue`/`/q` and Ctrl+Enter wired, keyed by stored chat, FIFO/edit/rm/move/clear/resume. Live 2026-10-18 `tests/live_backend.rs` commands verifies management without inference; gateway simulation verifies drains, Stop/error/attachment pause, runtime-remint isolation and rejected queue draft recovery (keyboard, slash/quick aliases, session-create failures, newer-draft protection). Live inference drain, disk persistence and macOS Cmd chord unverified/unbuilt.
+- [~] Queue a message while busy (⌘Enter) — local + RPC prompt.submit (queue drain) — src/store/composer-queue.ts ⟶ `/queue`/`/q` and Ctrl+Enter wired, keyed by stored chat, FIFO/edit/rm/move/clear/resume. Live 2026-10-18 `tests/live_backend.rs` commands verifies management without inference; gateway simulation verifies drains, Stop/error/attachment pause, runtime-remint isolation and rejected queue draft recovery (keyboard, slash/quick aliases, session-create failures, newer-draft protection). Durable queue snapshots and uncertain-submission records implemented; isolated controller recovery checks prove paused restart, explicit one-shot drain and stale-writer failure without submission. No real-user session store is touched. Live inference drain, disk persistence and macOS Cmd chord unverified/unbuilt.
 - [ ] Send next queued message (⌘⇧K) — local — src/store/composer-queue.ts, src/lib/keybinds/actions.ts
 - [x] Interrupt / stop the active turn — RPC session.interrupt — src/app/chat/session-tile-actions.ts ⟶ live 2026-10-16, `tests/live_backend.rs` vs private backend: Stop clicked mid-stream → reply stops growing (30 of 300 lines, unchanged 3 s later), running=false, no spinner, button back to Send, next prompt answered. **Esc** (global shortcut, focus in composer) verified the same way: stopped at 24 of 300 lines, unchanged 3 s later, next prompt answered
 - [~] Redirect a running turn — RPC session.redirect — src/app/chat/session-tile-actions.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
@@ -217,7 +217,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Undelivered clarify notice — local — src/components/assistant-ui/clarify/undelivered-notice.tsx
 - [~] Restore pending approval/clarify on resume — local — src/app/session/hooks/use-session-actions/restore-pending-approval.ts, restore-pending-clarify.ts ⟶ `session.resume.open_requests` replayed (approval + input prompts), resumes at the first unlocked question; gateway simulation only
 - [~] Secret request (masked value) — SRV secret — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts ⟶ masked card, `{value}` reply, field cleared at once and never echoed; Esc/Skip sends an empty value. Gateway simulation only
-- [~] Sudo request (terminal/display) — SRV sudo, display.install.sudo — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts ⟶ masked card for `sudo` and `display.install.sudo` (and `vault.unlock_prompt`); gateway simulation only
+- [~] Sudo request (terminal/display) — SRV sudo, display.install.sudo — src/app/session/hooks/use-message-stream/gateway-event/input-requests.ts ⟶ masked card for `sudo` and `display.install.sudo` (and `vault.unlock_prompt`, `vault.code`); gateway simulation checks masked code response, clearing and Escape decline. No real verification service or native vault-save integration tested.
 - [~] Connection request (remote OAuth/pairing) — SRV connection.request, RPC connection.respond — src/store/connection-request.ts ⟶ backend client ready in `api::plugins` (see docs/api/); UI not wired
 - [~] Free-tier challenge prompt — WS free_tier.challenge — src/store/free-tier-challenge.ts ⟶ backend client ready in `api::billing` (`free_tier.challenge` payload) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [~] Clarify lock (single-flight) — RPC clarify.lock — src/store/clarify.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
@@ -560,7 +560,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] TTS voices per provider (Edge/OpenAI/ElevenLabs/xAI/MiniMax/Mistral/Gemini/NeuTTS/KittenTTS/Piper/DeepInfra) — config tts.* — src/app/settings/constants.ts
 - [ ] Read responses aloud — config voice.auto_tts — src/app/settings/constants.ts
 - [~] Voice playback + queue — local + REST /api/audio/speak — src/lib/voice-playback.ts ⟶ backend client ready in `api::voice` (live-verified calls listed in docs/api/voice.md); UI not wired
-- [ ] Voice stream (live PCM sibling WS) — local WS /api/voice — src/lib/voice-stream.ts
+- [~] Voice stream (live PCM sibling WS) — WS /api/audio/transcribe-stream, /api/audio/speak-stream — src/lib/voice-stream.ts ⟶ UI-free bounded clients in `streaming`, tested with real loopback WebSocket fixtures; microphone/playback/provider integration and UI wiring remain unverified.
 - [~] Voice barge-in / interrupted — WS voice.interrupted — src/lib/voice-barge-in.ts ⟶ backend client ready in `api::events` (`voice.interrupted`) (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [~] Wake word (always-listening) — RPC wake.start|stop|status|feed|pause|resume — src/store/wake-word.ts ⟶ backend client ready in `api::system` (see docs/api/); UI not wired
 - [ ] Wake indicator window — local (Electron wake-indicator) — src/app/wake-indicator/wake-indicator-app.tsx
@@ -1143,7 +1143,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Subagent steer/interrupt — RPC subagent.steer, subagent.interrupt — src/store/subagents.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [~] Subagent spawn tree save/load/list — RPC spawn_tree.save|load|list — src/store/subagents.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
 - [~] Delegation status/pause — RPC delegation.status, delegation.pause — src/store/background-delegation.ts ⟶ backend client ready in `api::system` (live-verified calls listed in docs/api/system.md); UI not wired
-- [~] Background prompt (BTW) — RPC prompt.background, prompt.btw; WS btw.complete — src/app/session/hooks/use-prompt-actions/slash.ts ⟶ native `/bg`/`/background` and `/btw` use side-agent RPCs; completions return to stored parent chat even after navigation. Gateway simulation verifies bg request/results and wrong-chat isolation 2026-10-18. Successful live provider bg/btw completion and durable result storage remain unverified/unbuilt.
+- [~] Background prompt (BTW) — RPC prompt.background, prompt.btw; WS btw.complete — src/app/session/hooks/use-prompt-actions/slash.ts ⟶ native `/bg`/`/background` and `/btw` use side-agent RPCs; completions return to stored parent chat even after navigation. Gateway simulation verifies bg request/results and wrong-chat isolation 2026-10-18. Durable per-chat result storage, replay deduplication and reopening are tested with isolated disk/controller fixtures in `tests/durable_controls.rs`; successful live provider bg/btw completion remains unverified.
 - [~] Agents page (roster) — local + RPC session.active_list — src/app/agents/index.tsx ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [~] Learning graph — REST /api/learning/graph — src/api/skills.ts ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired
 - [~] Learning node detail/edit/delete — REST /api/learning/node + RPC learning.* — src/api/skills.ts ⟶ backend client ready in `api::extras` (live-verified calls listed in docs/api/extras.md / extras-admin.md); UI not wired

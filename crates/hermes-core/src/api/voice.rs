@@ -88,7 +88,7 @@ async fn send_timed_as<T: DeserializeOwned>(rest: &Rest, r: &Request, timeout: D
 /// verdict carries the provider endpoint the client may call itself (`wire` names the protocol:
 /// `openai-multipart` / `xai-stt` / `elevenlabs-stt` for STT, `openai-speech` / `elevenlabs-tts`
 /// for TTS), plus `streaming` on the STT half when live dictation is available.
-#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[derive(Clone, Default, PartialEq, serde::Deserialize)]
 #[serde(default)]
 pub struct VoiceEndpoint {
     pub mode: String,
@@ -109,6 +109,21 @@ pub struct VoiceEndpoint {
     /// Free-form Whisper-silence contract (`phrases` + `repeat_regex`).
     pub hallucination_filter: Option<Value>,
     pub streaming: Option<bool>,
+}
+
+impl std::fmt::Debug for VoiceEndpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Provider URLs and opaque extras can contain credentials too. Do not only
+        // redact api_key and accidentally expose an Authorization override or URL token.
+        f.debug_struct("VoiceEndpoint")
+            .field("mode", &self.mode)
+            .field("provider", &self.provider)
+            .field("has_api_key", &self.api_key.is_some())
+            .field("has_base_url", &self.base_url.is_some())
+            .field("has_extra_body", &self.extra_body.is_some())
+            .field("streaming", &self.streaming)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]

@@ -36,6 +36,7 @@ pub mod capabilities;
 pub mod commands;
 pub mod composer;
 pub mod diff;
+pub mod durable;
 pub mod highlight;
 pub mod http;
 pub mod input_requests;
@@ -51,6 +52,7 @@ pub mod remote;
 pub mod rpc;
 pub mod sessions;
 pub mod settings;
+pub mod streaming;
 pub mod styled;
 pub mod transcript;
 
