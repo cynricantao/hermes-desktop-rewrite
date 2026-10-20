@@ -1892,14 +1892,11 @@ impl Controller {
         else {
             return;
         };
-        if !self
-            .durable
-            .as_ref()
-            .is_some_and(|store| store.pending(&chat).is_some())
-        {
+        let Some(pending) = self.durable.as_ref().and_then(|store| store.pending(&chat)) else {
             return;
-        }
+        };
         self.clear_durable_pending(&chat);
+        self.clear_recovered_draft(&chat, pending.prompt.display);
         if turn_failed(&e.payload) {
             self.queue_paused.insert(chat.clone());
             self.sync_pause(&chat);
@@ -1913,13 +1910,15 @@ impl Controller {
     async fn restore_durable_chat(&mut self, chat: &str) {
         self.deliver_durable_results(chat).await;
         let pending = self.durable.as_ref().and_then(|store| store.pending(chat));
-        if pending
+        if let Some(answered) = pending
             .as_ref()
-            .is_some_and(|p| p.error.is_none() && self.history_answered(&p.prompt))
+            .filter(|p| p.error.is_none() && self.history_answered(&p.prompt))
         {
             // Its completion arrived while no window watched this chat; the history now
             // shows the answer, so the prompt is no longer uncertain.
+            let display = answered.prompt.display.clone();
             self.clear_durable_pending(chat);
+            self.clear_recovered_draft(chat, display);
             self.persist_durable().await;
             return;
         }

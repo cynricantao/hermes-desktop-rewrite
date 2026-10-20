@@ -40,7 +40,7 @@ Malformed JSON/schema errors do not echo saved values.
   draining. A restored uncertain prompt is never silently re-executed.
 - While a chat has an unknown-outcome record, its queue does not drain and
   `/queue resume` is refused. A recorded submit failure does not block: the backend
-  answered with an error and the prompt is back in the composer. Check the chat, then run `/queue discard-pending`; one store slot per
+  answered with an error, and the prompt was put back in the composer if it was empty. Check the chat, then run `/queue discard-pending`; one store slot per
   chat is never overwritten by an automatic submission. A manual Send is explicit
   intent and replaces it.
 - A turn that completes while its chat is not open clears that chat's uncertain
@@ -65,8 +65,8 @@ rewrite already-rendered transcript rows. `/queue discard-pending` explicitly re
 an uncertain recovery record and is refused while the chat is running; it also clears
 the recovered composer draft if the user has not edited it. Ordinary `/queue clear`
 only clears queued prompts, not a submitted prompt or saved results. Deleting a chat
-removes its queue, uncertain record and saved results from the state file; archiving
-keeps them.
+removes its queue, uncertain record and saved results from memory and, when the save
+succeeds, from the state file (a failed save is shown); archiving keeps them.
 
 Result identity uses the gateway's per-session event `seq` plus the task id (a fresh
 UUID per spawn). Only a backend that omits `seq` falls back to hashing the payload.
@@ -118,6 +118,14 @@ Known limits, left for later work:
   in the state directory; it is not swept at startup.
 - The startup identity probe is a single request; if it fails, recovery stays off
   until restart.
+- History reconciliation matches text only. If the app dies between recording a
+  prompt and the backend accepting it, and that exact text was also the previous
+  answered prompt, the record is cleared as answered. A submit time on the record
+  would close this.
+- An inactive completion clears the chat's record without checking which runtime
+  wrote it; only the open chat is protected from an older runtime's completion.
+- A very late submit failure (after the turn already completed) can re-create a
+  failed record; it is shown as a failure on reopen and does not block the queue.
 
 One uncertain submission is tracked per chat. This is a recovery record, not an
 exactly-once backend execution protocol. It cannot undo a submitted prompt or prove

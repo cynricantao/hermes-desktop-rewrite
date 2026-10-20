@@ -44,10 +44,12 @@ impl Controller {
             return false;
         }
         self.publish_queue();
-        self.banner(
-            "Queued and saved for the next turn. /queue lists pending prompts.".into(),
-            false,
-        );
+        let message = if self.durable.is_some() {
+            "Queued and saved for the next turn. /queue lists pending prompts."
+        } else {
+            "Queued for the next turn (recovery is off, so it will not survive a restart). /queue lists pending prompts."
+        };
+        self.banner(message.into(), false);
         true
     }
 
@@ -111,7 +113,7 @@ impl Controller {
     /// After an explicit discard, drop the recovered draft the restore step put in the
     /// composer, so one Enter cannot resend the prompt just declared resolved. A draft
     /// the user has since edited is kept.
-    fn clear_recovered_draft(&mut self, chat: &str, display: String) {
+    pub(super) fn clear_recovered_draft(&mut self, chat: &str, display: String) {
         if self.drafts.get(chat) == Some(&display) {
             self.drafts.remove(chat);
         }
@@ -163,7 +165,9 @@ impl Controller {
             }
             let saved = self.durable.clone();
             let Some(store) = self.durable.as_mut() else {
-                return false;
+                // Handled: with recovery off there are no saved records to clear.
+                self.banner("Queue recovery is off this session, so there are no saved records to clear.".into(), false);
+                return true;
             };
             let discarded = store.pending(&sid).map(|p| p.prompt.display);
             let result = if arg == "clear-results" {
