@@ -73,9 +73,10 @@ bash scripts/package/release-notes.sh 0.1.0 dist
 - **No auto-updater.** The app does not check these releases for updates.
 - **No ARM Linux package.** `packaging/PKGBUILD` declares `aarch64`, but CI builds
   x86_64 only.
-- **The in-app browser helper is not shipped.** `helpers/hermes-browser` is a
-  separate GTK/WebKit program built outside the workspace; release artifacts
-  contain the app only, so in-app browsing is unavailable from an installed
-  release.
+- **The in-app browser helper ships on Linux only.** `helpers/hermes-browser` is
+  a separate GTK/WebKit program built outside the workspace. The Arch package
+  builds and installs it (`/usr/bin/hermes-browser`, found next to the app
+  binary); the Windows and macOS bundles contain the app alone, so in-app
+  browsing is unavailable there.
 - **Windows and macOS are built, not tested.** Perf figures in `docs/PERF.md` are
   Linux measurements; nothing is measured on Windows or macOS yet.
