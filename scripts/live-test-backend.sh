@@ -24,6 +24,10 @@ real_root="$(realpath -m "$HOME/.hermes")"
 case "$(realpath -m "$home")/" in
   "$real_root"/*) echo "refusing: HERMES_LIVE_HOME ($home) is inside ~/.hermes" >&2; exit 2 ;;
 esac
+if [ "$(realpath -m "$src")" = "$(realpath -m "$home")" ]; then
+  # Copying a home onto itself truncates its .env before reading it, losing the model key.
+  echo "refusing: source home ($src) is the live-test home; unset HERMES_HOME" >&2; exit 2
+fi
 mkdir -p "$home"
 chmod 700 "$home"
 python3 - "$src/config.yaml" "$home/config.yaml" <<'PY'
