@@ -5,7 +5,7 @@
 //! Always allow, by click and by keyboard), a long (600-message) conversation, and the
 //! settings panel (registry nav, "Applies to" profile scope, saving, persistence, search).
 //!
-//! `HERMES_LIVE_ONLY=rich_seeded,sidebar,composer,keys,stop,model,approval,long,sessions,settings,settings_pages,capabilities,models` runs a subset.
+//! `HERMES_LIVE_ONLY=durable,rich_seeded,sidebar,composer,keys,stop,model,approval,long,sessions,settings,settings_pages,capabilities,models` runs a subset.
 //! The `models` section covers the picker's catalog curation (visibility ticks, favourites,
 //! hand-typed ids, group folding, Reset, and the Edit models dialog) — device-local state,
 //! so it checks the scratch `prefs.json`; pass `HERMES_LIVE_SCREENSHOTS=<dir>` to also dump
@@ -28,7 +28,8 @@
 //! `settings` writes through the panel and must never touch real files, so it points the app
 //! at scratch copies: `HERMES_DESKTOP_PREFS` and `HERMES_DESKTOP_EXPORT_DIR` are set to a
 //! temporary directory before the controller starts (the config writes go to the private
-//! backend's own home).
+//! backend's own home). `HERMES_DESKTOP_STATE` points queue recovery at the same scratch
+//! directory; the `durable` section spends two short model calls.
 //!
 //! The approval part runs `rm -r` on throwaway directories under
 //! `$HERMES_LIVE_SCRATCH` (default `$TMPDIR/hermes-live-test`). "Always allow" writes
@@ -40,6 +41,8 @@
 mod commands;
 #[path = "live_backend/composer.rs"]
 mod composer;
+#[path = "live_backend/durable.rs"]
+mod durable;
 #[path = "live_backend/rich_seeded.rs"]
 mod rich_seeded;
 #[path = "live_backend/sidebar.rs"]
@@ -308,6 +311,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("sidebar") {
         sidebar::section(&ui, &log).await;
+    }
+    if want("durable") {
+        durable::section(&ui, &log).await;
     }
     if want("failure_recovery") {
         failure_recovery_section(&ui, &log).await;
@@ -3416,6 +3422,9 @@ fn live_backend() {
     unsafe {
         std::env::set_var("HERMES_DESKTOP_PREFS", scratch.join("prefs.json"));
         std::env::set_var("HERMES_DESKTOP_EXPORT_DIR", scratch.join("export"));
+        // Queue recovery state: without this a run without HERMES_HOME would write the
+        // user's real ~/.local/state/hermes-desktop-rs/durable-state.json.
+        std::env::set_var("HERMES_DESKTOP_STATE", scratch.join("durable-state.json"));
     }
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
