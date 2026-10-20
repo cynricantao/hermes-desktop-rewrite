@@ -14,8 +14,8 @@
 //! * `/api/fs/list` answers **200** with `{"entries": [], "error": "ENOENT"}` when the read
 //!   fails — the errno string is in the payload, not the HTTP status.
 //! * `GET /api/git/status` answers JSON `null` for a non-repo; the wrapper returns `None`.
-//! * `/api/fs/download` (and the rest of `/api/files/*`) **stream raw bytes**. The JSON
-//!   [`Rest`] client cannot carry those, so those routes get a request builder only.
+//! * Binary downloads/media and multipart uploads use [`crate::http::transfer`],
+//!   preserving bytes with explicit size/time limits and no automatic write retries.
 //! * The git routes spawn `git` on the backend host; `gh-auth` / `ship-info` / `pr-list` /
 //!   `push` / `create-pr` also shell out to `gh` (network).
 //! * RPCs marked `live_session` (rollback, process, terminal) need a live session the gateway
@@ -136,10 +136,10 @@ pub async fn fs_read_data_url(rest: &Rest, path: &str, profile: &str) -> Result<
     send_as(rest, &fs_read_data_url_request(path, profile)).await
 }
 
-/// `GET /api/fs/download?path=…` — **streams the file as an attachment**; the body is binary,
-/// so there is no async wrapper (the JSON [`Rest`] client cannot decode it). Hand this
-/// [`Request`] to a body-preserving HTTP client. `session_id` scopes a relative path to a
-/// session's cwd; `""` omits it.
+/// `GET /api/fs/download?path=…` streams the file as an attachment.
+/// `session_id` scopes a relative path to a session's cwd; `""` omits it.
+/// Use [`fs_download_to`] to preserve binary bytes, or [`Rest::download_file`] for
+/// atomic publication to a caller-confirmed destination.
 pub fn fs_download_request(path: &str, profile: &str, session_id: &str) -> Request {
     req(
         Method::Get,
@@ -149,6 +149,25 @@ pub fn fs_download_request(path: &str, profile: &str, session_id: &str) -> Reque
         ),
         None,
     )
+}
+
+/// Stream a backend file into a sink. Partial sink bytes must be discarded on error.
+pub async fn fs_download_to<W: tokio::io::AsyncWrite + Unpin>(
+    rest: &Rest,
+    path: &str,
+    profile: &str,
+    session_id: &str,
+    writer: &mut W,
+    options: crate::http::transfer::TransferOptions,
+) -> Result<crate::http::transfer::BinaryReply, ApiError> {
+    Ok(rest
+        .download(
+            &fs_download_request(path, profile, session_id).path,
+            writer,
+            None,
+            options,
+        )
+        .await?)
 }
 
 /// `GET /api/fs/git-root` reply: the repo root that owns the path, or `null`.
@@ -1978,11 +1997,37 @@ pub async fn managed_list(rest: &Rest, path: &str) -> Result<ManagedListing, Api
     send_as(rest, &managed_list_request(path)).await
 }
 
-/// Builder only: `GET /api/files/stream` answers **raw media bytes** with Range
-/// support and inline `Content-Disposition`; the JSON [`Rest`] client cannot
-/// carry that, so the controller should issue this request outside [`Rest`].
+/// `GET /api/files/stream` answers raw media bytes with Range support.
+/// Use [`managed_stream_to`] for a bounded, byte-preserving transfer.
 pub fn managed_stream_request(path: &str) -> Request {
     req(Method::Get, with_query("/api/files/stream", &[("path", path)]), None)
+}
+
+/// Stream managed media bytes, optionally requesting an inclusive byte range.
+pub async fn managed_stream_to<W: tokio::io::AsyncWrite + Unpin>(
+    rest: &Rest,
+    path: &str,
+    writer: &mut W,
+    range: Option<crate::http::transfer::ByteRange>,
+    options: crate::http::transfer::TransferOptions,
+) -> Result<crate::http::transfer::BinaryReply, ApiError> {
+    Ok(rest
+        .download(&managed_stream_request(path).path, writer, range, options)
+        .await?)
+}
+
+/// Stream a managed upload without a whole-file allocation or base64 inflation.
+/// **Writes a file**. Confirm the target/overwrite choice first. A lost reply is
+/// an unknown outcome; do not automatically retry.
+pub async fn managed_upload_stream<R: tokio::io::AsyncRead + Unpin>(
+    rest: &Rest,
+    path: &str,
+    source: &mut R,
+    length: u64,
+    overwrite: bool,
+    options: crate::http::transfer::TransferOptions,
+) -> Result<ManagedWrite, ApiError> {
+    crate::api::decode(rest.upload_stream(path, source, length, overwrite, options).await?)
 }
 
 /// `POST /api/files/upload`: write one base64 `data_url` into the managed root.

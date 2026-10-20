@@ -51,6 +51,7 @@ pub mod remote;
 pub mod rpc;
 pub mod sessions;
 pub mod settings;
+pub mod streaming;
 pub mod styled;
 pub mod transcript;
 
