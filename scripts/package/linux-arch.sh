@@ -33,7 +33,15 @@ makepkg --syncdeps --noconfirm --cleanbuild
 
 mkdir -p "$root/$outdir"
 shopt -s nullglob
-packages=(*.pkg.tar.zst)
+packages=()
+for candidate in *.pkg.tar.zst; do
+  # makepkg also emits a `-debug` package; the binary is stripped (!lto builds
+  # without debug info in build()), so that package is empty and not released.
+  case "$candidate" in
+    *-debug-*) continue ;;
+  esac
+  packages+=("$candidate")
+done
 if [ "${#packages[@]}" -eq 0 ]; then
   echo "error: makepkg produced no .pkg.tar.zst" >&2
   exit 1
