@@ -1,6 +1,6 @@
 //! Blocking questions the agent asks the user through server→client requests: `clarify`
 //! (1–5 questions with optional choices), and the single masked-value prompts `sudo`,
-//! `display.install.sudo`, `secret` and `vault.unlock_prompt`.
+//! `display.install.sudo`, `secret`, `vault.unlock_prompt` and `vault.code`.
 //!
 //! Wire contract (`tui_gateway/server.py::_clarify_block`, `_ask`, `server_requests.py`):
 //! * clarify params `{session_id, questions: [{qid, question, choices|null, multi_select}],
@@ -111,7 +111,7 @@ fn parse_questions(params: &Value) -> Vec<Question> {
 pub fn handles(method: &str) -> bool {
     matches!(
         method,
-        "clarify" | "sudo" | "display.install.sudo" | "secret" | "vault.unlock_prompt"
+        "clarify" | "sudo" | "display.install.sudo" | "secret" | "vault.unlock_prompt" | "vault.code"
     )
 }
 
@@ -179,6 +179,15 @@ pub fn parse(id: &str, method: &str, params: &Value) -> Option<PendingInput> {
                 },
             )
         }
+        "vault.code" => base(
+            InputKind::Masked,
+            "Verification code requested".into(),
+            [s(params, "site"), s(params, "hint")]
+                .into_iter()
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<_>>()
+                .join(" · "),
+        ),
         "vault.unlock_prompt" => {
             let name = s(params, "display_name");
             let backend = s(params, "backend");

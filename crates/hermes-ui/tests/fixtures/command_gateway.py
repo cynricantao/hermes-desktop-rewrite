@@ -67,6 +67,8 @@ def ask(kind, sid):
         method, params = 'clarify', {'questions': QUESTIONS[kind]}
     elif kind == 'sudo':
         method, params = 'sudo', {'command': 'sudo pacman -S fixture'}
+    elif kind == 'vault.code':
+        method, params = 'vault.code', {'site': 'example.test', 'hint': 'Fixture one-time code'}
     else:
         method, params = 'secret', {'prompt': 'Fixture API key', 'env_var': 'FIXTURE_KEY'}
     with LOCK:
