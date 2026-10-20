@@ -43,9 +43,12 @@ HERMES_DESKTOP_PORT=<port> cargo test -p hermes-core --test live_api_<area> -- -
 Every RPC method, notification and server->client request the Electron desktop uses now
 has a typed client. Contract methods the desktop never calls stay unwrapped:
 `browser.controller.*` (browser-extension bridge), `session.foreign.*`, `shell.exec` and
-`session.delete` (the REST delete with mutation identity is used instead). Still outside the JSON
-client: multipart `POST /api/files/upload-stream`, binary replies (`GET /api/files/stream`,
-`GET /api/fs/download`, which have request builders only) and the streaming sockets
-(`/api/audio/*-stream`, `/api/display/ws`), whose wire formats are documented in
-`api::voice` and `api::display`. `GET /api/agents` is a Hermes Cloud (NAS) endpoint, not a
-local backend route, so it is not wrapped.
+`session.delete` (the REST delete with mutation identity is used instead).
+Binary file downloads/media and multipart uploads now have bounded clients in
+`http::transfer` and `api::workspace`; see [FILE_TRANSFERS.md](FILE_TRANSFERS.md).
+`streaming::{TranscribeStream, SpeakStream, DisplayStream}` carry the raw audio/display
+WebSockets; see [STREAMING.md](STREAMING.md). Mic capture, playback, RFB decoding and
+screen integration remain outside these clients.
+`GET /api/agents` is a Hermes Cloud (NAS) endpoint, not a local backend route, so it
+is not wrapped. Remote HTTPS/OAuth/SSH and new host-native request integrations are
+deferred to a separate batch.
