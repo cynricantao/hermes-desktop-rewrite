@@ -64,19 +64,27 @@ fn send(ui: &AppWindow, text: &str) -> bool {
     });
     true
 }
-async fn calls(port: u16) -> Value {
+async fn fixture_get(port: u16, path: &str) -> Value {
     let (tx, rx) = tokio::sync::oneshot::channel();
+    let path = path.to_owned();
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
         let result = rt
-            .block_on(hermes_core::http::Rest::new("127.0.0.1", port, "fixture").get("/api/test/state"))
+            .block_on(hermes_core::http::Rest::new("127.0.0.1", port, "fixture").get(&path))
             .unwrap();
         let _ = tx.send(result);
     });
     rx.await.unwrap()
+}
+async fn calls(port: u16) -> Value {
+    fixture_get(port, "/api/test/state").await
+}
+/// Re-read the state file until `check` holds (saves happen off the UI thread).
+async fn on_disk(path: &std::path::Path, backend: &str, check: impl Fn(&DurableState) -> bool) -> bool {
+    wait(|| DurableState::open(path, backend).is_ok_and(|s| check(&s))).await
 }
 fn submissions(calls: &Value, text: &str) -> usize {
     calls
@@ -135,6 +143,63 @@ async fn exercise(
         "queue pop and uncertain in-flight record were saved together",
         saved.entries("stored-recovery").is_empty() && saved.pending("stored-recovery").is_some(),
     );
+
+    // The answer to a saved uncertain prompt is already in the history: no false warning.
+    state.invoke_open_session("stored-answered".into());
+    check(
+        "an answered saved prompt is reconciled from history without a false warning",
+        wait(|| output(ui).contains("Answered while away.")).await
+            && on_disk(&path, &backend, |s| s.pending("stored-answered").is_none()).await
+            && !output(ui).contains("unknown outcome"),
+    );
+    // The resumed turn of stored-recovery finishes while another chat is open.
+    fixture_get(port, "/api/test/finish?sid=resumed-stored-recovery").await;
+    check(
+        "a turn finishing in a chat that is not open clears its uncertain record",
+        on_disk(&path, &backend, |s| s.pending("stored-recovery").is_none()).await,
+    );
+
+    state.invoke_open_session("stored-failed".into());
+    check(
+        "a recorded submission failure is shown instead of an unknown outcome",
+        wait(|| output(ui).contains("failed and was not resent: Simulated earlier failure")).await
+            && !output(ui).contains("unknown outcome"),
+    );
+    state.invoke_open_session("stored-uncertain".into());
+    check(
+        "an unknown-outcome prompt is restored with its warning",
+        wait(|| state.get_active_session() == "stored-uncertain" && output(ui).contains("unknown outcome")).await,
+    );
+    let typed = send(ui, "/queue resume");
+    check(
+        "resume is refused while an uncertain prompt is unresolved",
+        typed
+            && wait(|| state.get_banner().contains("discard-pending")).await
+            && submissions(&calls(port).await, "must-wait-for-check") == 0
+            && on_disk(&path, &backend, |s| s.pending("stored-uncertain").is_some()).await,
+    );
+    let typed = send(ui, "/queue discard-pending");
+    check(
+        "explicit discard removes the uncertain record",
+        typed && on_disk(&path, &backend, |s| s.pending("stored-uncertain").is_none()).await,
+    );
+    let typed = send(ui, "/queue resume");
+    check(
+        "after the discard, resume submits the queued prompt exactly once",
+        typed && wait(|| state.get_queue_count() == 0).await && {
+            pause(200).await;
+            submissions(&calls(port).await, "must-wait-for-check") == 1
+        },
+    );
+    state.invoke_delete_session("stored-uncertain".into());
+    check(
+        "deleting a chat removes its saved queue, prompt and results from disk",
+        on_disk(&path, &backend, |s| {
+            !s.chat_ids().iter().any(|c| c == "stored-uncertain")
+        })
+        .await,
+    );
+
     state.invoke_open_session("stored-blocked".into());
     check(
         "second stored chat restores its own queue",
@@ -220,6 +285,46 @@ fn durable_controller_recovery_and_conflict() {
             )
             .unwrap();
     }
+    store
+        .set_queue(
+            "stored-uncertain",
+            vec![PendingPrompt {
+                text: "must-wait-for-check".into(),
+                display: "must-wait-for-check".into(),
+            }],
+            false,
+        )
+        .unwrap();
+    store
+        .record_pending(
+            "stored-uncertain",
+            PendingPrompt {
+                text: "uncertain-prompt".into(),
+                display: "uncertain-prompt".into(),
+            },
+            None,
+        )
+        .unwrap();
+    store
+        .record_pending(
+            "stored-failed",
+            PendingPrompt {
+                text: "failed-prompt".into(),
+                display: "failed-prompt".into(),
+            },
+            Some("Simulated earlier failure"),
+        )
+        .unwrap();
+    store
+        .record_pending(
+            "stored-answered",
+            PendingPrompt {
+                text: "answered-prompt".into(),
+                display: "answered-prompt".into(),
+            },
+            None,
+        )
+        .unwrap();
     store
         .record_result(
             "stored-recovery",

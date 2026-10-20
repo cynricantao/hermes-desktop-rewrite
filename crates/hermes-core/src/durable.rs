@@ -453,6 +453,19 @@ impl DurableState {
         Ok(results)
     }
 
+    /// Drop every local record for a chat: queue, uncertain prompt and saved results.
+    /// Used after the chat itself is deleted, so its private text does not linger.
+    pub fn forget_chat(&mut self, chat: &str) -> Result<(), DurableError> {
+        validate_chat(chat)?;
+        if let Some(backend) = self.disk.backends.get_mut(&self.backend) {
+            backend.chats.remove(chat);
+            if backend.chats.is_empty() {
+                self.disk.backends.remove(&self.backend);
+            }
+        }
+        Ok(())
+    }
+
     /// Validate and write atomically. The previous file is replaced only after a
     /// complete, fsynced temp file exists; any error removes the temp file.
     pub fn save(&self) -> Result<(), DurableError> {

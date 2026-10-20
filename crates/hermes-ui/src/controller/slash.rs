@@ -1,6 +1,9 @@
 //! Desktop command routing. The backend owns command names, aliases and skills.
 use super::*;
 
+const UNCERTAIN_BLOCKS_QUEUE: &str = "This chat has a saved prompt whose outcome is uncertain, so the queue stays paused. \
+     Check the chat, then run /queue discard-pending and /queue resume.";
+
 impl Controller {
     pub(super) fn notice(&mut self, text: String, error: bool) {
         self.transcript
@@ -73,15 +76,26 @@ impl Controller {
             );
             return;
         }
+        // The store keeps one submission record per chat. Draining now would replace an
+        // unknown-outcome record, losing the only note that the prompt may already have run.
+        if self.has_uncertain_prompt(&key) {
+            self.queue_paused.insert(key.clone());
+            self.sync_queue(&key);
+            self.persist_durable().await;
+            self.publish_queue();
+            self.banner(UNCERTAIN_BLOCKS_QUEUE.into(), true);
+            return;
+        }
         let previous = self.queues.entries(&key);
         if let Some(prompt) = self.queues.pop(&key) {
             let saved = self.durable.clone();
             // The pop and uncertain submission share one atomic write-ahead snapshot.
             // There is no crash window containing neither a queue entry nor a pending prompt.
+            // Without a store (recovery off) there is nothing to record.
             let recorded = self
                 .durable
                 .as_mut()
-                .is_some_and(|store| store.record_pending(&key, prompt.clone(), None).is_ok());
+                .is_none_or(|store| store.record_pending(&key, prompt.clone(), None).is_ok());
             if !recorded || !self.sync_queue(&key) || !self.persist_durable().await {
                 self.queues.set_entries(&key, previous);
                 self.durable = saved;
@@ -92,6 +106,31 @@ impl Controller {
             self.publish_queue();
             self.submit(prompt.text, prompt.display).await;
         }
+    }
+
+    /// After an explicit discard, drop the recovered draft the restore step put in the
+    /// composer, so one Enter cannot resend the prompt just declared resolved. A draft
+    /// the user has since edited is kept.
+    fn clear_recovered_draft(&mut self, chat: &str, display: String) {
+        if self.drafts.get(chat) == Some(&display) {
+            self.drafts.remove(chat);
+        }
+        let chat = chat.to_owned();
+        ui(&self.weak, move |w| {
+            let st = w.global::<AppState>();
+            if st.get_active_session().as_str() == chat && st.get_draft().as_str() == display {
+                st.set_draft("".into());
+            }
+        });
+    }
+
+    /// A saved prompt whose outcome is unknown. A recorded submit failure is not
+    /// uncertain: the backend answered with an error, and the prompt is back in the draft.
+    fn has_uncertain_prompt(&self, key: &str) -> bool {
+        self.durable
+            .as_ref()
+            .and_then(|store| store.pending(key))
+            .is_some_and(|pending| pending.error.is_none())
     }
 
     pub(super) fn restore_rejected_queue(&mut self, draft: &str) {
@@ -126,6 +165,7 @@ impl Controller {
             let Some(store) = self.durable.as_mut() else {
                 return false;
             };
+            let discarded = store.pending(&sid).map(|p| p.prompt.display);
             let result = if arg == "clear-results" {
                 store.take_results(&sid).map(|_| ())
             } else {
@@ -139,8 +179,18 @@ impl Controller {
                 self.durable = saved;
                 return false;
             }
+            if arg == "discard-pending"
+                && let Some(display) = discarded
+            {
+                self.clear_recovered_draft(&sid, display);
+            }
             self.notice("Saved recovery records cleared for this chat.".into(), false);
         } else if arg == "resume" {
+            if self.has_uncertain_prompt(&sid) {
+                // Handled, not rejected: there is no queued draft to recover.
+                self.banner(UNCERTAIN_BLOCKS_QUEUE.into(), true);
+                return true;
+            }
             self.queue_paused.remove(&sid);
             if !self.sync_queue(&sid) || !self.persist_durable().await {
                 self.queue_paused.insert(sid);
@@ -182,7 +232,9 @@ impl Controller {
                 return false;
             }
             if !self.enqueue(text.into(), text.into()).await {
-                return false;
+                // `enqueue` already restored the rejected prompt; a second restore
+                // from the caller would repeat the notice.
+                return true;
             }
             self.drain_queue().await;
         }

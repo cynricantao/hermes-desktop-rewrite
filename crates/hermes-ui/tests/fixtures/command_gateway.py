@@ -6,6 +6,7 @@ real Rust controller/composer tests. It never reads Hermes files or runs tools.
 import base64
 import hashlib
 import json
+import os
 import socketserver
 import struct
 import threading
@@ -96,7 +97,9 @@ class Handler(socketserver.StreamRequestHandler):
             if url.path == '/api/status':
                 # Deliberately differs from the app's HERMES_HOME. Recovery must
                 # use the attached backend's identity, not the launch environment.
-                body = json.dumps({'hermes_home': '/fixture/backend'}).encode()
+                # FIXTURE_NO_DATA_ROOT simulates a backend without a usable identity.
+                status = {} if os.environ.get('FIXTURE_NO_DATA_ROOT') else {'hermes_home': '/fixture/backend'}
+                body = json.dumps(status).encode()
             elif url.path == '/api/test/state':
                 with LOCK:
                     body = json.dumps(CALLS).encode()
@@ -184,6 +187,10 @@ class Handler(socketserver.StreamRequestHandler):
                     result = {'session_id': 'resumed-replay', 'stored_session_id': 'stored-replay', 'messages': [{'role': 'user', 'text': 'replayed chat'}],
                               'open_requests': [{'id': 'srq-replayed', 'method': 'clarify', 'params': {
                                   'session_id': 'resumed-replay', 'answers': {'q0': 'Small'}, 'questions': QUESTIONS['clarify'][:2]}}]}
+                elif method == 'session.resume' and params['session_id'] == 'stored-answered':
+                    # The saved uncertain prompt was in fact answered while no window watched.
+                    result = {'session_id': 'resumed-stored-answered', 'stored_session_id': 'stored-answered',
+                              'messages': [{'role': 'user', 'text': 'answered-prompt'}, {'role': 'assistant', 'text': 'Answered while away.'}]}
                 elif method == 'session.resume':
                     result = {'session_id': 'resumed-' + params['session_id'], 'stored_session_id': params['session_id'], 'messages': [{'role': 'user', 'text': 'PRIVATE_SKILL_BODY', 'display_kind': 'hidden'}, {'role': 'user', 'text': '/fixture-skill'}]}
                 elif method == 'command.resolve':
