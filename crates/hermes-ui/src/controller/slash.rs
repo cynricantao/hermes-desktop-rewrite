@@ -19,13 +19,33 @@ impl Controller {
         ui(&self.weak, move |w| w.global::<AppState>().set_queue_count(n as i32));
     }
 
-    fn enqueue(&mut self, text: String, display: String) {
-        if let Some(key) = self.queue_key().map(str::to_owned) {
-            self.queues
-                .push(&key, hermes_core::commands::PendingPrompt { text, display });
+    async fn enqueue(&mut self, text: String, display: String) -> bool {
+        let Some(key) = self.queue_key().map(str::to_owned) else {
+            return false;
+        };
+        let previous = self.queues.entries(&key);
+        let saved = self.durable.clone();
+        self.queues.push(
+            &key,
+            hermes_core::commands::PendingPrompt {
+                text,
+                display: display.clone(),
+            },
+        );
+        if !self.sync_queue(&key) || !self.persist_durable().await {
+            self.queues.set_entries(&key, previous);
+            self.durable = saved;
+            self.queue_paused.insert(key);
             self.publish_queue();
-            self.banner("Queued for the next turn. /queue lists pending prompts.".into(), false);
+            self.restore_rejected_queue(&display);
+            return false;
         }
+        self.publish_queue();
+        self.banner(
+            "Queued and saved for the next turn. /queue lists pending prompts.".into(),
+            false,
+        );
+        true
     }
 
     pub(super) async fn drain_queue(&mut self) {
@@ -44,18 +64,33 @@ impl Controller {
             return;
         }
         if !self.attachments.is_empty() || !self.composer.files.is_empty() {
-            self.queue_paused.insert(key);
+            self.queue_paused.insert(key.clone());
+            self.sync_queue(&key);
+            self.persist_durable().await;
             self.banner(
                 "Queue paused to preserve your staged attachment. Send or remove it, then /queue resume.".into(),
                 false,
             );
             return;
         }
-        if let Some(p) = self.queues.pop(&key) {
+        let previous = self.queues.entries(&key);
+        if let Some(prompt) = self.queues.pop(&key) {
+            let saved = self.durable.clone();
+            // The pop and uncertain submission share one atomic write-ahead snapshot.
+            // There is no crash window containing neither a queue entry nor a pending prompt.
+            let recorded = self
+                .durable
+                .as_mut()
+                .is_some_and(|store| store.record_pending(&key, prompt.clone(), None).is_ok());
+            if !recorded || !self.sync_queue(&key) || !self.persist_durable().await {
+                self.queues.set_entries(&key, previous);
+                self.durable = saved;
+                self.queue_paused.insert(key);
+                self.publish_queue();
+                return;
+            }
             self.publish_queue();
-            // Queued text is a literal prompt, as in the CLI. Skill dispatches
-            // have already been expanded before entering this FIFO.
-            self.submit(p.text, p.display).await;
+            self.submit(prompt.text, prompt.display).await;
         }
     }
 
@@ -79,26 +114,66 @@ impl Controller {
         }
         let sid = self.queue_key().unwrap_or_default().to_owned();
         let (verb, rest) = arg.split_once(char::is_whitespace).unwrap_or((arg, ""));
-        if arg == "resume" {
+        if matches!(arg, "clear-results" | "discard-pending") {
+            if arg == "discard-pending" && self.transcript.running {
+                self.banner(
+                    "Stop the active turn before discarding its recovery record.".into(),
+                    true,
+                );
+                return false;
+            }
+            let saved = self.durable.clone();
+            let Some(store) = self.durable.as_mut() else {
+                return false;
+            };
+            let result = if arg == "clear-results" {
+                store.take_results(&sid).map(|_| ())
+            } else {
+                store.clear_pending(&sid)
+            };
+            if let Err(error) = result {
+                self.banner(format!("Could not clear saved state: {error}"), true);
+                return false;
+            }
+            if !self.persist_durable().await {
+                self.durable = saved;
+                return false;
+            }
+            self.notice("Saved recovery records cleared for this chat.".into(), false);
+        } else if arg == "resume" {
             self.queue_paused.remove(&sid);
+            if !self.sync_queue(&sid) || !self.persist_durable().await {
+                self.queue_paused.insert(sid);
+                return false;
+            }
             self.drain_queue().await;
         } else if matches!(verb, "" | "list" | "edit" | "rm" | "move" | "clear") {
-            match self.queues.manage(&sid, arg) {
-                Ok(text) => self.notice(text, false),
-                Err(e) => {
-                    self.banner(e, true);
+            let previous = self.queues.entries(&sid);
+            let saved = self.durable.clone();
+            let result = match self.queues.manage(&sid, arg) {
+                Ok(result) => result,
+                Err(error) => {
+                    self.banner(error, true);
                     return false;
                 }
+            };
+            if matches!(verb, "edit" | "rm" | "move" | "clear")
+                && (!self.sync_queue(&sid) || !self.persist_durable().await)
+            {
+                self.queues.set_entries(&sid, previous);
+                self.durable = saved;
+                self.queue_paused.insert(sid);
+                self.publish_queue();
+                return false;
             }
             self.publish_queue();
+            self.notice(result, false);
         } else {
             let text = if verb == "add" { rest.trim() } else { arg.trim() };
             if text.is_empty() {
                 self.banner("Usage: /queue <prompt>".into(), true);
                 return false;
             }
-            // Attachments are staged on the backend, not bound to FIFO entries.
-            // Refuse rather than attaching them to the wrong queued prompt.
             if !self.attachments.is_empty() || !self.composer.files.is_empty() {
                 self.banner(
                     "Send or remove staged attachments before queuing a prompt.".into(),
@@ -106,7 +181,9 @@ impl Controller {
                 );
                 return false;
             }
-            self.enqueue(text.into(), text.into());
+            if !self.enqueue(text.into(), text.into()).await {
+                return false;
+            }
             self.drain_queue().await;
         }
         true
@@ -132,9 +209,11 @@ impl Controller {
                 false,
             ),
             Ok(v) if v.get("status").and_then(Value::as_str) == Some("rejected") => {
-                self.enqueue(text.into(), text.into())
+                let _ = self.enqueue(text.into(), text.into()).await;
             }
-            Err(hermes_core::RpcError::Server { code: 4010, .. }) => self.enqueue(text.into(), text.into()),
+            Err(hermes_core::RpcError::Server { code: 4010, .. }) => {
+                let _ = self.enqueue(text.into(), text.into()).await;
+            }
             Ok(_) => {
                 self.banner(
                     "The backend returned an unknown steer status. It was not resent, to avoid a duplicate.".into(),
@@ -187,7 +266,7 @@ impl Controller {
         match hermes_core::api::sessions::commands_catalog(&self.client, self.session.as_deref(), "").await {
             Ok(cat) => {
                 let mut text = String::from(
-                    "Desktop commands: /bg, /btw, /queue, /steer, /skills, /model, /reasoning, /new, /stop, /preview.\nQueue is per chat and in memory. Stop/errors pause draining; /queue resume continues. Inactive chats wait until reopened and resumed.\nOther commands below are backend-advertised, not a promise of full desktop support. Terminal/platform-only commands can be unavailable.\n",
+                    "Desktop commands: /bg, /btw, /queue, /steer, /skills, /model, /reasoning, /new, /stop, /preview.\nQueues are saved per chat and restored paused. Stop/errors pause draining; /queue resume continues. /queue clear-results clears saved background results; /queue discard-pending clears an uncertain saved submission. Inactive chats wait until reopened and resumed.\nOther commands below are backend-advertised, not a promise of full desktop support. Terminal/platform-only commands can be unavailable.\n",
                 );
                 for pair in cat.pairs {
                     if let [name, desc, ..] = pair.as_slice() {
@@ -457,7 +536,7 @@ impl Controller {
                         self.notice(notice.to_owned(), false);
                     }
                     if self.transcript.running {
-                        self.enqueue(prompt, display);
+                        let _ = self.enqueue(prompt, display).await;
                     } else {
                         self.submit(prompt, display).await;
                     }

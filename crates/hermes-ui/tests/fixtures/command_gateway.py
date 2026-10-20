@@ -93,7 +93,11 @@ class Handler(socketserver.StreamRequestHandler):
             headers[key.lower()] = value.strip()
         if headers.get('upgrade', '').lower() != 'websocket':
             url = urlsplit(request[1])
-            if url.path == '/api/test/state':
+            if url.path == '/api/status':
+                # Deliberately differs from the app's HERMES_HOME. Recovery must
+                # use the attached backend's identity, not the launch environment.
+                body = json.dumps({'hermes_home': '/fixture/backend'}).encode()
+            elif url.path == '/api/test/state':
                 with LOCK:
                     body = json.dumps(CALLS).encode()
             elif url.path == '/api/test/reject-create':
