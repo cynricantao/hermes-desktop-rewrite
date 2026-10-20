@@ -10,6 +10,8 @@ license=('MIT')
 depends=('fontconfig' 'freetype2' 'libxkbcommon' 'wayland' 'libglvnd' 'gcc-libs'
          'gtk3' 'webkit2gtk-4.1')  # gtk3 + webkit2gtk-4.1: the in-app browser helper (hermes-browser)
 makedepends=('cargo')
+# hermes-ui's gateway fixture (tests/fixtures/command_gateway.py) is a Python script.
+checkdepends=('python')
 optdepends=('hermes-agent: the backend (the `hermes` CLI must be on PATH)')
 options=('!lto')
 source=()
@@ -34,6 +36,12 @@ build() {
 check() {
   cd "$(_root)"
   export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
+  # command_controls.rs and daily_driver.rs drive real widgets through
+  # ElementHandle, which only resolves elements when Slint compiled its debug
+  # info in. Without this the suite fails with "composer"/"expected element".
+  # Debug info only reaches the test profile; build()'s release output is
+  # unaffected.
+  export SLINT_EMIT_DEBUG_INFO=1
   cargo test --frozen --workspace
 }
 
