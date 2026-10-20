@@ -156,6 +156,21 @@ impl Controller {
         result
     }
 
+    /// A deleted chat's queued prompts, uncertain prompt and saved background results
+    /// are private text with no chat left to show them in: drop the local copies too.
+    async fn forget_local_chat(&mut self, id: &str) {
+        self.queues.set_entries(id, Vec::new());
+        self.queue_paused.remove(id);
+        self.side_results.remove(id);
+        self.shown_durable_results.retain(|(chat, _)| chat != id);
+        self.runtime_stores.retain(|_, stored| stored != id);
+        let Some(store) = self.durable.as_mut() else { return };
+        if let Err(e) = store.forget_chat(id) {
+            return self.banner(format!("Could not remove the chat's saved queue state: {e}"), true);
+        }
+        self.persist_durable().await;
+    }
+
     /// Delete a stored chat. Runtimes this window holds for it are stopped and closed first
     /// (the backend refuses to delete a chat with a live runtime), as the Electron app does.
     /// The open chat is left only once the delete has succeeded.
@@ -187,6 +202,7 @@ impl Controller {
                 self.drafts.remove(&id);
                 self.inputs
                     .retain(|p| p.session_id != id && !runtimes.contains(&p.session_id));
+                self.forget_local_chat(&id).await;
                 self.publish_sessions();
             }
             Err(e) => {

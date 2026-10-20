@@ -27,6 +27,7 @@ that spend model calls, spawn processes, use the network or reveal secrets:
 | Gateway notifications and server->client requests | `api::events` | [api/events.md](api/events.md) |
 | Attachments (paste/attach images and files) | `attachments` | module docs (PR #11) |
 | Capabilities screen data (profiles, skills, toolsets, MCP, memory, cron) | `capabilities` | see module docs |
+| Durable queue and background results (local disk, no backend call) | `durable` | [DURABLE_STATE.md](DURABLE_STATE.md) |
 
 ## Live checks
 
