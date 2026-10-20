@@ -1,0 +1,179 @@
+name: Release
+
+# One GitHub release per tag, with a separate build per OS:
+#   Linux  — Arch only: a pacman package built from packaging/PKGBUILD.
+#   Windows — portable x86_64 zip.
+#   macOS  — universal (arm64 + x86_64) .app in a .dmg and a .zip.
+#
+# Notes come from docs/releases/<tag>.md when that file exists; the download
+# list is generated from the artifacts. See docs/RELEASING.md.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)publish, e.g. v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+# Releases are published one at a time; a re-run replaces its own assets.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.detect.outputs.version }}
+      tag: ${{ steps.detect.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          fi
+          case "$tag" in
+            v*) ;;
+            *) echo "::error::tag '$tag' must start with v (e.g. v0.1.0)"; exit 1 ;;
+          esac
+          version="${tag#v}"
+          manifest="$(awk '/^\[workspace\.package\]/{f=1;next} /^\[/{f=0} f&&/^version[[:space:]]*=/{gsub(/["[:space:]]/,"",$3);print $3;exit}' Cargo.toml)"
+          echo "tag=$tag version=$version Cargo.toml=$manifest"
+          if [ "$version" != "$manifest" ]; then
+            echo "::error::tag $tag does not match the Cargo.toml workspace version ($manifest); bump the version first"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  linux:
+    name: Linux (Arch x86_64)
+    needs: version
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # makepkg refuses to run as root, so builds happen as an unprivileged user
+      # that owns the checkout.
+      - name: Prepare build user
+        run: |
+          set -euo pipefail
+          pacman -Syu --noconfirm --needed base-devel sudo
+          useradd --create-home --shell /bin/bash builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          chmod 0440 /etc/sudoers.d/builder
+          chown -R builder:builder "${GITHUB_WORKSPACE}"
+
+      - name: Build pacman package
+        run: |
+          set -euo pipefail
+          cd "${GITHUB_WORKSPACE}"
+          su builder -c "bash scripts/package/linux-arch.sh '${{ needs.version.outputs.version }}' dist"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifact-linux
+          path: dist/*
+          if-no-files-found: error
+
+  windows:
+    name: Windows (x86_64)
+    needs: version
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build zip
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/package/windows.ps1 -Version $env:VERSION -OutDir dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifact-windows
+          path: dist/*
+          if-no-files-found: error
+
+  macos:
+    name: macOS (universal)
+    needs: version
+    runs-on: macos-14
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Build app bundle, dmg and zip
+        run: bash scripts/package/macos.sh "$VERSION" dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifact-macos
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: [version, linux, windows, macos]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ needs.version.outputs.tag }}
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -- * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Release notes
+        run: bash scripts/package/release-notes.sh "$VERSION" dist > notes.md && head -n 40 notes.md
+
+      # A re-run edits the existing release instead of failing on it.
+      - name: Publish
+        run: |
+          set -euo pipefail
+          title="Hermes Desktop (Rust) v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG exists: updating notes and assets"
+            gh release edit "$TAG" --title "$title" --notes-file notes.md
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" --title "$title" --notes-file notes.md --target "$GITHUB_SHA" dist/*
+          fi
