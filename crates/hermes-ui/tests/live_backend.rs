@@ -312,9 +312,6 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     if want("sidebar") {
         sidebar::section(&ui, &log).await;
     }
-    if want("durable") {
-        durable::section(&ui, &log).await;
-    }
     if want("failure_recovery") {
         failure_recovery_section(&ui, &log).await;
     }
@@ -365,6 +362,11 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("settings_pages") {
         settings_pages_section(&ui, &log).await;
+    }
+    // Last: it adds two real chats to the sidebar, which would shift the seeded rows the
+    // sessions/daily sections click.
+    if want("durable") {
+        durable::section(&ui, &log).await;
     }
 }
 
