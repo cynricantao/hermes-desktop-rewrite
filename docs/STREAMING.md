@@ -6,7 +6,7 @@ routes, using the existing Tokio and tungstenite dependencies.
 | Client | Backend route | Traffic |
 |---|---|---|
 | `TranscribeStream` | `/api/audio/transcribe-stream` | sample-rate JSON, s16le mono PCM, one EOS; partial/final/error replies |
-| `SpeakStream` | `/api/audio/speak-stream` | incremental text, one done, stop/cancel; format metadata, PCM, end/fallback/error |
+| `SpeakStream` | `/api/audio/speak-stream` | incremental text, one done, stop/cancel; format metadata, PCM, end/fallback (an `error` frame is also accepted defensively; `audio.py` does not send one today) |
 | `DisplayStream` | `/api/display/ws` | raw binary RFB bytes; typed lease/auth/desktop close outcomes |
 
 ## Boundaries
@@ -40,10 +40,12 @@ buffer after each receive and must apply its own bounded playback buffering.
 - Reads and writes can proceed concurrently. Outbound voice controls serialize their
   state changes so text/PCM cannot be queued behind a terminal done/EOS marker.
 - `SpeakStream::stop` signals barge-in and wakes a pending receive. Late audio is
-  discarded. `cancel` also requests close, even when the stop frame could not be
-written. A `stop` future dropped before it completes may not reach the server; follow
-it with `cancel` or drop the stream. Stop does not rewind audio the device
-  already played; playback cancellation belongs to the caller.
+  discarded. `cancel` also marks the stream closed and wakes readers, even when the
+  stop frame could not be written. After a failed write no close frame can be sent,
+  so only dropping the stream releases the socket. A `stop` future dropped before it
+  completes may not reach the server; follow it with `cancel` or drop the stream.
+  Stop does not rewind audio the device already played; playback cancellation
+  belongs to the caller.
 - Cancelling or timing out a write has an unknown wire outcome. The connection is
   poisoned instead of being reused for an automatic retry. Drop it. No replay or
   automatic reconnection is performed.

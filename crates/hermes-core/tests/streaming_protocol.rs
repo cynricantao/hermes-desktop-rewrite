@@ -366,8 +366,8 @@ async fn speak_stream_accepts_provider_rates_outside_the_dictation_range() {
 
 #[tokio::test]
 async fn speak_stream_fallback_and_error_end_the_reply_without_audio() {
-    // audio.py sends `fallback` (no audio, use POST /api/audio/speak) or `error` without a
-    // preceding `start`; both are terminal and the error text is redacted.
+    // audio.py sends `fallback` (no audio, use POST /api/audio/speak) without a preceding
+    // `start`. An `error` frame is handled defensively; both are terminal, errors redacted.
     for (frame, expected) in [
         (json!({"type": "fallback"}), SpeakEvent::Fallback),
         (
