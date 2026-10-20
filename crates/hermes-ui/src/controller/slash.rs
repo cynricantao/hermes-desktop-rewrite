@@ -166,7 +166,10 @@ impl Controller {
             let saved = self.durable.clone();
             let Some(store) = self.durable.as_mut() else {
                 // Handled: with recovery off there are no saved records to clear.
-                self.banner("Queue recovery is off this session, so there are no saved records to clear.".into(), false);
+                self.banner(
+                    "Queue recovery is off this session, so there are no saved records to clear.".into(),
+                    false,
+                );
                 return true;
             };
             let discarded = store.pending(&sid).map(|p| p.prompt.display);
