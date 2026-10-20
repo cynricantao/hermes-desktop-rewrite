@@ -239,6 +239,29 @@ async fn input_cards(ui: &AppWindow, port: u16, check: &mut impl FnMut(String, b
             && !rows_text(ui).contains("fixture-pass-123")
             && !s.get_draft().contains("fixture-pass-123"),
     );
+    let id = ask(port, "vault.code", &sid).await;
+    let shown = wait(|| card.get_visible() && card.get_masked()).await && card.get_detail().contains("example.test");
+    screenshot(ui, "rs-vault-code-card");
+    let typed = set_field(ui, "Answer", "fixture-verification-code");
+    press(ui, Key::Return);
+    let r = wait_reply(port, &id).await;
+    check(
+        "vault code uses the masked card, replies once, and clears private text".into(),
+        shown
+            && typed
+            && r.as_ref().map(|r| &r["result"]) == Some(&json!({"value": "fixture-verification-code"}))
+            && wait(|| !card.get_visible()).await
+            && card.get_value().is_empty()
+            && !rows_text(ui).contains("fixture-verification-code")
+            && !s.get_draft().contains("fixture-verification-code"),
+    );
+    let id = ask(port, "vault.code", &sid).await;
+    wait(|| card.get_visible() && card.get_masked()).await;
+    press(ui, Key::Escape);
+    check(
+        "Esc declines a vault code without stopping the turn".into(),
+        wait_reply(port, &id).await.as_ref().map(|r| &r["result"]) == Some(&json!({"value": ""})) && s.get_running(),
+    );
     let id = ask(port, "secret", &sid).await;
     wait(|| card.get_visible()).await;
     let shown = card.get_title() == "Fixture API key" && card.get_detail() == "Saved as FIXTURE_KEY";
