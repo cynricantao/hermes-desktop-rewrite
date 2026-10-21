@@ -1,0 +1,68 @@
+// Isolated interaction host. Never included in the shipped application.
+import { RadioGroup, CommandPalette, Combobox, MenuSurface, MenuEntry, DropdownMenu,
+    ModalDialog, Button, Chip, CodeBlock, KitLine, TextArea, PreviewState } from "../../hermes-ui/ui/kit/kit.slint";
+
+export component KitRegressionWindow inherits Window {
+    width: 800px;
+    height: 600px;
+    in-out property <int> page: 0;
+    in-out property <int> selected: 0;
+    in-out property <int> activations: 0;
+    in-out property <string> combo-text: "keep this draft";
+    in-out property <bool> dialog-open: false;
+    in-out property <int> menu-highlight: -1;
+    in property <[MenuEntry]> menu-entries;
+    in property <[MenuEntry]> submenu-entries;
+    public function focus-palette() { palette.focus-input(); }
+    public function open-dropdown() { dropdown.open(); }
+    if root.page == 0: RadioGroup {
+        x: 20px; y: 20px; width: 300px;
+        label: "Regression radios";
+        options: [{label: "First"}, {label: "Second"}, {label: "Third"}, {label: "Fourth"}];
+        selected <=> root.selected;
+    }
+    palette := CommandPalette {
+        visible: root.page == 1;
+        x: 20px; y: 20px;
+        items: [];
+        activated(id) => { root.activations += 1; }
+    }
+    if root.page == 2: Combobox {
+        x: 20px; y: 20px; width: 300px;
+        label: "Regression combo";
+        options: [];
+        text <=> root.combo-text;
+        committed(text) => { root.activations += 1; }
+    }
+    if root.page == 3: MenuSurface {
+        x: 20px; y: 20px;
+        label: "Regression menu";
+        entries: root.menu-entries;
+        highlight <=> root.menu-highlight;
+        init => { self.focus-menu(); }
+        activated(id) => { root.activations += 1; }
+    }
+    dropdown := DropdownMenu {
+        x: 20px; y: 20px; width: 220px; height: 32px;
+        visible: root.page == 4;
+        entries: root.menu-entries;
+        submenu-entries: root.submenu-entries;
+        activated(id) => { root.activations += 1; }
+    }
+    if root.page == 5: Chip {
+        x: 20px; y: 20px; text: "Regression chip";
+        clicked => { root.activations += 1; }
+    }
+    if root.page == 6: TextArea {
+        x: 20px; y: 20px; width: 300px;
+        label: "Regression textarea";
+        preview: PreviewState.focus;
+    }
+    if root.dialog-open: ModalDialog {
+        width: parent.width; height: parent.height;
+        open: true;
+        title: "Regression dialog";
+        cancel => { root.dialog-open = false; }
+        confirm => { root.activations += 1; }
+    }
+}

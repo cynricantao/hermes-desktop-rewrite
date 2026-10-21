@@ -25,11 +25,20 @@ export component KitIcon inherits Image {
 }
 
 // 2px ring drawn just outside its parent (place as the last child; it fills the parent
-// by default and draws the ring 3px beyond it).
+// by default and draws the ring 3px beyond it). `inset` draws the ring inside the
+// parent's bounds instead, for parents that clip (code/diff/terminal cards, rows).
 export component FocusRing inherits Rectangle {
     in property <bool> shown;
+    in property <bool> inset: false;
     in property <length> radius: Theme.control-radius;
-    if root.shown: Rectangle {
+    if root.shown && root.inset: Rectangle {
+        width: root.width;
+        height: root.height;
+        border-radius: root.radius;
+        border-width: 2px;
+        border-color: Theme.ring;
+    }
+    if root.shown && !root.inset: Rectangle {
         x: -3px;
         y: -3px;
         width: root.width + 6px;
@@ -221,6 +230,14 @@ export component Chip inherits Rectangle {
     accessible-label: text;
     accessible-item-selected: selected;
     accessible-action-default => { root.clicked(); }
+    // Enter/Space activate the chip; the × is a second stop (Tab past the chip) so
+    // removal does not require a pointer.
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == " " { root.clicked(); return accept; }
+            return reject;
+        }
+    }
     ta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
     row := HorizontalLayout {
         padding-left: 8px;
@@ -233,14 +250,22 @@ export component Chip inherits Rectangle {
             height: 18px;
             y: (parent.height - 18px) / 2;
             border-radius: Theme.r-xs;
-            background: xta.has-hover ? Theme.pressed : transparent;
+            background: xta.has-hover || xfs.has-focus ? Theme.pressed : transparent;
             accessible-role: button;
             accessible-label: "Remove " + root.text;
             accessible-action-default => { root.removed(); }
-            KitIcon { name: "x"; size: 12px; tint: xta.has-hover ? Theme.foreground : Theme.faint; }
-            xta := TouchArea { mouse-cursor: pointer; clicked => { root.removed(); } }
+            xfs := FocusScope {
+                key-pressed(e) => {
+                    if e.text == Key.Return || e.text == " " { root.removed(); return accept; }
+                    return reject;
+                }
+            }
+            KitIcon { name: "x"; size: 12px; tint: xta.has-hover || xfs.has-focus ? Theme.foreground : Theme.faint; }
+            FocusRing { shown: xfs.has-focus; inset: true; radius: Theme.r-xs; }
+            xta := TouchArea { mouse-cursor: pointer; clicked => { xfs.focus(); root.removed(); } }
         }
     }
+    FocusRing { shown: fs.has-focus || preview == PreviewState.focus; radius: Theme.r-sm; }
 }
 
 // Session status (brief §3.6). Priority is decided in Rust; this only draws it.
@@ -315,12 +340,14 @@ export component Skeleton inherits Rectangle {
 export component ProgressBar inherits Rectangle {
     in property <float> value: 0;
     in property <bool> indeterminate: false;
+    in property <string> label: "Progress";
     in property <color> tint: Theme.accent;
     height: 4px;
     border-radius: 2px;
     background: Theme.muted;
     clip: true;
     accessible-role: progress-indicator;
+    accessible-label: root.label;
     accessible-value: indeterminate ? "" : round(clamp(value, 0, 1) * 100) + "%";
     property <float> phase: (indeterminate && !Motion.reduce) ? mod(animation-tick() / 1ms, 1400) / 1400 : 0.3;
     Rectangle {
@@ -339,11 +366,15 @@ export struct MeterPart { label: string, value: float, start: float, tint: color
 // Stacked meter: parts are fractions of the whole (sum ≤ 1).
 export component Meter inherits Rectangle {
     in property <[MeterPart]> parts;
+    in property <string> label: "Usage";
+    in property <float> value: -1;      // total fraction 0..1; negative → no value announced
     height: 8px;
     border-radius: 4px;
     background: Theme.muted;
     clip: true;
     accessible-role: progress-indicator;
+    accessible-label: root.label;
+    accessible-value: (root.value < 0) ? "" : round(clamp(root.value, 0, 1) * 100) + "%";
     for p in root.parts: Rectangle {
         x: root.width * clamp(p.start, 0, 1);
         width: root.width * clamp(p.value, 0, 1 - clamp(p.start, 0, 1));

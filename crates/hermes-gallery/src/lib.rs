@@ -95,12 +95,12 @@ pub fn goldens_dir() -> PathBuf {
 
 pub fn write_png(path: &Path, b: &Board) -> std::io::Result<()> {
     let file = std::fs::File::create(path)?;
-    let mut enc = png::Encoder::new(std::io::BufWriter::new(file), b.width, b.height);
+    let mut enc = png::Encoder::new(file, b.width, b.height);
     enc.set_color(png::ColorType::Rgba);
     enc.set_depth(png::BitDepth::Eight);
     let mut writer = enc.write_header().map_err(std::io::Error::other)?;
     writer.write_image_data(&b.rgba).map_err(std::io::Error::other)?;
-    Ok(())
+    writer.finish().map_err(std::io::Error::other)
 }
 
 pub fn read_png(path: &Path) -> std::io::Result<Board> {
@@ -124,7 +124,10 @@ pub fn diff_fraction(a: &Board, b: &Board, tolerance: u8) -> f64 {
     if a.width != b.width || a.height != b.height {
         return 1.0;
     }
-    let px = (a.width * a.height) as usize;
+    let px = a.width as usize * a.height as usize;
+    if px.checked_mul(4) != Some(a.rgba.len()) || a.rgba.len() != b.rgba.len() {
+        return 1.0;
+    }
     let differing = a
         .rgba
         .as_chunks::<4>()
@@ -134,4 +137,36 @@ pub fn diff_fraction(a: &Board, b: &Board, tolerance: u8) -> f64 {
         .filter(|(p, q)| p.iter().zip(q.iter()).any(|(x, y)| x.abs_diff(*y) > tolerance))
         .count();
     differing as f64 / px.max(1) as f64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn truncated_board_is_not_an_equal_image() {
+        let complete = Board {
+            width: 1,
+            height: 1,
+            rgba: vec![0, 0, 0, 255],
+        };
+        let truncated = Board {
+            width: 1,
+            height: 1,
+            rgba: Vec::new(),
+        };
+        assert_eq!(diff_fraction(&complete, &truncated, 0), 1.0);
+        assert_eq!(diff_fraction(&truncated, &truncated, 0), 1.0);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn png_write_errors_are_reported() {
+        let board = Board {
+            width: 1,
+            height: 1,
+            rgba: vec![0, 0, 0, 255],
+        };
+        assert!(write_png(Path::new("/dev/full"), &board).is_err());
+    }
 }

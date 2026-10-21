@@ -335,7 +335,7 @@ export component NavItem inherits Rectangle {
         }
         if root.badge != "": Badge { text: root.badge; y: (parent.height - 20px) / 2; }
     }
-    FocusRing { shown: fs.has-focus; }
+    FocusRing { shown: fs.has-focus; inset: true; }
 }
 
 // Collapsible section / project group header with hover actions (+, ⋯).
@@ -351,12 +351,22 @@ export component GroupHeader inherits Rectangle {
     callback menu();
     height: 28px;
     border-radius: Theme.control-radius;
-    background: ta.has-hover ? Theme.hover : transparent;
+    // Hover or keyboard focus reveals the +/⋯ actions. They stay mounted (only
+    // `visible` changes) so Tab can step into their focus scopes without recreating them.
+    property <bool> hov: ta.has-hover || fs.has-focus;
+    property <bool> actions-shown: root.actions && (root.hov || pfs.has-focus || mfs.has-focus);
+    background: root.hov ? Theme.hover : transparent;
     accessible-role: button;
     accessible-label: text;
     accessible-expandable: true;
     accessible-expanded: expanded;
     accessible-action-default => { root.toggle(); }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == " " { root.toggle(); return accept; }
+            return reject;
+        }
+    }
     ta := TouchArea { mouse-cursor: pointer; clicked => { root.toggle(); } }
     HorizontalLayout {
         padding-left: 6px;
@@ -373,28 +383,45 @@ export component GroupHeader inherits Rectangle {
             overflow: elide;
             horizontal-stretch: 1;
         }
-        if root.count != "" && !(root.actions && ta.has-hover): Text { text: root.count; font-size: Theme.fs-meta; color: Theme.faint; vertical-alignment: center; }
-        if root.actions && ta.has-hover: Rectangle {
+        if root.count != "" && !root.actions-shown: Text { text: root.count; font-size: Theme.fs-meta; color: Theme.faint; vertical-alignment: center; }
+        Rectangle {
+            visible: root.actions-shown;
             width: 22px; height: 22px; y: 3px;
             border-radius: Theme.r-xs;
-            background: pta.has-hover ? Theme.pressed : transparent;
+            background: pta.has-hover || pfs.has-focus ? Theme.pressed : transparent;
             accessible-role: button;
             accessible-label: root.new-label;
             accessible-action-default => { root.new-item(); }
+            pfs := FocusScope {
+                key-pressed(e) => {
+                    if e.text == Key.Return || e.text == " " { root.new-item(); return accept; }
+                    return reject;
+                }
+            }
             KitIcon { name: "plus"; size: 14px; tint: Theme.muted-foreground; }
-            pta := TouchArea { mouse-cursor: pointer; clicked => { root.new-item(); } }
+            FocusRing { shown: pfs.has-focus; inset: true; radius: Theme.r-xs; }
+            pta := TouchArea { mouse-cursor: pointer; clicked => { pfs.focus(); root.new-item(); } }
         }
-        if root.actions && ta.has-hover: Rectangle {
+        Rectangle {
+            visible: root.actions-shown;
             width: 22px; height: 22px; y: 3px;
             border-radius: Theme.r-xs;
-            background: mta.has-hover ? Theme.pressed : transparent;
+            background: mta.has-hover || mfs.has-focus ? Theme.pressed : transparent;
             accessible-role: button;
             accessible-label: "Group actions";
             accessible-action-default => { root.menu(); }
+            mfs := FocusScope {
+                key-pressed(e) => {
+                    if e.text == Key.Return || e.text == " " { root.menu(); return accept; }
+                    return reject;
+                }
+            }
             KitIcon { name: "ellipsis"; size: 14px; tint: Theme.muted-foreground; }
-            mta := TouchArea { mouse-cursor: pointer; clicked => { root.menu(); } }
+            FocusRing { shown: mfs.has-focus; inset: true; radius: Theme.r-xs; }
+            mta := TouchArea { mouse-cursor: pointer; clicked => { mfs.focus(); root.menu(); } }
         }
     }
+    FocusRing { shown: fs.has-focus; inset: true; }
 }
 
 // Session row data (built by Rust from the sidebar slice).
@@ -423,7 +450,8 @@ export component SessionRow inherits Rectangle {
     callback archive();
     callback menu(length, length);
     // The ⋯ button sits inside `ta`, so hovering it still counts as hovering the row.
-    property <bool> hov: ta.has-hover || force-hover;
+    property <bool> hov: ta.has-hover || force-hover || fs.has-focus;
+    property <bool> more-shown: root.hov || mfs.has-focus;
     height: Theme.session-row-h;
     border-radius: Theme.control-radius;
     background: item.selected ? Theme.selected : hov ? Theme.hover : transparent;
@@ -432,6 +460,15 @@ export component SessionRow inherits Rectangle {
     accessible-label: (item.title != "" ? item.title : "Untitled session") + (item.status != SessionStatus.idle ? ", " + StatusCopy.tooltip(item.status) : "");
     accessible-item-selected: item.selected;
     accessible-action-default => { root.open(); }
+    // Keyboard: one primary stop per row (Tab), Enter/Space opens it; the revealed ⋯ is
+    // the row's only secondary stop. Roving focus (Up/Down/Home/End) belongs to the
+    // sidebar's list container once that exists; this row must not grow more stops.
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == " " { root.open(); return accept; }
+            return reject;
+        }
+    }
     ta := TouchArea {
         mouse-cursor: pointer;
         pointer-event(e) => {
@@ -469,8 +506,8 @@ export component SessionRow inherits Rectangle {
                         horizontal-stretch: 1;
                     }
                     if root.item.pr != "": Badge { text: root.item.pr; icon: "git-pull-request"; tone: Tone.outline; y: (parent.height - 20px) / 2; }
-                    if !root.hov: Text { text: root.item.age; font-size: Theme.fs-meta; color: Theme.faint; vertical-alignment: center; }
-                    if root.hov: Rectangle { width: 20px; }
+                    if !root.more-shown: Text { text: root.item.age; font-size: Theme.fs-meta; color: Theme.faint; vertical-alignment: center; }
+                    if root.more-shown: Rectangle { width: 20px; }
                 }
                 if Theme.density >= 1: HorizontalLayout {
                     spacing: 6px;
@@ -492,19 +529,28 @@ export component SessionRow inherits Rectangle {
                 }
             }
         }
-        // Hover actions button (⋯) over the age column.
-        if root.hov: Rectangle {
+        // Hover actions button (⋯) over the age column; revealed on row focus too.
+        more-btn := Rectangle {
+            visible: root.more-shown;
             x: parent.width - self.width - 4px;
             y: Theme.density == 0 ? (parent.height - self.height) / 2 : 5px;
             width: 22px;
             height: 22px;
             border-radius: Theme.r-xs;
-            background: more-ta.has-hover ? Theme.pressed : transparent;
+            background: more-ta.has-hover || mfs.has-focus ? Theme.pressed : transparent;
             accessible-role: button;
             accessible-label: "Session actions";
-            accessible-action-default => { root.menu(self.x, self.y + self.height); }
+            accessible-action-default => { root.menu(more-btn.x, more-btn.y + more-btn.height); }
+            mfs := FocusScope {
+                key-pressed(e) => {
+                    if e.text == Key.Return || e.text == " " { root.menu(more-btn.x, more-btn.y + more-btn.height); return accept; }
+                    return reject;
+                }
+            }
             KitIcon { name: "ellipsis"; size: 14px; tint: Theme.muted-foreground; }
-            more-ta := TouchArea { mouse-cursor: pointer; clicked => { root.menu(parent.x, parent.y + parent.height); } }
+            FocusRing { shown: mfs.has-focus; inset: true; radius: Theme.r-xs; }
+            more-ta := TouchArea { mouse-cursor: pointer; clicked => { mfs.focus(); root.menu(parent.x, parent.y + parent.height); } }
         }
     }
+    FocusRing { shown: fs.has-focus; inset: true; }
 }

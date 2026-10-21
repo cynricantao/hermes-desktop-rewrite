@@ -33,6 +33,17 @@ Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md
 **76 done · 361 partial · 349 not started · 8 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
+P0 review follow-up (2026-10-21): the gallery now has headless keyboard/pointer
+regressions for radio navigation, empty search results, inert menus, cascading menus,
+chip activation and dialog focus, plus contrast assertions across all five palettes.
+ANSI carriage-return and malformed-escape regressions are covered in core. Normal and
+reduced-motion renders are checked for determinism on every board. The kit remains a
+preview, not a migrated app surface: list-container roving focus and disabling background
+content around modal dialogs are integration responsibilities. No checklist item is
+promoted by these checks. Windows reference refresh/validation runs in the gallery CI;
+Linux/macOS have no committed image references yet, so their image comparison is skipped.
+
+
 ## Summary
 
 | Section | Items |

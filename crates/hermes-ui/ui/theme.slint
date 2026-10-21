@@ -102,7 +102,7 @@ export global Theme {
     out property <color> accent-hover: dark ? accent.brighter(8%) : accent.darker(10%);
     out property <color> accent-pressed: dark ? accent.darker(8%) : accent.darker(20%);
     out property <color> accent-foreground:
-        pal-preset ? (pal-cyberpunk && dark ? #001200 : #ffffff)
+        pal-cyberpunk ? #001200
       : (dark ? #04201b : #ffffff);
     out property <color> accent-soft: accent.with-alpha(dark ? 0.16 : 0.10);
     out property <color> accent-text: accent;   // accent used as text on background (≥4.5:1)
@@ -115,15 +115,15 @@ export global Theme {
     out property <color> destructive:            dark ? #f07a74 : #c4302f;
     out property <color> destructive-foreground: dark ? #2a0605 : #ffffff;
     out property <color> destructive-soft:       destructive.with-alpha(dark ? 0.15 : 0.09);
-    out property <color> success:      dark ? #4fd18b : #18804a;
+    out property <color> success:      dark ? #4fd18b : #14703f;
     out property <color> success-soft: success.with-alpha(dark ? 0.15 : 0.10);
-    out property <color> warning:      dark ? #f1b955 : #9a6512;
+    out property <color> warning:      dark ? #f1b955 : #8a5a0f;
     out property <color> warning-soft: warning.with-alpha(dark ? 0.15 : 0.11);
     out property <color> info:         dark ? #78a8f6 : #2563c9;
     out property <color> info-soft:    info.with-alpha(dark ? 0.15 : 0.09);
 
     // Focus ring (2px, 3px offset) and text selection
-    out property <color> ring:      accent.with-alpha(0.55);
+    out property <color> ring:      accent;
     out property <color> selection: accent.with-alpha(dark ? 0.32 : 0.22);
 
     // Inverse surface (tooltips)

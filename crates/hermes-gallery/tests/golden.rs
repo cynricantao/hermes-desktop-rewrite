@@ -18,7 +18,7 @@ const MAX_DIFF: f64 = 0.002;
 fn gallery_boards_match_goldens() {
     init_headless();
     let dir = goldens_dir();
-    let update = std::env::var_os("HERMES_UPDATE_GOLDENS").is_some();
+    let update = std::env::var("HERMES_UPDATE_GOLDENS").as_deref() == Ok("1");
     let have_goldens = dir.join(board_name(0, false)).exists();
     if update {
         std::fs::create_dir_all(&dir).unwrap();
@@ -26,19 +26,23 @@ fn gallery_boards_match_goldens() {
     let mut failures = Vec::new();
     let mut compared = 0;
 
-    // Determinism: the same board twice in a row (different mock-clock offsets) must match.
-    let a = render_board(5, true, false);
-    let b = render_board(5, true, false);
-    assert_eq!(
-        diff_fraction(&a, &b, 0),
-        0.0,
-        "shell-dark is not deterministic across renders"
-    );
-
     for dark in [false, true] {
         for page in 0..PAGES.len() {
             let name = board_name(page, dark);
             let board = render_board(page, dark, false);
+            let repeat = render_board(page, dark, false);
+            assert_eq!(
+                diff_fraction(&board, &repeat, 0),
+                0.0,
+                "{name}: non-deterministic render"
+            );
+            let reduced = render_board(page, dark, true);
+            let reduced_repeat = render_board(page, dark, true);
+            assert_eq!(
+                diff_fraction(&reduced, &reduced_repeat, 0),
+                0.0,
+                "{name}: non-deterministic reduced-motion render"
+            );
             assert_eq!((board.width, board.height), (1440, 900), "{name}: board size");
             let path = dir.join(&name);
             if update {

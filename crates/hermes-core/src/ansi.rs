@@ -32,88 +32,96 @@ pub struct Run {
 
 /// Parse `input` into lines of runs. Style carries across lines (as in a terminal).
 pub fn parse(input: &str) -> Vec<Vec<Run>> {
-    let mut lines: Vec<Vec<Run>> = vec![Vec::new()];
+    let mut lines = Vec::new();
+    let mut cells: Vec<(char, Style)> = Vec::new();
+    let mut cursor = 0;
     let mut style = Style::default();
-    let mut buf = String::new();
     let mut chars = input.chars().peekable();
 
-    fn flush(lines: &mut [Vec<Run>], buf: &mut String, style: Style) {
-        if buf.is_empty() {
-            return;
+    fn finish_line(cells: &mut Vec<(char, Style)>) -> Vec<Run> {
+        let mut runs: Vec<Run> = Vec::new();
+        for (c, style) in cells.drain(..) {
+            match runs.last_mut() {
+                Some(last) if last.style == style => last.text.push(c),
+                _ => runs.push(Run {
+                    text: c.to_string(),
+                    style,
+                }),
+            }
         }
-        let line = lines.last_mut().expect("at least one line");
-        match line.last_mut() {
-            Some(last) if last.style == style => last.text.push_str(buf),
-            _ => line.push(Run {
-                text: std::mem::take(buf),
-                style,
-            }),
+        runs
+    }
+
+    fn put(cells: &mut Vec<(char, Style)>, cursor: &mut usize, c: char, style: Style) {
+        if *cursor < cells.len() {
+            cells[*cursor] = (c, style);
+        } else {
+            cells.push((c, style));
         }
-        buf.clear();
+        *cursor += 1;
     }
 
     while let Some(c) = chars.next() {
         match c {
-            '\u{1b}' => {
-                flush(&mut lines, &mut buf, style);
-                match chars.peek() {
-                    Some('[') => {
-                        chars.next();
-                        let mut params = String::new();
-                        let mut fin = None;
-                        for p in chars.by_ref() {
-                            if ('\u{40}'..='\u{7e}').contains(&p) {
-                                fin = Some(p);
-                                break;
-                            }
-                            params.push(p);
+            '\u{1b}' => match chars.peek() {
+                Some('[') => {
+                    chars.next();
+                    let mut params = String::new();
+                    // A control character aborts a malformed sequence. Leave it in the
+                    // iterator so a newline or a new escape is handled normally.
+                    while let Some(&p) = chars.peek() {
+                        if p.is_control() {
+                            break;
                         }
-                        if fin == Some('m') {
-                            apply_sgr(&mut style, &params);
-                        }
-                    }
-                    Some(']') => {
-                        // OSC: until BEL or ESC \ .
                         chars.next();
-                        while let Some(p) = chars.next() {
-                            if p == '\u{7}' {
-                                break;
+                        if ('\u{40}'..='\u{7e}').contains(&p) {
+                            if p == 'm' {
+                                apply_sgr(&mut style, &params);
                             }
-                            if p == '\u{1b}' {
-                                if chars.peek() == Some(&'\\') {
-                                    chars.next();
-                                }
-                                break;
-                            }
+                            break;
                         }
+                        params.push(p);
                     }
-                    Some(_) => {
-                        chars.next();
-                    }
-                    None => {}
                 }
-            }
+                Some(']') => {
+                    chars.next();
+                    while let Some(&p) = chars.peek() {
+                        if p == '\n' || p == '\r' {
+                            break;
+                        }
+                        chars.next();
+                        if p == '\u{7}' {
+                            break;
+                        }
+                        if p == '\u{1b}' {
+                            if chars.peek() == Some(&'\\') {
+                                chars.next();
+                            }
+                            break;
+                        }
+                    }
+                }
+                Some(_) => {
+                    chars.next();
+                }
+                None => {}
+            },
             '\n' => {
-                flush(&mut lines, &mut buf, style);
-                lines.push(Vec::new());
+                lines.push(finish_line(&mut cells));
+                cursor = 0;
             }
-            '\r' => {
-                if chars.peek() == Some(&'\n') {
-                    continue;
-                }
-                buf.clear();
-                if let Some(l) = lines.last_mut() {
-                    l.clear();
+            '\r' => cursor = 0,
+            '\t' => {
+                for _ in 0..4 {
+                    put(&mut cells, &mut cursor, ' ', style);
                 }
             }
-            '\t' => buf.push_str("    "),
             c if c.is_control() => {}
-            c => buf.push(c),
+            c => put(&mut cells, &mut cursor, c, style),
         }
     }
-    flush(&mut lines, &mut buf, style);
-    if lines.len() > 1 && lines.last().is_some_and(|l| l.is_empty()) {
-        lines.pop();
+    if !cells.is_empty() || lines.is_empty() {
+        lines.push(finish_line(&mut cells));
     }
     lines
 }
@@ -230,6 +238,24 @@ mod tests {
         assert_eq!(line_text(&l[0]), "100%");
         assert_eq!(line_text(&l[1]), "done");
         assert_eq!(parse("a\r\nb").len(), 2);
+    }
+
+    #[test]
+    fn carriage_return_preserves_the_unwritten_tail_and_style() {
+        assert_eq!(strip("done\r"), "done");
+        assert_eq!(strip("abc\rX"), "Xbc");
+        let lines = parse("\u{1b}[31mabc\r\u{1b}[0mX");
+        assert_eq!(lines[0][0].text, "X");
+        assert_eq!(lines[0][0].style, Style::default());
+        assert_eq!(lines[0][1].text, "bc");
+        assert_eq!(lines[0][1].style.fg, Some(Color::Index(1)));
+    }
+
+    #[test]
+    fn malformed_escapes_do_not_consume_later_lines() {
+        assert_eq!(strip("before\u{1b}[31\nafter"), "before\nafter");
+        assert_eq!(strip("before\u{1b}]unfinished title\nafter"), "before\nafter");
+        assert_eq!(strip("before\u{1b}[31\u{1b}[32mafter"), "beforeafter");
     }
 
     #[test]

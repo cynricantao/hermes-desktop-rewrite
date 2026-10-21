@@ -3,7 +3,7 @@
 // hermes-core parsers; these components only lay them out.
 
 import { Theme, Motion, Ease } from "../theme.slint";
-import { KitIcon, Badge, Tone } from "base.slint";
+import { KitIcon, Badge, Tone, FocusRing } from "base.slint";
 
 // One rendered line of code / diff / terminal output.
 // kind: 0 context, 1 added, 2 removed, 3 hunk header, 4 note.
@@ -13,22 +13,36 @@ export struct KitCell { md: styled-text, w: length, align: int }
 export struct KitRow { cells: [KitCell] }
 
 // Copy affordance that flips to a check for 1.5 s ("Copy code" → "Copied").
+// `shown: false` keeps it hidden until the caller shows it or it gets keyboard focus;
+// the touch area is disabled while invisible so a tap cannot copy unseen.
 export component CopyButton inherits Rectangle {
     in property <string> label: "Copy code";
     in property <bool> shown: true;
     callback copy();
     property <bool> done;
+    property <bool> visible-now: shown || done || fs.has-focus;
     width: 24px;
     height: 24px;
     border-radius: Theme.r-sm;
-    background: ta.has-hover ? Theme.hover : transparent;
-    opacity: shown || done || ta.has-hover ? 1 : 0;
+    background: ta.has-hover || fs.has-focus ? Theme.hover : transparent;
+    opacity: visible-now ? 1 : 0;
     animate opacity { duration: Motion.fast; }
     accessible-role: button;
     accessible-label: done ? "Copied" : label;
     accessible-action-default => { root.copy(); root.done = true; }
-    KitIcon { name: root.done ? "check" : "copy"; size: 13px; tint: root.done ? Theme.success : ta.has-hover ? Theme.foreground : Theme.muted-foreground; }
-    ta := TouchArea { mouse-cursor: pointer; clicked => { root.copy(); root.done = true; } }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == " " { root.copy(); root.done = true; return accept; }
+            return reject;
+        }
+    }
+    KitIcon { name: root.done ? "check" : "copy"; size: 13px; tint: root.done ? Theme.success : (ta.has-hover || fs.has-focus) ? Theme.foreground : Theme.muted-foreground; }
+    ta := TouchArea {
+        enabled: root.shown || root.done || fs.has-focus;
+        mouse-cursor: pointer;
+        clicked => { root.copy(); root.done = true; }
+    }
+    FocusRing { shown: fs.has-focus; radius: Theme.r-sm; }
     Timer { interval: 1500ms; running: root.done; triggered => { root.done = false; } }
 }
 
@@ -98,7 +112,7 @@ export component CodeBlock inherits Rectangle {
             width: et.preferred-width + 28px;
             height: 22px;
             border-radius: Theme.r-pill;
-            background: eta.has-hover ? Theme.muted.mix(Theme.hover, 0.5) : Theme.muted;
+            background: eta.has-hover || efs.has-focus ? Theme.muted.mix(Theme.hover, 0.5) : Theme.muted;
             border-width: 1px;
             border-color: Theme.border;
             accessible-role: button;
@@ -106,8 +120,15 @@ export component CodeBlock inherits Rectangle {
             accessible-expandable: true;
             accessible-expanded: root.expanded;
             accessible-action-default => { root.expanded = !root.expanded; }
+            efs := FocusScope {
+                key-pressed(e) => {
+                    if e.text == Key.Return || e.text == " " { root.expanded = !root.expanded; return accept; }
+                    return reject;
+                }
+            }
             et := Text { text: root.expanded ? "Collapse" : "Expand"; font-size: Theme.fs-meta; color: Theme.muted-foreground; }
-            eta := TouchArea { mouse-cursor: pointer; clicked => { root.expanded = !root.expanded; } }
+            FocusRing { shown: efs.has-focus; radius: Theme.r-pill; }
+            eta := TouchArea { mouse-cursor: pointer; clicked => { efs.focus(); root.expanded = !root.expanded; } }
         }
     }
 }
@@ -133,7 +154,14 @@ export component DiffView inherits Rectangle {
     hdr := Rectangle {
         y: 0;
         height: 34px;
-        background: hta.has-hover && !root.counts-only ? Theme.hover : transparent;
+        background: (hta.has-hover && !root.counts-only) || fs.has-focus ? Theme.hover : transparent;
+        fs := FocusScope {
+            enabled: !root.counts-only;
+            key-pressed(e) => {
+                if e.text == Key.Return || e.text == " " { root.open = !root.open; return accept; }
+                return reject;
+            }
+        }
         hta := TouchArea { mouse-cursor: root.counts-only ? default : pointer; clicked => { if !root.counts-only { root.open = !root.open; } } }
         HorizontalLayout {
             padding-left: 10px;
@@ -155,6 +183,7 @@ export component DiffView inherits Rectangle {
         accessible-expandable: !root.counts-only;
         accessible-expanded: root.open;
         accessible-action-default => { if !root.counts-only { root.open = !root.open; } }
+        FocusRing { shown: fs.has-focus; inset: true; radius: Theme.r-sm; }
     }
     body := VerticalLayout {
         y: hdr.height;
@@ -253,25 +282,33 @@ export component TerminalView inherits Rectangle {
                     border-radius: Theme.r-sm;
                     border-width: 1px;
                     border-color: Theme.border-strong;
-                    background: ota.has-hover ? Theme.hover : transparent;
+                    background: ota.has-hover || ofs.has-focus ? Theme.hover : transparent;
                     accessible-role: button;
                     accessible-label: "Open new terminal";
                     accessible-action-default => { root.open-new-terminal(); }
+                    ofs := FocusScope {
+                        key-pressed(e) => {
+                            if e.text == Key.Return || e.text == " " { root.open-new-terminal(); return accept; }
+                            return reject;
+                        }
+                    }
                     ot := Text { text: "Open new terminal"; font-size: Theme.fs-row; color: Theme.foreground; }
-                    ota := TouchArea { mouse-cursor: pointer; clicked => { root.open-new-terminal(); } }
+                    FocusRing { shown: ofs.has-focus; radius: Theme.r-sm; }
+                    ota := TouchArea { mouse-cursor: pointer; clicked => { ofs.focus(); root.open-new-terminal(); } }
                 }
             }
         }
     }
 }
 
-// GFM table with header row and hairline rules. Columns keep their measured widths; a
-// table wider than the column scrolls sideways (never squashed).
+// GFM table with header row and hairline rules. Column widths are the measured widths
+// scaled by Chat Text Size (`scale`), so text and cells grow together; a table wider than
+// the column scrolls sideways (never squashed).
 export component TableView inherits Rectangle {
     in property <KitRow> header;
     in property <[KitRow]> rows;
     in property <length> total-w;
-    property <float> scale: 1;
+    property <float> scale: Theme.chat-scale;
     height: body.preferred-height;
     border-radius: Theme.radius;
     border-width: 1px;
@@ -279,10 +316,10 @@ export component TableView inherits Rectangle {
     clip: true;
     accessible-role: table;
     Flickable {
-        content-width: max(self.width, root.total-w);
+        content-width: max(self.width, root.total-w * root.scale);
         content-height: body.preferred-height;
     body := VerticalLayout {
-        width: max(root.width, root.total-w);
+        width: max(root.width, root.total-w * root.scale);
         Rectangle {
             background: Theme.muted;
             HorizontalLayout {

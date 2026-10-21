@@ -42,6 +42,7 @@ export component MenuSurface inherits Rectangle {
     callback activated(string);
     callback open-submenu(int, length);   // index, y of the row (for placing the panel)
     callback close-submenu();
+    callback highlight-changed();
     callback dismissed();
     width: max(min-w, col.preferred-width);
     height: min(max-h, col.preferred-height + 8px);
@@ -59,23 +60,34 @@ export component MenuSurface inherits Rectangle {
     pure function inert(i: int) -> bool {
         return root.entries[i].kind == 1 || root.entries[i].kind == 2 || root.entries[i].disabled;
     }
-    // Next actionable row in direction d, skipping separators, labels and disabled rows
-    // (Slint has no loops: look up to three rows ahead, which covers separator + label).
+    // Next actionable row in direction d, skipping separators, labels and disabled rows.
+    // Slint has no loops, so this is a bounded lookahead; if every probed row is inert the
+    // highlight stays put rather than landing on a row that cannot be activated.
     function step(d: int) {
         let n = root.entries.length;
         if n == 0 { return; }
         let a = mod(root.highlight + d + n, n);
         let b = mod(a + d + n, n);
         let c = mod(b + d + n, n);
-        root.highlight = !root.inert(a) ? a : !root.inert(b) ? b : c;
+        let e = mod(c + d + n, n);
+        let f = mod(e + d + n, n);
+        let g = mod(f + d + n, n);
+        let h = mod(g + d + n, n);
+        let next = !root.inert(a) ? a : !root.inert(b) ? b : !root.inert(c) ? c
+            : !root.inert(e) ? e : !root.inert(f) ? f : !root.inert(g) ? g
+            : !root.inert(h) ? h : -1;
+        if next < 0 || next == root.highlight { return; }
+        root.highlight = next;
+        root.highlight-changed();
     }
     fs := FocusScope {
         key-pressed(e) => {
             if e.text == Key.DownArrow { root.step(1); return accept; }
             if e.text == Key.UpArrow { root.step(-1); return accept; }
-            if e.text == Key.Return && root.highlight >= 0 {
+            if e.text == Key.Return && root.highlight >= 0 && root.highlight < root.entries.length
+                    && !root.inert(root.highlight) {
                 if root.entries[root.highlight].submenu { root.open-submenu(root.highlight, 0); }
-                else if !root.entries[root.highlight].disabled { root.activated(root.entries[root.highlight].id); }
+                else { root.activated(root.entries[root.highlight].id); }
                 return accept;
             }
             if e.text == Key.RightArrow && root.highlight >= 0 && root.entries[root.highlight].submenu { root.open-submenu(root.highlight, 0); return accept; }
@@ -143,11 +155,20 @@ export component MenuSurface inherits Rectangle {
                 ta := TouchArea {
                     enabled: e.kind != 1 && e.kind != 2 && !e.disabled;
                     mouse-cursor: pointer;
-                    moved => { root.highlight = i; }
-                    changed has-hover => {
-                        if self.has-hover { root.highlight = i; if e.submenu { root.open-submenu(i, parent.y); } }
+                    moved => {
+                        if root.highlight != i {
+                            root.highlight = i;
+                            if !e.submenu { root.highlight-changed(); }
+                        }
                     }
-                    clicked => { if e.submenu { root.open-submenu(i, parent.y); } else { root.activated(e.id); } }
+                    changed has-hover => {
+                        if self.has-hover {
+                            root.highlight = i;
+                            if e.submenu { root.open-submenu(i, parent.y + 4px); }
+                            else { root.highlight-changed(); }
+                        }
+                    }
+                    clicked => { if e.submenu { root.open-submenu(i, parent.y + 4px); } else { root.activated(e.id); } }
                 }
             }
         }
@@ -161,19 +182,23 @@ export component DropdownMenu inherits Rectangle {
     in property <[MenuEntry]> submenu-entries;
     in property <string> label;
     in property <length> menu-w: 220px;
+    in property <length> submenu-w: 220px;
     in property <bool> align-end: false;
     in property <length> anchor-h: self.height;
     callback activated(string);
     callback submenu-requested(int);
     property <int> sub-index: -1;
     property <length> sub-y;
+    property <bool> sub-open: root.sub-index >= 0 && root.submenu-entries.length > 0;
+    property <length> pop-w: root.sub-open ? root.menu-w + root.submenu-w - 4px : root.menu-w;
     public function open() { popup.show(); }
     public function close() { popup.close(); }
     out property <bool> is-open: popup.is-open;
     popup := PopupWindow {
+        // Keep the parent menu anchored when the child surface grows to its right.
         x: root.align-end ? root.width - root.menu-w : 0;
         y: root.anchor-h + 4px;
-        width: root.menu-w;
+        width: root.pop-w;
         close-policy: PopupClosePolicy.close-on-click-outside;
         main := MenuSurface {
             width: root.menu-w;
@@ -182,15 +207,19 @@ export component DropdownMenu inherits Rectangle {
             init => { self.focus-menu(); }
             activated(id) => { root.activated(id); popup.close(); }
             open-submenu(i, y) => { root.sub-index = i; root.sub-y = y; root.submenu-requested(i); }
-            close-submenu => { root.sub-index = -1; }
+            close-submenu => { root.sub-index = -1; main.focus-menu(); }
+            highlight-changed => { root.sub-index = -1; }
             dismissed => { popup.close(); }
         }
-        if root.sub-index >= 0 && root.submenu-entries.length > 0: MenuSurface {
+        if root.sub-open: MenuSurface {
             x: root.menu-w - 4px;
             y: root.sub-y;
+            width: root.submenu-w;
             entries: root.submenu-entries;
+            init => { self.focus-menu(); }
             activated(id) => { root.activated(id); popup.close(); }
-            dismissed => { root.sub-index = -1; }
+            close-submenu => { root.sub-index = -1; main.focus-menu(); }
+            dismissed => { root.sub-index = -1; main.focus-menu(); }
         }
     }
 }
@@ -203,16 +232,30 @@ export component ContextMenuHost inherits Rectangle {
     callback opening();
     property <length> px;
     property <length> py;
-    ta := TouchArea {
-        pointer-event(e) => {
-            if e.button == PointerEventButton.right && e.kind == PointerEventKind.down {
-                root.px = self.mouse-x;
-                root.py = self.mouse-y;
+    fs := FocusScope {
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+        capture-key-pressed(e) => {
+            if (e.text == Key.Menu || (e.text == Key.F10 && e.modifiers.shift)) && root.entries.length > 0 {
+                root.px = root.width / 2;
+                root.py = root.height / 2;
                 root.opening();
                 popup.show();
+                return accept;
             }
+            return reject;
         }
-        @children
+        ta := TouchArea {
+            pointer-event(e) => {
+                if e.button == PointerEventButton.right && e.kind == PointerEventKind.down {
+                    root.px = self.mouse-x;
+                    root.py = self.mouse-y;
+                    root.opening();
+                    popup.show();
+                }
+            }
+            @children
+        }
     }
     popup := PopupWindow {
         x: root.px;
@@ -295,7 +338,10 @@ export component OptionList inherits Rectangle {
     callback dismissed();
     public function focus-list() { if root.searchable { search.focus(); } else { fs.focus(); } }
     function keys(e: KeyEvent) -> EventResult {
-        if e.text == Key.DownArrow { root.highlight = min(root.highlight + 1, root.options.length - 1); return accept; }
+        if e.text == Key.DownArrow {
+            if root.options.length > 0 { root.highlight = min(root.highlight + 1, root.options.length - 1); }
+            return accept;
+        }
         if e.text == Key.UpArrow { root.highlight = max(root.highlight - 1, 0); return accept; }
         if e.text == Key.Return && root.highlight >= 0 && root.highlight < root.options.length { root.picked(root.options[root.highlight].value); return accept; }
         if e.text == Key.Escape { root.dismissed(); return accept; }
@@ -435,9 +481,16 @@ export component Combobox inherits Rectangle {
     property <int> hl: 0;
     FocusScope {
         capture-key-pressed(e) => {
-            if e.text == Key.DownArrow { if !popup.is-open { popup.show(); } else { root.hl = min(root.hl + 1, root.options.length - 1); } return accept; }
-            if e.text == Key.UpArrow { root.hl = max(root.hl - 1, 0); return accept; }
-            if e.text == Key.Return && popup.is-open && root.hl < root.options.length { root.text = root.options[root.hl].value; root.committed(root.text); popup.close(); return accept; }
+            if e.text == Key.DownArrow {
+                if !popup.is-open { popup.show(); }
+                else if root.options.length > 0 { root.hl = min(root.hl + 1, root.options.length - 1); }
+                return accept;
+            }
+            if e.text == Key.UpArrow {
+                if root.options.length > 0 { root.hl = max(root.hl - 1, 0); }
+                return accept;
+            }
+            if e.text == Key.Return && popup.is-open && root.hl >= 0 && root.hl < root.options.length { root.text = root.options[root.hl].value; root.committed(root.text); popup.close(); return accept; }
             return reject;
         }
         TextField {
@@ -590,50 +643,56 @@ export component ModalDialog inherits Rectangle {
     animate opacity { duration: open ? Motion.base : Motion.exit; easing: Ease.standard; }
     background: Theme.scrim;
     TouchArea { clicked => { root.cancel(); } }
+    // The scope contains the controls so Escape still works after a field/button takes
+    // focus. Callers must disable background content while the modal is open.
+    init => { if root.open { fs.focus(); } }
+    changed open => { if self.open { fs.focus(); } }
     fs := FocusScope {
-        key-pressed(e) => {
+        capture-key-pressed(e) => {
             if e.text == Key.Escape { root.cancel(); return accept; }
+            return reject;
+        }
+        key-pressed(e) => {
             if e.text == Key.Return && root.confirm-enabled && !root.busy { root.confirm(); return accept; }
             return reject;
         }
-    }
-    changed open => { if self.open { fs.focus(); } }
-    card := Rectangle {
-        width: min(root.card-w, root.width - 32px);
-        height: body.preferred-height;
-        y: (root.height - self.height) / 2 - 24px + (root.open ? 0px : 8px);
-        animate y { duration: Motion.base; easing: Ease.standard; }
-        border-radius: Theme.radius + 2px;
-        background: Theme.popover;
-        border-width: 1px;
-        border-color: Theme.border;
-        drop-shadow-blur: Theme.shadow-pop-blur;
-        drop-shadow-offset-y: Theme.shadow-pop-y;
-        drop-shadow-color: Theme.shadow-color;
-        accessible-role: groupbox;
-        accessible-label: root.title;
-        accessible-description: root.description;
-        TouchArea { }
-        body := VerticalLayout {
-            padding: 20px;
-            spacing: 14px;
-            VerticalLayout {
-                spacing: 6px;
-                Text { text: root.title; font-size: Theme.fs-h3; font-weight: 600; color: Theme.foreground; wrap: word-wrap; }
-                if root.description != "": Text { text: root.description; font-size: Theme.fs-control; color: Theme.muted-foreground; wrap: word-wrap; }
-            }
-            @children
-            HorizontalLayout {
-                alignment: end;
-                spacing: 8px;
-                padding-top: 4px;
-                if root.show-cancel: Button { text: root.cancel-text; variant: ButtonVariant.ghost; clicked => { root.cancel(); } }
-                Button {
-                    text: root.confirm-text;
-                    variant: root.destructive ? ButtonVariant.destructive : ButtonVariant.primary;
-                    enabled: root.confirm-enabled;
-                    loading: root.busy;
-                    clicked => { root.confirm(); }
+        card := Rectangle {
+            width: min(root.card-w, root.width - 32px);
+            height: body.preferred-height;
+            y: (root.height - self.height) / 2 - 24px + (root.open ? 0px : 8px);
+            animate y { duration: Motion.base; easing: Ease.standard; }
+            border-radius: Theme.radius + 2px;
+            background: Theme.popover;
+            border-width: 1px;
+            border-color: Theme.border;
+            drop-shadow-blur: Theme.shadow-pop-blur;
+            drop-shadow-offset-y: Theme.shadow-pop-y;
+            drop-shadow-color: Theme.shadow-color;
+            accessible-role: groupbox;
+            accessible-label: root.title;
+            accessible-description: root.description;
+            TouchArea { }
+            body := VerticalLayout {
+                padding: 20px;
+                spacing: 14px;
+                VerticalLayout {
+                    spacing: 6px;
+                    Text { text: root.title; font-size: Theme.fs-h3; font-weight: 600; color: Theme.foreground; wrap: word-wrap; }
+                    if root.description != "": Text { text: root.description; font-size: Theme.fs-control; color: Theme.muted-foreground; wrap: word-wrap; }
+                }
+                @children
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 8px;
+                    padding-top: 4px;
+                    if root.show-cancel: Button { text: root.cancel-text; variant: ButtonVariant.ghost; clicked => { root.cancel(); } }
+                    Button {
+                        text: root.confirm-text;
+                        variant: root.destructive ? ButtonVariant.destructive : ButtonVariant.primary;
+                        enabled: root.confirm-enabled;
+                        loading: root.busy;
+                        clicked => { root.confirm(); }
+                    }
                 }
             }
         }
@@ -714,12 +773,19 @@ component ToastCard inherits Rectangle {
         Rectangle {
             width: 20px; height: 20px;
             border-radius: Theme.r-xs;
-            background: xta.has-hover ? Theme.hover : transparent;
+            background: xta.has-hover || tfs.has-focus ? Theme.hover : transparent;
             accessible-role: button;
             accessible-label: "Dismiss";
             accessible-action-default => { root.dismiss(root.item.id); }
-            KitIcon { name: "x"; size: 13px; tint: Theme.faint; }
+            KitIcon { name: "x"; size: 13px; tint: tfs.has-focus ? Theme.foreground : Theme.faint; }
+            tfs := FocusScope {
+                key-pressed(e) => {
+                    if e.text == Key.Return || e.text == " " { root.dismiss(root.item.id); return accept; }
+                    return reject;
+                }
+            }
             xta := TouchArea { mouse-cursor: pointer; clicked => { root.dismiss(root.item.id); } }
+            FocusRing { shown: tfs.has-focus; radius: Theme.r-xs; }
         }
     }
 }
@@ -803,12 +869,19 @@ export component Banner inherits Rectangle {
         if root.item.dismissible: Rectangle {
             width: 22px; height: 22px;
             border-radius: Theme.r-xs;
-            background: bta.has-hover ? Theme.hover : transparent;
+            background: bta.has-hover || bfs.has-focus ? Theme.hover : transparent;
             accessible-role: button;
             accessible-label: "Dismiss";
             accessible-action-default => { root.dismiss(root.item.id); }
-            KitIcon { name: "x"; size: 13px; tint: Theme.muted-foreground; }
+            KitIcon { name: "x"; size: 13px; tint: bfs.has-focus ? Theme.foreground : Theme.muted-foreground; }
+            bfs := FocusScope {
+                key-pressed(e) => {
+                    if e.text == Key.Return || e.text == " " { root.dismiss(root.item.id); return accept; }
+                    return reject;
+                }
+            }
             bta := TouchArea { mouse-cursor: pointer; clicked => { root.dismiss(root.item.id); } }
+            FocusRing { shown: bfs.has-focus; radius: Theme.r-xs; }
         }
     }
 }
@@ -872,9 +945,15 @@ export component CommandPalette inherits Rectangle {
             height: 48px;
             FocusScope {
                 capture-key-pressed(e) => {
-                    if e.text == Key.DownArrow { root.highlight = min(root.highlight + 1, root.items.length - 1); return accept; }
-                    if e.text == Key.UpArrow { root.highlight = max(root.highlight - 1, 0); return accept; }
-                    if e.text == Key.Return && root.highlight < root.items.length { root.activated(root.items[root.highlight].id); return accept; }
+                    if e.text == Key.DownArrow {
+                        if root.items.length > 0 { root.highlight = min(root.highlight + 1, root.items.length - 1); }
+                        return accept;
+                    }
+                    if e.text == Key.UpArrow {
+                        if root.items.length > 0 { root.highlight = max(root.highlight - 1, 0); }
+                        return accept;
+                    }
+                    if e.text == Key.Return && root.highlight >= 0 && root.highlight < root.items.length { root.activated(root.items[root.highlight].id); return accept; }
                     if e.text == Key.Escape { root.dismissed(); return accept; }
                     if e.text == Key.Backspace && root.query == "" { root.back(); return accept; }
                     return reject;
