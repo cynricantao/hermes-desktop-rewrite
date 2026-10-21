@@ -1,0 +1,974 @@
+// Kit overlays: menu surface (dropdown / context / select lists), dropdown + context menu
+// openers, select / searchable select / combobox, popover, tooltip, dialog, alert dialog,
+// toast stack, banner stack, command palette.
+//
+// Design notes (docs/DESIGN.md §6):
+// * Data-driven menus live in PopupWindows (never clipped by scroll areas). A PopupWindow
+//   may not host slots, so free-form popovers are drawn in-tree (`PopoverSurface`).
+// * Slint's builtin `Tooltip` is fixed at a 500 ms delay and takes the std-widgets style,
+//   so tooltips are one window-level layer (`TipLayer`) fed by `Tip` wrappers: 400 ms
+//   delay, inverse colours, never clipped, input-transparent.
+// * Open/close motion is opacity + 4–8 px translate (the software renderer draws no
+//   scale transforms or shadows; surfaces carry a border so depth never relies on them).
+
+import { Theme, Motion, Ease } from "../theme.slint";
+import { KitIcon, Kbd, Spinner, Badge, Tone, FocusRing } from "base.slint";
+import { Button, ButtonVariant, ButtonSize, TextField } from "controls.slint";
+
+// ── Menu ────────────────────────────────────────────────────────────────────────────
+
+// kind: 0 item, 1 separator, 2 section label, 3 checkable item, 4 radio item.
+export struct MenuEntry {
+    id: string,
+    kind: int,
+    label: string,
+    description: string,
+    icon: string,
+    shortcut: [string],
+    checked: bool,
+    danger: bool,
+    disabled: bool,
+    submenu: bool,
+}
+
+// The menu panel itself. Keyboard: ↑/↓ move, Enter activates, → opens a submenu,
+// ← / Esc closes. `highlight` is in-out so a parent can drive it (palette, combobox).
+export component MenuSurface inherits Rectangle {
+    in property <[MenuEntry]> entries;
+    in-out property <int> highlight: -1;
+    in property <length> min-w: 200px;
+    in property <length> max-h: 360px;
+    in property <string> label;
+    callback activated(string);
+    callback open-submenu(int, length);   // index, y of the row (for placing the panel)
+    callback close-submenu();
+    callback dismissed();
+    width: max(min-w, col.preferred-width);
+    height: min(max-h, col.preferred-height + 8px);
+    border-radius: Theme.radius;
+    background: Theme.popover;
+    border-width: 1px;
+    border-color: Theme.border;
+    drop-shadow-blur: Theme.shadow-pop-blur;
+    drop-shadow-offset-y: Theme.shadow-pop-y;
+    drop-shadow-color: Theme.shadow-color;
+    clip: true;
+    accessible-role: list;
+    accessible-label: label;
+    public function focus-menu() { fs.focus(); }
+    pure function inert(i: int) -> bool {
+        return root.entries[i].kind == 1 || root.entries[i].kind == 2 || root.entries[i].disabled;
+    }
+    // Next actionable row in direction d, skipping separators, labels and disabled rows
+    // (Slint has no loops: look up to three rows ahead, which covers separator + label).
+    function step(d: int) {
+        let n = root.entries.length;
+        if n == 0 { return; }
+        let a = mod(root.highlight + d + n, n);
+        let b = mod(a + d + n, n);
+        let c = mod(b + d + n, n);
+        root.highlight = !root.inert(a) ? a : !root.inert(b) ? b : c;
+    }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.DownArrow { root.step(1); return accept; }
+            if e.text == Key.UpArrow { root.step(-1); return accept; }
+            if e.text == Key.Return && root.highlight >= 0 {
+                if root.entries[root.highlight].submenu { root.open-submenu(root.highlight, 0); }
+                else if !root.entries[root.highlight].disabled { root.activated(root.entries[root.highlight].id); }
+                return accept;
+            }
+            if e.text == Key.RightArrow && root.highlight >= 0 && root.entries[root.highlight].submenu { root.open-submenu(root.highlight, 0); return accept; }
+            if e.text == Key.LeftArrow { root.close-submenu(); return accept; }
+            if e.text == Key.Escape { root.dismissed(); return accept; }
+            return reject;
+        }
+    }
+    Flickable {
+        content-height: col.preferred-height + 8px;
+        col := VerticalLayout {
+            padding: 4px;
+            spacing: 0px;
+            for e[i] in root.entries: Rectangle {
+                height: e.kind == 1 ? 9px : e.kind == 2 ? 26px : (e.description != "" ? 44px : Theme.menu-row-h);
+                border-radius: Theme.control-radius - 2px;
+                background: (e.kind != 1 && e.kind != 2 && !e.disabled && (i == root.highlight || ta.has-hover))
+                    ? (e.danger ? Theme.destructive-soft : Theme.hover) : transparent;
+                accessible-role: list-item;
+                accessible-label: e.kind == 1 ? "" : e.label;
+                accessible-description: e.description;
+                accessible-enabled: !e.disabled;
+                accessible-checkable: e.kind == 3 || e.kind == 4;
+                accessible-checked: e.checked;
+                accessible-action-default => { if !e.disabled && e.kind != 1 && e.kind != 2 { root.activated(e.id); } }
+                if e.kind == 1: Rectangle { x: -4px; width: parent.width + 8px; height: 1px; background: Theme.border; }
+                if e.kind == 2: Text {
+                    x: 8px;
+                    text: e.label;
+                    font-size: Theme.fs-meta;
+                    font-weight: 600;
+                    color: Theme.faint;
+                    vertical-alignment: center;
+                }
+                if e.kind != 1 && e.kind != 2: HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    spacing: 8px;
+                    // Leading slot: check / radio mark or icon (keeps text aligned).
+                    if e.kind == 3 || e.kind == 4: Rectangle {
+                        width: 14px;
+                        if e.checked && e.kind == 3: KitIcon { name: "check"; size: 14px; tint: Theme.foreground; }
+                        if e.checked && e.kind == 4: Rectangle { width: 6px; height: 6px; border-radius: 3px; background: Theme.foreground; }
+                    }
+                    if e.icon != "": KitIcon {
+                        name: e.icon;
+                        size: 15px;
+                        y: (parent.height - 15px) / 2;
+                        tint: e.disabled ? Theme.faint : e.danger ? Theme.destructive : Theme.muted-foreground;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        Text {
+                            text: e.label;
+                            font-size: Theme.fs-control;
+                            color: e.disabled ? Theme.faint : e.danger ? Theme.destructive : Theme.foreground;
+                            overflow: elide;
+                        }
+                        if e.description != "": Text { text: e.description; font-size: Theme.fs-row; color: Theme.muted-foreground; overflow: elide; }
+                    }
+                    if e.shortcut.length > 0: Kbd { keys: e.shortcut; y: (parent.height - 18px) / 2; }
+                    if e.submenu: KitIcon { name: "chevron-right"; size: 14px; y: (parent.height - 14px) / 2; tint: Theme.faint; }
+                }
+                ta := TouchArea {
+                    enabled: e.kind != 1 && e.kind != 2 && !e.disabled;
+                    mouse-cursor: pointer;
+                    moved => { root.highlight = i; }
+                    changed has-hover => {
+                        if self.has-hover { root.highlight = i; if e.submenu { root.open-submenu(i, parent.y); } }
+                    }
+                    clicked => { if e.submenu { root.open-submenu(i, parent.y); } else { root.activated(e.id); } }
+                }
+            }
+        }
+    }
+}
+
+// A button-anchored dropdown menu. One level of submenu, supplied by the caller in
+// response to `open-submenu` (Move to project ▸, Appearance ▸ …).
+export component DropdownMenu inherits Rectangle {
+    in property <[MenuEntry]> entries;
+    in property <[MenuEntry]> submenu-entries;
+    in property <string> label;
+    in property <length> menu-w: 220px;
+    in property <bool> align-end: false;
+    in property <length> anchor-h: self.height;
+    callback activated(string);
+    callback submenu-requested(int);
+    property <int> sub-index: -1;
+    property <length> sub-y;
+    public function open() { popup.show(); }
+    public function close() { popup.close(); }
+    out property <bool> is-open: popup.is-open;
+    popup := PopupWindow {
+        x: root.align-end ? root.width - root.menu-w : 0;
+        y: root.anchor-h + 4px;
+        width: root.menu-w;
+        close-policy: PopupClosePolicy.close-on-click-outside;
+        main := MenuSurface {
+            width: root.menu-w;
+            entries: root.entries;
+            label: root.label;
+            init => { self.focus-menu(); }
+            activated(id) => { root.activated(id); popup.close(); }
+            open-submenu(i, y) => { root.sub-index = i; root.sub-y = y; root.submenu-requested(i); }
+            close-submenu => { root.sub-index = -1; }
+            dismissed => { popup.close(); }
+        }
+        if root.sub-index >= 0 && root.submenu-entries.length > 0: MenuSurface {
+            x: root.menu-w - 4px;
+            y: root.sub-y;
+            entries: root.submenu-entries;
+            activated(id) => { root.activated(id); popup.close(); }
+            dismissed => { root.sub-index = -1; }
+        }
+    }
+}
+
+// Right-click (or Menu key) context menu over arbitrary content.
+export component ContextMenuHost inherits Rectangle {
+    in property <[MenuEntry]> entries;
+    in property <string> label;
+    callback activated(string);
+    callback opening();
+    property <length> px;
+    property <length> py;
+    ta := TouchArea {
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.down {
+                root.px = self.mouse-x;
+                root.py = self.mouse-y;
+                root.opening();
+                popup.show();
+            }
+        }
+        @children
+    }
+    popup := PopupWindow {
+        x: root.px;
+        y: root.py;
+        close-policy: PopupClosePolicy.close-on-click-outside;
+        MenuSurface {
+            entries: root.entries;
+            label: root.label;
+            init => { self.focus-menu(); }
+            activated(id) => { root.activated(id); popup.close(); }
+            dismissed => { popup.close(); }
+        }
+    }
+}
+
+// ── Select / Combobox ──────────────────────────────────────────────────────────────
+
+export struct SelectOption { value: string, label: string, description: string, icon: string }
+
+// Trigger look shared by Select and Combobox.
+export component SelectTrigger inherits Rectangle {
+    in property <string> text;
+    in property <string> placeholder: "Select…";
+    in property <string> icon;
+    in property <bool> open;
+    in property <bool> enabled: true;
+    in property <ButtonSize> size: ButtonSize.md;
+    callback clicked();
+    property <bool> off: !enabled;
+    height: size == ButtonSize.sm ? Theme.control-h-sm : Theme.control-h;
+    min-width: 140px;
+    border-radius: Theme.control-radius;
+    border-width: 1px;
+    border-color: open ? Theme.accent.with-alpha(0.7) : ta.has-hover && !off ? Theme.border-strong.mix(Theme.foreground, 0.75) : Theme.border-strong;
+    background: off ? Theme.muted : Theme.input-bg;
+    animate border-color { duration: Motion.fast; }
+    accessible-role: combobox;
+    accessible-value: text;
+    accessible-expandable: true;
+    accessible-expanded: open;
+    accessible-action-default => { root.clicked(); }
+    fs := FocusScope {
+        enabled: !root.off;
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == " " || e.text == Key.DownArrow { root.clicked(); return accept; }
+            return reject;
+        }
+    }
+    ta := TouchArea { enabled: !root.off; mouse-cursor: pointer; clicked => { fs.focus(); root.clicked(); } }
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 8px;
+        spacing: 6px;
+        if root.icon != "": KitIcon { name: root.icon; size: 14px; y: (parent.height - 14px) / 2; }
+        Text {
+            text: root.text != "" ? root.text : root.placeholder;
+            color: root.text != "" ? (root.off ? Theme.faint : Theme.foreground) : Theme.faint;
+            font-size: root.size == ButtonSize.sm ? Theme.fs-row : Theme.fs-control;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+        KitIcon { name: "chevron-down"; size: 14px; tint: Theme.faint; y: (parent.height - 14px) / 2; }
+    }
+    FocusRing { shown: fs.has-focus; }
+}
+
+// Option list panel (with optional search field) used by Select / Combobox / pickers.
+export component OptionList inherits Rectangle {
+    in property <[SelectOption]> options;   // already filtered by the caller (Rust)
+    in property <string> current;
+    in-out property <string> query;
+    in property <bool> searchable: false;
+    in property <string> search-placeholder: "Search…";
+    in property <string> empty-text: "No results";
+    in-out property <int> highlight: 0;
+    in property <length> max-h: 300px;
+    callback query-changed(string);
+    callback picked(string);
+    callback dismissed();
+    public function focus-list() { if root.searchable { search.focus(); } else { fs.focus(); } }
+    function keys(e: KeyEvent) -> EventResult {
+        if e.text == Key.DownArrow { root.highlight = min(root.highlight + 1, root.options.length - 1); return accept; }
+        if e.text == Key.UpArrow { root.highlight = max(root.highlight - 1, 0); return accept; }
+        if e.text == Key.Return && root.highlight >= 0 && root.highlight < root.options.length { root.picked(root.options[root.highlight].value); return accept; }
+        if e.text == Key.Escape { root.dismissed(); return accept; }
+        return reject;
+    }
+    height: min(max-h, col.preferred-height);
+    border-radius: Theme.radius;
+    background: Theme.popover;
+    border-width: 1px;
+    border-color: Theme.border;
+    drop-shadow-blur: Theme.shadow-pop-blur;
+    drop-shadow-offset-y: Theme.shadow-pop-y;
+    drop-shadow-color: Theme.shadow-color;
+    clip: true;
+    fs := FocusScope { key-pressed(e) => { return root.keys(e); } }
+    col := VerticalLayout {
+        padding: 4px;
+        spacing: 2px;
+        Rectangle {
+            height: root.searchable ? 34px : 0px;
+            visible: root.searchable;
+            FocusScope {
+                capture-key-pressed(e) => { return root.keys(e); }
+                search := TextField {
+                    x: 0; y: 1px;
+                    width: parent.width;
+                    size: ButtonSize.sm;
+                    icon: "search";
+                    text <=> root.query;
+                    placeholder: root.search-placeholder;
+                    label: root.search-placeholder;
+                    edited(t) => { root.highlight = 0; root.query-changed(t); }
+                    escape => { root.dismissed(); }
+                }
+            }
+        }
+        if root.options.length == 0: Text {
+            text: root.empty-text;
+            height: 36px;
+            color: Theme.muted-foreground;
+            font-size: Theme.fs-control;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        Flickable {
+            height: min(root.max-h - (root.searchable ? 40px : 8px), list.preferred-height);
+            content-height: list.preferred-height;
+            list := VerticalLayout {
+                for o[i] in root.options: Rectangle {
+                    height: o.description != "" ? 44px : Theme.menu-row-h;
+                    border-radius: Theme.control-radius - 2px;
+                    background: i == root.highlight ? Theme.hover : transparent;
+                    accessible-role: list-item;
+                    accessible-label: o.label;
+                    accessible-item-selected: o.value == root.current;
+                    accessible-action-default => { root.picked(o.value); }
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 8px;
+                        if o.icon != "": KitIcon { name: o.icon; size: 15px; y: (parent.height - 15px) / 2; }
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 1;
+                            Text { text: o.label; font-size: Theme.fs-control; color: Theme.foreground; overflow: elide; }
+                            if o.description != "": Text { text: o.description; font-size: Theme.fs-row; color: Theme.muted-foreground; overflow: elide; }
+                        }
+                        if o.value == root.current: KitIcon { name: "check"; size: 14px; tint: Theme.accent; y: (parent.height - 14px) / 2; }
+                    }
+                    TouchArea {
+                        mouse-cursor: pointer;
+                        moved => { root.highlight = i; }
+                        clicked => { root.picked(o.value); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Select: trigger + popup option list. `searchable` gives the "searchable-select" used by
+// settings with long enums. Filtering is done by the caller on `query-changed`.
+export component Select inherits Rectangle {
+    in property <[SelectOption]> options;
+    in-out property <string> value;
+    in property <string> display;           // label of the current value
+    in property <string> placeholder: "Select…";
+    in property <bool> searchable: false;
+    in property <string> search-placeholder: "Search…";
+    in property <string> empty-text: "No results";
+    in-out property <string> query;
+    in property <bool> enabled: true;
+    in property <length> list-w: self.width;
+    callback changed(string);
+    callback query-changed(string);
+    height: Theme.control-h;
+    min-width: 140px;
+    trigger := SelectTrigger {
+        width: root.width;
+        text: root.display;
+        placeholder: root.placeholder;
+        open: popup.is-open;
+        enabled: root.enabled;
+        clicked => { popup.show(); }
+    }
+    popup := PopupWindow {
+        y: root.height + 4px;
+        width: root.list-w;
+        close-policy: PopupClosePolicy.close-on-click-outside;
+        OptionList {
+            width: root.list-w;
+            options: root.options;
+            current: root.value;
+            searchable: root.searchable;
+            search-placeholder: root.search-placeholder;
+            empty-text: root.empty-text;
+            query <=> root.query;
+            init => { self.focus-list(); }
+            query-changed(q) => { root.query-changed(q); }
+            picked(v) => { root.value = v; root.changed(v); popup.close(); }
+            dismissed => { popup.close(); }
+        }
+    }
+}
+
+// Combobox: free text + suggestions (voice names, model ids: "free input" enums).
+export component Combobox inherits Rectangle {
+    in property <[SelectOption]> options;   // suggestions, filtered by the caller
+    in-out property <string> text;
+    in property <string> placeholder;
+    in property <string> label;
+    in property <string> empty-text: "No suggestions";
+    callback edited(string);
+    callback committed(string);
+    height: Theme.control-h;
+    min-width: 160px;
+    property <int> hl: 0;
+    FocusScope {
+        capture-key-pressed(e) => {
+            if e.text == Key.DownArrow { if !popup.is-open { popup.show(); } else { root.hl = min(root.hl + 1, root.options.length - 1); } return accept; }
+            if e.text == Key.UpArrow { root.hl = max(root.hl - 1, 0); return accept; }
+            if e.text == Key.Return && popup.is-open && root.hl < root.options.length { root.text = root.options[root.hl].value; root.committed(root.text); popup.close(); return accept; }
+            return reject;
+        }
+        TextField {
+            width: root.width;
+            text <=> root.text;
+            placeholder: root.placeholder;
+            label: root.label;
+            edited(t) => { root.hl = 0; root.edited(t); if root.options.length > 0 { popup.show(); } }
+            accepted(t) => { root.committed(t); popup.close(); }
+            escape => { popup.close(); }
+        }
+    }
+    popup := PopupWindow {
+        y: root.height + 4px;
+        width: root.width;
+        close-policy: PopupClosePolicy.close-on-click-outside;
+        OptionList {
+            width: root.width;
+            options: root.options;
+            current: root.text;
+            highlight <=> root.hl;
+            empty-text: root.empty-text;
+            picked(v) => { root.text = v; root.committed(v); popup.close(); }
+            dismissed => { popup.close(); }
+        }
+    }
+}
+
+// ── Popover ────────────────────────────────────────────────────────────────────────
+
+// Free-form floating panel (Options, filter/group popover, context breakdown). Drawn
+// in-tree: place it in an overlay layer that is not clipped. Fades and rises 4 px.
+export component PopoverSurface inherits Rectangle {
+    in property <bool> open: true;
+    in property <string> title;
+    in property <length> pad: 12px;
+    opacity: open ? 1 : 0;
+    visible: self.opacity > 0.01;
+    property <length> rise: open ? 0px : 4px;
+    animate opacity { duration: Motion.fast; easing: Ease.list; }
+    animate rise { duration: Motion.fast; easing: Ease.list; }
+    border-radius: Theme.radius;
+    background: Theme.popover;
+    border-width: 1px;
+    border-color: Theme.border;
+    drop-shadow-blur: Theme.shadow-pop-blur;
+    drop-shadow-offset-y: Theme.shadow-pop-y;
+    drop-shadow-color: Theme.shadow-color;
+    accessible-role: groupbox;
+    accessible-label: title;
+    height: pop-col.preferred-height;
+    // Swallow clicks so they don't reach content beneath.
+    TouchArea { }
+    pop-col := VerticalLayout {
+        y: root.rise;
+        padding: root.pad;
+        spacing: 10px;
+        alignment: start;
+        if root.title != "": Text { text: root.title; font-size: Theme.fs-control; font-weight: 600; color: Theme.foreground; }
+        @children
+    }
+}
+
+// ── Tooltip ────────────────────────────────────────────────────────────────────────
+
+export global TipState {
+    in-out property <string> text;
+    in-out property <[string]> keys;
+    in-out property <length> x;       // anchor centre x (window coordinates)
+    in-out property <length> y;       // anchor top y
+    in-out property <length> bottom;  // anchor bottom y
+    in-out property <bool> shown;
+}
+
+// Inverse-coloured tooltip bubble, optional shortcut chips.
+export component TooltipSurface inherits Rectangle {
+    in property <string> text;
+    in property <[string]> keys;
+    height: 26px;
+    width: row.preferred-width;
+    border-radius: Theme.r-sm;
+    background: Theme.inverse-bg;
+    accessible-role: AccessibleRole.text;
+    accessible-label: text;
+    row := HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 8px;
+        Text { text: root.text; font-size: Theme.fs-row; color: Theme.inverse-fg; vertical-alignment: center; }
+        if root.keys.length > 0: Kbd { keys: root.keys; inverse: true; y: 4px; }
+    }
+}
+
+// Wrap content to give it a tooltip (400 ms delay; hides on press or leave).
+export component Tip inherits Rectangle {
+    in property <string> text;
+    in property <[string]> keys;
+    ta := TouchArea {
+        changed has-hover => {
+            if !self.has-hover && TipState.shown && TipState.text == root.text { TipState.shown = false; }
+        }
+        changed pressed => { if self.pressed { TipState.shown = false; } }
+        @children
+    }
+    Timer {
+        interval: Motion.tooltip-delay;
+        running: ta.has-hover && !ta.pressed && root.text != "" && !(TipState.shown && TipState.text == root.text);
+        triggered => {
+            TipState.text = root.text;
+            TipState.keys = root.keys;
+            TipState.x = root.absolute-position.x + root.width / 2;
+            TipState.y = root.absolute-position.y;
+            TipState.bottom = root.absolute-position.y + root.height;
+            TipState.shown = true;
+        }
+    }
+}
+
+// One per window, last child of the root so it draws above everything.
+export component TipLayer inherits Rectangle {
+    in property <length> window-w;
+    if TipState.shown: s := TooltipSurface {
+        text: TipState.text;
+        keys: TipState.keys;
+        x: clamp(TipState.x - self.width / 2, 6px, root.window-w - self.width - 6px);
+        // Prefer below the anchor; flip above when there is no room.
+        y: TipState.bottom + 6px + self.height > root.height ? TipState.y - self.height - 6px : TipState.bottom + 6px;
+    }
+}
+
+// ── Dialogs ────────────────────────────────────────────────────────────────────────
+
+// Modal dialog: scrim + card. Esc / scrim click cancel; Enter confirms when the focus is
+// not in a multi-line field. Body content goes in the children slot.
+export component ModalDialog inherits Rectangle {
+    in property <bool> open;
+    in property <string> title;
+    in property <string> description;
+    in property <string> confirm-text: "Confirm";
+    in property <string> cancel-text: "Cancel";
+    in property <bool> destructive: false;
+    in property <bool> confirm-enabled: true;
+    in property <bool> busy: false;
+    in property <bool> show-cancel: true;
+    in property <length> card-w: 440px;
+    callback confirm();
+    callback cancel();
+    visible: self.opacity > 0.01;
+    opacity: open ? 1 : 0;
+    animate opacity { duration: open ? Motion.base : Motion.exit; easing: Ease.standard; }
+    background: Theme.scrim;
+    TouchArea { clicked => { root.cancel(); } }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape { root.cancel(); return accept; }
+            if e.text == Key.Return && root.confirm-enabled && !root.busy { root.confirm(); return accept; }
+            return reject;
+        }
+    }
+    changed open => { if self.open { fs.focus(); } }
+    card := Rectangle {
+        width: min(root.card-w, root.width - 32px);
+        height: body.preferred-height;
+        y: (root.height - self.height) / 2 - 24px + (root.open ? 0px : 8px);
+        animate y { duration: Motion.base; easing: Ease.standard; }
+        border-radius: Theme.radius + 2px;
+        background: Theme.popover;
+        border-width: 1px;
+        border-color: Theme.border;
+        drop-shadow-blur: Theme.shadow-pop-blur;
+        drop-shadow-offset-y: Theme.shadow-pop-y;
+        drop-shadow-color: Theme.shadow-color;
+        accessible-role: groupbox;
+        accessible-label: root.title;
+        accessible-description: root.description;
+        TouchArea { }
+        body := VerticalLayout {
+            padding: 20px;
+            spacing: 14px;
+            VerticalLayout {
+                spacing: 6px;
+                Text { text: root.title; font-size: Theme.fs-h3; font-weight: 600; color: Theme.foreground; wrap: word-wrap; }
+                if root.description != "": Text { text: root.description; font-size: Theme.fs-control; color: Theme.muted-foreground; wrap: word-wrap; }
+            }
+            @children
+            HorizontalLayout {
+                alignment: end;
+                spacing: 8px;
+                padding-top: 4px;
+                if root.show-cancel: Button { text: root.cancel-text; variant: ButtonVariant.ghost; clicked => { root.cancel(); } }
+                Button {
+                    text: root.confirm-text;
+                    variant: root.destructive ? ButtonVariant.destructive : ButtonVariant.primary;
+                    enabled: root.confirm-enabled;
+                    loading: root.busy;
+                    clicked => { root.confirm(); }
+                }
+            }
+        }
+    }
+}
+
+// Confirmation dialog (Delete session?, Always allow this command?, Clear goal …).
+export component AlertDialog inherits ModalDialog {
+    destructive: true;
+    card-w: 400px;
+}
+
+// ── Toasts & banners ───────────────────────────────────────────────────────────────
+
+export enum NoticeTone { neutral, success, warning, error, info }
+
+export struct ToastItem {
+    id: int,
+    tone: NoticeTone,
+    title: string,
+    body: string,
+    action: string,       // e.g. "Undo", "Retry" ("" = none)
+    leaving: bool,        // set by Rust ~150 ms before removal (slide/fade out)
+}
+
+component ToastCard inherits Rectangle {
+    in property <ToastItem> item;
+    callback action(int);
+    callback dismiss(int);
+    property <float> shown: 0;
+    init => { self.shown = 1; }
+    opacity: item.leaving ? 0 : shown;
+    property <length> slide: item.leaving ? 12px : (1 - shown) * 12px;
+    animate opacity { duration: Motion.toast; easing: Ease.list; }
+    animate slide { duration: Motion.toast; easing: Ease.list; }
+    width: 340px;
+    height: row.preferred-height;
+    border-radius: Theme.radius;
+    background: Theme.popover;
+    border-width: 1px;
+    border-color: Theme.border;
+    drop-shadow-blur: Theme.shadow-pop-blur;
+    drop-shadow-offset-y: Theme.shadow-pop-y;
+    drop-shadow-color: Theme.shadow-color;
+    accessible-role: banner;
+    accessible-label: item.title;
+    accessible-description: item.body;
+    accessible-live-region: AccessibleLiveness.polite;
+    row := HorizontalLayout {
+        x: root.slide;
+        padding: 12px;
+        spacing: 10px;
+        KitIcon {
+            y: 1px;
+            name: root.item.tone == NoticeTone.success ? "circle-check"
+                : root.item.tone == NoticeTone.warning ? "triangle-alert"
+                : root.item.tone == NoticeTone.error ? "circle-alert"
+                : "info";
+            size: 16px;
+            tint: root.item.tone == NoticeTone.success ? Theme.success
+                : root.item.tone == NoticeTone.warning ? Theme.warning
+                : root.item.tone == NoticeTone.error ? Theme.destructive
+                : root.item.tone == NoticeTone.info ? Theme.info
+                : Theme.muted-foreground;
+        }
+        VerticalLayout {
+            spacing: 2px;
+            horizontal-stretch: 1;
+            Text { text: root.item.title; font-size: Theme.fs-control; font-weight: 500; color: Theme.foreground; wrap: word-wrap; }
+            if root.item.body != "": Text { text: root.item.body; font-size: Theme.fs-row; color: Theme.muted-foreground; wrap: word-wrap; }
+        }
+        if root.item.action != "": Button {
+            size: ButtonSize.sm;
+            variant: ButtonVariant.secondary;
+            text: root.item.action;
+            clicked => { root.action(root.item.id); }
+        }
+        Rectangle {
+            width: 20px; height: 20px;
+            border-radius: Theme.r-xs;
+            background: xta.has-hover ? Theme.hover : transparent;
+            accessible-role: button;
+            accessible-label: "Dismiss";
+            accessible-action-default => { root.dismiss(root.item.id); }
+            KitIcon { name: "x"; size: 13px; tint: Theme.faint; }
+            xta := TouchArea { mouse-cursor: pointer; clicked => { root.dismiss(root.item.id); } }
+        }
+    }
+}
+
+// Bottom-right stack, newest at the bottom; Rust caps the list (3 visible) and passes the
+// overflow count for the "+N more" line.
+export component ToastStack inherits VerticalLayout {
+    in property <[ToastItem]> toasts;
+    in property <int> overflow: 0;
+    callback action(int);
+    callback dismiss(int);
+    callback show-all();
+    spacing: 8px;
+    alignment: end;
+    if root.overflow > 0: Rectangle {
+        height: 24px;
+        Text {
+            x: parent.width - self.width - 4px;
+            text: "+" + root.overflow + " more";
+            font-size: Theme.fs-row;
+            color: Theme.muted-foreground;
+        }
+        TouchArea { mouse-cursor: pointer; clicked => { root.show-all(); } }
+    }
+    for t in root.toasts: ToastCard {
+        item: t;
+        action(id) => { root.action(id); }
+        dismiss(id) => { root.dismiss(id); }
+    }
+}
+
+export struct BannerItem {
+    id: int,
+    tone: NoticeTone,
+    title: string,
+    body: string,
+    action: string,
+    dismissible: bool,
+}
+
+// Inline banner (update available, session database damaged, remote display …).
+export component Banner inherits Rectangle {
+    in property <BannerItem> item;
+    callback action(int);
+    callback dismiss(int);
+    property <color> tint: item.tone == NoticeTone.success ? Theme.success
+        : item.tone == NoticeTone.warning ? Theme.warning
+        : item.tone == NoticeTone.error ? Theme.destructive
+        : item.tone == NoticeTone.info ? Theme.info
+        : Theme.muted-foreground;
+    height: row.preferred-height;
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: tint.with-alpha(0.35);
+    background: item.tone == NoticeTone.neutral ? Theme.muted : tint.with-alpha(Theme.dark ? 0.10 : 0.07);
+    accessible-role: banner;
+    accessible-label: item.title;
+    accessible-description: item.body;
+    row := HorizontalLayout {
+        padding: 10px;
+        padding-left: 12px;
+        spacing: 10px;
+        KitIcon {
+            y: 1px;
+            name: root.item.tone == NoticeTone.error ? "circle-alert" : root.item.tone == NoticeTone.warning ? "triangle-alert" : root.item.tone == NoticeTone.success ? "circle-check" : "info";
+            size: 16px;
+            tint: root.tint;
+        }
+        VerticalLayout {
+            spacing: 2px;
+            horizontal-stretch: 1;
+            Text { text: root.item.title; font-size: Theme.fs-control; font-weight: 600; color: Theme.foreground; wrap: word-wrap; }
+            if root.item.body != "": Text { text: root.item.body; font-size: Theme.fs-row; color: Theme.foreground-2; wrap: word-wrap; }
+        }
+        if root.item.action != "": Button {
+            size: ButtonSize.sm;
+            variant: ButtonVariant.outline;
+            text: root.item.action;
+            clicked => { root.action(root.item.id); }
+        }
+        if root.item.dismissible: Rectangle {
+            width: 22px; height: 22px;
+            border-radius: Theme.r-xs;
+            background: bta.has-hover ? Theme.hover : transparent;
+            accessible-role: button;
+            accessible-label: "Dismiss";
+            accessible-action-default => { root.dismiss(root.item.id); }
+            KitIcon { name: "x"; size: 13px; tint: Theme.muted-foreground; }
+            bta := TouchArea { mouse-cursor: pointer; clicked => { root.dismiss(root.item.id); } }
+        }
+    }
+}
+
+// Notice stack above the composer: newest on top, Rust caps visible items at 3 and passes
+// the rest as `overflow` ("+N more" expands).
+export component BannerStack inherits VerticalLayout {
+    in property <[BannerItem]> items;
+    in property <int> overflow;
+    callback action(int);
+    callback dismiss(int);
+    callback expand();
+    spacing: 6px;
+    for b in root.items: Banner { item: b; action(id) => { root.action(id); } dismiss(id) => { root.dismiss(id); } }
+    if root.overflow > 0: Rectangle {
+        height: 22px;
+        Text { x: 4px; text: "+" + root.overflow + " more"; font-size: Theme.fs-row; color: Theme.muted-foreground; }
+        TouchArea { mouse-cursor: pointer; clicked => { root.expand(); } }
+    }
+}
+
+// ── Command palette ────────────────────────────────────────────────────────────────
+
+export struct PaletteItem {
+    id: string,
+    group: string,        // "Go to session", "Go to", "Commands", "Projects", "Settings" …
+    label: string,
+    detail: string,
+    icon: string,
+    keys: [string],
+}
+
+// ⌘K surface. Filtering/ranking happens in Rust (fuzzy, recent first); rows are grouped
+// with a header whenever `group` changes. Opening is instant (no animation > 100 ms).
+export component CommandPalette inherits Rectangle {
+    in property <[PaletteItem]> items;
+    in-out property <string> query;
+    in property <string> placeholder: "Search sessions, views, and actions";
+    in property <string> empty-text: "No results";
+    in property <bool> loading: false;
+    in-out property <int> highlight: 0;
+    callback query-changed(string);
+    callback activated(string);
+    callback dismissed();
+    callback back();
+    width: 600px;
+    height: min(440px, col.preferred-height);
+    border-radius: Theme.radius + 2px;
+    background: Theme.popover;
+    border-width: 1px;
+    border-color: Theme.border;
+    drop-shadow-blur: Theme.shadow-pop-blur;
+    drop-shadow-offset-y: Theme.shadow-pop-y;
+    drop-shadow-color: Theme.shadow-color;
+    clip: true;
+    accessible-role: search;
+    accessible-label: "Command palette";
+    public function focus-input() { input.focus(); }
+    col := VerticalLayout {
+        Rectangle {
+            height: 48px;
+            FocusScope {
+                capture-key-pressed(e) => {
+                    if e.text == Key.DownArrow { root.highlight = min(root.highlight + 1, root.items.length - 1); return accept; }
+                    if e.text == Key.UpArrow { root.highlight = max(root.highlight - 1, 0); return accept; }
+                    if e.text == Key.Return && root.highlight < root.items.length { root.activated(root.items[root.highlight].id); return accept; }
+                    if e.text == Key.Escape { root.dismissed(); return accept; }
+                    if e.text == Key.Backspace && root.query == "" { root.back(); return accept; }
+                    return reject;
+                }
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    spacing: 10px;
+                    KitIcon { name: "search"; size: 16px; tint: Theme.faint; y: (parent.height - 16px) / 2; }
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        if root.query == "": Text { x: 0; width: parent.width; text: root.placeholder; color: Theme.faint; font-size: Theme.fs-body-ui; vertical-alignment: center; }
+                        input := TextInput {
+                            x: 0;
+                            width: parent.width;
+                            height: parent.height;
+                            text <=> root.query;
+                            single-line: true;
+                            vertical-alignment: center;
+                            font-size: Theme.fs-body-ui;
+                            color: Theme.foreground;
+                            selection-background-color: Theme.selection;
+                            accessible-label: root.placeholder;
+                            edited => { root.highlight = 0; root.query-changed(self.text); }
+                        }
+                    }
+                    if root.loading: Spinner { size: 14px; y: (parent.height - 14px) / 2; }
+                    Kbd { keys: ["Esc"]; y: (parent.height - 18px) / 2; }
+                }
+            }
+            Rectangle { y: parent.height - 1px; height: 1px; background: Theme.border; }
+        }
+        if root.items.length == 0: Text {
+            height: 64px;
+            text: root.empty-text;
+            color: Theme.muted-foreground;
+            font-size: Theme.fs-control;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        Flickable {
+            height: min(392px, list.preferred-height);
+            content-height: list.preferred-height;
+            list := VerticalLayout {
+                padding: 6px;
+                for it[i] in root.items: VerticalLayout {
+                    if i == 0 || root.items[i - 1].group != it.group: Text {
+                        height: 28px;
+                        text: it.group;
+                        font-size: Theme.fs-meta;
+                        font-weight: 600;
+                        color: Theme.faint;
+                        vertical-alignment: center;
+                        x: 10px;
+                    }
+                    Rectangle {
+                        height: 36px;
+                        border-radius: Theme.control-radius;
+                        background: i == root.highlight ? Theme.selected : transparent;
+                        accessible-role: list-item;
+                        accessible-label: it.label;
+                        accessible-description: it.detail;
+                        accessible-item-selected: i == root.highlight;
+                        accessible-action-default => { root.activated(it.id); }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 10px;
+                            KitIcon { name: it.icon != "" ? it.icon : "circle"; size: 16px; y: (parent.height - 16px) / 2; tint: i == root.highlight ? Theme.foreground : Theme.muted-foreground; }
+                            Text { text: it.label; font-size: Theme.fs-control; color: Theme.foreground; vertical-alignment: center; overflow: elide; }
+                            Text { text: it.detail; font-size: Theme.fs-row; color: Theme.faint; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                            if it.keys.length > 0: Kbd { keys: it.keys; y: (parent.height - 18px) / 2; }
+                        }
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            moved => { root.highlight = i; }
+                            clicked => { root.activated(it.id); }
+                        }
+                    }
+                }
+            }
+        }
+        Rectangle {
+            height: 34px;
+            background: Theme.muted.with-alpha(0.6);
+            Rectangle { y: 0; height: 1px; background: Theme.border; }
+            HorizontalLayout {
+                padding-left: 14px;
+                spacing: 14px;
+                alignment: start;
+                HorizontalLayout { spacing: 5px; Kbd { keys: ["↑", "↓"]; y: 8px; } Text { text: "Navigate"; font-size: Theme.fs-meta; color: Theme.faint; vertical-alignment: center; } }
+                HorizontalLayout { spacing: 5px; Kbd { keys: ["↵"]; y: 8px; } Text { text: "Open"; font-size: Theme.fs-meta; color: Theme.faint; vertical-alignment: center; } }
+                HorizontalLayout { spacing: 5px; Kbd { keys: ["⌫"]; y: 8px; } Text { text: "Back"; font-size: Theme.fs-meta; color: Theme.faint; vertical-alignment: center; } }
+            }
+        }
+    }
+}

@@ -1,0 +1,817 @@
+// Hermes kit gallery: every component, every state, light / dark. Pages are fixed-size
+// boards so headless renders are deterministic goldens (`hermes-gallery-render`).
+// All labels are real Hermes copy (brief §5–§13); sample data comes from Rust.
+
+import { Theme, Motion, Ease, ThemeMode } from "../../hermes-ui/ui/theme.slint";
+import {
+    PreviewState, KitIcon, Spinner, ProgressRing, Shimmer, Kbd, Tone, Badge, Chip, SessionStatus, StatusCopy, StatusIndicator,
+    Separator, Skeleton, ProgressBar, MeterPart, Meter,
+    ButtonVariant, ButtonSize, Button, IconButton, TextField, Field, TextArea, Switch, Checkbox, RadioOption, RadioGroup,
+    Segmented, Slider, TabItem, Tabs,
+    MenuEntry, MenuSurface, DropdownMenu, SelectOption, SelectTrigger, OptionList, Select, Combobox, PopoverSurface,
+    TooltipSurface, Tip, TipLayer, ModalDialog, AlertDialog, NoticeTone, ToastItem, ToastStack, BannerItem, Banner, BannerStack,
+    PaletteItem, CommandPalette,
+    KitLine, KitRow, CodeBlock, DiffView, TerminalView, TableView, MdBlock, Markdown,
+    HermesMark, Wordmark, GlassSurface, FadeMask, ResizeHandle, FlipMotion, FlipItem, VirtualList, TreeRow, TreeView,
+    NavItem, GroupHeader, SessionRowData, SessionRow,
+} from "../../hermes-ui/ui/kit/kit.slint";
+
+export { Theme, Motion, ThemeMode }
+
+export global GalleryData {
+    in property <[MenuEntry]> row-menu;
+    in property <[MenuEntry]> move-submenu;
+    in property <[MenuEntry]> approval-menu;
+    in property <[SelectOption]> stt-providers;
+    in property <[SelectOption]> voices;
+    in property <[PaletteItem]> palette;
+    in property <[ToastItem]> toasts;
+    in property <[BannerItem]> banners;
+    in property <[KitLine]> code;
+    in property <[KitLine]> diff;
+    in property <[KitLine]> term;
+    in property <KitRow> table-head;
+    in property <[KitRow]> table-rows;
+    in property <length> table-w;
+    in property <[MdBlock]> markdown;
+    in property <[TreeRow]> tree;
+    in property <[SessionRowData]> sessions;
+    in property <[SessionRowData]> pinned;
+    in property <[FlipMotion]> flip-before;
+    in property <[FlipMotion]> flip-after;
+    in property <[string]> flip-titles;
+    in property <[string]> flip-before-titles;
+    in property <[MeterPart]> context-parts;
+    callback replay-flip();
+}
+
+// ── Board helpers ────────────────────────────────────────────────────────────────
+
+component Section inherits VerticalLayout {
+    in property <string> title;
+    in property <string> note;
+    spacing: 10px;
+    alignment: start;
+    HorizontalLayout {
+        spacing: 10px;
+        Text { text: root.title; font-size: Theme.fs-control; font-weight: 600; color: Theme.foreground; horizontal-stretch: 0; }
+        Text { text: root.note; font-size: Theme.fs-row; color: Theme.faint; vertical-alignment: center; horizontal-stretch: 0; }
+        Rectangle { horizontal-stretch: 1; }
+    }
+    @children
+}
+
+component Label inherits Text {
+    font-size: Theme.fs-meta;
+    color: Theme.faint;
+}
+
+component Card inherits Rectangle {
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: Theme.border;
+    background: Theme.card;
+    VerticalLayout {
+        padding: 16px;
+        spacing: 14px;
+        alignment: start;
+        @children
+    }
+}
+
+component PageHead inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> subtitle;
+    spacing: 14px;
+    padding-bottom: 6px;
+    Wordmark { size: 17px; }
+    Rectangle { width: 1px; height: 22px; background: Theme.border; y: 2px; }
+    VerticalLayout {
+        alignment: center;
+        Text { text: root.title; font-size: Theme.fs-h3; font-weight: 600; color: Theme.foreground; }
+    }
+    Text { text: root.subtitle; font-size: Theme.fs-row; color: Theme.faint; vertical-alignment: center; horizontal-stretch: 1; horizontal-alignment: right; }
+}
+
+// ── Page 0: tokens & brand ───────────────────────────────────────────────────────
+
+component Swatch inherits VerticalLayout {
+    in property <color> c;
+    in property <string> name;
+    in property <bool> outline: false;
+    spacing: 4px;
+    width: 104px;
+    Rectangle {
+        height: 44px;
+        border-radius: Theme.control-radius;
+        background: root.c;
+        border-width: 1px;
+        border-color: Theme.border;
+    }
+    Text { text: root.name; font-size: Theme.fs-meta; color: Theme.muted-foreground; overflow: elide; }
+}
+
+component TokensPage inherits Rectangle {
+    background: Theme.background;
+    VerticalLayout {
+        padding: 28px;
+        spacing: 22px;
+        PageHead { title: "Tokens & brand"; subtitle: "Verdigris & bronze · T3 radii, rhythm and motion"; }
+        HorizontalLayout {
+            spacing: 22px;
+            Card {
+                horizontal-stretch: 2;
+                Section {
+                    title: "Semantic palette";
+                    note: Theme.dark ? "dark" : "light";
+                    HorizontalLayout { spacing: 10px; alignment: start;
+                        Swatch { c: Theme.background; name: "background"; }
+                        Swatch { c: Theme.card; name: "card"; }
+                        Swatch { c: Theme.popover; name: "popover"; }
+                        Swatch { c: Theme.muted; name: "muted"; }
+                        Swatch { c: Theme.sidebar-bg; name: "sidebar-bg"; }
+                    }
+                    HorizontalLayout { spacing: 10px; alignment: start;
+                        Swatch { c: Theme.foreground; name: "foreground"; }
+                        Swatch { c: Theme.foreground-2; name: "foreground-2"; }
+                        Swatch { c: Theme.muted-foreground; name: "muted-foreground"; }
+                        Swatch { c: Theme.faint; name: "faint"; }
+                        Swatch { c: Theme.border-strong; name: "border-strong"; }
+                    }
+                    HorizontalLayout { spacing: 10px; alignment: start;
+                        Swatch { c: Theme.accent; name: "accent · verdigris"; }
+                        Swatch { c: Theme.accent-soft; name: "accent-soft"; }
+                        Swatch { c: Theme.secondary; name: "secondary · bronze"; }
+                        Swatch { c: Theme.secondary-soft; name: "secondary-soft"; }
+                        Swatch { c: Theme.ring; name: "ring"; }
+                    }
+                    HorizontalLayout { spacing: 10px; alignment: start;
+                        Swatch { c: Theme.destructive; name: "destructive"; }
+                        Swatch { c: Theme.success; name: "success"; }
+                        Swatch { c: Theme.warning; name: "warning"; }
+                        Swatch { c: Theme.info; name: "info"; }
+                        Swatch { c: Theme.selection; name: "selection"; }
+                    }
+                }
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 22px;
+                Card {
+                    Section {
+                        title: "Mark";
+                        HorizontalLayout { spacing: 18px; alignment: start;
+                            HermesMark { size: 56px; tile: true; }
+                            HermesMark { size: 40px; y: 8px; }
+                            HermesMark { size: 24px; y: 16px; tint: Theme.foreground; }
+                            HermesMark { size: 16px; y: 20px; tint: Theme.muted-foreground; }
+                        }
+                        Wordmark { size: 22px; }
+                    }
+                }
+                Card {
+                    Section {
+                        title: "Type scale";
+                        note: "Inter · JetBrains Mono";
+                        Text { text: "Heading 18 · Session settings"; font-size: Theme.fs-h2; font-weight: 600; color: Theme.foreground; }
+                        Text { text: "Heading 16 · New project"; font-size: Theme.fs-h3; font-weight: 600; color: Theme.foreground; }
+                        Text { text: "Body 14 · Hermes will fetch the page and include it as context."; font-size: Theme.fs-body-ui; color: Theme.foreground; wrap: word-wrap; }
+                        Text { text: "Control 13 · Search sessions…"; font-size: Theme.fs-control; color: Theme.foreground-2; }
+                        Text { text: "Row 12 · Earlier this week"; font-size: Theme.fs-row; color: Theme.muted-foreground; }
+                        Text { text: "Meta 11 · 5m · Tasks completed"; font-size: Theme.fs-meta; color: Theme.faint; }
+                        Text { text: "mono 13 · hermes serve --port 8787"; font-size: 13px; font-family: Theme.mono-font; color: Theme.foreground-2; }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 22px;
+            Card {
+                horizontal-stretch: 1;
+                Section {
+                    title: "Radii & layout";
+                    HorizontalLayout { spacing: 16px; alignment: start;
+                        VerticalLayout { spacing: 4px; Rectangle { width: 64px; height: 44px; border-radius: Theme.radius; border-width: 1px; border-color: Theme.border-strong; background: Theme.muted; } Label { text: "radius 10"; } }
+                        VerticalLayout { spacing: 4px; Rectangle { width: 64px; height: 44px; border-radius: Theme.control-radius; border-width: 1px; border-color: Theme.border-strong; background: Theme.muted; } Label { text: "control 8"; } }
+                        VerticalLayout { spacing: 4px; Rectangle { width: 64px; height: 44px; border-radius: Theme.r-sm; border-width: 1px; border-color: Theme.border-strong; background: Theme.muted; } Label { text: "chip 6"; } }
+                        VerticalLayout { spacing: 4px; Rectangle { width: 64px; height: 44px; border-radius: Theme.r-xs; border-width: 1px; border-color: Theme.border-strong; background: Theme.muted; } Label { text: "kbd 4"; } }
+                    }
+                    Text { text: "topbar 52 · sidebar 256 (192–448) · chat column 736 · controls 28 / 32 / 36"; font-size: Theme.fs-row; color: Theme.muted-foreground; }
+                }
+            }
+            Card {
+                horizontal-stretch: 1;
+                Section {
+                    title: "Motion";
+                    note: Motion.reduce ? "reduce motion: all 0 ms" : "";
+                    Text { text: "fast / list 150 ms ease-out · message 120 ms · toast 150 ms"; font-size: Theme.fs-row; color: Theme.foreground-2; }
+                    Text { text: "panel " + Motion.panel-ms + " ms (setting 0–400) · ease-drawer cubic-bezier(0.32, 0.72, 0, 1)"; font-size: Theme.fs-row; color: Theme.foreground-2; }
+                    Text { text: "FLIP: travel(h) = min(h, 40px) · ≤ 40 faded rows per update"; font-size: Theme.fs-row; color: Theme.foreground-2; }
+                    Text { text: "Glass: 94 % fill + fade mask (Slint has no backdrop blur)"; font-size: Theme.fs-row; color: Theme.foreground-2; }
+                }
+            }
+        }
+    }
+}
+
+// ── Page 1: buttons, badges, feedback ───────────────────────────────────────────
+
+component ButtonRow inherits HorizontalLayout {
+    in property <ButtonVariant> variant;
+    in property <string> text;
+    in property <string> name;
+    spacing: 12px;
+    alignment: start;
+    Label { text: root.name; width: 86px; vertical-alignment: center; }
+    Button { variant: root.variant; text: root.text; }
+    Button { variant: root.variant; text: root.text; preview: PreviewState.hover; }
+    Button { variant: root.variant; text: root.text; preview: PreviewState.pressed; }
+    Button { variant: root.variant; text: root.text; preview: PreviewState.focus; }
+    Button { variant: root.variant; text: root.text; preview: PreviewState.disabled; }
+    Button { variant: root.variant; text: root.text; loading: true; }
+    Button { variant: root.variant; text: root.text; size: ButtonSize.sm; y: 2px; }
+}
+
+component ControlsPage inherits Rectangle {
+    background: Theme.background;
+    VerticalLayout {
+        padding: 28px;
+        spacing: 20px;
+        PageHead { title: "Buttons, badges & feedback"; subtitle: "rest · hover · pressed · focus · disabled · loading · small"; }
+        Card {
+            Section {
+                title: "Button";
+                ButtonRow { name: "primary"; variant: ButtonVariant.primary; text: "Send"; }
+                ButtonRow { name: "secondary"; variant: ButtonVariant.secondary; text: "Refresh models"; }
+                ButtonRow { name: "outline"; variant: ButtonVariant.outline; text: "Add folder"; }
+                ButtonRow { name: "ghost"; variant: ButtonVariant.ghost; text: "Cancel"; }
+                ButtonRow { name: "destructive"; variant: ButtonVariant.destructive; text: "Delete"; }
+                HorizontalLayout { spacing: 12px; alignment: start;
+                    Label { text: "with icon"; width: 86px; vertical-alignment: center; }
+                    Button { variant: ButtonVariant.primary; icon: "check"; text: "Run"; }
+                    Button { variant: ButtonVariant.secondary; icon: "plus"; text: "New session"; }
+                    Button { variant: ButtonVariant.outline; text: "More approval options"; trailing-icon: "chevron-down"; }
+                    Button { variant: ButtonVariant.ghost; icon: "git-branch"; text: "Branch in new chat"; }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 20px;
+            Card {
+                horizontal-stretch: 1;
+                Section {
+                    title: "IconButton";
+                    note: "tooltip = accessible label";
+                    HorizontalLayout { spacing: 10px; alignment: start;
+                        IconButton { icon: "panel-left"; label: "Toggle sidebar"; }
+                        IconButton { icon: "settings"; label: "Settings"; preview: PreviewState.hover; }
+                        IconButton { icon: "copy"; label: "Copy"; preview: PreviewState.pressed; }
+                        IconButton { icon: "ellipsis"; label: "Session actions"; preview: PreviewState.focus; }
+                        IconButton { icon: "trash"; label: "Delete"; preview: PreviewState.disabled; }
+                        IconButton { icon: "pin"; label: "Pin"; active: true; }
+                        IconButton { icon: "x"; label: "Close"; size: ButtonSize.sm; icon-size: 14px; y: 3px; }
+                    }
+                    Text { text: "Tooltip"; font-size: Theme.fs-row; color: Theme.muted-foreground; }
+                    HorizontalLayout { spacing: 14px; alignment: start;
+                        TooltipSurface { text: "Group by workspace"; }
+                        TooltipSurface { text: "Toggle sidebar"; keys: ["Ctrl", "B"]; }
+                        TooltipSurface { text: "YOLO off. Shift+click toggles globally."; }
+                    }
+                }
+            }
+            Card {
+                horizontal-stretch: 1;
+                Section {
+                    title: "Badge · Chip · Kbd";
+                    HorizontalLayout { spacing: 8px; alignment: start;
+                        Badge { text: "Learned"; tone: Tone.secondary; }
+                        Badge { text: "Built-in"; }
+                        Badge { text: "Hub"; tone: Tone.info; }
+                        Badge { text: "Pro"; tone: Tone.accent; }
+                        Badge { text: "free"; tone: Tone.success; }
+                        Badge { text: "Limited"; tone: Tone.warning; }
+                        Badge { text: "Error"; tone: Tone.destructive; icon: "circle-alert"; }
+                        Badge { text: "primary"; tone: Tone.outline; }
+                    }
+                    HorizontalLayout { spacing: 8px; alignment: start;
+                        Chip { text: "design-notes.pdf"; icon: "paperclip"; removable: true; }
+                        Chip { text: "https://example.com/post"; icon: "link"; removable: true; preview: PreviewState.hover; }
+                        Chip { text: "Needs input"; selected: true; }
+                        Chip { text: "Working"; }
+                    }
+                    HorizontalLayout { spacing: 14px; alignment: start;
+                        Kbd { keys: ["Ctrl", "K"]; }
+                        Kbd { keys: ["Ctrl", "Shift", "M"]; }
+                        Kbd { keys: ["⌘", "⇧", "K"]; }
+                        Kbd { keys: ["Esc"]; }
+                        Kbd { keys: ["↑", "↓"]; }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 20px;
+            Card {
+                horizontal-stretch: 1;
+                Section {
+                    title: "Status pills";
+                    note: "priority: input → working → unread → background → draft";
+                    HorizontalLayout { spacing: 20px; alignment: start;
+                        for s in [SessionStatus.needs-input, SessionStatus.working, SessionStatus.unread, SessionStatus.background, SessionStatus.draft]: HorizontalLayout {
+                            spacing: 6px;
+                            StatusIndicator { status: s; y: 2px; }
+                            Text { text: StatusCopy.tooltip(s); font-size: Theme.fs-row; color: Theme.foreground-2; }
+                        }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 20px;
+            Card {
+                horizontal-stretch: 1;
+                Section {
+                    title: "Progress · meter · skeleton";
+                    HorizontalLayout { spacing: 14px;
+                        VerticalLayout { spacing: 6px; horizontal-stretch: 1;
+                            Label { text: "Downloading · 62%"; }
+                            ProgressBar { value: 0.62; }
+                            Label { text: "Loading into memory"; }
+                            ProgressBar { indeterminate: true; }
+                            Label { text: "Context usage · 41% full"; }
+                            Meter { parts: GalleryData.context-parts; }
+                        }
+                        VerticalLayout { spacing: 8px; alignment: start;
+                            HorizontalLayout { spacing: 10px; ProgressRing { value: 0.6; size: 18px; } Text { text: "3/5 Tasks completed"; font-size: Theme.fs-row; color: Theme.foreground-2; vertical-alignment: center; } }
+                            HorizontalLayout { spacing: 10px; Spinner { size: 16px; } Text { text: "Loading…"; font-size: Theme.fs-row; color: Theme.foreground-2; vertical-alignment: center; } }
+                            Shimmer { text: "Thinking…"; }
+                        }
+                    }
+                    VerticalLayout { spacing: 6px;
+                        Skeleton { height: 12px; width: 60%; }
+                        Skeleton { height: 12px; width: 84%; }
+                        Skeleton { height: 12px; width: 40%; }
+                    }
+                }
+            }
+            Card {
+                horizontal-stretch: 1;
+                Section {
+                    title: "Banner";
+                    for b[i] in GalleryData.banners: Banner { item: b; }
+                }
+            }
+        }
+    }
+}
+
+// ── Page 2: inputs ──────────────────────────────────────────────────────────────
+
+component InputsPage inherits Rectangle {
+    background: Theme.background;
+    VerticalLayout {
+        padding: 28px;
+        spacing: 20px;
+        PageHead { title: "Inputs"; subtitle: "text · select · combobox · switch · checkbox · radio · segmented · slider · tabs"; }
+        HorizontalLayout {
+            spacing: 20px;
+            Card {
+                horizontal-stretch: 1;
+                Section {
+                    title: "TextField";
+                    Field { label: "Name"; TextField { placeholder: "e.g. Skunkworks"; } }
+                    Field { label: "Search"; TextField { icon: "search"; text: "deploy"; clearable: true; clear-label: "Clear search"; preview: PreviewState.focus; } }
+                    Field { label: "Attach a URL"; hint: "Hermes will fetch the page and include it as context for this turn."; TextField { placeholder: "https://example.com/post"; preview: PreviewState.hover; } }
+                    Field { label: "Profile name"; error: "Lowercase letters, digits, hyphens, and underscores. Must start with a letter or digit."; TextField { text: "My Profile"; invalid: true; } }
+                    Field { label: "secret value"; TextField { text: "sk-live-0000"; password: true; mono: true; } }
+                    Field { label: "Disabled"; TextField { text: "Set by Simple mode"; preview: PreviewState.disabled; } }
+                    Field { label: "Idea"; TextArea { placeholder: "What's this project about? (saved to IDEA.md)"; min-lines: 3; } }
+                }
+            }
+            Card {
+                horizontal-stretch: 1;
+                Section {
+                    title: "Select · Combobox";
+                    Field { label: "Speech-to-text provider"; Select { options: GalleryData.stt-providers; value: "local"; display: "local"; } }
+                    Field { label: "Open (searchable-select)"; OptionList { options: GalleryData.stt-providers; current: "groq"; searchable: true; search-placeholder: "Search providers…"; highlight: 1; } }
+                    Field { label: "GPT-Live voice (free input)"; hint: "Pick a suggestion or type a voice name."; Combobox { text: "marin"; options: GalleryData.voices; placeholder: "Voice"; } }
+                    Field { label: "Empty"; SelectTrigger { text: ""; placeholder: "Not set"; } }
+                }
+            }
+            Card {
+                horizontal-stretch: 1;
+                Section {
+                    title: "Choice";
+                    HorizontalLayout { spacing: 14px; alignment: start;
+                        Switch { checked: true; label: "Collapse thinking by default"; }
+                        Switch { checked: false; label: "Reactions"; }
+                        Switch { checked: true; label: "Focused"; preview: PreviewState.focus; }
+                        Switch { checked: true; label: "Disabled"; preview: PreviewState.disabled; }
+                    }
+                    HorizontalLayout { spacing: 16px; alignment: start;
+                        Checkbox { checked: true; text: "Inbox style"; }
+                        Checkbox { checked: false; text: "Preview"; }
+                        Checkbox { partial: true; text: "PR"; }
+                        Checkbox { checked: true; text: "Disabled"; preview: PreviewState.disabled; }
+                    }
+                    Text { text: "Approval mode"; font-size: Theme.fs-control; font-weight: 600; color: Theme.foreground; }
+                    RadioGroup {
+                        label: "Approval mode";
+                        selected: 1;
+                        options: [
+                            { label: "Manual", description: "Ask before actions that require approval", icon: "hand" },
+                            { label: "Smart", description: "Automatically assess actions and ask when needed", icon: "shield-check" },
+                            { label: "Off", description: "Run without approval prompts", icon: "zap" },
+                        ];
+                    }
+                    Field { label: "Color Mode"; hint: "Pick a fixed mode or let Hermes follow your system setting."; Segmented { options: ["Light", "Dark", "System"]; selected: Theme.dark ? 1 : 0; } }
+                    Field { label: "Session List Density"; Segmented { options: ["Compact", "Comfortable", "Detailed"]; selected: 1; size: ButtonSize.sm; } }
+                    Field { label: "Panel animation"; hint: "Sidebar and right panel open/close. 0 turns it off."; Slider { value: 180; minimum: 0; maximum: 400; step: 10; unit: " ms"; label: "Panel animation"; } }
+                    Field { label: "UI Scale"; Slider { value: 100; minimum: 75; maximum: 150; step: 5; unit: "%"; label: "UI Scale"; } }
+                }
+            }
+        }
+        Card {
+            Section {
+                title: "Tabs";
+                Tabs {
+                    current: 0;
+                    label: "Capabilities";
+                    tabs: [
+                        { label: "Skills", icon: "sparkles", count: "42" },
+                        { label: "Tools", icon: "wrench", count: "18" },
+                        { label: "Plugins", icon: "puzzle", count: "3" },
+                    ];
+                }
+                Rectangle {
+                    height: 40px;
+                    border-radius: Theme.control-radius;
+                    background: Theme.sidebar-bg;
+                    Tabs {
+                        strip: true;
+                        current: 1;
+                        label: "Right panel";
+                        tabs: [
+                            { label: "Files", icon: "folder" },
+                            { label: "Terminal", icon: "terminal", closable: true, dirty: true },
+                            { label: "Review", icon: "git-compare", count: "4" },
+                            { label: "Browser", icon: "globe", closable: true },
+                            { label: "Logs", icon: "scroll-text" },
+                        ];
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Page 3: overlays ────────────────────────────────────────────────────────────
+
+component OverlaysPage inherits Rectangle {
+    background: Theme.background;
+    VerticalLayout {
+        padding: 28px;
+        spacing: 20px;
+        PageHead { title: "Menus, popovers & dialogs"; subtitle: "drawn open for review; live versions open in PopupWindows"; }
+        HorizontalLayout {
+            spacing: 20px;
+            alignment: start;
+            VerticalLayout {
+                spacing: 8px;
+                alignment: start;
+                Label { text: "Dropdown / context menu · submenu · danger · shortcuts"; }
+                Rectangle {
+                    width: 236px + 188px - 4px;
+                    height: 470px;
+                    MenuSurface { x: 0; y: 0; min-w: 236px; max-h: 470px; entries: GalleryData.row-menu; highlight: 13; label: "Session actions"; }
+                    MenuSurface { x: 232px; y: 393px - 30px; min-w: 188px; entries: GalleryData.move-submenu; highlight: 1; label: "Move to project"; }
+                }
+            }
+            VerticalLayout {
+                spacing: 20px;
+                alignment: start;
+                VerticalLayout {
+                    spacing: 8px;
+                    Label { text: "Popover · Options"; }
+                    PopoverSurface {
+                        width: 300px;
+                        title: "Options";
+                        HorizontalLayout { Text { text: "Thinking"; font-size: Theme.fs-control; color: Theme.foreground; vertical-alignment: center; horizontal-stretch: 1; } Switch { checked: true; label: "Thinking"; } }
+                        Text { text: "Effort"; font-size: Theme.fs-row; color: Theme.muted-foreground; }
+                        Segmented { options: ["Low", "Medium", "High", "Max"]; selected: 1; size: ButtonSize.sm; label: "Effort"; }
+                        HorizontalLayout { Text { text: "Ultrafast"; font-size: Theme.fs-control; color: Theme.foreground; vertical-alignment: center; horizontal-stretch: 1; } Switch { checked: false; label: "Ultrafast"; } }
+                        Text { text: "Changes apply to new sessions."; font-size: Theme.fs-row; color: Theme.faint; }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 8px;
+                    Label { text: "Radio menu · Approval mode"; }
+                    MenuSurface { min-w: 300px; entries: GalleryData.approval-menu; highlight: 2; label: "Approval mode"; }
+                }
+            }
+            VerticalLayout {
+                spacing: 8px;
+                width: 470px;
+                alignment: start;
+                Label { text: "Alert dialog · destructive"; }
+                Rectangle {
+                    height: 236px;
+                    border-radius: Theme.radius;
+                    clip: true;
+                    AlertDialog {
+                        open: true;
+                        title: "Delete session?";
+                        description: "This permanently deletes the session and its transcript. This can't be undone.";
+                        confirm-text: "Delete";
+                    }
+                }
+                Label { text: "Dialog · form"; }
+                Rectangle {
+                    height: 300px;
+                    border-radius: Theme.radius;
+                    clip: true;
+                    ModalDialog {
+                        open: true;
+                        title: "Rename session";
+                        description: "Leave empty to clear.";
+                        confirm-text: "Rename";
+                        TextField { text: "Fix flaky approval timeout test"; preview: PreviewState.focus; }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Page 4: content ─────────────────────────────────────────────────────────────
+
+component ContentPage inherits Rectangle {
+    background: Theme.background;
+    VerticalLayout {
+        padding: 28px;
+        spacing: 18px;
+        PageHead { title: "Content"; subtitle: "markdown · code · diff · table · terminal · tree"; }
+        HorizontalLayout {
+            spacing: 20px;
+            VerticalLayout {
+                horizontal-stretch: 3;
+                spacing: 14px;
+                alignment: start;
+                Card { Section { title: "Markdown"; note: "assistant message"; Markdown { blocks: GalleryData.markdown; } } }
+                DiffView { path: "crates/hermes-core/src/flip.rs"; lines: GalleryData.diff; added: 4; removed: 1; }
+                DiffView { path: "crates/hermes-ui/ui/theme.slint"; lines: GalleryData.diff; added: 4; removed: 1; counts-only: true; }
+            }
+            VerticalLayout {
+                horizontal-stretch: 2;
+                spacing: 14px;
+                alignment: start;
+                TerminalView { height: 210px; lines: GalleryData.term; title: "cargo test -p hermes-core"; running: true; }
+                TerminalView { height: 150px; lines: GalleryData.term; title: "npm run dev"; read-only: true; }
+                Card {
+                    Section {
+                        title: "Tree view";
+                        note: "Files tab";
+                        TreeView { height: 210px; rows: GalleryData.tree; current: 3; label: "Files"; }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Page 5: shell pieces ────────────────────────────────────────────────────────
+
+component ShellPage inherits Rectangle {
+    background: Theme.background;
+    HorizontalLayout {
+        // Sidebar
+        Rectangle {
+            width: Theme.sidebar-default-w;
+            background: Theme.sidebar-bg;
+            VerticalLayout {
+                padding: 8px;
+                spacing: 2px;
+                HorizontalLayout {
+                    height: 36px;
+                    padding-left: 6px;
+                    spacing: 6px;
+                    Wordmark { size: 15px; }
+                    Rectangle { horizontal-stretch: 1; }
+                    IconButton { icon: "panel-left"; label: "Toggle sidebar"; y: 3px; }
+                }
+                TextField { icon: "search"; placeholder: "Search sessions…"; label: "Search sessions"; size: ButtonSize.sm; }
+                Rectangle { height: 6px; }
+                NavItem { icon: "square-pen"; text: "New session"; }
+                NavItem { icon: "sparkles"; text: "Capabilities"; }
+                NavItem { icon: "message-circle"; text: "Messaging"; badge: "2"; }
+                NavItem { icon: "layers"; text: "Artifacts"; }
+                NavItem { icon: "calendar-clock"; text: "Scheduled jobs"; active: true; }
+                Rectangle { height: 8px; }
+                GroupHeader { text: "Pinned"; count: "1"; }
+                for s in GalleryData.pinned: SessionRow { item: s; }
+                GroupHeader { text: "hermes-desktop-rewrite"; count: "5"; dot: Theme.accent; actions: true; new-label: "New session in hermes-desktop-rewrite"; }
+                for s[i] in GalleryData.sessions: SessionRow { item: s; force-hover: i == 1; }
+                Rectangle { vertical-stretch: 1; }
+            }
+            Rectangle { x: parent.width - 1px; width: 1px; background: Theme.sidebar-border; }
+        }
+        // Content area: status rows, FLIP demo, glass composer
+        VerticalLayout {
+            padding: 24px;
+            spacing: 18px;
+            HorizontalLayout {
+                spacing: 18px;
+                Card {
+                    horizontal-stretch: 1;
+                    Section {
+                        title: "Density";
+                        note: "Compact · Comfortable · Detailed (Theme.density)";
+                        Text { text: "The sidebar here renders Comfortable; the row height token is " + (Theme.session-row-h / 1px) + " px."; font-size: Theme.fs-row; color: Theme.muted-foreground; wrap: word-wrap; }
+                        Text { text: "Shift-click a chat to pin"; font-size: Theme.fs-row; color: Theme.faint; }
+                    }
+                }
+                Card {
+                    horizontal-stretch: 1;
+                    Section {
+                        title: "FLIP list";
+                        note: "before → after (insert, pin move, removal)";
+                        HorizontalLayout {
+                            spacing: 14px;
+                            for phase in 2: Rectangle {
+                                height: 176px;
+                                border-radius: Theme.control-radius;
+                                background: Theme.sidebar-bg;
+                                clip: true;
+                                for m[i] in (phase == 0 ? GalleryData.flip-before : GalleryData.flip-after): FlipItem {
+                                    motion: m;
+                                    Rectangle {
+                                        x: 6px;
+                                        width: parent.width - 12px;
+                                        border-radius: Theme.control-radius;
+                                        background: m.kind == 1 ? Theme.accent-soft : m.kind == 3 ? Theme.destructive-soft : m.kind == 2 ? Theme.hover : transparent;
+                                        HorizontalLayout {
+                                            padding-left: 10px;
+                                            spacing: 8px;
+                                            Text { text: phase == 0 ? (i < GalleryData.flip-before-titles.length ? GalleryData.flip-before-titles[i] : "") : (i < GalleryData.flip-titles.length ? GalleryData.flip-titles[i] : ""); font-size: Theme.fs-control; color: Theme.foreground; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                                            if phase == 1: Text { text: m.kind == 1 ? "enter" : m.kind == 2 ? "move " + round(m.dy / 1px) : m.kind == 3 ? "exit" : ""; font-size: Theme.fs-meta; color: Theme.faint; vertical-alignment: center; }
+                                            Rectangle { width: 6px; }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Button { size: ButtonSize.sm; variant: ButtonVariant.secondary; icon: "rotate-ccw"; text: "Replay"; clicked => { GalleryData.replay-flip(); } }
+                    }
+                }
+            }
+            // Transcript fading under the glass composer
+            Rectangle {
+                vertical-stretch: 1;
+                border-radius: Theme.radius;
+                border-width: 1px;
+                border-color: Theme.border;
+                clip: true;
+                VerticalLayout {
+                    padding: 22px;
+                    padding-left: 60px;
+                    padding-right: 60px;
+                    spacing: 14px;
+                    alignment: start;
+                    HorizontalLayout { alignment: end;
+                        Rectangle {
+                            border-radius: Theme.radius + 4px;
+                            background: Theme.muted;
+                            HorizontalLayout { padding: 10px; padding-left: 14px; padding-right: 14px;
+                                Text { text: "Can you add the FLIP motion to the sidebar rows?"; font-size: Theme.fs-chat; color: Theme.foreground; }
+                            }
+                        }
+                    }
+                    HorizontalLayout { spacing: 8px; KitIcon { name: "chevron-right"; size: 13px; tint: Theme.faint; y: 2px; } Text { text: "Thought for 6s"; font-size: Theme.fs-row; color: Theme.muted-foreground; } }
+                    Text { text: "Done — rows now enter, move and exit with the 150 ms list motion. Inserting more than 40 rows at once skips the animation, and reduce motion turns it off."; wrap: word-wrap; font-size: Theme.fs-chat; color: Theme.foreground; }
+                    HorizontalLayout { spacing: 8px; Spinner { size: 13px; y: 2px; } Shimmer { text: "Running cargo test -p hermes-core"; font-size: Theme.fs-row; } }
+                    Text { text: "The remaining work is the sidebar wiring in P1; the planner lives in hermes-core so it is unit-tested without a window."; wrap: word-wrap; font-size: Theme.fs-chat; color: Theme.foreground; }
+                }
+                FadeMask { x: 1px; width: parent.width - 2px; y: parent.height - 170px; height: 90px; }
+                Rectangle { x: 1px; width: parent.width - 2px; y: parent.height - 81px; height: 80px; background: Theme.background; }
+                GlassSurface {
+                    x: (parent.width - self.width) / 2;
+                    y: parent.height - self.height - 16px;
+                    width: min(parent.width - 48px, Theme.chat-max-w);
+                    height: 108px;
+                    VerticalLayout {
+                        padding: 12px;
+                        padding-bottom: 8px;
+                        spacing: 8px;
+                        Text { text: "Send a follow-up"; font-size: Theme.fs-chat; color: Theme.faint; height: 40px; }
+                        HorizontalLayout {
+                            spacing: 4px;
+                            IconButton { icon: "plus"; label: "Attach"; }
+                            Button { size: ButtonSize.sm; variant: ButtonVariant.ghost; text: "openai/gpt-5"; trailing-icon: "chevron-down"; y: 1px; }
+                            Button { size: ButtonSize.sm; variant: ButtonVariant.ghost; icon: "sliders-horizontal"; text: "Medium"; y: 1px; }
+                            Button { size: ButtonSize.sm; variant: ButtonVariant.ghost; icon: "shield-check"; text: "Smart"; y: 1px; }
+                            Rectangle { horizontal-stretch: 1; }
+                            IconButton { icon: "mic"; label: "Voice"; }
+                            IconButton { icon: "arrow-up"; label: "Send"; active: true; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Page 6: palette, toasts, notices ────────────────────────────────────────────
+
+component PalettePage inherits Rectangle {
+    background: Theme.background;
+    VerticalLayout {
+        padding: 28px;
+        spacing: 20px;
+        PageHead { title: "Command palette, toasts & notices"; subtitle: "Ctrl+K · bottom-right toasts · banner stack above the composer"; }
+        HorizontalLayout {
+            spacing: 24px;
+            alignment: start;
+            CommandPalette { items: GalleryData.palette; query: "set"; highlight: 4; }
+            VerticalLayout {
+                spacing: 18px;
+                alignment: start;
+                Label { text: "Toast stack (3 visible, +N more)"; }
+                ToastStack { toasts: GalleryData.toasts; overflow: 2; }
+                Label { text: "Banner stack"; }
+                BannerStack { width: 380px; items: [GalleryData.banners[0], GalleryData.banners[2]]; overflow: 1; }
+                Label { text: "Resize handle (hover / drag)"; }
+                Rectangle {
+                    width: 380px;
+                    height: 64px;
+                    border-radius: Theme.control-radius;
+                    background: Theme.sidebar-bg;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                    ResizeHandle { x: 128px; height: parent.height; size: 256px; min-size: 192px; max-size: 448px; default-size: 256px; label: "Resize sidebar"; }
+                }
+            }
+        }
+    }
+}
+
+// ── Window ──────────────────────────────────────────────────────────────────────
+
+export component Gallery inherits Window {
+    in-out property <int> page: 0;
+    in property <bool> board: false;   // golden-render mode: no chrome, fixed board size
+    out property <[string]> pages: ["Tokens", "Controls", "Inputs", "Overlays", "Content", "Shell", "Palette"];
+    title: "Hermes kit gallery";
+    preferred-width: 1440px;
+    preferred-height: 900px;
+    background: Theme.background;
+    default-font-family: Theme.ui-font;
+    default-font-size: Theme.fs-control;
+    VerticalLayout {
+        if !root.board: Rectangle {
+            height: Theme.topbar-h;
+            background: Theme.sidebar-bg;
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                spacing: 12px;
+                Wordmark { size: 15px; y: 15px; }
+                Tabs {
+                    y: 8px;
+                    strip: true;
+                    current <=> root.page;
+                    label: "Gallery pages";
+                    tabs: [
+                        { label: "Tokens" }, { label: "Controls" }, { label: "Inputs" }, { label: "Overlays" },
+                        { label: "Content" }, { label: "Shell" }, { label: "Palette" },
+                    ];
+                    horizontal-stretch: 1;
+                }
+                Segmented {
+                    y: 10px;
+                    width: 210px;
+                    size: ButtonSize.sm;
+                    options: ["Light", "Dark", "System"];
+                    selected: Theme.mode == ThemeMode.light ? 0 : Theme.mode == ThemeMode.dark ? 1 : 2;
+                    changed(i) => { Theme.mode = i == 0 ? ThemeMode.light : i == 1 ? ThemeMode.dark : ThemeMode.system; }
+                }
+                Tip {
+                    text: "Reduce motion";
+                    width: 34px;
+                    IconButton { y: 10px; icon: "pause"; label: "Reduce motion"; active: Motion.reduce; clicked => { Motion.reduce = !Motion.reduce; } }
+                }
+            }
+            Rectangle { y: parent.height - 1px; height: 1px; background: Theme.border; }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            if root.page == 0: TokensPage { }
+            if root.page == 1: ControlsPage { }
+            if root.page == 2: InputsPage { }
+            if root.page == 3: OverlaysPage { }
+            if root.page == 4: ContentPage { }
+            if root.page == 5: ShellPage { }
+            if root.page == 6: PalettePage { }
+        }
+    }
+    TipLayer { window-w: root.width; }
+}

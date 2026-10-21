@@ -26,7 +26,11 @@
 //!   toolsets, MCP servers, memory, scheduled jobs) over the backend's REST routes.
 //! * [`models`] — picker curation: which models are visible, favourites, custom ids
 //!   (front-end state in `prefs.json`; the backend stays the catalog authority).
+//! * [`flip`] — FLIP list-motion planner (enter / move / exit, 40-row cap) and list
+//!   windowing for virtualised lists.
+//! * [`ansi`] — ANSI SGR → styled runs for terminal and tool output.
 
+pub mod ansi;
 pub mod api;
 pub mod artifacts;
 pub mod attachments;
@@ -37,6 +41,7 @@ pub mod commands;
 pub mod composer;
 pub mod diff;
 pub mod durable;
+pub mod flip;
 pub mod highlight;
 pub mod http;
 pub mod input_requests;

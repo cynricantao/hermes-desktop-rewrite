@@ -1,0 +1,524 @@
+// Kit layout pieces: brand mark, glass surface + fade mask, resize handle, FLIP list item
+// and virtualised list, tree view, sidebar nav item, group header, session row.
+//
+// FLIP: positions and the enter/move/exit plan come from `hermes_core::flip` (pure,
+// unit-tested). `FlipItem` only plays one plan step with transform + opacity:
+//   ENTER  opacity 0→1, translateY(travel)→0
+//   MOVE   translateY(old − new)→0
+//   EXIT   opacity 1→0, translateY(0)→travel, at its last position (Rust drops it after)
+// 150 ms ease-out; a new plan (higher `seq`) restarts from the new offsets, cancelling the
+// one in flight. Reduce motion skips straight to the end state.
+
+import { Theme, Motion, Ease } from "../theme.slint";
+import { KitIcon, StatusIndicator, SessionStatus, StatusCopy, Badge, Tone, FocusRing } from "base.slint";
+
+// ── Brand ─────────────────────────────────────────────────────────────────────────
+
+// The Hermes mark: two stems and a crossbar with a swept wing off the right stem.
+// Original artwork (packaging/hermes-desktop-rs.svg uses the same geometry).
+export component HermesMark inherits Rectangle {
+    in property <length> size: 22px;
+    in property <color> tint: Theme.accent;
+    in property <bool> tile: false;      // draw on an accent tile (app icon style)
+    width: size;
+    height: size;
+    border-radius: size * 0.26;
+    background: tile ? tint : transparent;
+    accessible-role: image;
+    accessible-label: "Hermes";
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tile ? Theme.accent-foreground : root.tint;
+        stroke-width: root.size * (root.tile ? 0.085 : 0.1);
+        stroke-line-cap: round;
+        stroke-line-join: round;
+        // stems + crossbar
+        MoveTo { x: 7; y: 5.5; }
+        LineTo { x: 7; y: 18.5; }
+        MoveTo { x: 14; y: 5.5; }
+        LineTo { x: 14; y: 18.5; }
+        MoveTo { x: 7; y: 12; }
+        LineTo { x: 14; y: 12; }
+        // wing: three swept feathers
+        MoveTo { x: 14; y: 7.5; }
+        LineTo { x: 19.5; y: 5; }
+        MoveTo { x: 14; y: 10.5; }
+        LineTo { x: 20; y: 9; }
+        MoveTo { x: 14; y: 13.5; }
+        LineTo { x: 18; y: 13; }
+    }
+}
+
+export component Wordmark inherits HorizontalLayout {
+    in property <length> size: 18px;
+    spacing: root.size * 0.4;
+    alignment: start;
+    HermesMark { size: root.size * 1.2; y: (parent.height - self.height) / 2; }
+    Text {
+        text: "Hermes";
+        font-size: root.size;
+        font-weight: 650;
+        letter-spacing: -0.2px;
+        color: Theme.foreground;
+        vertical-alignment: center;
+    }
+}
+
+// ── Glass ─────────────────────────────────────────────────────────────────────────
+
+// Floating "glass" surface (composer, HUD bars). No backdrop blur exists in Slint, so the
+// fill is near-opaque and the content behind fades out under a `FadeMask`.
+export component GlassSurface inherits Rectangle {
+    border-radius: Theme.radius;
+    background: Theme.glass-bg;
+    border-width: 1px;
+    border-color: Theme.glass-border;
+    drop-shadow-blur: 18px;
+    drop-shadow-offset-y: 6px;
+    drop-shadow-color: Theme.shadow-color;
+    // 1px top highlight (reads as the lit edge of glass).
+    Rectangle {
+        x: root.border-radius;
+        y: 1px;
+        width: root.width - 2 * root.border-radius;
+        height: 1px;
+        background: Theme.glass-highlight;
+    }
+    @children
+}
+
+// Gradient that fades scrolling content into the background (under the composer, at
+// list edges). `up` fades towards the top.
+export component FadeMask inherits Rectangle {
+    in property <bool> up: false;
+    in property <color> to: Theme.background;
+    background: up ? @linear-gradient(0deg, to.with-alpha(0) 0%, to 100%) : @linear-gradient(180deg, to.with-alpha(0) 0%, to 100%);
+}
+
+// ── Resize handle ─────────────────────────────────────────────────────────────────
+
+// Drag handle between panes: a 1px rail with a 9px hit area; drag changes `size` within
+// [min-size, max-size]. `side`: 0 = pane on the left of the handle, 1 = on the right.
+// Double-click resets to `default-size`. Keyboard: ←/→ by 16px.
+export component ResizeHandle inherits Rectangle {
+    in-out property <length> size;
+    in property <length> min-size;
+    in property <length> max-size;
+    in property <length> default-size;
+    in property <int> side: 0;
+    in property <string> label: "Resize";
+    callback resized(length);
+    width: 9px;
+    property <length> start-size;
+    property <bool> active: ta.pressed || ta.has-hover || fs.has-focus;
+    accessible-role: slider;
+    accessible-label: label;
+    accessible-value: round(size / 1px) + " px";
+    accessible-action-increment => { root.set(root.size + 16px); }
+    accessible-action-decrement => { root.set(root.size - 16px); }
+    function set(v: length) { root.size = clamp(v, root.min-size, root.max-size); root.resized(root.size); }
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        width: root.active ? 2px : 1px;
+        background: root.active ? Theme.accent.with-alpha(0.7) : Theme.border;
+        animate background { duration: Motion.fast; }
+    }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.RightArrow { root.set(root.size + (root.side == 0 ? 16px : -16px)); return accept; }
+            if e.text == Key.LeftArrow { root.set(root.size - (root.side == 0 ? 16px : -16px)); return accept; }
+            return reject;
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: ew-resize;
+        pointer-event(e) => { if e.kind == PointerEventKind.down { root.start-size = root.size; fs.focus(); } }
+        moved => {
+            if self.pressed {
+                root.set(root.start-size + (root.side == 0 ? 1 : -1) * (self.mouse-x - self.pressed-x));
+            }
+        }
+        double-clicked => { root.set(root.default-size); }
+    }
+}
+
+// ── FLIP list ─────────────────────────────────────────────────────────────────────
+
+// One plan step for one visible row (see hermes_core::flip). kind: 0 still, 1 enter,
+// 2 move, 3 exit. `dy`: inverse offset (move) or travel (enter / exit).
+export struct FlipMotion { y: length, h: length, kind: int, dy: length, seq: int }
+
+export component FlipItem inherits Rectangle {
+    in property <FlipMotion> motion;
+    property <int> seq: motion.seq;
+    property <duration> start;
+    property <bool> running: false;
+    property <float> p: running ? clamp((animation-tick() - start) / max(1ms, Motion.list), 0, 1) : 1;
+    property <float> e: 1 - (1 - p) * (1 - p);   // ease-out
+    function restart() {
+        if motion.kind != 0 && !Motion.reduce {
+            root.start = animation-tick();
+            root.running = true;
+        } else {
+            root.running = false;
+        }
+    }
+    init => { root.restart(); }
+    changed seq => { root.restart(); }
+    property <length> ty: motion.kind == 3 ? motion.dy * e : motion.kind == 0 ? 0px : motion.dy * (1 - e);
+    y: motion.y + ty;
+    height: motion.h;
+    opacity: motion.kind == 1 ? e : motion.kind == 3 ? 1 - e : 1;
+    Timer {
+        interval: Motion.list + 16ms;
+        running: root.running;
+        triggered => { root.running = false; }
+    }
+    @children
+}
+
+// Virtualised list: Rust supplies only the rows in (viewport ± overscan) with absolute
+// positions, and the total content height. Scrolling reports the viewport so Rust can
+// re-window synchronously (same frame). `drop-y` ≥ 0 draws the drag insertion line.
+export component VirtualList inherits Rectangle {
+    in property <length> content-h;
+    in property <length> drop-y: -1px;
+    in property <string> label;
+    out property <length> scroll-y: -flick.content-y;
+    callback viewport-changed(length, length);   // scroll offset, viewport height
+    clip: true;
+    accessible-role: list;
+    accessible-label: label;
+    flick := Flickable {
+        content-height: max(root.content-h, self.height);
+        changed content-y => { root.viewport-changed(-self.content-y, self.height); }
+        changed height => { root.viewport-changed(-self.content-y, self.height); }
+        @children
+        if root.drop-y >= 0: Rectangle {
+            y: root.drop-y - 1px;
+            x: 8px;
+            width: parent.width - 16px;
+            height: 2px;
+            border-radius: 1px;
+            background: Theme.accent;
+            Rectangle { x: -3px; y: -2px; width: 6px; height: 6px; border-radius: 3px; background: Theme.accent; }
+        }
+    }
+}
+
+// ── Tree view ─────────────────────────────────────────────────────────────────────
+
+export struct TreeRow {
+    id: string,
+    label: string,
+    icon: string,
+    depth: int,
+    expandable: bool,
+    expanded: bool,
+    muted: bool,       // gitignored / hidden
+    badge: string,     // git status letter (M, A, D, ?)
+    tone: int,         // badge tone: 0 neutral, 1 added, 2 modified, 3 deleted
+}
+
+// Flattened tree (Rust expands/collapses and windows). ↑/↓ move, → expand / ← collapse,
+// Enter open. Indent 12px per level with faint guide lines.
+export component TreeView inherits Rectangle {
+    in property <[TreeRow]> rows;
+    in-out property <int> current: -1;
+    in property <string> label;
+    callback toggle(string);
+    callback open(string);
+    callback context(string, length, length);
+    accessible-role: tree;
+    accessible-label: label;
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.DownArrow { root.current = min(root.current + 1, root.rows.length - 1); return accept; }
+            if e.text == Key.UpArrow { root.current = max(root.current - 1, 0); return accept; }
+            if root.current >= 0 && root.current < root.rows.length {
+                if e.text == Key.RightArrow && root.rows[root.current].expandable && !root.rows[root.current].expanded { root.toggle(root.rows[root.current].id); return accept; }
+                if e.text == Key.LeftArrow && root.rows[root.current].expandable && root.rows[root.current].expanded { root.toggle(root.rows[root.current].id); return accept; }
+                if e.text == Key.Return { if root.rows[root.current].expandable { root.toggle(root.rows[root.current].id); } else { root.open(root.rows[root.current].id); } return accept; }
+            }
+            return reject;
+        }
+    }
+    Flickable {
+        content-height: col.preferred-height;
+        col := VerticalLayout {
+            for r[i] in root.rows: Rectangle {
+                height: 26px;
+                border-radius: Theme.r-sm;
+                background: i == root.current ? Theme.selected : ta.has-hover ? Theme.hover : transparent;
+                accessible-role: list-item;
+                accessible-label: r.label;
+                accessible-item-selected: i == root.current;
+                accessible-expandable: r.expandable;
+                accessible-expanded: r.expanded;
+                accessible-action-default => { if r.expandable { root.toggle(r.id); } else { root.open(r.id); } }
+                for d in r.depth: Rectangle {
+                    x: 14px + d * 12px;
+                    width: 1px;
+                    background: Theme.border;
+                }
+                HorizontalLayout {
+                    padding-left: 6px + r.depth * 12px;
+                    padding-right: 8px;
+                    spacing: 4px;
+                    Rectangle {
+                        width: 16px;
+                        if r.expandable: KitIcon { name: r.expanded ? "chevron-down" : "chevron-right"; size: 13px; tint: Theme.faint; }
+                    }
+                    KitIcon {
+                        name: r.icon != "" ? r.icon : (r.expandable ? (r.expanded ? "folder-open" : "folder") : "file");
+                        size: 15px;
+                        y: (parent.height - 15px) / 2;
+                        tint: r.muted ? Theme.faint : r.expandable ? Theme.secondary : Theme.muted-foreground;
+                    }
+                    Text {
+                        text: r.label;
+                        font-size: Theme.fs-control;
+                        color: r.muted ? Theme.faint : Theme.foreground-2;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        horizontal-stretch: 1;
+                    }
+                    if r.badge != "": Text {
+                        text: r.badge;
+                        font-size: Theme.fs-meta;
+                        font-family: Theme.mono-font;
+                        font-weight: 600;
+                        color: r.tone == 1 ? Theme.success : r.tone == 2 ? Theme.warning : r.tone == 3 ? Theme.destructive : Theme.faint;
+                        vertical-alignment: center;
+                    }
+                }
+                ta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { fs.focus(); root.current = i; if r.expandable { root.toggle(r.id); } }
+                    double-clicked => { if !r.expandable { root.open(r.id); } }
+                    pointer-event(e) => {
+                        if e.button == PointerEventButton.right && e.kind == PointerEventKind.down { root.current = i; root.context(r.id, self.mouse-x, parent.y + self.mouse-y); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Sidebar pieces ────────────────────────────────────────────────────────────────
+
+// Nav stack row: New session · Capabilities · Messaging · Artifacts · Scheduled jobs.
+export component NavItem inherits Rectangle {
+    in property <string> icon;
+    in property <string> text;
+    in property <string> badge;
+    in property <[string]> keys;
+    in property <bool> active: false;
+    callback clicked();
+    height: 30px;
+    border-radius: Theme.control-radius;
+    background: ta.pressed ? Theme.pressed : active ? Theme.selected : ta.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.fast; easing: Ease.list; }
+    accessible-role: button;
+    accessible-label: text;
+    accessible-item-selected: active;
+    accessible-action-default => { root.clicked(); }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == " " { root.clicked(); return accept; }
+            return reject;
+        }
+    }
+    ta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 9px;
+        KitIcon { name: root.icon; size: 16px; y: (parent.height - 16px) / 2; tint: root.active ? Theme.foreground : Theme.muted-foreground; }
+        Text {
+            text: root.text;
+            font-size: Theme.fs-control;
+            font-weight: root.active ? 500 : 400;
+            color: root.active ? Theme.foreground : Theme.sidebar-fg;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+        if root.badge != "": Badge { text: root.badge; y: (parent.height - 20px) / 2; }
+    }
+    FocusRing { shown: fs.has-focus; }
+}
+
+// Collapsible section / project group header with hover actions (+, ⋯).
+export component GroupHeader inherits Rectangle {
+    in property <string> text;
+    in property <string> count;
+    in property <color> dot: transparent;
+    in property <bool> expanded: true;
+    in property <bool> actions: false;
+    in property <string> new-label;
+    callback toggle();
+    callback new-item();
+    callback menu();
+    height: 28px;
+    border-radius: Theme.control-radius;
+    background: ta.has-hover ? Theme.hover : transparent;
+    accessible-role: button;
+    accessible-label: text;
+    accessible-expandable: true;
+    accessible-expanded: expanded;
+    accessible-action-default => { root.toggle(); }
+    ta := TouchArea { mouse-cursor: pointer; clicked => { root.toggle(); } }
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 4px;
+        spacing: 6px;
+        KitIcon { name: root.expanded ? "chevron-down" : "chevron-right"; size: 13px; tint: Theme.faint; y: (parent.height - 13px) / 2; }
+        if root.dot != transparent: Rectangle { width: 8px; height: 8px; y: (parent.height - 8px) / 2; border-radius: 4px; background: root.dot; }
+        Text {
+            text: root.text;
+            font-size: Theme.fs-row;
+            font-weight: 600;
+            color: Theme.muted-foreground;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+        if root.count != "" && !(root.actions && ta.has-hover): Text { text: root.count; font-size: Theme.fs-meta; color: Theme.faint; vertical-alignment: center; }
+        if root.actions && ta.has-hover: Rectangle {
+            width: 22px; height: 22px; y: 3px;
+            border-radius: Theme.r-xs;
+            background: pta.has-hover ? Theme.pressed : transparent;
+            accessible-role: button;
+            accessible-label: root.new-label;
+            accessible-action-default => { root.new-item(); }
+            KitIcon { name: "plus"; size: 14px; tint: Theme.muted-foreground; }
+            pta := TouchArea { mouse-cursor: pointer; clicked => { root.new-item(); } }
+        }
+        if root.actions && ta.has-hover: Rectangle {
+            width: 22px; height: 22px; y: 3px;
+            border-radius: Theme.r-xs;
+            background: mta.has-hover ? Theme.pressed : transparent;
+            accessible-role: button;
+            accessible-label: "Group actions";
+            accessible-action-default => { root.menu(); }
+            KitIcon { name: "ellipsis"; size: 14px; tint: Theme.muted-foreground; }
+            mta := TouchArea { mouse-cursor: pointer; clicked => { root.menu(); } }
+        }
+    }
+}
+
+// Session row data (built by Rust from the sidebar slice).
+export struct SessionRowData {
+    key: string,           // durable id
+    title: string,         // "" → "Untitled session"
+    status: SessionStatus,
+    age: string,           // "now", "5m", "2h", "3d"
+    workspace: string,     // comfortable+
+    messages: string,      // detailed: "24 messages"
+    tools: string,         // detailed: "8 tool calls"
+    todos: string,         // detailed: "3/5"
+    pinned: bool,
+    selected: bool,
+    pr: string,            // PR chip ("#123") when Show → PR is on
+    profile: string,       // owned-by-profile tag (all-profiles view)
+}
+
+// Sidebar session row; secondary line by Session List Density (Theme.density).
+export component SessionRow inherits Rectangle {
+    in property <SessionRowData> item;
+    in property <bool> force-hover: false;
+    callback open();
+    callback open-new-tab();
+    callback toggle-pin();
+    callback archive();
+    callback menu(length, length);
+    // The ⋯ button sits inside `ta`, so hovering it still counts as hovering the row.
+    property <bool> hov: ta.has-hover || force-hover;
+    height: Theme.session-row-h;
+    border-radius: Theme.control-radius;
+    background: item.selected ? Theme.selected : hov ? Theme.hover : transparent;
+    animate background { duration: Motion.fast; easing: Ease.list; }
+    accessible-role: list-item;
+    accessible-label: (item.title != "" ? item.title : "Untitled session") + (item.status != SessionStatus.idle ? ", " + StatusCopy.tooltip(item.status) : "");
+    accessible-item-selected: item.selected;
+    accessible-action-default => { root.open(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.up && e.button == PointerEventButton.left {
+                if e.modifiers.shift && e.modifiers.alt { root.archive(); }
+                else if e.modifiers.shift { root.toggle-pin(); }
+                else if e.modifiers.control || e.modifiers.meta { root.open-new-tab(); }
+                else { root.open(); }
+            }
+            if e.kind == PointerEventKind.down && e.button == PointerEventButton.right { root.menu(self.mouse-x, self.mouse-y); }
+        }
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 6px;
+            spacing: 8px;
+            Rectangle {
+                width: 12px;
+                StatusIndicator { y: Theme.density == 0 ? (parent.height - 12px) / 2 : 9px; status: root.item.status; }
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: Theme.density == 0 ? center : start;
+                padding-top: Theme.density == 0 ? 0px : 6px;
+                spacing: 2px;
+                HorizontalLayout {
+                    spacing: 6px;
+                    if root.item.pinned: KitIcon { name: "pin"; size: 12px; tint: Theme.faint; y: (parent.height - 12px) / 2; }
+                    Text {
+                        text: root.item.title != "" ? root.item.title : "Untitled session";
+                        font-size: Theme.fs-control;
+                        font-weight: root.item.status == SessionStatus.unread ? 600 : 400;
+                        color: root.item.title != "" ? Theme.foreground : Theme.muted-foreground;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        horizontal-stretch: 1;
+                    }
+                    if root.item.pr != "": Badge { text: root.item.pr; icon: "git-pull-request"; tone: Tone.outline; y: (parent.height - 20px) / 2; }
+                    if !root.hov: Text { text: root.item.age; font-size: Theme.fs-meta; color: Theme.faint; vertical-alignment: center; }
+                    if root.hov: Rectangle { width: 20px; }
+                }
+                if Theme.density >= 1: HorizontalLayout {
+                    spacing: 6px;
+                    if root.item.profile != "": Badge { text: root.item.profile; tone: Tone.secondary; height: 16px; }
+                    Text {
+                        text: root.item.workspace;
+                        font-size: Theme.fs-meta;
+                        color: Theme.faint;
+                        overflow: elide;
+                        horizontal-stretch: 1;
+                    }
+                }
+                if Theme.density == 2: HorizontalLayout {
+                    spacing: 10px;
+                    if root.item.messages != "": HorizontalLayout { spacing: 4px; KitIcon { name: "message-square"; size: 11px; tint: Theme.faint; y: 2px; } Text { text: root.item.messages; font-size: Theme.fs-meta; color: Theme.faint; } }
+                    if root.item.tools != "": HorizontalLayout { spacing: 4px; KitIcon { name: "wrench"; size: 11px; tint: Theme.faint; y: 2px; } Text { text: root.item.tools; font-size: Theme.fs-meta; color: Theme.faint; } }
+                    if root.item.todos != "": HorizontalLayout { spacing: 4px; KitIcon { name: "list-todo"; size: 11px; tint: Theme.faint; y: 2px; } Text { text: root.item.todos; font-size: Theme.fs-meta; color: Theme.faint; } }
+                    Rectangle { horizontal-stretch: 1; }
+                }
+            }
+        }
+        // Hover actions button (⋯) over the age column.
+        if root.hov: Rectangle {
+            x: parent.width - self.width - 4px;
+            y: Theme.density == 0 ? (parent.height - self.height) / 2 : 5px;
+            width: 22px;
+            height: 22px;
+            border-radius: Theme.r-xs;
+            background: more-ta.has-hover ? Theme.pressed : transparent;
+            accessible-role: button;
+            accessible-label: "Session actions";
+            accessible-action-default => { root.menu(self.x, self.y + self.height); }
+            KitIcon { name: "ellipsis"; size: 14px; tint: Theme.muted-foreground; }
+            more-ta := TouchArea { mouse-cursor: pointer; clicked => { root.menu(parent.x, parent.y + parent.height); } }
+        }
+    }
+}

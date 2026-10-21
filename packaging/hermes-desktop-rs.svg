@@ -1,8 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <!-- Original icon for hermes-desktop-rs (CC0). Not derived from any Anthropic asset. -->
-  <rect width="256" height="256" rx="56" fill="#1a1a19"/>
-  <g fill="none" stroke="#d97757" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M84 72v112M172 72v112M84 128h88"/>
-    <path d="M60 96c-14-8-22-22-20-36M196 96c14-8 22-22 20-36"/>
+  <!-- Original icon for hermes-desktop-rs (CC0): the Hermes mark, an H whose right stem
+       carries a swept three-feather wing. Same geometry as HermesMark in
+       crates/hermes-ui/ui/kit/layout.slint (24-unit grid, scaled by 256/24). -->
+  <rect width="256" height="256" rx="66" fill="#0b7a6a"/>
+  <g fill="none" stroke="#ffffff" stroke-width="21" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M74.7 58.7v138.6M149.3 58.7v138.6M74.7 128h74.6"/>
+    <path d="M149.3 80l58.7-26.7M149.3 112l64-16M149.3 144l42.7-5.3"/>
   </g>
 </svg>

@@ -1,0 +1,364 @@
+// Kit content views: code block, diff view, terminal view, table, markdown renderer.
+// Styled lines (syntax colours, ANSI colours) are built in Rust (`hermes_ui::kit`) from
+// hermes-core parsers; these components only lay them out.
+
+import { Theme, Motion, Ease } from "../theme.slint";
+import { KitIcon, Badge, Tone } from "base.slint";
+
+// One rendered line of code / diff / terminal output.
+// kind: 0 context, 1 added, 2 removed, 3 hunk header, 4 note.
+export struct KitLine { md: styled-text, kind: int, old: string, new: string }
+
+export struct KitCell { md: styled-text, w: length, align: int }
+export struct KitRow { cells: [KitCell] }
+
+// Copy affordance that flips to a check for 1.5 s ("Copy code" → "Copied").
+export component CopyButton inherits Rectangle {
+    in property <string> label: "Copy code";
+    in property <bool> shown: true;
+    callback copy();
+    property <bool> done;
+    width: 24px;
+    height: 24px;
+    border-radius: Theme.r-sm;
+    background: ta.has-hover ? Theme.hover : transparent;
+    opacity: shown || done || ta.has-hover ? 1 : 0;
+    animate opacity { duration: Motion.fast; }
+    accessible-role: button;
+    accessible-label: done ? "Copied" : label;
+    accessible-action-default => { root.copy(); root.done = true; }
+    KitIcon { name: root.done ? "check" : "copy"; size: 13px; tint: root.done ? Theme.success : ta.has-hover ? Theme.foreground : Theme.muted-foreground; }
+    ta := TouchArea { mouse-cursor: pointer; clicked => { root.copy(); root.done = true; } }
+    Timer { interval: 1500ms; running: root.done; triggered => { root.done = false; } }
+}
+
+// Fenced code: header (language + copy), lines never wrap (scroll sideways), body capped
+// with an expand toggle when it overflows.
+export component CodeBlock inherits Rectangle {
+    in property <string> lang;
+    in property <[KitLine]> lines;
+    in property <string> raw;
+    in property <length> cap: 320px;
+    in property <bool> line-numbers: false;
+    callback copy(string);
+    property <bool> expanded;
+    property <length> body-h: body.preferred-height;
+    property <bool> overflowing: body-h > cap;
+    height: 32px + (expanded || !overflowing ? body-h : cap);
+    animate height { duration: Motion.base; easing: Ease.out; }
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: Theme.border;
+    background: Theme.code-bg;
+    clip: true;
+    accessible-role: groupbox;
+    accessible-label: (lang != "" ? lang : "Code") + " block";
+    header := Rectangle {
+        y: 0;
+        height: 32px;
+        HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 4px;
+            spacing: 8px;
+            Text { text: root.lang != "" ? root.lang : "text"; font-size: Theme.fs-meta; font-family: Theme.mono-font; color: Theme.faint; vertical-alignment: center; horizontal-stretch: 1; }
+            CopyButton { y: 4px; label: "Copy code"; copy => { root.copy(root.raw); } }
+        }
+        Rectangle { y: parent.height - 1px; height: 1px; background: Theme.border; }
+    }
+    flick := Flickable {
+        y: 32px;
+        height: root.height - 32px;
+        content-width: max(self.width, body.preferred-width);
+        content-height: root.body-h;
+        interactive: root.expanded || !root.overflowing;
+        body := VerticalLayout {
+            padding-top: 8px;
+            padding-bottom: 8px;
+            for l[i] in root.lines: HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 12px;
+                if root.line-numbers: Text { width: 24px; text: i + 1; horizontal-alignment: right; font-family: Theme.mono-font; font-size: Theme.fs-chat-code - 1px; color: Theme.faint; }
+                StyledText {
+                    text: l.md;
+                    default-font-family: Theme.mono-font;
+                    default-font-size: Theme.fs-chat-code;
+                    default-color: Theme.foreground.with-alpha(0.92);
+                }
+            }
+        }
+    }
+    if root.overflowing: Rectangle {
+        y: root.height - 30px;
+        height: 30px;
+        background: root.expanded ? transparent : @linear-gradient(0deg, Theme.code-bg 0%, Theme.code-bg.with-alpha(0) 100%);
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: 4px;
+            width: et.preferred-width + 28px;
+            height: 22px;
+            border-radius: Theme.r-pill;
+            background: eta.has-hover ? Theme.muted.mix(Theme.hover, 0.5) : Theme.muted;
+            border-width: 1px;
+            border-color: Theme.border;
+            accessible-role: button;
+            accessible-label: root.expanded ? "Collapse" : "Expand";
+            accessible-expandable: true;
+            accessible-expanded: root.expanded;
+            accessible-action-default => { root.expanded = !root.expanded; }
+            et := Text { text: root.expanded ? "Collapse" : "Expand"; font-size: Theme.fs-meta; color: Theme.muted-foreground; }
+            eta := TouchArea { mouse-cursor: pointer; clicked => { root.expanded = !root.expanded; } }
+        }
+    }
+}
+
+// Inline file diff with +/- counts; `counts-only` honours "Hide code diffs".
+export component DiffView inherits Rectangle {
+    in property <string> path;
+    in property <[KitLine]> lines;
+    in property <int> added;
+    in property <int> removed;
+    in property <bool> counts-only: false;
+    in-out property <bool> open: true;
+    callback copy-path(string);
+    height: hdr.height + (open && !counts-only ? body.preferred-height : 0px);
+    animate height { duration: Motion.base; easing: Ease.out; }
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: Theme.border;
+    background: Theme.code-bg;
+    clip: true;
+    accessible-role: groupbox;
+    accessible-label: "Diff " + path;
+    hdr := Rectangle {
+        y: 0;
+        height: 34px;
+        background: hta.has-hover && !root.counts-only ? Theme.hover : transparent;
+        hta := TouchArea { mouse-cursor: root.counts-only ? default : pointer; clicked => { if !root.counts-only { root.open = !root.open; } } }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 8px;
+            if !root.counts-only: KitIcon {
+                name: root.open ? "chevron-down" : "chevron-right";
+                size: 14px;
+                tint: Theme.faint;
+                y: (parent.height - 14px) / 2;
+            }
+            KitIcon { name: "file-diff"; size: 14px; y: (parent.height - 14px) / 2; }
+            Text { text: root.path; font-size: Theme.fs-row; font-family: Theme.mono-font; color: Theme.foreground-2; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+            Text { text: "+" + root.added; font-size: Theme.fs-row; font-family: Theme.mono-font; color: Theme.diff-add-fg; vertical-alignment: center; }
+            Text { text: "−" + root.removed; font-size: Theme.fs-row; font-family: Theme.mono-font; color: Theme.diff-del-fg; vertical-alignment: center; }
+        }
+        accessible-role: button;
+        accessible-label: root.path;
+        accessible-expandable: !root.counts-only;
+        accessible-expanded: root.open;
+        accessible-action-default => { if !root.counts-only { root.open = !root.open; } }
+    }
+    body := VerticalLayout {
+        y: hdr.height;
+        Rectangle { height: 1px; background: Theme.border; }
+        for l in root.lines: Rectangle {
+            height: 20px * Theme.chat-scale;
+            background: l.kind == 1 ? Theme.diff-add-bg : l.kind == 2 ? Theme.diff-del-bg : l.kind == 3 ? Theme.info-soft : transparent;
+            HorizontalLayout {
+                padding-right: 12px;
+                spacing: 8px;
+                Text { width: 36px; text: l.old; horizontal-alignment: right; vertical-alignment: center; font-family: Theme.mono-font; font-size: Theme.fs-meta; color: Theme.faint; }
+                Text { width: 36px; text: l.new; horizontal-alignment: right; vertical-alignment: center; font-family: Theme.mono-font; font-size: Theme.fs-meta; color: Theme.faint; }
+                Text {
+                    width: 10px;
+                    text: l.kind == 1 ? "+" : l.kind == 2 ? "−" : "";
+                    vertical-alignment: center;
+                    font-family: Theme.mono-font;
+                    font-size: Theme.fs-chat-code;
+                    color: l.kind == 1 ? Theme.diff-add-fg : Theme.diff-del-fg;
+                }
+                StyledText {
+                    text: l.md;
+                    vertical-alignment: center;
+                    default-font-family: Theme.mono-font;
+                    default-font-size: Theme.fs-chat-code;
+                    default-color: l.kind == 3 ? Theme.info : Theme.foreground.with-alpha(0.92);
+                }
+            }
+        }
+    }
+}
+
+// Terminal output view (ANSI already converted to styled lines in Rust). `read-only`
+// shows the background-command notice with an action.
+export component TerminalView inherits Rectangle {
+    in property <[KitLine]> lines;
+    in property <string> title: "Terminal";
+    in property <bool> read-only: false;
+    in property <bool> running: false;
+    callback open-new-terminal();
+    callback copy-output();
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: Theme.border;
+    background: Theme.term-bg;
+    clip: true;
+    accessible-role: AccessibleRole.text;
+    accessible-label: title;
+    VerticalLayout {
+        Rectangle {
+            height: 32px;
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 4px;
+                spacing: 8px;
+                KitIcon { name: "terminal"; size: 14px; y: (parent.height - 14px) / 2; }
+                Text { text: root.title; font-size: Theme.fs-row; color: Theme.foreground-2; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                if root.running: Badge { text: "Running"; tone: Tone.accent; y: 6px; }
+                if root.read-only: Badge { text: "Read-only"; tone: Tone.outline; y: 6px; }
+                CopyButton { y: 4px; label: "Copy output"; copy => { root.copy-output(); } }
+            }
+            Rectangle { y: parent.height - 1px; height: 1px; background: Theme.border; }
+        }
+        Flickable {
+            content-height: max(self.height, out.preferred-height);
+            content-y: min(0px, self.height - out.preferred-height);
+            out := VerticalLayout {
+                padding: 10px;
+                for l in root.lines: StyledText {
+                    text: l.md;
+                    default-font-family: Theme.mono-font;
+                    default-font-size: 12.5px;
+                    default-color: Theme.term-fg;
+                }
+            }
+        }
+        if root.read-only: Rectangle {
+            height: notice.preferred-height;
+            background: Theme.muted;
+            Rectangle { y: 0; height: 1px; background: Theme.border; }
+            notice := HorizontalLayout {
+                padding: 8px;
+                padding-left: 12px;
+                spacing: 10px;
+                Text {
+                    text: "To answer prompts, stop the background command and run it in a new terminal…";
+                    font-size: Theme.fs-row;
+                    color: Theme.muted-foreground;
+                    wrap: word-wrap;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                Rectangle {
+                    width: ot.preferred-width + 16px;
+                    height: 24px;
+                    border-radius: Theme.r-sm;
+                    border-width: 1px;
+                    border-color: Theme.border-strong;
+                    background: ota.has-hover ? Theme.hover : transparent;
+                    accessible-role: button;
+                    accessible-label: "Open new terminal";
+                    accessible-action-default => { root.open-new-terminal(); }
+                    ot := Text { text: "Open new terminal"; font-size: Theme.fs-row; color: Theme.foreground; }
+                    ota := TouchArea { mouse-cursor: pointer; clicked => { root.open-new-terminal(); } }
+                }
+            }
+        }
+    }
+}
+
+// GFM table with header row and hairline rules. Columns keep their measured widths; a
+// table wider than the column scrolls sideways (never squashed).
+export component TableView inherits Rectangle {
+    in property <KitRow> header;
+    in property <[KitRow]> rows;
+    in property <length> total-w;
+    property <float> scale: 1;
+    height: body.preferred-height;
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: Theme.border;
+    clip: true;
+    accessible-role: table;
+    Flickable {
+        content-width: max(self.width, root.total-w);
+        content-height: body.preferred-height;
+    body := VerticalLayout {
+        width: max(root.width, root.total-w);
+        Rectangle {
+            background: Theme.muted;
+            HorizontalLayout {
+                alignment: start;
+                for c in root.header.cells: Rectangle {
+                    width: c.w * root.scale;
+                    height: ht.preferred-height + 14px;
+                    ht := StyledText {
+                        x: 10px; width: parent.width - 20px;
+                        text: c.md;
+                        default-font-size: Theme.fs-chat - 1px;
+                        default-font-family: Theme.ui-font;
+                        default-color: Theme.foreground;
+                        horizontal-alignment: c.align == 1 ? center : c.align == 2 ? right : left;
+                    }
+                }
+            }
+        }
+        for r in root.rows: VerticalLayout {
+            Rectangle { height: 1px; background: Theme.border; }
+            HorizontalLayout {
+                alignment: start;
+                for c in r.cells: Rectangle {
+                    width: c.w * root.scale;
+                    height: ct.preferred-height + 14px;
+                    ct := StyledText {
+                        x: 10px; width: parent.width - 20px;
+                        text: c.md;
+                        default-font-size: Theme.fs-chat - 1px;
+                        default-font-family: Theme.ui-font;
+                        default-color: Theme.foreground-2;
+                        link-color: Theme.accent-text;
+                        horizontal-alignment: c.align == 1 ? center : c.align == 2 ? right : left;
+                    }
+                }
+            }
+        }
+    }
+    }
+}
+
+// One markdown block. kind: 0 prose, 1 code, 2 diff, 3 table.
+export struct MdBlock {
+    kind: int,
+    md: styled-text,
+    lang: string,
+    raw: string,
+    lines: [KitLine],
+    header: KitRow,
+    rows: [KitRow],
+    total-w: length,
+    path: string,
+    added: int,
+    removed: int,
+}
+
+// Assistant-message markdown: prose via StyledText (GFM subset after hermes-core's
+// rewrite), fenced code, diffs and tables as dedicated blocks.
+export component Markdown inherits VerticalLayout {
+    in property <[MdBlock]> blocks;
+    in property <bool> hide-diffs: false;
+    callback copy(string);
+    callback link(string);
+    spacing: 12px;
+    alignment: start;
+    for b in root.blocks: VerticalLayout {
+        if b.kind == 0: StyledText {
+            text: b.md;
+            default-color: Theme.foreground;
+            default-font-size: Theme.fs-chat;
+            default-font-family: Theme.ui-font;
+            link-color: Theme.accent-text;
+            link-clicked(url) => { root.link(url); }
+        }
+        if b.kind == 1: CodeBlock { lang: b.lang; lines: b.lines; raw: b.raw; copy(t) => { root.copy(t); } }
+        if b.kind == 2: DiffView { path: b.path; lines: b.lines; added: b.added; removed: b.removed; counts-only: root.hide-diffs; }
+        if b.kind == 3: TableView { header: b.header; rows: b.rows; total-w: b.total-w; }
+    }
+}

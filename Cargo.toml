@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
-members = ["crates/hermes-core", "crates/hermes-ui", "crates/hermes-app"]
+members = ["crates/hermes-core", "crates/hermes-ui", "crates/hermes-app", "crates/hermes-gallery"]
+# `hermes-gallery` is a dev tool (component gallery + golden renders); it is never part of
+# the shipped binary — the release builds use `-p hermes-app`.
 # `helpers/hermes-browser` is the in-app browser, a separate GTK + wry program launched by
 # the app (never linked into it: that measured +46 ms first frame and +20 MiB PSS — see
 # docs/browser.md). Out of the workspace so its WebKit dependency never reaches the app's

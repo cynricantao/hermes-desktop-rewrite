@@ -20,6 +20,8 @@ crates/
     artifacts.rs     Artifact detection, registry and library scan (pure).
     notify.rs        Notification rules: when to toast / notify, copy, throttling (pure).
     keybinds.rs      Shortcut registry: actions, Linux defaults, parse/match, overrides.
+    flip.rs          FLIP list-motion planner (enter/move/exit, 40-row cap) + list windowing.
+    ansi.rs          ANSI SGR → styled runs for terminal and tool output.
     browser.rs       In-app browser helper protocol + preview.read / preview.act mapping.
     api/            Typed backend client, one module per area (sessions, plugins, messaging,
                      voice, workspace, system, extras). Pure request builders + lenient reply
@@ -29,7 +31,9 @@ crates/
     examples/probe.rs  live end-to-end probe against a real backend
   hermes-ui/     Slint views (ui/*.slint) + controller bridging core ↔ UI
     ui/theme.slint       design tokens (docs/DESIGN.md) + Motion/Ease globals
-    ui/components.slint  buttons, chips, toggle, segmented control, spinner, shimmer, banner
+    ui/kit/*.slint       component kit (P0): controls, overlays, content views, sidebar
+                         pieces, FLIP list item; import from ui/kit/kit.slint
+    ui/components.slint  legacy primitives used by the pre-kit views
     ui/chat.slint        virtualised transcript, tool groups, thinking block, composer
     ui/settings.slint    settings modal
     ui/capabilities.slint  Capabilities modal (six tabs, filter, create form, detail editor)
@@ -39,6 +43,8 @@ crates/
     src/capabilities.rs  Capabilities task: its own tokio task, so a slow MCP test or a
                          cron "run now" never stalls chat streaming
   hermes-app/    binary `hermes-desktop-rs`: logging, runtime, window
+  hermes-gallery/ dev tool: kit gallery window, headless board renderer, golden test
+                  (goldens/<os>/*.png). Never part of the shipped binary.
 assets/          bundled fonts (OFL) and icons (ISC) with their licences
 packaging/       PKGBUILD, .desktop file, icon
 ```
@@ -98,19 +104,13 @@ components; Slint is GPLv3 / royalty-free / commercial licensed (we use it under
 royalty-free desktop licence terms; see Slint's LICENSE).
 
 ## Motion
-All durations come from the `Motion` global (60/120/200/300 ms ladder from DESIGN.md
-§8.1); easings from `Ease`. Setting *Reduce motion* (Settings → Appearance, or
-`HERMES_DESKTOP_REDUCE_MOTION=1`) sets every duration to 0 and freezes spinners/shimmer.
-
-| Element | Duration | Easing |
-|---|---|---|
-| hover / press colour | 120 ms | ease-snap `(.32,.72,0,1)` |
-| tool row expand + chevron | 300 ms height / 200 ms chevron | ease-out `(.165,.84,.44,1)` |
-| modal in / out | 200 / 150 ms, scale .98→1 + fade | ease-snap |
-| sidebar collapse | 300 ms width | ease-out |
-| toggle knob, segmented pill | 200 ms | ease-out |
-| row insert | 200 ms fade | ease-out |
-| spinner | 1 rev / ≈0.8 s, continuous | linear |
+All durations come from the `Motion` global and easings from `Ease` (docs/DESIGN.md §5):
+150 ms ease-out for hover/press and the FLIP list motion, 120 ms message enter, 150 ms
+toast, `Motion.panel` (device setting 0–400 ms, default 180 ms) with
+`Ease.drawer = cubic-bezier(0.32, 0.72, 0, 1)` for panels, 200/150 ms dialogs. Setting
+*Reduce motion* (Settings → Appearance, or `HERMES_DESKTOP_REDUCE_MOTION=1`) sets every
+duration to 0 and freezes spinners/shimmer. Only translate + opacity animate (the default
+software renderer ignores rotate/scale and draws no shadows; DESIGN.md §6).
 
 ## Testing
 * `cargo test --workspace` — reducer, discovery parsing, row conversion, helpers.
