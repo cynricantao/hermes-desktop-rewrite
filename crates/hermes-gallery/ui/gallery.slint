@@ -394,7 +394,7 @@ component InputsPage inherits Rectangle {
                 horizontal-stretch: 1;
                 Section {
                     title: "Select · Combobox";
-                    Field { label: "Speech-to-text provider"; Select { options: GalleryData.stt-providers; value: "local"; display: "local"; } }
+                    Field { label: "Speech-to-text provider"; Select { options: GalleryData.stt-providers; value: "local"; display: self.value; } }
                     Field { label: "Open (searchable-select)"; OptionList { options: GalleryData.stt-providers; current: "groq"; searchable: true; search-placeholder: "Search providers…"; highlight: 1; } }
                     Field { label: "GPT-Live voice (free input)"; hint: "Pick a suggestion or type a voice name."; Combobox { text: "marin"; options: GalleryData.voices; placeholder: "Voice"; } }
                     Field { label: "Empty"; SelectTrigger { text: ""; placeholder: "Not set"; } }
