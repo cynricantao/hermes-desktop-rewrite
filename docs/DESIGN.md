@@ -1,8 +1,9 @@
 # DESIGN.md — Hermes Desktop design language (T3-style structure, Hermes identity)
 
-Status: **P0 (tokens + component kit + gallery)**. The shell, sidebar, transcript and
-composer views are rebuilt on this kit in P1+; until then the existing views keep working
-through the legacy token aliases in `ui/theme.slint`.
+Status: **P1 workspace migration**. The main shell, sidebar navigation and composer now
+use the P0 kit, including the Hermes wordmark, a 256 px sidebar, 52 px header and 736 px
+conversation column. Transcript content renderers and secondary screens still use the
+existing views and legacy token aliases in `ui/theme.slint`; this is not full UI parity.
 
 The previous Claude-Desktop-inspired specification (measured CDS tokens, the 60/120/200/
 300 ms ladder) is superseded. It remains readable in git history

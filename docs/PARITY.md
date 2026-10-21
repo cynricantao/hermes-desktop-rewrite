@@ -37,11 +37,19 @@ P0 review follow-up (2026-10-21): the gallery now has headless keyboard/pointer
 regressions for radio navigation, empty search results, inert menus, cascading menus,
 chip activation and dialog focus, plus contrast assertions across all five palettes.
 ANSI carriage-return and malformed-escape regressions are covered in core. Normal and
-reduced-motion renders are checked for determinism on every board. The kit remains a
-preview, not a migrated app surface: list-container roving focus and disabling background
-content around modal dialogs are integration responsibilities. No checklist item is
-promoted by these checks. Windows reference refresh/validation runs in the gallery CI;
+reduced-motion renders are checked for determinism on every board. The P0 checks alone
+did not migrate app surfaces: list-container roving focus and disabling background content
+around modal dialogs remain integration responsibilities. No checklist item is promoted
+by these checks. Windows reference refresh/validation runs in the gallery CI;
 Linux/macOS have no committed image references yet, so their image comparison is skipped.
+
+P1 workspace visual migration: the main app now uses kit navigation, search, branding,
+transcript-detail controls and the glass composer. The shell follows the documented
+256 px sidebar, 52 px header and 736 px conversation width. `workspace_visual` exercises
+light/dark, reduced-motion and minimum-window rendering with labelled fixture content;
+private `live_backend` sidebar/composer/rich-seeded checks exercise the existing actions.
+This visual pass adds no backend capability and promotes no checklist markers. Settings,
+secondary screens and the transcript's content renderers retain their existing views.
 
 
 ## Summary
