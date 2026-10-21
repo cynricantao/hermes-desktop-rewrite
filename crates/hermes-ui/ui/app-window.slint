@@ -15,6 +15,7 @@ import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
 import { CapAction, CapItem, CapState, CapabilitiesModal } from "capabilities.slint";
 import { InputCard, InputChoice, InputState } from "input-card.slint";
 import { SessionItem, SessionRow } from "session-row.slint";
+import { Wordmark, HermesMark, TextField, Button, ButtonVariant, NavItem as KitNavItem, IconButton as KitIconButton, Segmented as KitSegmented } from "kit/kit.slint";
 
 export { CommandItem, Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, AppearanceState, ModelsState, ProvidersState, SystemState, CapAction, CapItem, CapState, InputChoice, InputState, ModelItem, EditModelRow, SessionItem }
 
@@ -129,63 +130,46 @@ export global AppState {
 
 component Sidebar inherits Rectangle {
     callback open-settings();
+    callback focus-composer();
     background: Theme.sidebar-bg;
     clip: true;
 
     VerticalLayout {
-        padding-left: 8px;
-        padding-right: 8px;
-        padding-top: Theme.titlebar-h + 4px;
-        padding-bottom: 8px;
-        spacing: 2px;
+        padding-left: Theme.space-md;
+        padding-right: Theme.space-md;
+        padding-top: Theme.space-xs;
+        padding-bottom: Theme.space-md;
+        spacing: Theme.space-xs;
 
-        // Search
-        Rectangle {
-            height: 32px;
-            border-radius: Theme.r-md;
-            border-width: 1px;
-            border-color: search.has-focus ? Theme.border-strong : Theme.border;
-            background: Theme.bg.with-alpha(0.4);
-            animate border-color { duration: Motion.fast; }
-            HorizontalLayout {
-                padding-left: 9px;
-                spacing: 6px;
-                Image { source: @image-url("../../../assets/icons/search.svg"); width: 14px; height: 14px; y: 9px; colorize: Theme.text-3; }
-                search := TextInput {
-                    text <=> AppState.session-search;
-                    font-size: Theme.fs-md;
-                    color: Theme.text;
-                    vertical-alignment: center;
-                    single-line: true;
-                    accessible-label: "Search chats";
-                    Text {
-                        visible: parent.text == "";
-                        text: "Search";
-                        color: Theme.text-3;
-                        font-size: Theme.fs-md;
-                        vertical-alignment: center;
-                        height: parent.height;
-                        x: 0;
-                    }
-                }
-            }
+        HorizontalLayout {
+            height: Theme.topbar-h - Theme.space-md;
+            padding-left: Theme.space-md;
+            Wordmark { size: Theme.fs-h3; }
         }
-        Rectangle { height: 6px; }
-        NavItem {
-            icon: @image-url("../../../assets/icons/plus.svg");
+
+        TextField {
+            icon: "search";
+            placeholder: "Search chats…";
+            label: "Search chats";
+            text <=> AppState.session-search;
+        }
+        Button {
             text: "New chat";
-            emphasized: true;
-            clicked => { AppState.new-chat(); }
+            icon: "square-pen";
+            variant: ButtonVariant.primary;
+            height: Theme.control-h-lg;
+            clicked => { AppState.new-chat(); root.focus-composer(); }
         }
-        NavItem {
-            icon: @image-url("../../../assets/icons/folder.svg");
+        Rectangle { height: Theme.space-xs; }
+        KitNavItem {
+            icon: "folder";
             text: ProjectState.active-name != "" ? ProjectState.active-name : "Projects";
             clicked => { ProjectState.open = true; ProjectState.refresh(); }
         }
-        NavItem { icon: @image-url("../../../assets/icons/box.svg"); text: "Artifacts"; clicked => { AppState.banner = "Artifact browsing is not available in this preview yet."; AppState.banner-error = false; } }
-        NavItem { icon: @image-url("../../../assets/icons/clock.svg"); text: "Scheduled"; clicked => { CapState.open = true; CapState.tab = 5; CapState.set-tab(5); } }
-        NavItem { icon: @image-url("../../../assets/icons/puzzle.svg"); text: "Capabilities"; clicked => { CapState.open = true; CapState.set-tab(CapState.tab); } }
-        NavItem { icon: @image-url("../../../assets/icons/sliders-horizontal.svg"); text: "Customize"; clicked => { root.open-settings(); } }
+        KitNavItem { icon: "box"; text: "Artifacts"; clicked => { AppState.banner = "Artifact browsing is not available in this preview yet."; AppState.banner-error = false; } }
+        KitNavItem { icon: "clock"; text: "Scheduled"; clicked => { CapState.open = true; CapState.tab = 5; CapState.set-tab(5); } }
+        KitNavItem { icon: "puzzle"; text: "Capabilities"; clicked => { CapState.open = true; CapState.set-tab(CapState.tab); } }
+        KitNavItem { icon: "sliders-horizontal"; text: "Customize"; clicked => { root.open-settings(); } }
 
         Rectangle { height: 10px; }
         SectionHeader { text: "Recents"; }
@@ -251,8 +235,8 @@ component Sidebar inherits Rectangle {
                 y: 10px;
                 width: 24px; height: 24px;
                 border-radius: 12px;
-                background: Theme.interactive.with-alpha(0.75);
-                Text { text: AppState.user-name != "" ? AppState.user-name.character-count > 0 ? "H" : "H" : "H"; color: Theme.on-accent; font-size: Theme.fs-sm; font-weight: 600; }
+                background: Theme.accent-soft;
+                Text { text: "H"; color: Theme.accent-text; font-size: Theme.fs-sm; font-weight: 600; }
             }
             VerticalLayout {
                 alignment: center;
@@ -264,10 +248,10 @@ component Sidebar inherits Rectangle {
                     font-size: Theme.fs-xs;
                 }
             }
-            IconButton {
+            KitIconButton {
                 y: 7px;
-                icon: @image-url("../../../assets/icons/settings.svg");
-                tooltip: "Settings";
+                icon: "settings";
+                label: "Settings";
                 clicked => { root.open-settings(); }
             }
         }
@@ -341,14 +325,19 @@ export component AppWindow inherits Window {
     }
     in-out property <bool> picker-open: false;
     in-out property <bool> effort-open: false;
+    property <int> composer-focus-tick;
+    changed picker-open => { if !self.picker-open { self.composer-focus-tick += 1; } }
+    changed effort-open => { if !self.effort-open { self.composer-focus-tick += 1; } }
     property <bool> empty: AppState.rows.length == 0;
-    property <length> dock-h: 92px;
+    property <length> dock-h: 160px;
+    // Window coordinates from whichever composer is mounted (welcome or docked).
+    property <length> picker-anchor-y;
 
     callback quit();
 
     // Sidebar width animates; content reflows with it.
-    property <length> sb-w: sidebar-open ? Theme.sidebar-w : 0px;
-    animate sb-w { duration: Motion.slow; easing: Ease.in-out; }
+    property <length> sb-w: sidebar-open ? Theme.sidebar-default-w : 0px;
+    animate sb-w { duration: Motion.panel; easing: Ease.drawer; }
 
     // Global shortcuts.
     keys := FocusScope {
@@ -397,6 +386,7 @@ export component AppWindow inherits Window {
             width: root.sb-w;
             height: root.height;
             open-settings => { root.settings-open = true; }
+            focus-composer => { root.composer-focus-tick += 1; }
         }
         if root.sb-w > 0: Rectangle { x: root.sb-w - 1px; width: 1px; height: root.height; background: Theme.border; }
 
@@ -409,18 +399,18 @@ export component AppWindow inherits Window {
             // Title strip
             HorizontalLayout {
                 y: 0;
-                height: Theme.titlebar-h;
+                height: Theme.topbar-h;
                 padding-left: 8px;
                 padding-right: 10px;
                 spacing: 6px;
-                IconButton {
-                    y: 5px;
-                    icon: @image-url("../../../assets/icons/panel-left.svg");
-                    tooltip: "Toggle sidebar (Ctrl+B)";
+                KitIconButton {
+                    y: (parent.height - self.height) / 2;
+                    icon: "panel-left";
+                    label: "Toggle sidebar (Ctrl+B)";
                     clicked => { root.sidebar-open = !root.sidebar-open; }
                 }
                 Text {
-                    text: root.empty ? "" : AppState.session-title;
+                    text: root.empty ? "New chat" : AppState.session-title;
                     color: Theme.text-2;
                     font-size: Theme.fs-md;
                     vertical-alignment: center;
@@ -428,14 +418,15 @@ export component AppWindow inherits Window {
                     horizontal-stretch: 1;
                 }
                 if AppState.connection != "open": Chip {
-                    y: 6px;
+                    y: (parent.height - self.height) / 2;
                     interactive: false;
                     outlined: true;
                     text: AppState.connection == "error" ? "Offline" : "Connecting";
                 }
-                if !root.empty: Segmented {
-                    y: 4px;
-                    width: 228px;
+                if !root.empty: KitSegmented {
+                    y: (parent.height - self.height) / 2;
+                    width: main.width < 600px ? 196px : 228px;
+                    label: "Transcript detail";
                     options: ["Normal", "Thinking", "Verbose"];
                     selected <=> AppState.transcript-mode;
                 }
@@ -443,40 +434,48 @@ export component AppWindow inherits Window {
 
             if AppState.banner != "": Banner {
                 x: (parent.width - self.width) / 2;
-                y: Theme.titlebar-h + 4px;
-                width: min(parent.width - 48px, Theme.column-w);
+                y: Theme.topbar-h + 4px;
+                width: min(parent.width - 48px, Theme.chat-max-w);
                 text: AppState.banner;
                 error: AppState.banner-error;
                 dismissed => { AppState.dismiss-banner(); }
             }
 
-            // Empty state: serif greeting + centred composer.
+            Rectangle { y: Theme.topbar-h - 1px; height: 1px; background: Theme.border; }
+
+            // A task-first welcome, using the same column and composer as an open chat.
             if root.empty: VerticalLayout {
+                y: Theme.topbar-h;
+                height: parent.height - Theme.topbar-h;
                 alignment: center;
-                spacing: 22px;
-                padding-bottom: 80px;
+                spacing: Theme.space-2xl;
+                padding-bottom: main.height > 600px ? Theme.space-3xl * 2 : Theme.space-xl;
                 HorizontalLayout {
                     alignment: center;
-                    spacing: 12px;
-                    Image {
-                        source: @image-url("../../../assets/icons/sparkles.svg");
-                        width: 32px; height: 32px;
-                        y: (parent.height - 32px) / 2;
-                        colorize: Theme.accent;
-                    }
-                    Text {
-                        text: AppState.greeting + ", " + AppState.user-name + "?";
-                        font-family: Theme.serif-font;
-                        font-size: Theme.fs-greet;
-                        font-weight: 400;
-                        color: Theme.text;
-                    }
+                    HermesMark { size: 48px; }
+                }
+                Text {
+                    text: "What would you like to work on?";
+                    font-size: main.width < 600px ? Theme.fs-h2 : Theme.fs-greet;
+                    font-weight: 600;
+                    color: Theme.foreground;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+                Text {
+                    text: "Ask a question, explore an idea, or build something.";
+                    font-size: Theme.fs-control;
+                    color: Theme.muted-foreground;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
                 }
                 HorizontalLayout {
                     alignment: center;
                     hero := Composer {
                         init => { self.focus(); }
-                        width: min(main.width - 64px, 672px);
+                        changed picker-top => { root.picker-anchor-y = self.picker-top; }
+                        focus-tick: root.composer-focus-tick;
+                        width: min(main.width - Theme.space-2xl * 2, Theme.chat-max-w);
                         centered: true;
                         text <=> AppState.draft;
                         running: AppState.running;
@@ -489,8 +488,8 @@ export component AppWindow inherits Window {
                         cwd-label: AppState.cwd-label;
                         send(t) => { AppState.send(t); self.text = ""; }
                         stop => { AppState.stop(); }
-                        pick-model => { root.effort-open = false; root.picker-open = !root.picker-open; AppState.refresh-models(); }
-                        pick-effort => { root.picker-open = false; root.effort-open = !root.effort-open; }
+                        pick-model => { root.picker-anchor-y = self.picker-top; root.effort-open = false; root.picker-open = !root.picker-open; AppState.refresh-models(); }
+                        pick-effort => { root.picker-anchor-y = self.picker-top; root.picker-open = false; root.effort-open = !root.effort-open; }
                         pick-folder => { ProjectState.open = true; ProjectState.refresh(); }
                         attach => { AppState.attach-files(); }
                         browsing: AppState.browsing;
@@ -505,9 +504,9 @@ export component AppWindow inherits Window {
             }
 
             if !root.empty: transcript := Transcript {
-                y: Theme.titlebar-h;
+                y: Theme.topbar-h;
                 width: parent.width;
-                height: parent.height - Theme.titlebar-h - root.dock-h - 8px;
+                height: parent.height - Theme.topbar-h - root.dock-h - Theme.space-xl;
                 rows: AppState.rows;
                 running: AppState.running;
                 status: AppState.status;
@@ -518,13 +517,15 @@ export component AppWindow inherits Window {
             }
             if !root.empty: dock := Composer {
                 x: (parent.width - self.width) / 2;
-                y: parent.height - self.height - 8px;
+                y: parent.height - self.height - Theme.space-xl;
                 // The hero composer is destroyed when the first row appears; keep typing focus.
                 init => { root.dock-h = self.height; self.focus(); }
                 // Editing a message puts its text here; type straight into it.
                 changed editing => { if self.editing { self.focus(); } }
                 changed height => { root.dock-h = self.height; }
-                width: min(parent.width - 48px, Theme.column-w);
+                changed picker-top => { root.picker-anchor-y = self.picker-top; }
+                focus-tick: root.composer-focus-tick;
+                width: min(parent.width - 48px, Theme.chat-max-w);
                 centered: false;
                 placeholder: "Reply to Hermes…";
                 text <=> AppState.draft;
@@ -549,8 +550,8 @@ export component AppWindow inherits Window {
                 edit-note: AppState.edit-note;
                 cancel-edit => { AppState.cancel-edit(); }
                 stop => { AppState.stop(); }
-                pick-model => { root.effort-open = false; root.picker-open = !root.picker-open; AppState.refresh-models(); }
-                pick-effort => { root.picker-open = false; root.effort-open = !root.effort-open; }
+                pick-model => { root.picker-anchor-y = self.picker-top; root.effort-open = false; root.picker-open = !root.picker-open; AppState.refresh-models(); }
+                pick-effort => { root.picker-anchor-y = self.picker-top; root.picker-open = false; root.effort-open = !root.effort-open; }
                 pick-folder => { ProjectState.open = true; ProjectState.refresh(); }
                 attach => { AppState.attach-files(); }
                         browsing: AppState.browsing;
@@ -566,27 +567,30 @@ export component AppWindow inherits Window {
                 x: (parent.width - self.width) / 2;
                 // Above the docked composer and the 40 px live status line.
                 y: parent.height - self.height - root.dock-h - 8px - 48px;
-                width: min(parent.width - 48px, Theme.column-w);
+                width: min(parent.width - 48px, Theme.chat-max-w);
             }
 
             // Shown only when no approval card is up (an approval answers first).
             if InputState.visible && !AppState.approval.visible: InputCard {
                 x: (parent.width - self.width) / 2;
-                y: max(Theme.titlebar-h + 8px, parent.height - self.height - root.dock-h - 8px - 48px);
-                width: min(parent.width - 48px, Theme.column-w);
+                y: max(Theme.topbar-h + 8px, parent.height - self.height - root.dock-h - 8px - 48px);
+                width: min(parent.width - 48px, Theme.chat-max-w);
             }
 
             if root.effort-open: TouchArea { clicked => { root.effort-open = false; } }
             if root.effort-open: Rectangle {
-                width: 180px; height: 288px;
-                x: parent.width - self.width - max(24px, (parent.width - Theme.column-w) / 2);
-                y: parent.height - self.height - 54px;
+                width: 180px;
+                height: min(288px, root.picker-anchor-y - Theme.topbar-h - Theme.space-xl);
+                x: parent.width - self.width - max(24px, (parent.width - Theme.chat-max-w) / 2);
+                y: root.picker-anchor-y - self.height - Theme.space-md;
                 background: Theme.raised; border-radius: Theme.r-lg; border-width: 1px; border-color: Theme.border-strong;
-                VerticalLayout {
-                    padding: 6px; spacing: 2px;
-                    for level in AppState.effort-options: NavItem {
-                        has-icon: false; text: level; selected: level == AppState.effort-label;
-                        clicked => { AppState.select-effort(level); root.effort-open = false; }
+                ScrollView {
+                    VerticalLayout {
+                        padding: Theme.space-sm; spacing: Theme.space-2xs;
+                        for level in AppState.effort-options: KitNavItem {
+                            text: level; active: level == AppState.effort-label;
+                            clicked => { AppState.select-effort(level); root.effort-open = false; }
+                        }
                     }
                 }
             }
@@ -600,9 +604,9 @@ export component AppWindow inherits Window {
                 empty-text: AppState.model-empty-text;
                 hidden-count: AppState.model-hidden-count;
                 width: 360px;
-                height: min(460px, parent.height - 120px);
-                x: parent.width - self.width - max(24px, (parent.width - Theme.column-w) / 2);
-                y: parent.height - self.height - 54px;
+                height: min(460px, root.picker-anchor-y - Theme.topbar-h - Theme.space-xl);
+                x: parent.width - self.width - max(24px, (parent.width - Theme.chat-max-w) / 2);
+                y: root.picker-anchor-y - self.height - Theme.space-md;
                 query-changed(q) => { AppState.model-query = q; AppState.model-query-changed(q); }
                 select(provider, model) => { AppState.select-model(provider, model); root.picker-open = false; }
                 favorite(provider, model) => { AppState.favorite-model(provider, model); }

@@ -3,6 +3,7 @@
 import { ListView, ScrollView } from "std-widgets.slint";
 import { Theme, Motion, Ease } from "theme.slint";
 import { Icon, IconButton, Chip, Spinner, ShimmerText } from "components.slint";
+import { GlassSurface, Chip as KitChip, IconButton as KitIconButton, Button, ButtonVariant, SelectTrigger } from "kit/kit.slint";
 
 export struct ToolRow {
     name: string,
@@ -414,7 +415,7 @@ component MessageRow inherits Rectangle {
     property <float> appear: 0;
     init => { appear = 1; }
     opacity: appear;
-    animate opacity { duration: Motion.base; easing: Ease.out; }
+    animate opacity { duration: Motion.message; easing: Ease.list; }
 
     height: lay.preferred-height;
     // Hover over the whole row (its children included) reveals its actions (copy, edit).
@@ -571,7 +572,7 @@ export component Transcript inherits Rectangle {
             index: i;
             busy: root.running;
             edit(n, t) => { root.edit(n, t); }
-            column-w: Theme.column-w;
+            column-w: Theme.chat-max-w;
             window-h: root.height;
             transcript-mode: root.transcript-mode;
             copy(t) => { root.copy(t); }
@@ -582,8 +583,8 @@ export component Transcript inherits Rectangle {
             y: root.height - root.status-h;
             height: root.status-h;
             HorizontalLayout {
-                x: (root.width - min(root.width - 48px, Theme.column-w)) / 2;
-                width: min(root.width - 48px, Theme.column-w);
+                x: (root.width - min(root.width - 48px, Theme.chat-max-w)) / 2;
+                width: min(root.width - 48px, Theme.chat-max-w);
                 spacing: 8px;
                 alignment: start;
                 if root.running: Image {
@@ -665,6 +666,8 @@ export component Composer inherits Rectangle {
     in-out property <string> text;
     in property <bool> running;
     in property <bool> centered;
+    in property <int> focus-tick;
+    changed focus-tick => { input.focus(); }
     in property <string> placeholder: "How can I help you today?";
     in property <string> model-label;
     in property <string> effort-label;
@@ -700,29 +703,46 @@ export component Composer inherits Rectangle {
     // Focus lands in the text input itself (the FocusScope around it only captures Enter).
     forward-focus: input;
 
-    height: card.height + (centered ? 40px : 36px);
+    height: card.height + Theme.control-h + Theme.space-xs;
+    property <length> attachments-h: root.attachments.length > 0 ? Theme.control-h + Theme.space-xs : 0px;
+    out property <length> picker-top: self.absolute-position.y + card.height - Theme.control-h - Theme.space-md;
 
-    card := Rectangle {
+    card := GlassSurface {
         y: 0;
-        height: max(centered ? 112px : 56px, min(260px, input.preferred-height + (centered ? 68px : 30px)));
-        animate height { duration: Motion.fast; easing: Ease.out; }
-        border-radius: Theme.r-xl;
-        background: Theme.raised;
-        border-width: 1px;
-        border-color: input.has-focus ? Theme.border-strong : Theme.border;
+        height: max(root.centered ? 140px : 124px, min(248px, input.preferred-height + 80px)) + root.attachments-h;
+        border-color: input.has-focus ? Theme.accent.with-alpha(0.55) : Theme.glass-border;
         animate border-color { duration: Motion.fast; }
-        drop-shadow-blur: 18px;
-        drop-shadow-offset-y: 4px;
-        drop-shadow-color: Theme.dark ? #00000055 : #0000001a;
 
-        // Bare multi-line input inside the card. Enter sends, Shift+Enter inserts a newline.
-        // In a conversation the card is one row: + on the left, send on the right, so the
-        // text starts after the + button instead of underneath it.
+        // Attachments get a separate horizontally scrollable lane, never space taken
+        // from the model/reasoning controls or the message input.
+        if root.attachments.length > 0: Flickable {
+            x: Theme.space-lg;
+            y: Theme.space-md;
+            width: parent.width - Theme.space-2xl;
+            height: Theme.control-h;
+            content-width: attached.preferred-width;
+            content-height: self.height;
+            attached := HorizontalLayout {
+                alignment: start;
+                spacing: Theme.space-sm;
+                for name[i] in root.attachments: KitChip {
+                    text: name;
+                    icon: "paperclip";
+                    removable: true;
+                    width: min(root.width - Theme.space-3xl, 260px);
+                    clicked => { root.remove-attachment(i); }
+                    removed => { root.remove-attachment(i); }
+                }
+            }
+        }
+
+        // Enter sends, Shift+Enter inserts a newline. The full-width input grows above
+        // a stable control row in both the welcome and conversation states.
         keys := FocusScope {
-            x: root.centered ? 16px : 48px;
-            y: 14px;
-            width: parent.width - 32px - (root.centered ? 0px : 76px);
-            height: parent.height - (root.centered ? 58px : 22px);
+            x: Theme.space-xl;
+            y: Theme.space-xl + root.attachments-h;
+            width: parent.width - Theme.space-3xl;
+            height: parent.height - 64px - root.attachments-h;
             capture-key-pressed(e) => {
                 if e.modifiers.control && (e.text == "v" || e.text == "V") {
                     root.paste-image();
@@ -778,35 +798,39 @@ export component Composer inherits Rectangle {
         }
 
         HorizontalLayout {
-            x: 8px;
-            y: parent.height - self.height - 8px;
-            width: parent.width - 16px;
-            height: 34px;
-            spacing: 4px;
-            IconButton {
-                icon: @image-url("../../../assets/icons/plus.svg");
-                tooltip: "Add files";
+            x: Theme.space-md;
+            y: parent.height - self.height - Theme.space-md;
+            width: parent.width - Theme.space-xl;
+            height: Theme.control-h;
+            spacing: Theme.space-sm;
+            KitIconButton {
+                icon: "plus";
+                label: "Add files";
                 clicked => { root.attach(); }
             }
-            Rectangle { horizontal-stretch: 1; }
-            send-btn := Rectangle {
-                width: 32px;
-                height: 32px;
-                border-radius: Theme.r-md;
-                property <bool> can-send: root.running || root.text != "";
-                background: !can-send ? Theme.surface-2 : (send-ta.pressed ? Theme.accent.darker(15%) : send-ta.has-hover ? Theme.accent.darker(7%) : Theme.accent);
-                animate background { duration: Motion.fast; }
-                accessible-role: button;
+            SelectTrigger {
+                min-width: 0px;
+                horizontal-stretch: 1;
+                text: root.model-label;
+                accessible-label: root.model-label + " ";
+                clicked => { root.pick-model(); }
+            }
+            SelectTrigger {
+                min-width: root.width < 560px ? 100px : 120px;
+                max-width: self.min-width;
+                text: root.effort-label != "" ? root.effort-label : "Reasoning";
+                accessible-label: self.text + " ";
+                clicked => { root.pick-effort(); }
+            }
+            Button {
+                width: Theme.control-h;
+                icon: root.running ? "square" : "arrow-up";
+                variant: ButtonVariant.primary;
+                enabled: root.running || root.text != "";
                 accessible-label: root.running ? "Stop" : "Send";
-                accessible-action-default => { if root.running { root.stop(); } else { root.send(root.text); } }
-                Image {
-                    width: 16px; height: 16px;
-                    source: root.running ? @image-url("../../../assets/icons/square.svg") : @image-url("../../../assets/icons/arrow-up.svg");
-                    colorize: parent.can-send ? Theme.on-accent : Theme.text-4;
-                }
-                send-ta := TouchArea {
-                    mouse-cursor: pointer;
-                    clicked => { if root.running { root.stop(); } else if root.text != "" { root.send(root.text); } }
+                clicked => {
+                    if root.running { root.stop(); } else { root.send(root.text); }
+                    input.focus();
                 }
             }
         }
@@ -854,37 +878,30 @@ export component Composer inherits Rectangle {
         }
     }
 
-    // Chips row under the card.
+    // Project context and queued work remain separate from message actions.
     HorizontalLayout {
-        y: card.height + 6px;
-        height: 28px;
-        spacing: 2px;
-        padding-left: 6px;
-        padding-right: 6px;
-        Chip {
+        y: card.height + Theme.space-xs;
+        height: Theme.control-h;
+        spacing: Theme.space-sm;
+        SelectTrigger {
+            min-width: 0px;
+            preferred-width: min(root.width * 0.55, 280px);
+            max-width: self.preferred-width;
             text: root.cwd-label != "" ? root.cwd-label : "Project or folder";
-            has-chevron: true;
+            icon: "folder";
+            accessible-label: self.text + " ";
             clicked => { root.pick-folder(); }
-        }
-        // Images queued for the next message; clicking one removes it.
-        for name[i] in root.attachments: Chip {
-            text: "📎 " + name + "  ✕";
-            outlined: true;
-            clicked => { root.remove-attachment(i); }
         }
         if root.queue-count > 0: Chip {
             text: "Queued: " + root.queue-count;
             clicked => { root.inspect-queue(); }
         }
         Rectangle { horizontal-stretch: 1; }
-        Chip {
-            text: root.model-label;
-            clicked => { root.pick-model(); }
-        }
-        Chip {
-            text: root.effort-label != "" ? root.effort-label : "Reasoning";
-            has-chevron: true;
-            clicked => { root.pick-effort(); }
+        if root.width >= 560px: Text {
+            text: "Shift+Enter for a new line";
+            color: Theme.faint;
+            font-size: Theme.fs-meta;
+            vertical-alignment: center;
         }
     }
 }
