@@ -1,0 +1,28 @@
+[package]
+name = "hermes-gallery"
+description = "Component gallery for the Hermes Desktop kit: every component and state, light and dark, plus headless golden renders."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+# `cargo run -p hermes-gallery` opens the interactive gallery (the crate has two bins).
+default-run = "hermes-gallery"
+
+[[bin]]
+name = "hermes-gallery"
+path = "src/main.rs"
+
+[[bin]]
+name = "hermes-gallery-render"
+path = "src/render.rs"
+
+[dependencies]
+hermes-core.workspace = true
+slint.workspace = true
+# Already in the dependency tree (Slint's compiler and resvg use them); no new crates.
+i-slint-backend-testing = { version = "=1.18.1", features = ["renderer-software"] }
+png = "0.18"
+
+[build-dependencies]
+slint-build.workspace = true

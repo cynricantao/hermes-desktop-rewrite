@@ -30,8 +30,19 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**76 done · 358 partial · 352 not started · 8 unsupported** (of 794).
+**76 done · 361 partial · 349 not started · 8 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
+
+P0 review follow-up (2026-10-21): the gallery now has headless keyboard/pointer
+regressions for radio navigation, empty search results, inert menus, cascading menus,
+chip activation and dialog focus, plus contrast assertions across all five palettes.
+ANSI carriage-return and malformed-escape regressions are covered in core. Normal and
+reduced-motion renders are checked for determinism on every board. The kit remains a
+preview, not a migrated app surface: list-container roving focus and disabling background
+content around modal dialogs are integration responsibilities. No checklist item is
+promoted by these checks. Windows reference refresh/validation runs in the gallery CI;
+Linux/macOS have no committed image references yet, so their image comparison is skipped.
+
 
 ## Summary
 
@@ -241,7 +252,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [~] Session read/unread state — REST PATCH /api/sessions/{id} — src/store/session-unread-remote.ts ⟶ backend client ready in `api::sessions` (live-verified calls listed in docs/api/sessions.md); UI not wired
 - [~] Session search (⌘⇧F) — REST /api/sessions/search — src/app/chat/sidebar/use-server-session-search.ts, src/lib/session-search.ts ⟶ sidebar search filters titles at once and adds backend full-text hits (`GET /api/sessions/search`) under "Found in messages"; live 2026-10-18 sidebar section. No ⌘⇧F shortcut or snippet highlight
 - [ ] Session sort (recent/title) — local — src/store/sidebar-sort.ts
-- [ ] Session list density (compact/comfortable/detailed) — local — src/store/session-list-density.ts
+- [~] Session list density (compact/comfortable/detailed) — local — src/store/session-list-density.ts ⟶ P0 (2026-10-21): `Theme.density` token + kit `SessionRow` renders all three densities (gallery Shell board, golden-tested headless); not yet wired to the sidebar or a setting (P1/P3), no live verification.
 - [ ] Sidebar grouping cycle — local — src/app/chat/sidebar/order.ts
 - [ ] Sidebar collapse/expand (⌘B) — local — src/store/layout.ts
 - [ ] Sidebar filter menu — local — src/app/chat/sidebar/filter-menu.tsx
@@ -1019,7 +1030,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 
 ## Appearance / themes
 
-- [ ] Built-in themes (light/dark/system) — local — src/themes/*
+- [~] Built-in themes (light/dark/system) — local — src/themes/* ⟶ P0 (2026-10-21): new semantic palette (verdigris & bronze) in `ui/theme.slint`, light/dark/system via `Theme.mode`; every kit board rendered in both modes and golden-tested (`cargo test -p hermes-gallery --test golden`); existing views re-themed through legacy aliases (headless snapshot checked). Not verified against a live backend; views not yet rebuilt on the kit (P1).
 - [ ] Theme marketplace (browse themes) — local — src/app/command-palette/marketplace-theme-page.tsx
 - [~] Skin changed event (gateway-driven skin) — WS skin.changed — src/store/notifications.ts ⟶ backend client ready in `api::events` (builders unit-tested; safe reads live-verified, see docs/api); UI not wired
 - [ ] Local skin override — local (Electron local-skin) — electron/local-skin.ts
@@ -1027,7 +1038,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Backdrop blur — local — src/store/backdrop.ts
 - [ ] Particles background — local — src/components/particles/*
 - [ ] Code editor theme — local — src/components/chat/code-editor-theme.ts
-- [ ] Brand icons / product identity — local — src/lib/brand-icon.ts, product-identity.cjs
+- [~] Brand icons / product identity — local — src/lib/brand-icon.ts, product-identity.cjs ⟶ P0 (2026-10-21): owner-supplied winged-H logo in `assets/brand/` (kit `HermesMark`/`Wordmark`, window icon, app icon set incl. `packaging/hermes-desktop-rs.svg` and the macOS iconset); Lucide restyled to 1.5 stroke (134 icons). Window icon is set on AppWindow; the in-app shell does not show the mark yet (P1). Not verified on a live desktop session.
 - [ ] Profile color swatches — local — src/lib/profile-color.ts
 - [ ] Starmap visualization (session map) — local — src/app/starmap/*
 - [ ] Pet overlay appearance — local — src/app/pet-overlay/pet-overlay-app.tsx

@@ -1,0 +1,383 @@
+// Kit foundations: icon, focus ring, spinner, shimmer, kbd, badge, chip, status
+// indicators, separator, skeleton, progress, meter and ring. Token-only (theme.slint).
+//
+// Renderer notes (docs/DESIGN.md §6): the default software renderer draws no box shadows
+// and ignores rotate/scale transforms, so motion here uses translate + opacity and arcs
+// are drawn as Paths (which it does render).
+
+import { Theme, Motion, Ease } from "../theme.slint";
+import { Icons } from "../icons.slint";
+
+// Preview state for the gallery / golden images: 0 live, 1 hover, 2 pressed, 3 focus,
+// 4 disabled. Real UI leaves it at 0.
+export enum PreviewState { live, hover, pressed, focus, disabled }
+
+export component KitIcon inherits Image {
+    in property <string> name;
+    in property <length> size: 16px;
+    in property <color> tint: Theme.muted-foreground;
+    source: Icons.get(name);
+    width: size;
+    height: size;
+    colorize: tint;
+    image-fit: contain;
+    accessible-role: none;
+}
+
+// 2px ring drawn just outside its parent (place as the last child; it fills the parent
+// by default and draws the ring 3px beyond it). `inset` draws the ring inside the
+// parent's bounds instead, for parents that clip (code/diff/terminal cards, rows).
+export component FocusRing inherits Rectangle {
+    in property <bool> shown;
+    in property <bool> inset: false;
+    in property <length> radius: Theme.control-radius;
+    if root.shown && root.inset: Rectangle {
+        width: root.width;
+        height: root.height;
+        border-radius: root.radius;
+        border-width: 2px;
+        border-color: Theme.ring;
+    }
+    if root.shown && !root.inset: Rectangle {
+        x: -3px;
+        y: -3px;
+        width: root.width + 6px;
+        height: root.height + 6px;
+        border-radius: root.radius + 3px;
+        border-width: 2px;
+        border-color: Theme.ring;
+    }
+}
+
+// Arc spinner drawn as a Path (rotation transforms are not rendered by the software
+// renderer). One revolution per 800 ms; frozen at a fixed angle under reduce motion.
+export component Spinner inherits Rectangle {
+    in property <length> size: 14px;
+    in property <color> tint: Theme.muted-foreground;
+    in property <bool> spinning: true;
+    width: size;
+    height: size;
+    property <float> turn: (spinning && !Motion.reduce) ? mod(animation-tick() / 1ms, 800) / 800 : 0.1;
+    property <angle> a0: turn * 360deg;
+    property <angle> a1: a0 + 270deg;
+    accessible-role: progress-indicator;
+    accessible-label: "Loading";
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint.with-alpha(0.22);
+        stroke-width: root.size / 8;
+        MoveTo { x: 21; y: 12; }
+        ArcTo { x: 3; y: 12; radius-x: 9; radius-y: 9; sweep: true; }
+        ArcTo { x: 21; y: 12; radius-x: 9; radius-y: 9; sweep: true; }
+    }
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: root.size / 8;
+        stroke-line-cap: round;
+        MoveTo { x: 12 + 9 * cos(root.a0); y: 12 + 9 * sin(root.a0); }
+        ArcTo { x: 12 + 9 * cos(root.a1); y: 12 + 9 * sin(root.a1); radius-x: 9; radius-y: 9; sweep: true; large-arc: true; }
+    }
+}
+
+// Progress ring (todos): fraction 0..1, drawn as two arcs.
+export component ProgressRing inherits Rectangle {
+    in property <float> value;
+    in property <length> size: 16px;
+    in property <color> tint: Theme.accent;
+    width: size;
+    height: size;
+    property <float> v: clamp(value, 0, 0.9999);
+    property <angle> end: -90deg + v * 360deg;
+    accessible-role: progress-indicator;
+    accessible-value: round(v * 100) + "%";
+    Path {
+        width: 100%; height: 100%;
+        viewbox-width: 24; viewbox-height: 24;
+        stroke: Theme.muted-foreground.with-alpha(0.28);
+        stroke-width: root.size / 7;
+        MoveTo { x: 21; y: 12; }
+        ArcTo { x: 3; y: 12; radius-x: 9; radius-y: 9; sweep: true; }
+        ArcTo { x: 21; y: 12; radius-x: 9; radius-y: 9; sweep: true; }
+    }
+    if root.v > 0.001: Path {
+        width: 100%; height: 100%;
+        viewbox-width: 24; viewbox-height: 24;
+        stroke: root.tint;
+        stroke-width: root.size / 7;
+        stroke-line-cap: round;
+        MoveTo { x: 12; y: 3; }
+        ArcTo { x: 12 + 9 * cos(root.end); y: 12 + 9 * sin(root.end); radius-x: 9; radius-y: 9; sweep: true; large-arc: root.v > 0.5; }
+    }
+}
+
+// Text with a travelling highlight ("Thinking…", running tool rows). Static under reduce.
+export component Shimmer inherits Rectangle {
+    in property <string> text;
+    in property <length> font-size: Theme.fs-control;
+    in property <color> base: Theme.muted-foreground;
+    in property <color> peak: Theme.foreground;
+    in property <bool> active: true;
+    preferred-width: label.preferred-width;
+    height: label.preferred-height;
+    property <float> phase: (active && !Motion.reduce) ? mod(animation-tick() / 1ms, 1800) / 1800 : 0;
+    property <float> head: phase * 1.6 - 0.3;
+    label := Text {
+        x: 0;
+        width: root.width;
+        text: root.text;
+        font-size: root.font-size;
+        font-family: Theme.ui-font;
+        vertical-alignment: center;
+        horizontal-alignment: left;
+        color: (root.active && !Motion.reduce)
+            ? @linear-gradient(90deg, root.base 0%, root.base max(0%, (root.head - 0.15) * 100%), root.peak max(0%, min(100%, root.head * 100%)), root.base min(100%, (root.head + 0.15) * 100%), root.base 100%)
+            : root.base;
+    }
+}
+
+// Keyboard key chips. Rust formats per platform ("⌘", "Ctrl", …); one string per key.
+export component Kbd inherits HorizontalLayout {
+    in property <[string]> keys;
+    in property <bool> inverse: false;
+    spacing: 3px;
+    alignment: start;
+    for k in root.keys: Rectangle {
+        height: 18px;
+        width: max(18px, kt.preferred-width + 8px);
+        border-radius: Theme.r-xs;
+        background: root.inverse ? Theme.inverse-fg.with-alpha(0.14) : Theme.muted;
+        border-width: root.inverse ? 0px : 1px;
+        border-color: Theme.border;
+        kt := Text {
+            text: k;
+            font-size: Theme.fs-meta;
+            font-family: Theme.ui-font;
+            font-weight: 500;
+            color: root.inverse ? Theme.inverse-fg : Theme.muted-foreground;
+        }
+    }
+}
+
+export enum Tone { neutral, accent, secondary, success, warning, destructive, info, outline }
+
+// Static label: counts, provenance ("Learned", "Built-in"), plan tiers ("Pro"), states.
+export component Badge inherits Rectangle {
+    in property <string> text;
+    in property <Tone> tone: Tone.neutral;
+    in property <string> icon;
+    property <color> fg: tone == Tone.accent ? Theme.accent
+        : tone == Tone.secondary ? Theme.secondary
+        : tone == Tone.success ? Theme.success
+        : tone == Tone.warning ? Theme.warning
+        : tone == Tone.destructive ? Theme.destructive
+        : tone == Tone.info ? Theme.info
+        : Theme.muted-foreground;
+    height: 20px;
+    width: row.preferred-width;
+    border-radius: Theme.r-sm;
+    background: tone == Tone.accent ? Theme.accent-soft
+        : tone == Tone.secondary ? Theme.secondary-soft
+        : tone == Tone.success ? Theme.success-soft
+        : tone == Tone.warning ? Theme.warning-soft
+        : tone == Tone.destructive ? Theme.destructive-soft
+        : tone == Tone.info ? Theme.info-soft
+        : tone == Tone.outline ? transparent
+        : Theme.muted;
+    border-width: tone == Tone.outline ? 1px : 0px;
+    border-color: Theme.border-strong;
+    accessible-role: AccessibleRole.text;
+    accessible-label: text;
+    row := HorizontalLayout {
+        padding-left: 7px;
+        padding-right: 7px;
+        spacing: 4px;
+        if root.icon != "": KitIcon { name: root.icon; size: 12px; tint: root.fg; y: (parent.height - 12px) / 2; }
+        Text {
+            text: root.text;
+            font-size: Theme.fs-meta;
+            font-weight: 500;
+            color: root.fg;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// Interactive chip: attachments, filters, mentions. Optional remove button.
+export component Chip inherits Rectangle {
+    in property <string> text;
+    in property <string> icon;
+    in property <bool> removable: false;
+    in property <bool> selected: false;
+    in property <PreviewState> preview: PreviewState.live;
+    callback clicked();
+    callback removed();
+    property <bool> hov: ta.has-hover || preview == PreviewState.hover;
+    height: 26px;
+    width: row.preferred-width;
+    border-radius: Theme.r-sm;
+    border-width: 1px;
+    border-color: selected ? Theme.accent.with-alpha(0.55) : Theme.border;
+    background: selected ? Theme.accent-soft : hov ? Theme.hover : Theme.card;
+    animate background, border-color { duration: Motion.fast; easing: Ease.list; }
+    accessible-role: button;
+    accessible-label: text;
+    accessible-item-selected: selected;
+    accessible-action-default => { root.clicked(); }
+    // Enter/Space activate the chip; the × is a second stop (Tab past the chip) so
+    // removal does not require a pointer.
+    fs := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == " " { root.clicked(); return accept; }
+            return reject;
+        }
+    }
+    ta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+    row := HorizontalLayout {
+        padding-left: 8px;
+        padding-right: root.removable ? 3px : 9px;
+        spacing: 5px;
+        if root.icon != "": KitIcon { name: root.icon; size: 13px; y: (parent.height - 13px) / 2; tint: root.selected ? Theme.accent : Theme.muted-foreground; }
+        Text { text: root.text; font-size: Theme.fs-row; color: Theme.foreground-2; vertical-alignment: center; overflow: elide; }
+        if root.removable: Rectangle {
+            width: 18px;
+            height: 18px;
+            y: (parent.height - 18px) / 2;
+            border-radius: Theme.r-xs;
+            background: xta.has-hover || xfs.has-focus ? Theme.pressed : transparent;
+            accessible-role: button;
+            accessible-label: "Remove " + root.text;
+            accessible-action-default => { root.removed(); }
+            xfs := FocusScope {
+                key-pressed(e) => {
+                    if e.text == Key.Return || e.text == " " { root.removed(); return accept; }
+                    return reject;
+                }
+            }
+            KitIcon { name: "x"; size: 12px; tint: xta.has-hover || xfs.has-focus ? Theme.foreground : Theme.faint; }
+            FocusRing { shown: xfs.has-focus; inset: true; radius: Theme.r-xs; }
+            xta := TouchArea { mouse-cursor: pointer; clicked => { xfs.focus(); root.removed(); } }
+        }
+    }
+    FocusRing { shown: fs.has-focus || preview == PreviewState.focus; radius: Theme.r-sm; }
+}
+
+// Session status (brief §3.6). Priority is decided in Rust; this only draws it.
+export enum SessionStatus { idle, needs-input, working, unread, background, draft }
+
+// Exact tooltip copy per status (brief §3.6).
+export global StatusCopy {
+    public pure function tooltip(s: SessionStatus) -> string {
+        return s == SessionStatus.needs-input ? "Needs your input"
+            : s == SessionStatus.working ? "Session running"
+            : s == SessionStatus.unread ? "Finished — unread"
+            : s == SessionStatus.background ? "Background task running"
+            : s == SessionStatus.draft ? "Draft — nothing sent yet"
+            : "";
+    }
+}
+
+export component StatusIndicator inherits Rectangle {
+    in property <SessionStatus> status;
+    width: 12px;
+    height: 12px;
+    accessible-role: image;
+    accessible-label: StatusCopy.tooltip(status);
+    // Working: arc spinner in the accent.
+    if root.status == SessionStatus.working: Spinner { size: 12px; tint: Theme.accent; }
+    // Needs input: amber dot with a slow halo pulse (static under reduce motion).
+    if root.status == SessionStatus.needs-input: Rectangle {
+        property <float> pulse: Motion.reduce ? 0 : (1 - cos(mod(animation-tick() / 1ms, 1600) / 1600 * 360deg)) / 2;
+        Rectangle {
+            width: 8px + 4px * parent.pulse;
+            height: self.width;
+            border-radius: self.width / 2;
+            background: Theme.warning.with-alpha(0.30 * (1 - parent.pulse));
+        }
+        Rectangle { width: 7px; height: 7px; border-radius: 3.5px; background: Theme.warning; }
+    }
+    if root.status == SessionStatus.unread: Rectangle { width: 7px; height: 7px; border-radius: 3.5px; background: Theme.accent; }
+    if root.status == SessionStatus.background: Rectangle {
+        width: 8px; height: 8px; border-radius: 4px;
+        border-width: 1.5px; border-color: Theme.info; background: transparent;
+    }
+    if root.status == SessionStatus.draft: KitIcon { name: "pencil"; size: 11px; tint: Theme.faint; }
+}
+
+// Hairline. Horizontal by default; `vertical` for toolbar dividers.
+export component Separator inherits Rectangle {
+    height: 1px;
+    background: Theme.border;
+}
+
+export component VSeparator inherits Rectangle {
+    width: 1px;
+    background: Theme.border;
+}
+
+// Placeholder block; the sweep freezes under reduce motion.
+export component Skeleton inherits Rectangle {
+    in property <length> radius: Theme.r-xs;
+    border-radius: radius;
+    background: Theme.muted;
+    clip: true;
+    property <float> phase: Motion.reduce ? -1 : mod(animation-tick() / 1ms, 1600) / 1600;
+    if !Motion.reduce: Rectangle {
+        x: (root.phase * 2 - 0.5) * root.width;
+        width: root.width * 0.5;
+        background: @linear-gradient(90deg, transparent 0%, Theme.foreground.with-alpha(Theme.dark ? 0.05 : 0.06) 50%, transparent 100%);
+    }
+    accessible-role: none;
+}
+
+// Linear progress; indeterminate slides a segment (static under reduce motion).
+export component ProgressBar inherits Rectangle {
+    in property <float> value: 0;
+    in property <bool> indeterminate: false;
+    in property <string> label: "Progress";
+    in property <color> tint: Theme.accent;
+    height: 4px;
+    border-radius: 2px;
+    background: Theme.muted;
+    clip: true;
+    accessible-role: progress-indicator;
+    accessible-label: root.label;
+    accessible-value: indeterminate ? "" : round(clamp(value, 0, 1) * 100) + "%";
+    property <float> phase: (indeterminate && !Motion.reduce) ? mod(animation-tick() / 1ms, 1400) / 1400 : 0.3;
+    Rectangle {
+        x: root.indeterminate ? (root.phase * 1.4 - 0.4) * root.width : 0;
+        width: root.indeterminate ? root.width * 0.4 : root.width * clamp(root.value, 0, 1);
+        border-radius: 2px;
+        background: root.tint;
+        animate width { duration: Motion.base; easing: Ease.out; }
+    }
+}
+
+// One coloured slice of a meter (context usage split). `start` is the running sum of the
+// previous slices (computed in Rust), so slices are positioned without a layout.
+export struct MeterPart { label: string, value: float, start: float, tint: color }
+
+// Stacked meter: parts are fractions of the whole (sum ≤ 1).
+export component Meter inherits Rectangle {
+    in property <[MeterPart]> parts;
+    in property <string> label: "Usage";
+    in property <float> value: -1;      // total fraction 0..1; negative → no value announced
+    height: 8px;
+    border-radius: 4px;
+    background: Theme.muted;
+    clip: true;
+    accessible-role: progress-indicator;
+    accessible-label: root.label;
+    accessible-value: (root.value < 0) ? "" : round(clamp(root.value, 0, 1) * 100) + "%";
+    for p in root.parts: Rectangle {
+        x: root.width * clamp(p.start, 0, 1);
+        width: root.width * clamp(p.value, 0, 1 - clamp(p.start, 0, 1));
+        background: p.tint;
+    }
+}

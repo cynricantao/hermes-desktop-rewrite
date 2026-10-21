@@ -5,9 +5,9 @@ workers, …) and to humans.
 
 ## 1. What this is
 
-A native **Rust** rewrite of Hermes Desktop with a **Slint** UI. The design is inspired by
-Claude Desktop (restrained, warm, serif greeting, quiet motion), recreated from observation
-with openly licensed fonts and icons. The goal is **the same features as the current
+A native **Rust** rewrite of Hermes Desktop with a **Slint** UI. The design follows
+T3code's structure, spacing rhythm and list motion with Hermes' own identity (palette,
+mark, restyled icons) — docs/DESIGN.md. The goal is **the same features as the current
 Hermes Desktop** (`apps/desktop`, Electron/React), talking to the **unchanged** Hermes
 backend over its existing JSON-RPC 2.0 WebSocket gateway protocol.
 
@@ -116,13 +116,16 @@ Continuous animations must stop when not visible (idle CPU 0 %).
 ## 9. Design rules
 
 * Follow [docs/DESIGN.md](docs/DESIGN.md): tokens live in `ui/theme.slint`; durations come
-  from the `Motion` global, easings from `Ease`.
-* Only the approved animation set (DESIGN.md §8 / ARCHITECTURE.md *Motion*). No new kinds
-  of motion without approval.
+  from the `Motion` global, easings from `Ease`. New views are built from the kit
+  (`ui/kit/kit.slint`); a new component goes into the kit **and** the gallery
+  (`crates/hermes-gallery`), and its goldens are re-blessed in the same PR.
+* Only the approved animation set (DESIGN.md §5). No new kinds of motion without approval.
+  Animate translate + opacity only (DESIGN.md §6).
 * Respect **reduce motion** (`Motion.reduce`, `HERMES_DESKTOP_REDUCE_MOTION=1`): every
   duration 0, spinners/shimmers frozen.
-* **No proprietary Anthropic assets** (fonts, icons, logos, illustrations). Use the bundled
-  OFL fonts and Lucide icons; record licences for anything new.
+* **No proprietary assets or third-party branding** (Anthropic, T3code: fonts, icons,
+  logos, illustrations, source). Use the bundled OFL fonts and the restyled Lucide icons;
+  record licences for anything new.
 
 ## 10. Dependencies
 

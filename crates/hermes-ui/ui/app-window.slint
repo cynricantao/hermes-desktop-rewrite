@@ -318,6 +318,7 @@ export component AppWindow inherits Window {
     property <bool> dark: Theme.dark;
     changed dark => { AppState.retheme(); }
     title: "Hermes";
+    icon: @image-url("../../../assets/brand/hermes-icon-256.png");
     preferred-width: 1280px;
     preferred-height: 820px;
     min-width: 720px;

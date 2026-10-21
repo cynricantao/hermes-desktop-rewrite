@@ -1,0 +1,52 @@
+name: Gallery (Windows)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/gallery-windows.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/hermes-gallery/**'
+      - 'crates/hermes-core/src/ansi.rs'
+      - 'crates/hermes-core/src/flip.rs'
+      - 'crates/hermes-ui/ui/kit/**'
+      - 'crates/hermes-ui/ui/theme.slint'
+      - 'crates/hermes-ui/ui/icons.slint'
+      - 'assets/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gallery-windows-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gallery:
+    name: Windows gallery interactions and references
+    runs-on: windows-latest
+    env:
+      SLINT_EMIT_DEBUG_INFO: '1'
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Test component interactions and helpers
+        run: cargo test --locked -p hermes-gallery --lib --test interactions -- --nocapture
+
+      # Generate reviewable evidence separately from blessing committed references.
+      # Updating a reference still requires downloading, inspecting and committing it.
+      - name: Render Windows boards
+        run: cargo run --locked -p hermes-gallery --bin hermes-gallery-render -- "${{ runner.temp }}/gallery-windows"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gallery-windows-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/gallery-windows/*.png
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Compare committed Windows references
+        run: cargo test --locked -p hermes-gallery --test golden -- --nocapture

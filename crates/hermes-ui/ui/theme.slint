@@ -1,5 +1,10 @@
-// Design tokens. Values follow docs/DESIGN.md §5/§8/§10 (CDS token ladder, warm neutral).
-// Every animation duration goes through Motion so "reduce motion" zeroes them in one place.
+// Design tokens — Hermes Desktop. Structure, spacing rhythm and motion follow T3code;
+// palette, mark and icon weight are Hermes' own ("verdigris & bronze"). docs/DESIGN.md.
+//
+// Rules: views never use raw colours, radii, shadows or durations — everything resolves
+// to a token here. Every duration goes through `Motion` so "reduce motion" zeroes them in
+// one place. Older views still use the legacy names (bg, surface, text-2 …); they are kept
+// as aliases of the semantic tokens until those views are rebuilt (P1+).
 
 import "../../../assets/fonts/Inter.ttf";
 import "../../../assets/fonts/SourceSerif4.ttf";
@@ -12,52 +17,64 @@ export global Theme {
     in-out property <bool> system-dark: true;
     out property <bool> dark: mode == ThemeMode.dark || (mode == ThemeMode.system && system-dark);
 
-    // Palette. "" / "nous" is the default look (the values below, unchanged); the four
-    // names below are the desktop presets this client can render locally (midnight, ember,
-    // mono, cyberpunk — the ones shared with the Electron desktop). Any other name keeps the
-    // default tokens: the backend still switches the dashboard theme, this window just has no
-    // local palette for it. Set by `widgets::appearance::apply_pref` from the device pref.
+    // Palette. "" / "nous" is the Hermes default below. midnight / ember / mono / cyberpunk
+    // are the desktop presets shared with the Electron app (surfaces + accent only). Any
+    // other name keeps the default tokens. Set by `widgets::appearance::apply_pref`.
     in-out property <string> palette: "nous";
     property <bool> pal-midnight: palette == "midnight";
     property <bool> pal-ember: palette == "ember";
     property <bool> pal-mono: palette == "mono";
     property <bool> pal-cyberpunk: palette == "cyberpunk";
+    property <bool> pal-preset: pal-midnight || pal-ember || pal-mono || pal-cyberpunk;
 
+    // ── Semantic palette ─────────────────────────────────────────────────────────────
     // Surfaces
-    out property <color> bg:
+    out property <color> background:
         pal-midnight ? (dark ? #08081c : #f6f5fc)
       : pal-ember ? (dark ? #160800 : #fdf7f0)
       : pal-mono ? (dark ? #0e0e0e : #fafafa)
       : pal-cyberpunk ? (dark ? #000a00 : #eef7ec)
-      : (dark ? #151515 : #fcfcfb);
+      : (dark ? #101314 : #ffffff);
+    out property <color> card:
+        pal-midnight ? (dark ? #0d0d28 : #ffffff)
+      : pal-ember ? (dark ? #1e0e04 : #ffffff)
+      : pal-mono ? (dark ? #141414 : #ffffff)
+      : pal-cyberpunk ? (dark ? #001200 : #ffffff)
+      : (dark ? #151a1b : #ffffff);
+    out property <color> popover:
+        pal-midnight ? (dark ? #0d0d28 : #ffffff)
+      : pal-ember ? (dark ? #1e0e04 : #ffffff)
+      : pal-mono ? (dark ? #141414 : #ffffff)
+      : pal-cyberpunk ? (dark ? #001200 : #ffffff)
+      : (dark ? #181d1e : #ffffff);
+    // Muted fill: secondary buttons, tracks, segmented background, skeletons.
+    out property <color> muted:
+        pal-midnight ? (dark ? #13133a : #eceaf7)
+      : pal-ember ? (dark ? #2a1408 : #f7ece0)
+      : pal-mono ? (dark ? #1e1e1e : #f0f0f0)
+      : pal-cyberpunk ? (dark ? #001a00 : #dcefda)
+      : (dark ? #1e2324 : #f1f3f3);
     out property <color> sidebar-bg:
         pal-midnight ? (dark ? #06061a : #f1f0fa)
       : pal-ember ? (dark ? #100600 : #fbf1e7)
       : pal-mono ? (dark ? #0a0a0a : #f6f6f6)
       : pal-cyberpunk ? (dark ? #000600 : #e7f2e4)
-      : (dark ? #111111 : #fbfbf9);
-    out property <color> surface:
-        pal-midnight ? (dark ? #0d0d28 : #ffffff)
-      : pal-ember ? (dark ? #1e0e04 : #ffffff)
-      : pal-mono ? (dark ? #141414 : #ffffff)
-      : pal-cyberpunk ? (dark ? #001200 : #ffffff)
-      : (dark ? #20201f : #ffffff);
-    out property <color> surface-2:
-        pal-midnight ? (dark ? #13133a : #eceaf7)
-      : pal-ember ? (dark ? #2a1408 : #f7ece0)
-      : pal-mono ? (dark ? #1e1e1e : #f0f0f0)
-      : pal-cyberpunk ? (dark ? #001a00 : #dcefda)
-      : (dark ? #2c2c2a : #f0efec);
-    out property <color> raised:
-        pal-midnight ? (dark ? #0d0d28 : #ffffff)
-      : pal-ember ? (dark ? #1e0e04 : #ffffff)
-      : pal-mono ? (dark ? #141414 : #ffffff)
-      : pal-cyberpunk ? (dark ? #001200 : #ffffff)
-      : (dark ? #20201f : #ffffff);
-    out property <color> hover:         dark ? #ffffff0d : #0b0b0b0d;
-    out property <color> pressed:       dark ? #ffffff1a : #0b0b0b1a;
-    out property <color> selected:      dark ? #ffffff1a : #0b0b0b1a;
-    out property <color> scrim:         dark ? #00000080 : #00000066;
+      : (dark ? #0c0f10 : #f7f8f8);
+    // Control fill inside inputs (slightly lifted in dark, plain in light).
+    out property <color> input-bg:   dark ? #ffffff08 : #ffffff;
+
+    // Text
+    out property <color> foreground:       dark ? #e8eeee : #0e1416;
+    out property <color> foreground-2:     dark ? #c3cccd : #2f3a3d;   // secondary body
+    out property <color> muted-foreground: dark ? #98a3a5 : #5b6669;   // labels, descriptions
+    out property <color> faint:            dark ? #838e90 : #626d70;   // meta, placeholders (≥4.5:1 on background)
+    out property <color> sidebar-fg:       dark ? #c3cccd : #2f3a3d;
+
+    // Interaction overlays (neutral; T3 keeps selection neutral, accent marks state)
+    out property <color> hover:    dark ? #ffffff0d : #0e14160a;
+    out property <color> pressed:  dark ? #ffffff17 : #0e141614;
+    out property <color> selected: dark ? #ffffff14 : #0e141612;
+    out property <color> scrim:    dark ? #000000a6 : #0e141666;
 
     // Borders
     out property <color> border:
@@ -65,82 +82,157 @@ export global Theme {
       : pal-ember ? (dark ? #3a1c08 : #ecdcc9)
       : pal-mono ? (dark ? #2a2a2a : #e3e3e3)
       : pal-cyberpunk ? (dark ? #003000 : #c9e2c6)
-      : (dark ? #ffffff1a : #0b0b0b1a);
+      : (dark ? #ffffff17 : #0e14161a);
+    // Input borders and emphasised separators.
     out property <color> border-strong:
         pal-midnight ? (dark ? #2b2b6e : #c6c0e4)
       : pal-ember ? (dark ? #552a10 : #dcc4a6)
       : pal-mono ? (dark ? #3d3d3d : #c9c9c9)
       : pal-cyberpunk ? (dark ? #005000 : #a9d2a4)
-      : (dark ? #ffffff33 : #0b0b0b33);
+      : (dark ? #ffffff29 : #0e141629);
+    out property <color> sidebar-border: border;
 
-    // Text
-    out property <color> text:          dark ? #f0efec : #0b0b0b;
-    out property <color> text-2:        dark ? #c3c2b7 : #3d3d3a;
-    out property <color> text-3:        dark ? #898781 : #73726c;
-    out property <color> text-4:        dark ? #6d6b67 : #a5a49a;
-
-    // Accent & semantic
+    // Brand accent: verdigris (primary actions, focus, selection marks, switches on).
     out property <color> accent:
         pal-midnight ? (dark ? #8b80e8 : #6d5fd0)
       : pal-ember ? (dark ? #d97316 : #c1502a)
       : pal-mono ? (dark ? #9a9a9a : #5f5f5f)
       : pal-cyberpunk ? (dark ? #00ff41 : #0f8f2f)
-      : (dark ? #d97757 : #d97757);
-    out property <color> accent-soft:
-        pal-midnight ? (dark ? #8b80e82e : #6d5fd024)
-      : pal-ember ? (dark ? #d973162e : #c1502a24)
-      : pal-mono ? (dark ? #9a9a9a2e : #5f5f5f24)
-      : pal-cyberpunk ? (dark ? #00ff412e : #0f8f2f24)
-      : (dark ? #d977572e : #d9775724);
-    out property <color> on-accent:     #ffffff;
-    // Interactive blue (toggles, focus, primary buttons); clay above is brand-only.
-    out property <color> interactive:
-        pal-midnight ? (dark ? #8b80e8 : #6d5fd0)
-      : pal-ember ? (dark ? #d97316 : #c1502a)
-      : pal-mono ? (dark ? #9a9a9a : #5f5f5f)
-      : pal-cyberpunk ? (dark ? #00ff41 : #0f8f2f)
-      : #2a78d6;
-    out property <color> toggle-on:
-        pal-midnight ? (dark ? #8b80e8 : #6d5fd0)
-      : pal-ember ? (dark ? #d97316 : #c1502a)
-      : pal-mono ? (dark ? #9a9a9a : #5f5f5f)
-      : pal-cyberpunk ? (dark ? #00ff41 : #0f8f2f)
-      : (dark ? #2a78d6 : #2a78d6);
-    out property <color> link:          dark ? #74abe2 : #1b67b2;
-    out property <color> success:       dark ? #55bf50 : #1e9e3c;
-    out property <color> danger:        dark ? #ec7e7e : #cd2054;
-    out property <color> warning:       dark ? #fab219 : #98801f;
-    out property <color> diff-add-bg:   dark ? #32d74b33 : #1e9e3c33;
-    out property <color> diff-del-bg:   dark ? #ff2c5633 : #cd205433;
-    out property <color> diff-add-fg:   dark ? #32d74b : #1e9e3c;
-    out property <color> diff-del-fg:   dark ? #ff2c56 : #cd2054;
+      : (dark ? #3fc2a8 : #0b7a6a);
+    out property <color> accent-hover: dark ? accent.brighter(8%) : accent.darker(10%);
+    out property <color> accent-pressed: dark ? accent.darker(8%) : accent.darker(20%);
+    out property <color> accent-foreground:
+        pal-cyberpunk ? #001200
+      : (dark ? #04201b : #ffffff);
+    out property <color> accent-soft: accent.with-alpha(dark ? 0.16 : 0.10);
+    out property <color> accent-text: accent;   // accent used as text on background (≥4.5:1)
+
+    // Secondary: bronze (provenance marks, "Learned", favourites, highlights). Never a CTA.
+    out property <color> secondary:       dark ? #d9a15e : #9a5f1c;
+    out property <color> secondary-soft:  secondary.with-alpha(dark ? 0.16 : 0.10);
+
+    // Semantic
+    out property <color> destructive:            dark ? #f07a74 : #c4302f;
+    out property <color> destructive-foreground: dark ? #2a0605 : #ffffff;
+    out property <color> destructive-soft:       destructive.with-alpha(dark ? 0.15 : 0.09);
+    out property <color> success:      dark ? #4fd18b : #14703f;
+    out property <color> success-soft: success.with-alpha(dark ? 0.15 : 0.10);
+    out property <color> warning:      dark ? #f1b955 : #8a5a0f;
+    out property <color> warning-soft: warning.with-alpha(dark ? 0.15 : 0.11);
+    out property <color> info:         dark ? #78a8f6 : #2563c9;
+    out property <color> info-soft:    info.with-alpha(dark ? 0.15 : 0.09);
+
+    // Focus ring (2px, 3px offset) and text selection
+    out property <color> ring:      accent;
+    out property <color> selection: accent.with-alpha(dark ? 0.32 : 0.22);
+
+    // Inverse surface (tooltips)
+    out property <color> inverse-bg: dark ? #e8eeee : #1a2022;
+    out property <color> inverse-fg: dark ? #0e1416 : #f1f4f4;
+
+    // Glass (composer, floating bars). Slint has no backdrop blur on any renderer, so the
+    // fill is near-opaque and the content beneath fades out under it (DESIGN.md §6).
+    out property <float> glass-opacity: 0.94;          // T3: 80% + 12/16px blur
+    out property <length> glass-blur: dark ? 16px : 12px; // recorded for parity; unused
+    out property <color> glass-bg: background.with-alpha(glass-opacity);
+    out property <color> glass-border: foreground.with-alpha(0.12);
+    out property <color> glass-highlight: dark ? #ffffff0a : #ffffffb3;
+
+    // Code, diff, terminal
     out property <color> code-bg:
         pal-midnight ? (dark ? #0b0b22 : #f4f2fb)
       : pal-ember ? (dark ? #1a0b02 : #fbf3ea)
       : pal-mono ? (dark ? #111111 : #f5f5f5)
       : pal-cyberpunk ? (dark ? #000d00 : #eaf5e7)
-      : (dark ? #1a1a19 : #f9f9f7);
+      : (dark ? #0c1011 : #f6f8f8);
+    out property <color> diff-add-fg: success;
+    out property <color> diff-del-fg: destructive;
+    out property <color> diff-add-bg: success.with-alpha(dark ? 0.14 : 0.10);
+    out property <color> diff-del-bg: destructive.with-alpha(dark ? 0.14 : 0.09);
+    out property <color> term-bg: dark ? #0a0d0e : #fbfcfc;
+    out property <color> term-fg: dark ? #d5dddd : #1d2628;
 
-    // Typography
+    // Shadows (drawn by the femtovg renderer; the software renderer skips shadows, so
+    // depth never depends on them: popovers also carry a border and a surface step).
+    out property <color>  shadow-color: dark ? #00000099 : #0e141629;
+    out property <length> shadow-sm-blur: 2px;
+    out property <length> shadow-sm-y: 1px;
+    out property <length> shadow-pop-blur: 24px;
+    out property <length> shadow-pop-y: 8px;
+
+    // ── Typography ──────────────────────────────────────────────────────────────────
     in-out property <string> ui-font: "Inter";
-    out property <string> serif-font: "Source Serif 4";
     in-out property <string> mono-font: "JetBrains Mono";
-    out property <length> fs-xs: 11px;
-    out property <length> fs-sm: 12.5px;
-    out property <length> fs-md: 14px;
-    out property <length> fs-body: 15.5px;
-    out property <length> fs-lg: 17px;
-    out property <length> fs-greet: 38px;
+    out property <string> serif-font: "Source Serif 4";   // legacy greeting only
+    // Device-local "Chat Text Size": scales transcript + composer only.
+    in-out property <float> chat-scale: 1.0;
+    out property <length> fs-meta: 11px;     // timestamps, badges, kbd
+    out property <length> fs-row: 12px;      // sidebar rows, chips, menu shortcuts
+    out property <length> fs-control: 13px;  // buttons, inputs, menus
+    out property <length> fs-body-ui: 14px;  // dialog body, settings descriptions
+    out property <length> fs-h3: 16px;
+    out property <length> fs-h2: 18px;
+    out property <length> fs-display: 28px;  // empty-state title
+    out property <length> fs-chat: 14px * chat-scale;
+    out property <length> fs-chat-code: 13px * chat-scale;
+    out property <float> lh-body: 1.5;
 
-    // Radii
-    out property <length> r-xs: 4px;   // skeleton / tiny
-    out property <length> r-sm: 6px;   // chips
-    out property <length> r-md: 8px;   // controls, rows
-    out property <length> r-lg: 12px;  // panels, modals, cards
-    out property <length> r-xl: 14px;  // composer (comfortable density)
+    // ── Radii ───────────────────────────────────────────────────────────────────────
+    out property <length> radius: 10px;          // panels, cards, popovers, composer
+    out property <length> control-radius: 8px;   // inputs, buttons, menu items
+    out property <length> r-xs: 4px;   // kbd, checkbox, skeleton line
+    out property <length> r-sm: 6px;   // chips, badges
+    out property <length> r-md: 8px;   // = control-radius
+    out property <length> r-lg: 10px;  // = radius
+    out property <length> r-xl: 10px;  // composer (= radius)
     out property <length> r-pill: 999px;
 
-    // Layout
+    // ── Spacing (4px rhythm) ────────────────────────────────────────────────────────
+    out property <length> space-2xs: 2px;
+    out property <length> space-xs: 4px;
+    out property <length> space-sm: 6px;
+    out property <length> space-md: 8px;
+    out property <length> space-lg: 12px;
+    out property <length> space-xl: 16px;
+    out property <length> space-2xl: 24px;
+    out property <length> space-3xl: 32px;
+
+    // ── Layout ──────────────────────────────────────────────────────────────────────
+    out property <length> topbar-h: 52px;          // --workspace-topbar-height
+    out property <length> sidebar-default-w: 256px; // --sidebar-width
+    out property <length> sidebar-min-w: 192px;    // 12rem
+    out property <length> sidebar-max-w: 448px;    // 28rem
+    out property <length> chat-max-w: 736px;       // --chat-content-max-width (46rem)
+    out property <length> right-panel-default-w: 400px;
+    out property <length> control-h-sm: 28px;
+    out property <length> control-h: 32px;
+    out property <length> control-h-lg: 36px;
+    out property <length> menu-row-h: 30px;
+    // Session List Density: 0 compact, 1 comfortable, 2 detailed (device-local).
+    in-out property <int> density: 1;
+    out property <length> session-row-h: density == 0 ? 30px : density == 1 ? 44px : 60px;
+
+    // ── Legacy aliases (views not yet rebuilt) ──────────────────────────────────────
+    out property <color> bg: background;
+    out property <color> surface: card;
+    out property <color> surface-2: muted;
+    out property <color> raised: popover;
+    out property <color> text: foreground;
+    out property <color> text-2: foreground-2;
+    out property <color> text-3: muted-foreground;
+    out property <color> text-4: faint;
+    out property <color> on-accent: accent-foreground;
+    out property <color> interactive: accent;
+    out property <color> toggle-on: accent;
+    out property <color> link: accent-text;
+    out property <color> danger: destructive;
+    out property <length> fs-xs: fs-meta;
+    out property <length> fs-sm: fs-row;
+    out property <length> fs-md: fs-control;
+    out property <length> fs-body: fs-chat;
+    out property <length> fs-lg: fs-h3;
+    out property <length> fs-greet: 32px;
+    // Shell geometry stays as it was until the T3 shell lands (P1).
     out property <length> sidebar-w: 288px;
     out property <length> titlebar-h: 36px;
     out property <length> column-w: 768px;
@@ -149,15 +241,26 @@ export global Theme {
 
 export global Motion {
     in-out property <bool> reduce: false;
-    out property <duration> fast:   reduce ? 0ms : 120ms;   // --cds-dur-snap: hover / press colour
-    out property <duration> base:   reduce ? 0ms : 200ms;   // --cds-dur-base: modal in, expand, chevron
-    out property <duration> exit:   reduce ? 0ms : 150ms;   // modal out
-    out property <duration> slow:   reduce ? 0ms : 300ms;   // --cds-dur-sheet: sidebar / right panel
+    // Device-local "Panel animation" (0–400 ms); owner-approved default 180 ms.
+    in-out property <int> panel-ms: 180;
+    out property <duration> fast:    reduce ? 0ms : 150ms;   // hover, press colour (T3 --motion-fast)
+    out property <duration> list:    reduce ? 0ms : 150ms;   // sidebar row enter / move / exit
+    out property <duration> message: reduce ? 0ms : 120ms;   // message enter (fade + 4px rise)
+    out property <duration> toast:   reduce ? 0ms : 150ms;   // toast slide
+    out property <duration> panel:   reduce ? 0ms : clamp(panel-ms, 0, 400) * 1ms;   // drawers
+    out property <duration> base:    reduce ? 0ms : 200ms;   // dialog in, expand, chevron
+    out property <duration> exit:    reduce ? 0ms : 150ms;   // dialog out
+    out property <duration> slow:    reduce ? 0ms : 300ms;   // legacy sheets
+    out property <duration> tooltip-delay: 400ms;           // builtin Tooltip is fixed at 500 ms (DESIGN.md §6)
+    out property <length> travel-max: 40px;                 // travel(h) = min(h, 40px)
+    out property <int> max-faded-rows: 40;                  // MAX_FADED_ROWS_PER_UPDATE
 }
 
-// Easings live in their own global (not re-exported to Rust: easing is not a public API type).
+// Easings (not re-exported to Rust: easing is not a public API type).
 export global Ease {
-    out property <easing> out:      cubic-bezier(0.165, 0.84, 0.44, 1);   // --cds-ease-out
-    out property <easing> in-out:   cubic-bezier(0.165, 0.84, 0.44, 1);   // sheets use ease-out too
-    out property <easing> standard: cubic-bezier(0.32, 0.72, 0, 1);      // --cds-ease-snap
+    out property <easing> drawer:   cubic-bezier(0.32, 0.72, 0, 1);       // --ease-drawer
+    out property <easing> list:     ease-out;                             // T3 list motion
+    out property <easing> out:      cubic-bezier(0.165, 0.84, 0.44, 1);   // legacy ease-out
+    out property <easing> in-out:   cubic-bezier(0.165, 0.84, 0.44, 1);
+    out property <easing> standard: cubic-bezier(0.32, 0.72, 0, 1);
 }

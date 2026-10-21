@@ -5,8 +5,9 @@ A native desktop client for [Hermes Agent](https://hermes-agent.nousresearch.com
 
 It speaks the **existing** Hermes gateway protocol (JSON-RPC 2.0 over WebSocket, the same
 contract the Electron desktop and the TUI use), so the backend is unchanged. The goal is
-feature parity with the current Hermes Desktop with a restrained, Claude-Desktop-inspired
-look and motion.
+feature parity with the current Hermes Desktop. The UI is being rebuilt on a T3code-style
+structure (sidebar, glass composer, list motion) with its own Hermes identity — see
+[docs/DESIGN.md](docs/DESIGN.md) and the component gallery (`cargo run -p hermes-gallery`).
 
 > **Status: early.** A working vertical slice: chat with streaming against the real
 > backend, sessions sidebar, thinking blocks, tool/terminal rows, approvals, model picker,
@@ -68,7 +69,7 @@ WAYLAND_DISPLAY=hermes-shot weston-screenshooter
 
 Docs: [ANALYSIS](docs/ANALYSIS.md) (how the current desktop talks to the backend) ·
 [ARCHITECTURE](docs/ARCHITECTURE.md) (crates, threading, why Slint) ·
-[DESIGN](docs/DESIGN.md) (tokens and motion) · [PARITY](docs/PARITY.md) (feature checklist).
+[DESIGN](docs/DESIGN.md) (tokens, component kit, motion, gallery) · [PARITY](docs/PARITY.md) (feature checklist).
 
 ## Daily-use work
 
@@ -106,6 +107,6 @@ running, so there is no side-by-side comparison yet.
 ## Licences
 
 Code: MIT. Bundled fonts (Inter, Source Serif 4, JetBrains Mono): SIL OFL 1.1, texts in
-`assets/fonts/`. Icons: Lucide (ISC), `assets/icons/LICENSE-lucide.txt`. The app icon
-(`packaging/hermes-desktop-rs.svg`) is original. No Anthropic assets are used; the look is
-recreated from observation with openly licensed fonts and icons.
+`assets/fonts/`. Icons: Lucide (ISC), restyled to a 1.5 stroke, `assets/icons/LICENSE-lucide.txt`.
+The Hermes logo (`assets/brand/`, also the app icon) is the project owner's artwork. No
+T3code or Anthropic source, assets or branding are used.

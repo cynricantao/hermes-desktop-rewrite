@@ -42,22 +42,20 @@ echo "== Info.plist =="
 sed -e "s/@@VERSION@@/${version}/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
 plutil -lint "$app/Contents/Info.plist"
 
-# The app icon is an SVG; .icns needs raster renditions. librsvg is not part of
-# the base image, so a missing rsvg-convert costs the icon, not the build.
+# The app icon ships as ready-made rasters (assets/brand/hermes-icon-<size>.png), so no
+# SVG converter is needed; sips (part of macOS) fills any missing size from the 1024 px one.
 echo "== app icon =="
-icon_src="$root/packaging/hermes-desktop-rs.svg"
-if ! command -v rsvg-convert >/dev/null 2>&1; then
-  if command -v brew >/dev/null 2>&1; then
-    brew install librsvg >/dev/null 2>&1 || true
+brand="$root/assets/brand"
+iconset="$stage/AppIcon.iconset"
+mkdir -p "$iconset"
+# iconutil needs exactly these ten names.
+while read -r size file; do
+  if [ -f "$brand/hermes-icon-$size.png" ]; then
+    cp "$brand/hermes-icon-$size.png" "$iconset/$file"
+  else
+    sips -z "$size" "$size" "$brand/hermes-icon-1024.png" --out "$iconset/$file" >/dev/null
   fi
-fi
-if command -v rsvg-convert >/dev/null 2>&1; then
-  # iconutil needs exactly these ten names.
-  iconset="$stage/AppIcon.iconset"
-  mkdir -p "$iconset"
-  while read -r size file; do
-    rsvg-convert -w "$size" -h "$size" "$icon_src" -o "$iconset/$file"
-  done <<'SIZES'
+done <<'SIZES'
 16 icon_16x16.png
 32 icon_16x16@2x.png
 32 icon_32x32.png
@@ -69,13 +67,9 @@ if command -v rsvg-convert >/dev/null 2>&1; then
 512 icon_512x512.png
 1024 icon_512x512@2x.png
 SIZES
-  iconutil -c icns "$iconset" -o "$app/Contents/Resources/AppIcon.icns"
-  rm -rf "$iconset"
-  echo "icon embedded"
-else
-  echo "::warning::rsvg-convert unavailable — the bundle ships without an icon" >&2
-fi
-
+iconutil -c icns "$iconset" -o "$app/Contents/Resources/AppIcon.icns"
+rm -rf "$iconset"
+echo "icon embedded"
 echo "== ad-hoc signature =="
 codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict "$app"
