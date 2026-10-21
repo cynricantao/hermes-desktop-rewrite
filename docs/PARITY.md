@@ -1027,7 +1027,7 @@ Performance work is tracked separately in [PERF.md](PERF.md).
 - [ ] Backdrop blur — local — src/store/backdrop.ts
 - [ ] Particles background — local — src/components/particles/*
 - [ ] Code editor theme — local — src/components/chat/code-editor-theme.ts
-- [~] Brand icons / product identity — local — src/lib/brand-icon.ts, product-identity.cjs ⟶ P0 (2026-10-21): original Hermes mark (`HermesMark`/`Wordmark`, kit) + new app icon `packaging/hermes-desktop-rs.svg`; Lucide restyled to 1.5 stroke (134 icons). The current app shell does not show the mark yet (P1).
+- [~] Brand icons / product identity — local — src/lib/brand-icon.ts, product-identity.cjs ⟶ P0 (2026-10-21): owner-supplied winged-H logo in `assets/brand/` (kit `HermesMark`/`Wordmark`, window icon, app icon set incl. `packaging/hermes-desktop-rs.svg` and the macOS iconset); Lucide restyled to 1.5 stroke (134 icons). Window icon is set on AppWindow; the in-app shell does not show the mark yet (P1). Not verified on a live desktop session.
 - [ ] Profile color swatches — local — src/lib/profile-color.ts
 - [ ] Starmap visualization (session map) — local — src/app/starmap/*
 - [ ] Pet overlay appearance — local — src/app/pet-overlay/pet-overlay-app.tsx

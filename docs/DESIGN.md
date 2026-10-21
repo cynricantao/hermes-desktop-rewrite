@@ -197,10 +197,22 @@ idle CPU; femtovg/OpenGL is opt-in, see PERF.md). Checked against Slint 1.18.1's
 
 ## 8. Brand
 
-`HermesMark`: an H whose right stem carries a three-feather swept wing (Hermes' winged
-messenger), drawn as a `Path` on a 24-unit grid; `Wordmark` = mark + "Hermes" in Inter
-650. The app icon (`packaging/hermes-desktop-rs.svg`) is the same geometry on a verdigris
-tile. Original artwork, CC0.
+The mark is the **owner-supplied winged "H"** (italic H whose left stem carries two swept
+wing feathers; teal → indigo gradient). Files in `assets/brand/`:
+
+| File | Use |
+|---|---|
+| `hermes-mark-source.png` | trimmed master (671 × 426, transparent; background removed from the supplied art by edge flood-fill, anti-aliased rim kept) |
+| `hermes-mark-64.png`, `hermes-mark-256.png` | `HermesMark` renditions (square, centred); ≤ 40 px uses the 64 px file |
+| `hermes-icon-{16…1024}.png` | app icon: mark on a dark rounded tile (`#0c0f10`, radius 22.5 %) |
+
+Rules: the mark is **full colour and never tinted** (no `colorize`); on light surfaces it
+sits directly on the background, in icon contexts on its dark tile. `Wordmark` = mark +
+"Hermes" in Inter 650. The window icon (`Window.icon`) and the platform icons all come
+from the `hermes-icon-*` set: `packaging/hermes-desktop-rs.svg` is a thin SVG wrapper
+around the 512 px PNG (so the Linux install paths keep working), and the macOS bundle
+copies the PNGs straight into its iconset. Its gradient pairs naturally with the
+verdigris accent; the UI palette is unchanged.
 
 ## 9. Icons
 

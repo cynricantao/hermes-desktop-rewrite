@@ -160,13 +160,15 @@ component TokensPage inherits Rectangle {
                 Card {
                     Section {
                         title: "Mark";
-                        HorizontalLayout { spacing: 18px; alignment: start;
-                            HermesMark { size: 56px; tile: true; }
-                            HermesMark { size: 40px; y: 8px; }
-                            HermesMark { size: 24px; y: 16px; tint: Theme.foreground; }
-                            HermesMark { size: 16px; y: 20px; tint: Theme.muted-foreground; }
+                        HorizontalLayout { spacing: 22px; alignment: start; height: 112px;
+                            HermesMark { size: 64px; tile: true; y: 24px; }
+                            HermesMark { size: 112px; }
+                            HermesMark { size: 40px; y: 36px; }
+                            HermesMark { size: 24px; y: 44px; }
+                            HermesMark { size: 16px; y: 48px; }
                         }
                         Wordmark { size: 22px; }
+                        Text { text: "Full-colour mark; never tinted. App icon = mark on a dark tile."; font-size: Theme.fs-row; color: Theme.faint; }
                     }
                 }
                 Card {
@@ -761,6 +763,7 @@ export component Gallery inherits Window {
     in property <bool> board: false;   // golden-render mode: no chrome, fixed board size
     out property <[string]> pages: ["Tokens", "Controls", "Inputs", "Overlays", "Content", "Shell", "Palette"];
     title: "Hermes kit gallery";
+    icon: @image-url("../../../assets/brand/hermes-icon-256.png");
     preferred-width: 1440px;
     preferred-height: 900px;
     background: Theme.background;

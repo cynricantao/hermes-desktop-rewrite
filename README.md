@@ -108,5 +108,5 @@ running, so there is no side-by-side comparison yet.
 
 Code: MIT. Bundled fonts (Inter, Source Serif 4, JetBrains Mono): SIL OFL 1.1, texts in
 `assets/fonts/`. Icons: Lucide (ISC), restyled to a 1.5 stroke, `assets/icons/LICENSE-lucide.txt`.
-The Hermes mark and app icon (`packaging/hermes-desktop-rs.svg`) are original (CC0). No
+The Hermes logo (`assets/brand/`, also the app icon) is the project owner's artwork. No
 T3code or Anthropic source, assets or branding are used.
