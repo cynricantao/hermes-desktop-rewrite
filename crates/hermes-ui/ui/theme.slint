@@ -6,6 +6,7 @@
 // one place. Older views still use the legacy names (bg, surface, text-2 …); they are kept
 // as aliases of the semantic tokens until those views are rebuilt (P1+).
 
+import { Palette } from "std-widgets.slint";
 import "../../../assets/fonts/Inter.ttf";
 import "../../../assets/fonts/SourceSerif4.ttf";
 import "../../../assets/fonts/JetBrainsMono.ttf";
@@ -14,7 +15,7 @@ export enum ThemeMode { system, light, dark }
 
 export global Theme {
     in-out property <ThemeMode> mode: ThemeMode.system;
-    in-out property <bool> system-dark: true;
+    in-out property <bool> system-dark: Palette.color-scheme == ColorScheme.dark;
     out property <bool> dark: mode == ThemeMode.dark || (mode == ThemeMode.system && system-dark);
 
     // Palette. "" / "nous" is the Hermes default below. midnight / ember / mono / cyberpunk
@@ -166,6 +167,9 @@ export global Theme {
     out property <string> serif-font: "Source Serif 4";   // legacy greeting only
     // Device-local "Chat Text Size": scales transcript + composer only.
     in-out property <float> chat-scale: 1.0;
+    // User zoom is relative to the monitor's native scale, never compounded on edits.
+    in-out property <float> ui-zoom: 1.0;
+    in-out property <float> last-window-scale: 0.0;
     out property <length> fs-meta: 11px;     // timestamps, badges, kbd
     out property <length> fs-row: 12px;      // sidebar rows, chips, menu shortcuts
     out property <length> fs-control: 13px;  // buttons, inputs, menus
@@ -174,7 +178,18 @@ export global Theme {
     out property <length> fs-h2: 18px;
     out property <length> fs-display: 28px;  // empty-state title
     out property <length> fs-chat: 14px * chat-scale;
+    // Conversation reading scale, independent of compact controls and code.
+    out property <length> fs-reply: 16px * chat-scale;
+    out property <length> fs-reply-title: 24px * chat-scale;
+    out property <length> fs-reply-heading: 20px * chat-scale;
+    out property <length> fs-reply-subheading: 18px * chat-scale;
+    out property <length> fs-composer: 15px * chat-scale;
+    out property <length> fs-chat-table: 14px * chat-scale;
+    out property <length> reply-block-gap: 12px * chat-scale;
+    out property <length> reply-heading-gap: 20px * chat-scale;
+    out property <length> reply-list-gap: 6px * chat-scale;
     out property <length> fs-chat-code: 13px * chat-scale;
+    out property <length> chat-code-line-h: 20px * chat-scale;
     out property <float> lh-body: 1.5;
 
     // ── Radii ───────────────────────────────────────────────────────────────────────

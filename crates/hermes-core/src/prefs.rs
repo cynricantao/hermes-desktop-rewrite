@@ -79,18 +79,53 @@ impl Prefs {
 
     /// Set (or with `Value::Null`, clear) a key and persist.
     pub fn set(&mut self, key: &str, value: Value) -> std::io::Result<()> {
+        let _lock = self.write_lock()?;
+        // Other windows and widget helpers may have saved since this instance loaded.
+        // Never replace their keys, or overwrite a malformed/unreadable file with defaults.
+        let mut latest = match std::fs::read(&self.path) {
+            Ok(bytes) => serde_json::from_slice::<Map<String, Value>>(&bytes)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => self.values.clone(),
+            Err(e) => return Err(e),
+        };
         if value.is_null() {
-            self.values.remove(key);
+            latest.remove(key);
         } else {
-            self.values.insert(key.to_owned(), value);
+            latest.insert(key.to_owned(), value);
         }
-        self.save()
+        let previous = std::mem::replace(&mut self.values, latest);
+        if let Err(error) = self.save() {
+            self.values = previous;
+            return Err(error);
+        }
+        Ok(())
     }
 
     /// Replace every value (import) and persist.
     pub fn replace_all(&mut self, values: Map<String, Value>) -> std::io::Result<()> {
-        self.values = values;
-        self.save()
+        let _lock = self.write_lock()?;
+        let previous = std::mem::replace(&mut self.values, values);
+        if let Err(error) = self.save() {
+            self.values = previous;
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    fn write_lock(&self) -> std::io::Result<std::fs::File> {
+        if let Some(dir) = self.path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true).write(true).create(true).truncate(false);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let file = options.open(self.path.with_extension("json.lock"))?;
+        file.lock()?;
+        Ok(file)
     }
 
     fn save(&self) -> std::io::Result<()> {
@@ -116,6 +151,21 @@ impl Prefs {
     }
 }
 
+/// Validated desktop scale presets, matching the original chat text store.
+/// Unknown or externally edited values fall back rather than reaching the renderer.
+pub fn scale_percent(key: &str, value: &str) -> u16 {
+    let fallback = if key == "hermes.desktop.chat-text-scale.v1" {
+        110
+    } else {
+        100
+    };
+    let number = value.parse::<f64>().ok();
+    [90, 100, 110, 125, 150, 175]
+        .into_iter()
+        .find(|n| number == Some(f64::from(*n)))
+        .unwrap_or(fallback)
+}
+
 /// Defaults for device prefs, matching the original's store defaults.
 pub fn default_for(key: &str) -> &'static str {
     match key {
@@ -125,7 +175,8 @@ pub fn default_for(key: &str) -> &'static str {
         "hermes.desktop.tours.v1" => "true",
         "hermes-desktop-mode-v1" => "system",
         "hermes-desktop-theme-v2" => "nous",
-        "zoom" | "hermes.desktop.chat-text-scale.v1" => "100",
+        "zoom" => "100",
+        "hermes.desktop.chat-text-scale.v1" => "110",
         "hermes.desktop.interfaceMode.v1" => "advanced",
         "hermes.desktop.sessionListDensity" => "compact",
         "hermes.desktop.tabStripDefault" => "auto",
@@ -162,6 +213,43 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("hermes-prefs-test-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir.join("prefs.json")
+    }
+
+    #[test]
+    fn stale_instances_preserve_other_saved_settings_and_refuse_corrupt_files() {
+        let path = tmp("merge");
+        let mut first = Prefs::load(&path);
+        let mut second = Prefs::load(&path);
+        first.set("chat-size", json!(110)).unwrap();
+        second.set("palette", json!("ember")).unwrap();
+        first.set("chat-size", json!(125)).unwrap();
+        let saved = Prefs::load(&path);
+        assert_eq!(saved.get("palette"), Some(&json!("ember")));
+        assert_eq!(saved.get("chat-size"), Some(&json!(125)));
+        std::fs::write(&path, "not valid JSON").unwrap();
+        assert!(first.set("chat-size", json!(150)).is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "not valid JSON");
+        assert_eq!(first.get("chat-size"), Some(&json!(125)));
+    }
+
+    #[test]
+    fn failed_writes_do_not_change_the_effective_preferences() {
+        let path = tmp("failed-write");
+        let mut prefs = Prefs::load(&path);
+        prefs.set("present", json!("old")).unwrap();
+        let before = prefs.all().clone();
+        let blocked = path.parent().unwrap().join("not-a-directory");
+        std::fs::write(&blocked, "fixture").unwrap();
+        prefs.path = blocked.join("prefs.json");
+        assert!(prefs.set("present", json!("new")).is_err());
+        assert_eq!(prefs.all(), &before);
+        assert!(prefs.set("present", Value::Null).is_err());
+        assert_eq!(prefs.all(), &before);
+        assert!(prefs.set("missing", json!(true)).is_err());
+        assert_eq!(prefs.all(), &before);
+        assert!(prefs.replace_all(Map::new()).is_err());
+        assert_eq!(prefs.all(), &before);
+        assert_eq!(Prefs::load(&path).all(), &before);
     }
 
     #[test]

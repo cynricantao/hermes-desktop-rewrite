@@ -37,8 +37,8 @@ use crate::capabilities::CapCmd;
 use crate::rows::{Ctx as RowCtx, hl_job_id, hl_jobs, hl_result_id, seg_block, to_row};
 use crate::widgets::{self, Ctx, Outcome};
 use crate::{
-    AppState, AppWindow, ApprovalInfo, CapState, ChatRow, EditModelRow, ModelItem, NavEntry, ProjectItem, ProjectState,
-    ScopeChip, SearchHit, SessionItem, SettingRowUI, SettingsState, Theme,
+    AppState, AppWindow, ApprovalInfo, CapState, ChatDisplayState, ChatRow, EditModelRow, ModelItem, NavEntry,
+    ProjectItem, ProjectState, ScopeChip, SearchHit, SessionItem, SettingRowUI, SettingsState, Theme,
 };
 
 /// Chats the sidebar lists (`session.list`); pinned flags are read for the same window.
@@ -125,6 +125,8 @@ pub enum Cmd {
     Banner(String, bool),
     /// The theme flipped: code colours are baked into rows, so rebuild them.
     Retheme,
+    /// A native resize/monitor transition may replace the platform scale factor.
+    ReapplyZoom,
 }
 
 /// Settings-panel intents from the UI (see `ui/settings.slint`).
@@ -319,6 +321,10 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
     st.on_retheme(move || {
         let _ = t.send(Cmd::Retheme);
     });
+    let t = tx.clone();
+    st.on_viewport_changed(move || {
+        let _ = t.send(Cmd::ReapplyZoom);
+    });
     sidebar::wire(ui, &tx);
     let w = ui.as_weak();
     st.on_dismiss_banner(move || {
@@ -359,13 +365,8 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
         let _ = t.send(Cmd::Settings(SettingsCmd::Scope(name.into())));
     });
     let t = tx.clone();
-    let w = ui.as_weak();
     s.on_edit(move |id, value| {
-        // Device prefs that change the look apply immediately on the UI thread; the
-        // persistent write goes through the controller like every other setting.
-        if let Some(ui) = w.upgrade() {
-            apply_device_pref(&ui, id.as_str(), value.as_str());
-        }
+        // Validate and persist before applying the canonical value to the window.
         let _ = t.send(Cmd::Settings(SettingsCmd::Edit {
             id: id.into(),
             value: value.into(),
@@ -443,10 +444,46 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
     });
 }
 
-/// Device preferences that change the look *now*, applied on the UI thread the moment a
-/// control moves. Everything else is only stored (the row's feature reads it when built),
-/// and every device pref is persisted by the controller in `prefs.json`.
+/// Apply validated, persisted device preferences to the UI thread, also used at startup.
+/// Only keys with a native consumer have an effect here; persistence alone does not
+/// establish feature parity (see docs/PARITY.md).
 pub fn apply_device_pref(ui: &AppWindow, key: &str, value: &str) {
+    let chat = ui.global::<ChatDisplayState>();
+    match key {
+        "hermes.desktop.chat-text-scale.v1" => {
+            ui.global::<Theme>()
+                .set_chat_scale(f32::from(hermes_core::prefs::scale_percent(key, value)) / 100.0);
+        }
+        "zoom" => {
+            let theme = ui.global::<Theme>();
+            let old_zoom = theme.get_ui_zoom();
+            let current = ui.window().scale_factor();
+            let base = if (current - theme.get_last_window_scale()).abs() < 0.001 {
+                current / old_zoom
+            } else {
+                current
+            };
+            let zoom = f32::from(hermes_core::prefs::scale_percent(key, value)) / 100.0;
+            let scale = base * zoom;
+            let size = ui.window().size();
+            theme.set_ui_zoom(zoom);
+            theme.set_last_window_scale(scale);
+            ui.window()
+                .dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor: scale });
+            ui.window().dispatch_event(slint::platform::WindowEvent::Resized {
+                size: size.to_logical(scale),
+            });
+        }
+        "hermes.desktop.intro-splash.v1" => ui.global::<AppState>().set_intro_splash(value == "true"),
+        "hermes.desktop.user-bubble-transparency.v1" => {
+            let level = value.parse::<f32>().ok().filter(|n| n.is_finite()).unwrap_or(0.0);
+            chat.set_user_bubble_transparency(level.round().clamp(0.0, 100.0) as i32);
+        }
+        "hermes.desktop.toolView.technical" => chat.set_technical_tools(value == "true"),
+        "hermes.desktop.toolView.hideCodeDiffs" => chat.set_hide_code_diffs(value == "true"),
+        "hermes.desktop.reasoning.collapsedByDefault" => chat.set_reasoning_collapsed(value == "true"),
+        _ => {}
+    }
     // Appearance › Theme mode (the original's `hermes-desktop-mode-v1`).
     if key == "hermes-desktop-mode-v1" {
         let mode = match value {
@@ -459,6 +496,32 @@ pub fn apply_device_pref(ui: &AppWindow, key: &str, value: &str) {
     // Widget panels own the rest of the visual prefs (the palette and cached fonts); they
     // are applied here so an edit and a fresh start look the same.
     crate::widgets::apply_pref(ui, key, value);
+}
+
+/// Reapply the persisted zoom after a native scale/resize event, without polling.
+/// The guard also makes the resize generated by our own zoom update a no-op.
+pub fn reapply_window_zoom(ui: &AppWindow) {
+    let theme = ui.global::<Theme>();
+    if theme.get_last_window_scale() > 0.0 && (ui.window().scale_factor() - theme.get_last_window_scale()).abs() > 0.001
+    {
+        apply_device_pref(ui, "zoom", &format!("{:.0}", theme.get_ui_zoom() * 100.0));
+    }
+}
+
+/// Apply only the running profile's verified config, including after import/reset.
+pub fn apply_profile_config(ui: &AppWindow, config: &Value) {
+    let font = settings::get(config, "desktop.font_family")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("Inter");
+    let mono = settings::get(config, "terminal.font_family")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("JetBrains Mono");
+    ui.global::<Theme>().set_ui_font(font.into());
+    ui.global::<Theme>().set_mono_font(mono.into());
+    ui.global::<ChatDisplayState>()
+        .set_show_reasoning(settings::local_show_reasoning(config));
 }
 
 pub fn greeting_for_hour(h: u32) -> &'static str {
@@ -552,8 +615,11 @@ struct Controller {
     profiles: Vec<(String, String)>,
     /// Profile whose config the settings pages read and write ("" = the default profile).
     scope: String,
+    backend_home: Option<std::path::PathBuf>,
+    current_profile: String,
     /// Config of `scope`, as loaded. Also the local copy edits merge into.
     config: Value,
+    config_ready: bool,
     /// `/api/config/schema` fields, for runtime option lists (timezones, providers).
     schema: Option<Value>,
     /// Device preferences (the original's Electron-storage settings).
@@ -624,13 +690,16 @@ impl Controller {
         // than this process's HERMES_HOME. Never restore from a guessed namespace.
         let endpoint = &backend.endpoint;
         let identity_rest = Rest::new(endpoint.host.clone(), endpoint.port, endpoint.token.clone());
-        let durable_backend = match identity_rest.get("/api/status").await {
+        let backend_home = match identity_rest.get("/api/status").await {
             Ok(status) => status["hermes_home"]
                 .as_str()
                 .filter(|home| std::path::Path::new(home).is_absolute())
-                .map(|home| hermes_core::durable::backend_id(std::path::Path::new(home), None)),
+                .map(std::path::PathBuf::from),
             Err(_) => None,
         };
+        let durable_backend = backend_home
+            .as_deref()
+            .map(|home| hermes_core::durable::backend_id(home, None));
         // `load_error`: the store is unusable, so queues stay in memory only.
         // `pause_error`: the store loaded but saving its recovery pauses failed.
         let (durable, load_error, pause_error) = if let Some(durable_backend) = durable_backend {
@@ -711,7 +780,10 @@ impl Controller {
             rest: None,
             profiles: Vec::new(),
             scope: String::new(),
+            backend_home,
+            current_profile: String::new(),
             config: Value::Null,
+            config_ready: false,
             schema: None,
             prefs: Prefs::load(hermes_core::prefs::default_path()),
             settings_page: ("appearance".into(), "general".into()),
@@ -749,12 +821,19 @@ impl Controller {
             st.set_connection("open".into());
             st.set_rows(ModelRc::new(VecModel::<ChatRow>::default()));
         });
-        let saved_prefs: Vec<(String, String)> = c
+        let mut saved_prefs: std::collections::BTreeMap<String, String> = c
             .prefs
             .all()
             .keys()
             .map(|k| (k.clone(), c.prefs.get_str(k, "")))
             .collect();
+        for setting in settings::SETTINGS {
+            if let Store::Device(key) = setting.store {
+                saved_prefs
+                    .entry(key.to_owned())
+                    .or_insert_with(|| hermes_core::prefs::default_for(key).to_owned());
+            }
+        }
         ui(&weak, move |w| {
             for (key, value) in saved_prefs {
                 apply_device_pref(w, &key, &value);
@@ -770,23 +849,7 @@ impl Controller {
         if let Some(rest) = c.rest()
             && let Ok(config) = rest.get("/api/config").await
         {
-            let font = settings::get(&config, "desktop.font_family")
-                .and_then(Value::as_str)
-                .unwrap_or("Inter")
-                .to_owned();
-            let mono = settings::get(&config, "terminal.font_family")
-                .and_then(Value::as_str)
-                .unwrap_or("JetBrains Mono")
-                .to_owned();
-            ui(&weak, move |w| {
-                w.global::<Theme>()
-                    .set_ui_font(if font.is_empty() { "Inter".into() } else { font.into() });
-                w.global::<Theme>().set_mono_font(if mono.is_empty() {
-                    "JetBrains Mono".into()
-                } else {
-                    mono.into()
-                });
-            });
+            ui(&weak, move |w| apply_profile_config(w, &config));
         }
         // Dev/measurement hook: open a stored session once connected.
         if let Ok(id) = std::env::var("HERMES_DESKTOP_OPEN_SESSION")
@@ -1036,6 +1099,7 @@ impl Controller {
             Cmd::PasteImage => self.paste_image().await,
             Cmd::RemoveAttachment(i) => self.remove_attachment(i).await,
             Cmd::Retheme => self.reset = true,
+            Cmd::ReapplyZoom => ui(&self.weak, reapply_window_zoom),
             Cmd::Stop => {
                 if let Some(key) = self.queue_key().map(str::to_owned) {
                     self.queue_paused.insert(key.clone());
@@ -1351,7 +1415,7 @@ impl Controller {
             .client
             .request(
                 "config.set",
-                json!({"key": "reasoning", "value": level, "scope": "session", "session_id": sid}),
+                json!({"key": "reasoning", "value": level, "session_id": sid}),
             )
             .await
         {
@@ -1377,23 +1441,29 @@ impl Controller {
         let t0 = std::time::Instant::now();
         let Some(rest) = self.rest() else { return };
         self.set_loading(true);
-        if self.profiles.is_empty() {
+        {
             match rest.get("/api/profiles").await {
-                Ok(v) => self.profiles = parse_profiles(&v),
+                Ok(v) => {
+                    self.current_profile = self
+                        .backend_home
+                        .as_deref()
+                        .and_then(|home| settings::profile_name_for_home(&v, home))
+                        .unwrap_or_default()
+                        .to_owned();
+                    self.profiles = parse_profiles(&v);
+                }
                 Err(e) => {
+                    self.set_loading(false);
                     return self.settings_error(format!("Could not load profiles: {e}"));
                 }
             }
         }
-        if self.schema.is_none() {
-            match rest.get("/api/config/schema").await {
-                Ok(v) => self.schema = Some(v),
-                Err(e) => tracing::warn!("config schema unavailable: {e}"),
-            }
-        }
-        self.load_scoped_config().await;
+        self.load_schema().await;
+        let ready = self.load_scoped_config().await;
         self.publish_settings();
-        self.load_widgets().await;
+        if ready {
+            self.load_widgets().await;
+        }
         self.set_loading(false);
         // Open time = keypress → the page's rows handed to the UI (docs/PERF.md).
         tracing::info!(
@@ -1403,15 +1473,48 @@ impl Controller {
         );
     }
 
-    /// Load (or reload) the config of the scoped profile.
-    async fn load_scoped_config(&mut self) {
+    async fn load_schema(&mut self) {
+        self.schema = None;
         let Some(rest) = self.rest() else { return };
+        let path = format!("/api/config/schema{}", profile_query(&self.scope));
+        match rest.get(&path).await {
+            Ok(value) => self.schema = Some(value),
+            Err(error) => tracing::warn!("config schema unavailable: {error}"),
+        }
+    }
+
+    /// Load (or reload) the config of the scoped profile.
+    async fn load_scoped_config(&mut self) -> bool {
+        self.config_ready = false;
+        let Some(rest) = self.rest() else { return false };
         let path = format!("/api/config{}", profile_query(&self.scope));
         match rest.get(&path).await {
-            Ok(v) => self.config = v,
+            Ok(v) => {
+                self.config = v;
+                self.config_ready = true;
+                true
+            }
             Err(e) => {
-                self.config = Value::Object(Default::default());
+                self.config = Value::Null;
                 self.settings_error(format!("Could not load this profile's config: {e}"));
+                false
+            }
+        }
+    }
+
+    /// Always read the running window's profile, not whichever profile is being edited.
+    async fn refresh_active_config(&mut self) -> bool {
+        let Some(rest) = self.rest() else { return false };
+        match rest.get("/api/config").await {
+            Ok(config) => {
+                ui(&self.weak, move |w| apply_profile_config(w, &config));
+                self.refresh_model_label().await;
+                self.refresh_effort().await;
+                true
+            }
+            Err(e) => {
+                self.settings_error(format!("Profile saved, but the active window could not refresh: {e}"));
+                false
             }
         }
     }
@@ -1440,9 +1543,12 @@ impl Controller {
             SettingsCmd::Scope(name) => {
                 if name != self.scope {
                     self.scope = name;
-                    self.load_scoped_config().await;
+                    self.load_schema().await;
+                    let ready = self.load_scoped_config().await;
                     self.publish_settings();
-                    self.load_widgets().await;
+                    if ready {
+                        self.load_widgets().await;
+                    }
                 }
             }
             SettingsCmd::Edit { id, value } => self.edit_setting(&id, &value).await,
@@ -1456,8 +1562,17 @@ impl Controller {
     /// Persist one edited control and re-render its page.
     async fn edit_setting(&mut self, id: &str, value: &str) {
         let Some(s) = settings::setting(id) else {
-            return;
+            return self.settings_error("Unknown settings control; no change was saved.".into());
         };
+        if let Some(reason) = settings::unavailable_reason(s) {
+            self.settings_error(reason.to_owned());
+            self.publish_settings();
+            return;
+        }
+        if matches!(s.store, Store::Config(_)) && !self.config_ready {
+            return self
+                .settings_error("This profile's settings have not loaded. Reopen Settings before editing.".into());
+        }
         let current = match s.store {
             Store::Config(key) => settings::get(&self.config, key),
             Store::Device(key) => self.prefs.get(key),
@@ -1465,7 +1580,13 @@ impl Controller {
         };
         let parsed = match settings::parse_value(&s.control, value, current) {
             Ok(v) => normalize_number(v),
-            Err(e) => return self.settings_error(e),
+            Err(e) => {
+                self.settings_error(e);
+                if matches!(s.control, settings::Control::Slider { .. }) {
+                    self.publish_settings();
+                }
+                return;
+            }
         };
         match s.store {
             Store::Config(key) => {
@@ -1477,53 +1598,36 @@ impl Controller {
                     Ok(_) => {
                         self.config = match rest.get(&path).await {
                             Ok(config) if settings::get(&config, key) == Some(&parsed) => config,
-                            Ok(_) => return self.settings_error(format!("The backend did not save {key}.")),
-                            Err(e) => return self.settings_error(format!("Could not verify {key}: {e}")),
+                            Ok(_) => {
+                                self.settings_error(format!("The backend did not save {}.", s.label));
+                                self.publish_settings();
+                                return;
+                            }
+                            Err(e) => {
+                                self.settings_error(format!("Could not verify {}: {e}", s.label));
+                                self.publish_settings();
+                                return;
+                            }
                         };
-                        if self.scope.is_empty() && matches!(key, "desktop.font_family" | "terminal.font_family") {
-                            let key = key.to_owned();
-                            let value = parsed.as_str().unwrap_or_default().to_owned();
-                            ui(&self.weak, move |w| {
-                                if key == "desktop.font_family" {
-                                    w.global::<Theme>().set_ui_font(if value.is_empty() {
-                                        "Inter".into()
-                                    } else {
-                                        value.into()
-                                    });
-                                } else {
-                                    w.global::<Theme>().set_mono_font(if value.is_empty() {
-                                        "JetBrains Mono".into()
-                                    } else {
-                                        value.into()
-                                    });
-                                }
-                            });
-                        }
-                        self.settings_saved(key);
-                        // Session-scoped switches the backend also tracks per session.
-                        if key == "yolo"
-                            && let Some(sid) = &self.session
-                        {
-                            let v = if parsed == Value::Bool(true) { "on" } else { "off" };
-                            let _ = self
-                                .client
-                                .request(
-                                    "config.set",
-                                    json!({"key": "yolo", "value": v, "session_id": sid, "scope": "session"}),
-                                )
-                                .await;
+                        if self.refresh_active_config().await {
+                            self.settings_saved(key);
                         }
                     }
-                    Err(e) => self.settings_error(format!("Could not save {key}: {e}")),
+                    Err(e) => self.settings_error(format!("Could not save {}: {e}", s.label)),
                 }
             }
             Store::Device(key) => {
                 if let Err(e) = self.prefs.set(key, parsed) {
-                    return self.settings_error(format!("Could not save {key}: {e}"));
+                    self.settings_error(format!("Could not save {}: {e}", s.label));
+                    self.publish_settings();
+                    return;
                 }
-                self.settings_saved(key);
+                let key = key.to_owned();
+                let value = self.prefs.get_str(&key, "");
+                ui(&self.weak, move |w| apply_device_pref(w, &key, &value));
+                self.settings_saved(s.id);
             }
-            Store::None => {}
+            Store::None => self.settings_error("This control has no saved setting; no change was applied.".into()),
         }
         self.publish_settings();
         self.load_widgets().await;
@@ -1564,9 +1668,11 @@ impl Controller {
             Outcome::Error(text) => self.settings_error(text),
             Outcome::Edit(id, value) => self.edit_setting(&id, &value).await,
             Outcome::Reload => {
-                self.load_scoped_config().await;
-                self.publish_settings();
-                self.load_widgets().await;
+                if self.load_scoped_config().await {
+                    self.refresh_active_config().await;
+                    self.publish_settings();
+                    self.load_widgets().await;
+                }
             }
         }
     }
@@ -1647,12 +1753,23 @@ impl Controller {
             Some(v) => v,
             None => return self.settings_error(format!("{} is not valid JSON", file.display())),
         };
+        if !cfg.is_object() {
+            return self.settings_error("Imported config must be a JSON object; no settings changed.".into());
+        }
         let Some(rest) = self.rest() else { return };
         let path = format!("/api/config{}", profile_query(&self.scope));
         match rest.put(&path, &json!({ "config": cfg })).await {
             Ok(_) => {
-                self.load_scoped_config().await;
-                self.settings_notice(format!("Imported {}", file.display()), false);
+                if self.load_scoped_config().await && self.refresh_active_config().await {
+                    self.settings_notice(
+                        format!(
+                            "Merged settings from {}; existing custom entries are retained",
+                            file.display()
+                        ),
+                        false,
+                    );
+                    self.load_widgets().await;
+                }
             }
             Err(e) => self.settings_error(format!("Import failed: {e}")),
         }
@@ -1675,8 +1792,10 @@ impl Controller {
         let path = format!("/api/config{}", profile_query(&self.scope));
         match rest.put(&path, &json!({ "config": defaults })).await {
             Ok(_) => {
-                self.load_scoped_config().await;
-                self.settings_notice("Restored Hermes defaults", false);
+                if self.load_scoped_config().await && self.refresh_active_config().await {
+                    self.settings_notice("Applied Hermes defaults; existing custom entries are retained", false);
+                    self.load_widgets().await;
+                }
             }
             Err(e) => self.settings_error(format!("Reset failed: {e}")),
         }
@@ -1701,7 +1820,8 @@ impl Controller {
     }
 
     fn settings_saved(&self, key: &str) {
-        self.settings_notice(format!("Saved {key}"), false);
+        let label = settings::setting(key).map(|s| s.label).unwrap_or("Setting");
+        self.settings_notice(format!("{label} saved"), false);
     }
 
     fn settings_error(&self, text: String) {
@@ -1713,7 +1833,7 @@ impl Controller {
     fn publish_settings(&self) {
         let (group, page) = self.settings_page.clone();
         let nav = build_nav(&group, &page);
-        let scopes = build_scopes(&self.profiles, &self.scope);
+        let scopes = build_scopes(&self.profiles, &self.scope, &self.current_profile);
         let per_profile = settings::page(&group, &page).map(|p| p.per_profile).unwrap_or(false);
         let group_title = settings::group(&group).map(|g| g.label).unwrap_or_default();
         let page_title = settings::page(&group, &page).map(|p| p.label).unwrap_or_default();
@@ -3163,19 +3283,30 @@ fn build_nav(active_group: &str, active_page: &str) -> Vec<NavEntry> {
 
 /// The "Applies to" pills: every profile, with the default profile selected while the
 /// scope is unset.
-fn build_scopes(profiles: &[(String, String)], scope: &str) -> Vec<ScopeChip> {
-    profiles
+fn build_scopes(profiles: &[(String, String)], scope: &str, current_profile: &str) -> Vec<ScopeChip> {
+    let mut scopes: Vec<ScopeChip> = profiles
         .iter()
         .map(|(name, label)| ScopeChip {
             name: name.as_str().into(),
             label: label.as_str().into(),
             active: if scope.is_empty() {
-                name == "default"
+                name == current_profile
             } else {
                 name == scope
             },
         })
-        .collect()
+        .collect();
+    if current_profile.is_empty() {
+        scopes.insert(
+            0,
+            ScopeChip {
+                name: "".into(),
+                label: "This window".into(),
+                active: scope.is_empty(),
+            },
+        );
+    }
+    scopes
 }
 
 /// `GET /api/profiles` → (name, label). The label is the bot title, else the display name,
@@ -3250,7 +3381,10 @@ fn build_rows(
             max: r.max,
             unit: r.unit.into(),
             highlight: !hit.is_empty() && r.id == hit,
-            note: String::new().into(),
+            note: settings::setting(r.id)
+                .and_then(settings::unavailable_reason)
+                .unwrap_or("")
+                .into(),
             full: matches!(r.kind, "widget" | "fallback") && !widgets::area(r.id).is_empty(),
             area: widgets::area(r.id).into(),
         })
@@ -3367,6 +3501,21 @@ pub fn short_path(p: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scopes_highlight_the_running_profile_and_keep_default_explicit() {
+        let profiles = vec![("default".into(), "Default".into()), ("work".into(), "Work".into())];
+        let active = |scope: &str, current: &str| {
+            build_scopes(&profiles, scope, current)
+                .into_iter()
+                .filter(|chip| chip.active)
+                .map(|chip| chip.name.to_string())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(active("", "work"), ["work"]);
+        assert_eq!(active("default", "work"), ["default"]);
+        assert_eq!(active("", ""), [""]);
+    }
 
     #[test]
     fn helpers() {

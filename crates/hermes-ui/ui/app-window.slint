@@ -3,7 +3,7 @@
 import { ScrollView } from "std-widgets.slint";
 import { Theme, Motion, Ease, ThemeMode } from "theme.slint";
 import { Icon, IconButton, NavItem, SectionHeader, Chip, Banner, Spinner, Toggle, Segmented, PrimaryButton, GhostButton } from "components.slint";
-import { Transcript, Composer, ChatRow, ToolRow, CommandItem } from "chat.slint";
+import { Transcript, Composer, ChatRow, ToolRow, CommandItem, ChatDisplayState } from "chat.slint";
 import { SettingsModal, SettingsState } from "settings.slint";
 import { AppearanceState } from "w-appearance.slint";
 import { ModelsState } from "w-models.slint";
@@ -15,9 +15,9 @@ import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
 import { CapAction, CapItem, CapState, CapabilitiesModal } from "capabilities.slint";
 import { InputCard, InputChoice, InputState } from "input-card.slint";
 import { SessionItem, SessionRow } from "session-row.slint";
-import { Wordmark, HermesMark, TextField, Button, ButtonVariant, NavItem as KitNavItem, IconButton as KitIconButton, Segmented as KitSegmented } from "kit/kit.slint";
+import { HermesMark, TextField, Button, ButtonVariant, NavItem as KitNavItem, IconButton as KitIconButton, Segmented as KitSegmented } from "kit/kit.slint";
 
-export { CommandItem, Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, AppearanceState, ModelsState, ProvidersState, SystemState, CapAction, CapItem, CapState, InputChoice, InputState, ModelItem, EditModelRow, SessionItem }
+export { CommandItem, Theme, Motion, ThemeMode, ChatRow, ToolRow, ChatDisplayState, SettingsState, ProjectItem, ProjectState, AppearanceState, ModelsState, ProvidersState, SystemState, CapAction, CapItem, CapState, InputChoice, InputState, ModelItem, EditModelRow, SessionItem }
 
 export struct ApprovalInfo {
     visible: bool,
@@ -33,6 +33,7 @@ export struct ApprovalInfo {
 export global AppState {
     in-out property <string> user-name: "there";
     in-out property <string> greeting: "Up late";
+    in-out property <bool> intro-splash: true;
     in-out property <string> connection: "connecting"; // connecting | open | error
     in-out property <string> connection-detail;
     in-out property <[SessionItem]> sessions;
@@ -96,6 +97,7 @@ export global AppState {
     callback dismiss-banner();
     // The effective theme flipped (code colours are baked into rows).
     callback retheme();
+    callback viewport-changed();
     callback search-sessions(string);
     callback cycle-session(int);
     // Sidebar row actions. Only one row has its actions open (or is being renamed) at a time.
@@ -141,10 +143,23 @@ component Sidebar inherits Rectangle {
         padding-bottom: Theme.space-md;
         spacing: Theme.space-xs;
 
-        HorizontalLayout {
+        // Fixed brand slots keep the mark and lettering on one centre line.
+        Rectangle {
             height: Theme.topbar-h - Theme.space-md;
-            padding-left: Theme.space-md;
-            Wordmark { size: Theme.fs-h3; }
+            HermesMark {
+                x: Theme.space-md;
+                y: (parent.height - self.height) / 2;
+                size: Theme.control-h;
+            }
+            Text {
+                x: Theme.space-md + Theme.control-h + Theme.space-sm;
+                height: parent.height;
+                text: "Hermes";
+                font-size: Theme.fs-h2;
+                font-weight: 650;
+                color: Theme.foreground;
+                vertical-alignment: center;
+            }
         }
 
         TextField {
@@ -301,6 +316,8 @@ component ApprovalCard inherits Rectangle {
 export component AppWindow inherits Window {
     property <bool> dark: Theme.dark;
     changed dark => { AppState.retheme(); }
+    changed width => { AppState.viewport-changed(); }
+    changed height => { AppState.viewport-changed(); }
     title: "Hermes";
     icon: @image-url("../../../assets/brand/hermes-icon-256.png");
     preferred-width: 1280px;
@@ -396,18 +413,22 @@ export component AppWindow inherits Window {
             width: root.width - root.sb-w;
             height: root.height;
 
-            // Title strip
+            // Fixed-height slots centre controls without changing horizontal anchors.
             HorizontalLayout {
                 y: 0;
+                width: parent.width;
                 height: Theme.topbar-h;
-                padding-left: 8px;
+                padding-left: Theme.space-md;
                 padding-right: 10px;
-                spacing: 6px;
-                KitIconButton {
-                    y: (parent.height - self.height) / 2;
-                    icon: "panel-left";
-                    label: "Toggle sidebar (Ctrl+B)";
-                    clicked => { root.sidebar-open = !root.sidebar-open; }
+                spacing: Theme.space-sm;
+                Rectangle {
+                    width: Theme.control-h;
+                    KitIconButton {
+                        y: (parent.height - self.height) / 2;
+                        icon: "panel-left";
+                        label: "Toggle sidebar (Ctrl+B)";
+                        clicked => { root.sidebar-open = !root.sidebar-open; }
+                    }
                 }
                 Text {
                     text: root.empty ? "New chat" : AppState.session-title;
@@ -417,18 +438,24 @@ export component AppWindow inherits Window {
                     overflow: elide;
                     horizontal-stretch: 1;
                 }
-                if AppState.connection != "open": Chip {
-                    y: (parent.height - self.height) / 2;
-                    interactive: false;
-                    outlined: true;
-                    text: AppState.connection == "error" ? "Offline" : "Connecting";
+                if AppState.connection != "open": Rectangle {
+                    width: status-chip.width;
+                    status-chip := Chip {
+                        y: (parent.height - self.height) / 2;
+                        interactive: false;
+                        outlined: true;
+                        text: AppState.connection == "error" ? "Offline" : "Connecting";
+                    }
                 }
-                if !root.empty: KitSegmented {
-                    y: (parent.height - self.height) / 2;
+                if !root.empty: Rectangle {
                     width: main.width < 600px ? 196px : 228px;
-                    label: "Transcript detail";
-                    options: ["Normal", "Thinking", "Verbose"];
-                    selected <=> AppState.transcript-mode;
+                    KitSegmented {
+                        y: (parent.height - self.height) / 2;
+                        width: parent.width;
+                        label: "Transcript detail";
+                        options: ["Normal", "Thinking", "Verbose"];
+                        selected <=> AppState.transcript-mode;
+                    }
                 }
             }
 
@@ -450,19 +477,21 @@ export component AppWindow inherits Window {
                 alignment: center;
                 spacing: Theme.space-2xl;
                 padding-bottom: main.height > 600px ? Theme.space-3xl * 2 : Theme.space-xl;
-                HorizontalLayout {
+                if AppState.intro-splash: HorizontalLayout {
                     alignment: center;
                     HermesMark { size: 48px; }
                 }
-                Text {
+                if AppState.intro-splash: Text {
                     text: "What would you like to work on?";
+                    accessible-role: text;
+                    accessible-label: "Welcome prompt";
                     font-size: main.width < 600px ? Theme.fs-h2 : Theme.fs-greet;
                     font-weight: 600;
                     color: Theme.foreground;
                     horizontal-alignment: center;
                     wrap: word-wrap;
                 }
-                Text {
+                if AppState.intro-splash: Text {
                     text: "Ask a question, explore an idea, or build something.";
                     font-size: Theme.fs-control;
                     color: Theme.muted-foreground;
