@@ -37,6 +37,8 @@
 //! (`$HERMES_LIVE_HOME`, default `~/.cache/hermes-desktop-rs/live-home`, which
 //! `scripts/live-test-backend.sh` regenerates on every start).
 
+#[path = "live_backend/chat_display.rs"]
+mod chat_display;
 #[path = "live_backend/commands.rs"]
 mod commands;
 #[path = "live_backend/composer.rs"]
@@ -353,6 +355,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("settings") {
         settings_section(&ui, &log).await;
+    }
+    if want("chat_display") {
+        chat_display::section(&ui, &log).await;
     }
     if want("capabilities") {
         capabilities_section(&ui, &log).await;
@@ -3427,6 +3432,9 @@ fn live_backend() {
         // Queue recovery state: without this a run without HERMES_HOME would write the
         // user's real ~/.local/state/hermes-desktop-rs/durable-state.json.
         std::env::set_var("HERMES_DESKTOP_STATE", scratch.join("durable-state.json"));
+    }
+    if std::env::var_os("HERMES_LIVE_DISPLAY_PREFS").is_some() {
+        chat_display::seed_preferences(&scratch.join("prefs.json"));
     }
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)

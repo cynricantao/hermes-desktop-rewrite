@@ -30,7 +30,7 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**76 done · 361 partial · 349 not started · 8 unsupported** (of 794).
+**74 done · 363 partial · 349 not started · 8 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
 
 P0 review follow-up (2026-10-21): the gallery now has headless keyboard/pointer
@@ -48,8 +48,31 @@ transcript-detail controls and the glass composer. The shell follows the documen
 256 px sidebar, 52 px header and 736 px conversation width. `workspace_visual` exercises
 light/dark, reduced-motion and minimum-window rendering with labelled fixture content;
 private `live_backend` sidebar/composer/rich-seeded checks exercise the existing actions.
-This visual pass adds no backend capability and promotes no checklist markers. Settings,
-secondary screens and the transcript's content renderers retain their existing views.
+This visual pass adds no backend capability and promotes no checklist markers. Settings
+and secondary screens retain their existing views.
+
+Reply presentation follow-up: prose is separated into paragraphs, headings and list items,
+with a larger reading size, hanging list markers and semantic colour accents. Sidebar
+branding uses aligned fixed slots. The styled-parser and row-conversion regressions
+pass, alongside the workspace headless rendering/pointer checks. No new live-backend
+parity claim or marker promotion is made.
+The settings shell retains the reference navigation and registry-driven controls, with
+theme-aware inputs, centred navigation icons and stacked wide controls on narrow pages.
+The model catalog reserves its height, palette cards fit their grid, credential/local-model
+rows use separate lines, and archived/plugin/connection actions occupy real layout slots.
+`settings_visual` renders all 53 registry pages in light/dark at wide/narrow sizes, with
+labelled widget fixtures and checks for switch/search/model/restore/endpoint input intents.
+These are local rendering/UI-intent checks, not backend persistence or provider inference.
+
+Settings runtime follow-up: see [SETTINGS-PARITY.md](SETTINGS-PARITY.md) for the
+53-page queue, verified consumers and remaining native feature gaps. Chat Text Size now
+applies immediately and at startup; UI zoom is independent, intro visibility is wired,
+palette writes have one owner, and fonts respect save success and profile scope.
+Preferences lock and merge disk values instead of overwriting newer settings. Unported
+native controls are visibly disabled and cannot falsely report a save. Diff fold/reopen
+and failed-save slider regressions pass. Local checks: 5 preference tests, 15 settings
+tests, 3 software-rendering tests and 20 isolated-backend checks passed. No inference,
+owner-display run or full 53-page functional parity is claimed. No markers are promoted.
 
 
 ## Summary
@@ -697,67 +720,67 @@ secondary screens and the transcript's content renderers retain their existing v
 
 ## Settings — Appearance page
 
-> Every `[~]` row renders in the panel and persists its value (device prefs in `prefs.json`, or the scoped profile's config through `PUT /api/config?profile=`) — the note names the part of the feature that is still missing.
+> Rows remain visible. Native controls without a consumer are disabled with an explanation and do not save. Editable profile controls use the documented backend contract. Notes distinguish partial behavior from verified consumers.
 
 - [~] Language / locale — local — src/app/settings/settings-manifest.ts (appearance.language)
-  ⟶ writes display.language per profile (live-tested); no localisation catalog yet
+  ⟶ disabled with a reason; no native localisation catalog yet
 - [~] Intro splash — local — src/app/settings/settings-manifest.ts (appearance.introSplash)
-  ⟶ row renders and persists; the empty-chat greeting ignores it
+  ⟶ welcome content toggles without removing the composer; software rendering and private startup restoration pass
 - [~] Model pricing in picker — local — src/app/settings/settings-manifest.ts (appearance.modelPricing)
-  ⟶ row renders and persists; the model picker shows no prices
+  ⟶ disabled with a reason; the native model picker has no pricing consumer
 - [~] Resume last session on launch — local — src/app/settings/settings-manifest.ts (appearance.resumeLastSession)
-  ⟶ row renders and persists; launch always starts a new chat
+  ⟶ disabled with a reason; automatic last-chat restoration is not implemented
 - [~] Tips — local — src/app/settings/settings-manifest.ts (appearance.tips)
-  ⟶ row renders and persists; no tips system
+  ⟶ disabled with a reason; no tips system
 - [~] Tours — local — src/app/settings/settings-manifest.ts (appearance.tours)
-  ⟶ row renders and persists; no tours
-- [x] Theme / skin — local — src/app/settings/settings-manifest.ts (appearance.theme)
-  ⟶ `hermes-desktop-theme-v2` renders a palette grid from GET /api/dashboard/themes (label + description + colour swatch, active marked); picking PUTs /api/dashboard/theme and persists the device pref, and the four palettes this window carries a local copy of (Midnight, Ember, Mono, Cyberpunk) re-skin it live — widgets live test: 8 grid rows == the backend's 8 themes, a pick switched the backend theme; themes without a local copy say so in the panel (docs/screenshots/rs-widget-appearance-theme.png)
-- [x] Dark/light/system mode — local — src/app/settings/constants.ts (MODE_OPTIONS)
-  ⟶ applied live to the app's Theme global (mode switch is immediate); shot in light and dark (docs/screenshots/rs-settings-*.png)
+  ⟶ disabled with a reason; no tours
+- [~] Theme / skin — local — src/app/settings/settings-manifest.ts (appearance.theme)
+  ⟶ the catalog still comes from the dashboard API, not the original skin system. Supported local presets persist through one controller-owned device write and survive the next unrelated edit (private checks). Unsupported catalog palettes are rejected; no unrelated dashboard theme is changed
+- [~] Dark/light/system mode — local — src/app/settings/constants.ts (MODE_OPTIONS)
+  ⟶ manual modes render live; System now follows Slint's platform palette instead of hardcoded dark. Native compositor/OS changes remain unverified
 - [~] UI scale — local — src/app/settings/settings-manifest.ts (appearance.uiScale)
-  ⟶ row renders and persists; the layout does not scale yet
+  ⟶ relative window zoom is independent of chat scale; repeated-value, physical-size and private controller checks pass. Native compositor/DPI transitions and zoom hotkeys remain unverified
 - [~] Chat text scale — local — src/app/settings/settings-manifest.ts (appearance.chatTextScale)
-  ⟶ row renders and persists; conversation text does not scale yet
+  ⟶ 110% default reaches prose, composer, code and table tokens; rendered 100%→110% growth and private controller/startup restoration pass
 - [x] Chat font — local — src/app/settings/settings-manifest.ts (appearance.chatFont)
   ⟶ searchable picker over the installed families (`fc-list`, 240 here) with a "theme font" option; writes `desktop.font_family`, applied live and at startup — widgets live test: both pickers listed 240 families (docs/screenshots/rs-widget-appearance-typography.png)
 - [x] Terminal font — local — src/app/settings/settings-manifest.ts (appearance.terminalFont)
   ⟶ same installed-font picker for `terminal.font_family`; applied to the app's mono face (there is still no terminal panel in this client)
 - [~] Interface mode (Simple/Advanced) — local — src/store/interface-mode.ts
-  ⟶ row renders and persists; the shell always shows the advanced layout
+  ⟶ disabled with a reason; only the advanced shell is implemented
 - [~] Session list density — local — src/store/session-list-density.ts
-  ⟶ row renders and persists; the sidebar keeps one density
+  ⟶ disabled with a reason; the sidebar keeps one density
 - [~] Tab strip mode — local — src/store/tabstrip-prefs.ts
-  ⟶ row renders and persists; no zone tab strip yet
+  ⟶ disabled with a reason; no zone tab strip yet
 - [~] Titlebar app actions side — local — src/app/settings/settings-manifest.ts (appearance.appActions)
-  ⟶ row renders and persists; the titlebar layout is fixed
+  ⟶ disabled with a reason; the titlebar layout is fixed
 - [~] Minimize to tray — local (Electron) — src/app/settings/minimize-to-tray-setting.tsx
-  ⟶ row renders and persists; no tray integration yet
+  ⟶ disabled with a reason; no tray integration yet
 - [~] Window translucency — local (Electron) — src/app/settings/settings-manifest.ts (appearance.translucency)
   ⟶ row renders and persists; the window is opaque
 - [~] Backdrop / glass tint/fade/frost/area — local — src/store/backdrop.ts, src/app/settings/appearance-settings.tsx
-  ⟶ row renders and persists; no backdrop rendering
+  ⟶ disabled with a reason; no backdrop rendering
 - [~] File browser pane startup — local — src/store/layout.ts
-  ⟶ row renders and persists; no file browser pane
+  ⟶ disabled with a reason; no file browser pane
 - [~] Composer popout — local — src/store/composer-popout.ts
-  ⟶ row renders and persists; the composer stays docked
+  ⟶ disabled with a reason; the composer stays docked
 - [~] User bubble opacity — local — src/store/user-bubble-transparency.ts
-  ⟶ the slider writes the pref; user bubbles ignore it
+  ⟶ alpha and retained outline change in software renders; private persistence and failed-save slider recovery pass
 - [~] Text direction (LTR/RTL) — local — src/store/text-direction.ts
-  ⟶ row renders and persists; the layout is LTR only
+  ⟶ disabled with a reason; explicit direction handling is not implemented
 - [~] Hide thread timeline — local — src/store/thread-timeline.ts
-  ⟶ row renders and persists; no thread timeline
+  ⟶ disabled with a reason; no thread timeline
 - [ ] Reactions (emoji) — local + config.set display.reactions — src/store/reactions-enabled.ts
 - [~] Vibe hearts — local — src/store/vibe-hearts-enabled.ts
-  ⟶ row renders and persists; no hearts
+  ⟶ disabled with a reason; no hearts
 - [~] Tool view (product/technical) — local — src/store/tool-view.ts
-  ⟶ row renders and persists; tool rows have one rendering
+  ⟶ Product/Technical changes captured-context and output-preview visibility; full raw inputs and unbounded inspection remain missing
 - [~] Hide code diffs — local — src/app/settings/settings-manifest.ts (appearance.hideCodeDiffs)
-  ⟶ row renders and persists; diffs are always shown
+  ⟶ file-edit diffs hide/restore, including a clickable fold/reopen button; software and private preference checks pass
 - [~] Reasoning collapsed — local — src/store/reasoning-disclosure.ts
-  ⟶ row renders and persists; reasoning blocks are not rendered yet
+  ⟶ disclosure defaults and local reasoning visibility are wired; software pointer disclosure and private preference restoration pass
 - [~] Embeds mode (ask/always/off) — local — src/store/embed-consent.ts
-  ⟶ row renders and persists; no embed handling
+  ⟶ disabled with a reason; no embed handling
 - [-] Pet appearance — local — src/app/settings/pet-settings.tsx
   ⟶ unsupported: the petdex runtime (spritesheet renderer + pet dex RPC) is not part of this client; the panel says exactly that instead of offering a dead picker
 - [~] Video playback speed — local — src/store/video-playback-speed.ts
@@ -784,7 +807,7 @@ secondary screens and the transcript's content renderers retain their existing v
 - [x] File read limit — config file_read_max_chars — src/app/settings/constants.ts
   ⟶ renders on its registry page and saves `file_read_max_chars` through the panel, read back over REST and put back (live 2026-10-17, tests/live_backend.rs `settings_pages`)
 - [~] Data-URL read limit — local — src/store/data-url-read-max.ts
-  ⟶ device row `data-url-read-max` lives on Chat › Attachments and saves through the live-verified prefs.json path (`settings` section) — not individually exercised; the client does not enforce the cap
+  ⟶ disabled with a reason on Chat › Attachments; the client does not enforce this preview cap
 
 ## Settings — Safety page
 
@@ -953,23 +976,23 @@ secondary screens and the transcript's content renderers retain their existing v
 ## Settings — Notifications page
 
 - [~] Enable all notifications — local — src/app/settings/notifications-settings.tsx
-  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+  ⟶ the device control is disabled with a reason; no OS-notification path is implemented, and the test action reports that limitation
 - [~] Approval notifications — local — src/store/native-notifications.ts
-  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+  ⟶ the device control is disabled with a reason; no OS-notification path is implemented, and the test action reports that limitation
 - [~] Input notifications — local — src/store/native-notifications.ts
-  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+  ⟶ the device control is disabled with a reason; no OS-notification path is implemented, and the test action reports that limitation
 - [~] Turn-done notifications — local — src/store/native-notifications.ts
-  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+  ⟶ the device control is disabled with a reason; no OS-notification path is implemented, and the test action reports that limitation
 - [~] Turn-error notifications — local — src/store/native-notifications.ts
-  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+  ⟶ the device control is disabled with a reason; no OS-notification path is implemented, and the test action reports that limitation
 - [~] Background-done notifications — local — src/store/native-notifications.ts
-  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+  ⟶ the device control is disabled with a reason; no OS-notification path is implemented, and the test action reports that limitation
 - [~] Credits notifications — local — src/store/native-notifications.ts
-  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+  ⟶ the device control is disabled with a reason; no OS-notification path is implemented, and the test action reports that limitation
 - [~] Plugin notifications — local — src/store/native-notifications.ts
-  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+  ⟶ the device control is disabled with a reason; no OS-notification path is implemented, and the test action reports that limitation
 - [~] Completion sound — local — src/store/completion-sound.ts
-  ⟶ the device row renders and persists; this client has no OS-notification path yet, so nothing is raised (the “Send test notification” button now says so instead of posting to the removed /api/desktop/notify route)
+  ⟶ the device control is disabled with a reason; no OS-notification path is implemented, and the test action reports that limitation
 
 ## Settings — Sessions page
 

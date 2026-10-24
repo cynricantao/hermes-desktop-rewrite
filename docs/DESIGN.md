@@ -2,8 +2,9 @@
 
 Status: **P1 workspace migration**. The main shell, sidebar navigation and composer now
 use the P0 kit, including the Hermes wordmark, a 256 px sidebar, 52 px header and 736 px
-conversation column. Transcript content renderers and secondary screens still use the
-existing views and legacy token aliases in `ui/theme.slint`; this is not full UI parity.
+conversation column. Reply prose now uses separate paragraphs, hierarchical headings and
+hanging list markers at a 16 px reading size; code, diff, table and secondary views
+retain their existing renderers. This is not full UI parity.
 
 The previous Claude-Desktop-inspired specification (measured CDS tokens, the 60/120/200/
 300 ms ladder) is superseded. It remains readable in git history
@@ -99,8 +100,15 @@ The desktop presets shared with the Electron app (`midnight`, `ember`, `mono`,
 
 Inter (UI) and JetBrains Mono (code/terminal), bundled, OFL. Scale: 11 meta · 12 rows/
 chips · 13 controls · 14 body · 16/18 headings. `Theme.chat-scale` (device-local *Chat
-Text Size*) multiplies `fs-chat` / `fs-chat-code` only — "Sidebars and controls stay the
-same size." *UI Scale* is applied as the window scale factor (P3). *Chat Font* and
+Text Size*) scales conversation, composer and code text only — "Sidebars and controls stay the
+same size." Conversation prose uses `fs-reply` (16 px base), 24/20/18 px heading
+levels, 15 px composer text, 13 px code and 14 px table text. These scale with
+`chat-scale`, whose controller default is 110%. Scaled paragraph gaps are 12 px,
+heading gaps 20 px and adjacent-list gaps 6 px. List markers use a separate gutter.
+The inline renderer does not expose line-height; paragraph spacing is explicit.
+Headings use foreground contrast, links use info blue and markers use bronze.
+*UI Scale* applies a relative window scale independently of chat size. Its software
+rendering is tested; native compositor/DPI transitions remain unverified. *Chat Font* and
 *Terminal Font* set `ui-font` / `mono-font` (blank = bundled font).
 
 ## 4. Components (kit)

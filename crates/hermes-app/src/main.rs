@@ -34,8 +34,12 @@ fn main() -> Result<(), slint::PlatformError> {
     slint::set_xdg_app_id("hermes-desktop-rs")?;
 
     // Follow the system colour scheme; manual override lives in Settings → Appearance.
-    let dark = !matches!(std::env::var("HERMES_DESKTOP_THEME").as_deref(), Ok("light"));
-    ui.global::<Theme>().set_system_dark(dark);
+    // A measurement override must not break the live platform-palette binding by default.
+    match std::env::var("HERMES_DESKTOP_THEME").as_deref() {
+        Ok("light") => ui.global::<Theme>().set_system_dark(false),
+        Ok("dark") => ui.global::<Theme>().set_system_dark(true),
+        _ => {}
+    }
     if std::env::var_os("HERMES_DESKTOP_REDUCE_MOTION").is_some() {
         ui.global::<Motion>().set_reduce(true);
     }

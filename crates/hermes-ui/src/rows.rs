@@ -306,34 +306,61 @@ fn table_seg(t: &Table) -> Seg {
     }
 }
 
-/// Assistant text → display segments (prose, code, diff, table, prose fence).
+/// Assistant text → display segments. Highlight ids continue to use the original
+/// fence index, independent of how many readable prose blocks precede the fence.
 pub fn segments(block: usize, text: &str, streaming: bool, ctx: &Ctx) -> Vec<Seg> {
-    md::split(text, streaming)
-        .iter()
-        .enumerate()
-        .filter_map(|(i, s)| match s {
-            Segment::Prose(p) => Some(Seg {
-                kind: SEG_PROSE,
-                md: markdown(p, false),
-                ..Default::default()
-            }),
-            Segment::Table(t) => Some(table_seg(t)),
-            Segment::Code { code, .. } => match fence_kind(s)? {
-                SEG_DIFF => Some(diff_seg(seg_id(block, i), code, ctx)),
-                SEG_PROSE_FENCE => Some(Seg {
-                    kind: SEG_PROSE_FENCE,
-                    // Prose that the model fenced: render its markdown, keep the source for copy.
-                    md: markdown(code.trim_end(), false),
-                    raw: code.trim_end().into(),
-                    ..Default::default()
-                }),
-                _ => Some(code_seg(seg_id(block, i), code.strip_suffix('\n').unwrap_or(code), ctx)),
+    let mut result = Vec::new();
+    for (i, segment) in md::split(text, streaming).iter().enumerate() {
+        match segment {
+            Segment::Prose(prose) => result.extend(prose_segments(prose, SEG_PROSE)),
+            Segment::Table(table) => result.push(table_seg(table)),
+            Segment::Code { code, .. } => match fence_kind(segment) {
+                Some(SEG_DIFF) => result.push(diff_seg(seg_id(block, i), code, ctx)),
+                Some(SEG_PROSE_FENCE) => result.extend(prose_segments(code.trim_end(), SEG_PROSE_FENCE)),
+                Some(_) => result.push(code_seg(seg_id(block, i), code.strip_suffix('\n').unwrap_or(code), ctx)),
+                None => {}
             },
+        }
+    }
+    result
+}
+
+fn prose_segments(text: &str, paragraph_kind: i32) -> Vec<Seg> {
+    styled::prose_blocks(text)
+        .into_iter()
+        .map(|block| {
+            let heading = block.heading_level > 0;
+            Seg {
+                kind: if heading {
+                    5
+                } else if !block.marker.is_empty() {
+                    6
+                } else {
+                    paragraph_kind
+                },
+                md: markdown(
+                    &if heading {
+                        format!("**{}**", block.text)
+                    } else {
+                        block.text.clone()
+                    },
+                    false,
+                ),
+                raw: block.text.into(),
+                heading_level: i32::from(block.heading_level),
+                marker: if matches!(block.marker.as_str(), "-" | "*" | "+") {
+                    "•".into()
+                } else {
+                    block.marker.into()
+                },
+                indent: block.indent.min(12) as i32,
+                ..Default::default()
+            }
         })
         .collect()
 }
 
-fn tool_row(c: &ToolCall) -> ToolRow {
+fn tool_row(c: &ToolCall, id: u64, ctx: &Ctx) -> ToolRow {
     let (a, r) = c.diff_counts();
     ToolRow {
         name: c.name.as_str().into(),
@@ -348,6 +375,9 @@ fn tool_row(c: &ToolCall) -> ToolRow {
         added: a as i32,
         removed: r as i32,
         duration: c.duration_s.map(|d| format!("{d:.1}s")).unwrap_or_default().into(),
+        has_diff: c.inline_diff.as_ref().is_some_and(|d| !d.trim().is_empty()),
+        is_edit: c.is_edit(),
+        diff: c.inline_diff.as_ref().map(|d| diff_seg(id, d, ctx)).unwrap_or_default(),
     }
 }
 
@@ -423,7 +453,11 @@ pub fn to_row(i: usize, b: &Block, ctx: &Ctx) -> ChatRow {
             ..Default::default()
         },
         Block::Tools { calls } => {
-            let rows: Vec<ToolRow> = calls.iter().map(tool_row).collect();
+            let rows: Vec<ToolRow> = calls
+                .iter()
+                .enumerate()
+                .map(|(n, call)| tool_row(call, seg_id(i, n), ctx))
+                .collect();
             let (a, r) = rows.iter().fold((0, 0), |(a, r), t| (a + t.added, r + t.removed));
             ChatRow {
                 kind: 2,
@@ -570,6 +604,20 @@ mod tests {
         assert_eq!(kinds, vec![3, 2, 1, 0]);
         assert_eq!(d.lines.row_data(1).unwrap().old, "1");
         assert_eq!(d.lines.row_data(2).unwrap().new, "1");
+    }
+
+    #[test]
+    fn reply_has_separate_readable_paragraphs_headings_and_list_items() {
+        let text = "First paragraph.\n\n## Next steps\n1. **Record** a short video.\n   Keep it simple.\n2. Share it with a friend.\n\nAsk what they think.";
+        let blocks = segs(text);
+        assert_eq!(blocks.iter().map(|b| b.kind).collect::<Vec<_>>(), vec![0, 5, 6, 6, 0]);
+        assert_eq!(blocks[1].heading_level, 2);
+        assert_eq!(blocks[2].marker, "1.");
+        assert_eq!(blocks[3].marker, "2.");
+        assert_eq!(
+            blocks[2].md,
+            markdown("**Record** a short video.\nKeep it simple.", false)
+        );
     }
 
     #[test]

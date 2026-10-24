@@ -7,10 +7,11 @@
 // through the backend's REST API, resolves each row, and pushes the models below. The UI
 // only sends intents back (goto / search / jump / scope / edit / export…).
 
-import { ScrollView, LineEdit, Slider } from "std-widgets.slint";
+import { ScrollView, Slider } from "std-widgets.slint";
 import { Theme, Motion, Ease } from "theme.slint";
 import { IconButton, Toggle, Segmented, PrimaryButton } from "components.slint";
 import { Icons } from "icons.slint";
+import { TextField } from "kit/kit.slint";
 import { AppearanceWidget } from "w-appearance.slint";
 import { ModelsWidget } from "w-models.slint";
 import { ProvidersWidget } from "w-providers.slint";
@@ -126,11 +127,15 @@ component NavRow inherits Rectangle {
         padding-left: entry.level == 1 ? 26px : 10px;
         padding-right: 8px;
         spacing: 9px;
-        Image {
-            source: Icons.get(entry.icon);
+        Rectangle {
             width: entry.level == 1 ? 14px : 15px;
-            height: entry.level == 1 ? 14px : 15px;
-            colorize: entry.active ? Theme.text : Theme.text-3;
+            Image {
+                y: (parent.height - self.height) / 2;
+                source: Icons.get(entry.icon);
+                width: parent.width;
+                height: self.width;
+                colorize: entry.active ? Theme.text : Theme.text-3;
+            }
         }
         Text {
             vertical-alignment: center;
@@ -141,11 +146,15 @@ component NavRow inherits Rectangle {
             horizontal-stretch: 1;
             overflow: elide;
         }
-        if entry.level == 0 && entry.page == "": Image {
-            source: Icons.get(entry.expanded ? "chevron-down" : "chevron-right");
+        if entry.level == 0 && entry.page == "": Rectangle {
             width: 12px;
-            height: 12px;
-            colorize: Theme.text-4;
+            Image {
+                y: (parent.height - self.height) / 2;
+                source: Icons.get(entry.expanded ? "chevron-down" : "chevron-right");
+                width: 12px;
+                height: 12px;
+                colorize: Theme.text-4;
+            }
         }
     }
     ta := TouchArea {
@@ -185,6 +194,8 @@ component ScopePill inherits Rectangle {
 
 component SelectControl inherits Rectangle {
     in property <SettingRowUI> item;
+    property <bool> enabled: item.note == "";
+    opacity: enabled ? 1 : 0.5;
     in property <string> current-label;
     width: 260px;
     height: 32px;
@@ -195,7 +206,7 @@ component SelectControl inherits Rectangle {
     accessible-role: button;
     accessible-label: item.label;
     accessible-value: root.current-label;
-    accessible-action-default => { pop.show(); }
+    accessible-action-default => { if root.enabled { pop.show(); } }
     HorizontalLayout {
         padding-left: 10px;
         padding-right: 8px;
@@ -217,6 +228,7 @@ component SelectControl inherits Rectangle {
     }
     ta := TouchArea {
         mouse-cursor: pointer;
+        enabled: root.enabled;
         clicked => { pop.show(); }
     }
     pop := PopupWindow {
@@ -269,14 +281,15 @@ component SelectControl inherits Rectangle {
     }
 }
 
-component TextControl inherits LineEdit {
+component TextControl inherits TextField {
     in property <SettingRowUI> item;
-    width: 260px;
-    height: 32px;
-    font-size: Theme.fs-md;
-    font-family: item.kind == "mono" ? Theme.mono-font : Theme.ui-font;
+    min-width: 260px;
+    max-width: 260px;
+    mono: item.kind == "mono";
+    password: item.kind == "secret";
     text: item.value;
-    accessible-label: item.label;
+    label: item.label;
+    enabled: item.note == "";
     edited(text) => { SettingsState.edit(item.id, text); }
 }
 
@@ -314,11 +327,13 @@ component RowControl inherits VerticalLayout {
     in property <SettingRowUI> item;
     alignment: center;
     if item.kind == "toggle": Toggle {
+        enabled: item.note == "";
         checked: item.value == "true";
         accessible-label: item.label;
         toggled(v) => { SettingsState.edit(item.id, v ? "true" : "false"); }
     }
     if item.kind == "segmented": Segmented {
+        enabled: item.note == "";
         width: min(340px, max(160px, item.option-labels.length * 72px));
         options: item.option-labels;
         selected: item.selected;
@@ -356,6 +371,9 @@ component RowControl inherits VerticalLayout {
 
 component SettingRowView inherits Rectangle {
     in property <SettingRowUI> item;
+    // Keep short switches beside their labels; move wide editors below on narrow pages.
+    in property <bool> compact;
+    property <bool> stacked: root.compact && root.item.kind != "toggle" && !root.item.full;
     background: item.highlight ? Theme.accent-soft : transparent;
     VerticalLayout {
         padding-left: 14px;
@@ -374,6 +392,7 @@ component SettingRowView inherits Rectangle {
                     text: root.item.label;
                     color: Theme.text;
                     font-size: Theme.fs-md;
+                    wrap: word-wrap;
                 }
                 if root.item.description != "": Text {
                     text: root.item.description;
@@ -382,13 +401,24 @@ component SettingRowView inherits Rectangle {
                     wrap: word-wrap;
                 }
             }
-            if !root.item.full: RowControl { item: root.item; }
+            if !root.item.full && !root.stacked: RowControl { item: root.item; }
+        }
+        if root.stacked: HorizontalLayout {
+            Rectangle { horizontal-stretch: 1; }
+            RowControl { item: root.item; }
+        }
+        if root.item.note != "": Text {
+            text: root.item.note;
+            font-size: Theme.fs-sm;
+            color: Theme.text-3;
+            wrap: word-wrap;
         }
         // Widget rows (and the fallback list editor) draw their panel here, full width.
         if root.item.full: HorizontalLayout {
             spacing: 0px;
             if root.item.area == "appearance": AppearanceWidget {
                 id: root.item.id;
+                compact: root.compact;
                 act(a) => { SettingsState.action(a); }
             }
             if root.item.area == "models": ModelsWidget {
@@ -438,10 +468,9 @@ component SettingsNav inherits Rectangle {
                 clicked => { SettingsState.open = false; }
             }
         }
-        search := LineEdit {
-            placeholder-text: "Search settings";
-            accessible-label: "Search settings";
-            font-size: Theme.fs-md;
+        search := TextField {
+            placeholder: "Search settings";
+            label: "Search settings";
             height: 30px;
             text <=> SettingsState.query;
             edited(text) => { SettingsState.search(text); }
@@ -575,6 +604,7 @@ component ScopePills inherits VerticalLayout {
 }
 
 component SettingsPageView inherits Rectangle {
+    in property <bool> compact;
     // Approximate scroll to a search-jumped row: the controller estimates the offset.
     // (`changed` handlers only bind to local properties, so the global is mirrored here.)
     property <int> jump: SettingsState.jump-scroll;
@@ -584,8 +614,8 @@ component SettingsPageView inherits Rectangle {
         }
     }
     VerticalLayout {
-        padding-left: 28px;
-        padding-right: 28px;
+        padding-left: root.compact ? Theme.space-xl : 28px;
+        padding-right: root.compact ? Theme.space-xl : 28px;
         padding-top: 20px;
         spacing: 14px;
         VerticalLayout {
@@ -593,6 +623,7 @@ component SettingsPageView inherits Rectangle {
             Text {
                 vertical-alignment: center;
                 text: SettingsState.group-title + " › " + SettingsState.page-title;
+                overflow: elide;
                 color: Theme.text;
                 font-size: Theme.fs-lg - 2px;
                 font-weight: 600;
@@ -618,6 +649,7 @@ component SettingsPageView inherits Rectangle {
         }
         if SettingsState.rows.length == 0 && !SettingsState.loading: Text {
                 text: "Nothing on this page yet — its feature is still on the parity checklist.";
+                wrap: word-wrap;
                 color: Theme.text-4;
                 font-size: Theme.fs-sm;
             }
@@ -625,7 +657,7 @@ component SettingsPageView inherits Rectangle {
             vertical-stretch: 1;
             VerticalLayout {
                 alignment: start;
-                for r[i] in SettingsState.rows: SettingRowView { item: r; }
+                for r[i] in SettingsState.rows: SettingRowView { item: r; compact: root.compact; }
                 Rectangle { height: 12px; }
             }
         }
@@ -667,12 +699,15 @@ export component SettingsModal inherits Rectangle {
         HorizontalLayout {
             spacing: 0px;
             SettingsNav {
-                width: 226px;
+                width: card.width < 820px ? 180px : 226px;
                 background: Theme.sidebar-bg;
             }
             Rectangle { width: 1px; background: Theme.border; }
             if SettingsState.query != "": SearchResults { horizontal-stretch: 1; }
-            if SettingsState.query == "": SettingsPageView { horizontal-stretch: 1; }
+            if SettingsState.query == "": SettingsPageView {
+                compact: card.width < 820px;
+                horizontal-stretch: 1;
+            }
         }
     }
 }

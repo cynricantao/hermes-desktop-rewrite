@@ -76,7 +76,7 @@ pub(crate) async fn load(id: &str, ctx: &Ctx) {
 pub(crate) async fn action(rest: &str, ctx: &Ctx) -> Outcome {
     let mut parts = rest.splitn(3, ':');
     match parts.next().unwrap_or("") {
-        "palette" => pick_palette(parts.next().unwrap_or(""), ctx).await,
+        "palette" => pick_palette(parts.next().unwrap_or("")),
         "font" => {
             let which = parts.next().unwrap_or("chat");
             pick_font(which == "terminal", parts.next().unwrap_or(""), ctx)
@@ -105,7 +105,8 @@ async fn load_palette(ctx: &Ctx) {
             return;
         }
     };
-    let active = value.get("active").and_then(Value::as_str).unwrap_or("").to_owned();
+    let active = hermes_core::prefs::Prefs::load(hermes_core::prefs::default_path())
+        .get_str(PALETTE_KEY, hermes_core::prefs::default_for(PALETTE_KEY));
     let mut cards: Vec<PaletteCard> = Vec::new();
     if let Some(themes) = value.get("themes").and_then(Value::as_array) {
         for (i, t) in themes.iter().enumerate() {
@@ -136,33 +137,12 @@ async fn load_palette(ctx: &Ctx) {
     });
 }
 
-async fn pick_palette(name: &str, ctx: &Ctx) -> Outcome {
-    if name.is_empty() {
-        return Outcome::Error("No palette name.".into());
+fn pick_palette(name: &str) -> Outcome {
+    if name != "nous" && !LOCAL_PALETTES.contains(&name) {
+        return Outcome::Error("This palette is not rendered by the Rust app yet; no theme was changed.".into());
     }
-    let body = serde_json::json!({ "name": name });
-    let path = format!("/api/dashboard/theme{}", ctx.profile_query());
-    if let Err(e) = ctx.put_json(&path, &body).await {
-        return Outcome::Error(format!("Could not switch the dashboard theme: {e}"));
-    }
-    // Apply the local palette at once. The panel's edit path applies it too, but only for
-    // the default profile (the widget row's store is `Store::None`, so nothing runs for it).
-    let for_ui = name.to_owned();
-    ctx.ui(move |w| apply_pref(w, PALETTE_KEY, &for_ui));
-    // Persist the device pref so the row and the panel agree and a restart keeps the look.
-    persist_pref(PALETTE_KEY, name);
+    // One controller-owned write, followed by live application only after success.
     Outcome::Edit(PALETTE_KEY.to_owned(), name.to_owned())
-}
-
-/// Write one device pref the way the controller does (same file, same key, atomic write).
-///
-/// The palette row is a `widget()` / `Store::None` registry row, so `edit_setting` does not
-/// persist an `Outcome::Edit` for it (verified in `controller.rs`: `Store::None => {}`).
-/// Without this the choice would be lost on restart. If that row ever becomes a device row,
-/// `edit_setting` writes the same key and this becomes a harmless duplicate write.
-fn persist_pref(key: &str, value: &str) {
-    let mut prefs = hermes_core::prefs::Prefs::load(hermes_core::prefs::default_path());
-    let _ = prefs.set(key, Value::String(value.to_owned()));
 }
 
 // ── Fonts ───────────────────────────────────────────────────────────────────────
@@ -235,38 +215,12 @@ async fn load_font(ctx: &Ctx, chat: bool) {
             }
             s.set_fonts_error(error_s);
         }
-        // Mirror the controller's startup mapping (empty = the bundled font) so the picker
-        // and the live app never disagree.
-        let family: SharedString = if current.is_empty() {
-            if chat { "Inter" } else { "JetBrains Mono" }.into()
-        } else {
-            current.as_str().into()
-        };
-        let t = w.global::<Theme>();
-        if chat {
-            t.set_ui_font(family);
-        } else {
-            t.set_mono_font(family);
-        }
+        // Browsing another profile (or a failed read) must not change the active window.
     });
 }
 
-fn pick_font(terminal: bool, family: &str, ctx: &Ctx) -> Outcome {
-    // Live preview; the panel's edit path saves and applies the same mapping.
-    let for_ui = family.to_owned();
-    ctx.ui(move |w| {
-        let value: SharedString = if for_ui.is_empty() {
-            if terminal { "JetBrains Mono" } else { "Inter" }.into()
-        } else {
-            for_ui.as_str().into()
-        };
-        let t = w.global::<Theme>();
-        if terminal {
-            t.set_mono_font(value);
-        } else {
-            t.set_ui_font(value);
-        }
-    });
+fn pick_font(terminal: bool, family: &str, _ctx: &Ctx) -> Outcome {
+    // Apply only after the controller verifies persistence in the correct profile.
     let key = if terminal { TERMINAL_FONT_KEY } else { CHAT_FONT_KEY };
     Outcome::Edit(key.to_owned(), family.to_owned())
 }

@@ -6,9 +6,10 @@
 // `act("<area>:<verb>[:<arg>]")` — settings.slint forwards those to
 // `SettingsState.action`. Rendered full-width inside the settings row for its id.
 
-import { ScrollView, LineEdit } from "std-widgets.slint";
+import { ScrollView } from "std-widgets.slint";
 import { Theme, Motion } from "theme.slint";
 import { Icons } from "icons.slint";
+import { TextField } from "kit/kit.slint";
 
 /// One dashboard theme offered by `GET /api/dashboard/themes`. `local` is set when this
 /// client can render the theme's palette locally (otherwise only the backend switches).
@@ -116,18 +117,22 @@ component PaletteCardView inherits Rectangle {
                 color: Theme.text-3;
                 font-size: Theme.fs-xs;
                 wrap: word-wrap;
+                max-lines: 2;
+                overflow: elide;
             }
             if !card.local: Text {
                 text: "Backend theme only — this window keeps its own palette.";
                 color: Theme.text-4;
                 font-size: Theme.fs-xs;
                 wrap: word-wrap;
+                max-lines: 3;
+                overflow: elide;
             }
         }
-        if card.active: VerticalLayout {
+        VerticalLayout {
             width: 16px;
             alignment: center;
-            Image {
+            if card.active: Image {
                 source: Icons.get("check");
                 width: 14px;
                 height: 14px;
@@ -146,15 +151,17 @@ component PaletteCardView inherits Rectangle {
 component PaletteGrid inherits Rectangle {
     in property <[PaletteCard]> cards;
     in property <int> rows: 1;
+    in property <bool> compact;
     callback picked(string);
     property <length> gap: 10px;
-    property <length> card-h: 100px;
-    property <length> cell: (self.width - 2 * gap) / 3;
-    height: rows * (card-h + gap) - gap;
+    property <length> card-h: compact ? 120px : 140px;
+    property <length> cell: compact ? self.width : (self.width - 2 * gap) / 3;
+    height: max(0px, (compact ? cards.length : rows) * (card-h + gap) - gap);
     for c[i] in cards: PaletteCardView {
-        x: c.col * (cell + gap);
-        y: c.row * (card-h + gap);
+        x: root.compact ? 0px : c.col * (cell + gap);
+        y: (root.compact ? i : c.row) * (card-h + gap);
         width: cell;
+        height: card-h;
         card: c;
         picked => { root.picked(c.name); }
     }
@@ -230,11 +237,10 @@ component FontPicker inherits VerticalLayout {
             font-size: Theme.fs-xs;
         }
     }
-    LineEdit {
+    TextField {
         height: 30px;
-        font-size: Theme.fs-md;
-        placeholder-text: "Filter installed fonts";
-        accessible-label: "Filter installed fonts";
+        placeholder: "Filter installed fonts";
+        label: "Filter installed fonts";
         text <=> query;
         edited(t) => { root.filter(t); }
     }
@@ -278,6 +284,7 @@ component FontPicker inherits VerticalLayout {
 
 export component AppearanceWidget inherits VerticalLayout {
     in property <string> id;
+    in property <bool> compact;
     callback act(string);
     spacing: 8px;
 
@@ -298,6 +305,7 @@ export component AppearanceWidget inherits VerticalLayout {
         PaletteGrid {
             cards: AppearanceState.palettes;
             rows: AppearanceState.palette-rows;
+            compact: root.compact;
             picked(n) => { root.act("appearance:palette:" + n); }
         }
         Text {

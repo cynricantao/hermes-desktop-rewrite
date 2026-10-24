@@ -242,10 +242,10 @@ fn dechunk(mut b: &[u8]) -> Result<Vec<u8>, HttpError> {
     }
 }
 
-/// `?profile=<name>` suffix for profile-scoped routes (empty for the default profile,
-/// which the backend treats the same as no parameter).
+/// Empty selects the running backend's profile. A named `default` selects the
+/// actual default root, which can differ from the profile that launched the backend.
 pub fn profile_query(profile: &str) -> String {
-    if profile.is_empty() || profile == "default" {
+    if profile.is_empty() {
         String::new()
     } else {
         format!("?profile={}", crate::backend::percent_encode(profile))
@@ -255,6 +255,13 @@ pub fn profile_query(profile: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn default_profile_is_not_an_alias_for_the_launch_profile() {
+        assert_eq!(profile_query(""), "");
+        assert_eq!(profile_query("default"), "?profile=default");
+        assert_eq!(profile_query("work"), "?profile=work");
+    }
 
     #[test]
     fn parses_content_length_body() {
@@ -278,9 +285,9 @@ mod tests {
     }
 
     #[test]
-    fn profile_query_skips_default() {
+    fn profile_query_keeps_named_targets_explicit() {
         assert_eq!(profile_query(""), "");
-        assert_eq!(profile_query("default"), "");
+        assert_eq!(profile_query("default"), "?profile=default");
         assert_eq!(profile_query("swe"), "?profile=swe");
     }
 

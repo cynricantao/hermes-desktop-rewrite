@@ -228,6 +228,8 @@ export component GhostButton inherits Rectangle {
 }
 
 export component Toggle inherits Rectangle {
+    in property <bool> enabled: true;
+    opacity: enabled ? 1 : 0.5;
     in-out property <bool> checked;
     callback toggled(bool);
     width: 36px;
@@ -237,7 +239,7 @@ export component Toggle inherits Rectangle {
     animate background { duration: Motion.base; easing: Ease.standard; }
     accessible-role: switch;
     accessible-checked: checked;
-    accessible-action-default => { root.checked = !root.checked; root.toggled(root.checked); }
+    accessible-action-default => { if root.enabled { root.checked = !root.checked; root.toggled(root.checked); } }
     knob := Rectangle {
         width: 16px;
         height: 16px;
@@ -251,12 +253,15 @@ export component Toggle inherits Rectangle {
     }
     TouchArea {
         mouse-cursor: pointer;
+        enabled: root.enabled;
         clicked => { root.checked = !root.checked; root.toggled(root.checked); }
     }
 }
 
 // Segmented control: "Normal | Thinking | Verbose", "Light | Dark | System" …
 export component Segmented inherits Rectangle {
+    in property <bool> enabled: true;
+    opacity: enabled ? 1 : 0.5;
     in property <[string]> options;
     in-out property <int> selected;
     callback changed(int);
@@ -286,14 +291,14 @@ export component Segmented inherits Rectangle {
         accessible-role: tab;
         accessible-label: opt;
         accessible-item-selected: i == root.selected;
-        accessible-action-default => { root.selected = i; root.changed(i); }
+        accessible-action-default => { if root.enabled { root.selected = i; root.changed(i); } }
         Text {
             text: opt;
             font-size: Theme.fs-sm + 0.5px;
             color: i == root.selected ? Theme.text : Theme.text-3;
             animate color { duration: Motion.fast; }
         }
-        TouchArea { mouse-cursor: pointer; clicked => { root.selected = i; root.changed(i); } }
+        TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.selected = i; root.changed(i); } }
     }
 }
 

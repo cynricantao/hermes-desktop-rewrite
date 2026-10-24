@@ -463,6 +463,50 @@ const fn term(
         ..cfg(group, page, key, label, description, control, keywords)
     }
 }
+/// Match backend profile metadata without guessing a profile from a directory name.
+pub fn profile_name_for_home<'a>(roster: &'a Value, home: &std::path::Path) -> Option<&'a str> {
+    roster
+        .get("profiles")?
+        .as_array()?
+        .iter()
+        .find(|profile| {
+            profile
+                .get("path")
+                .and_then(Value::as_str)
+                .is_some_and(|path| std::path::Path::new(path) == home)
+        })?
+        .get("name")?
+        .as_str()
+        .filter(|name| !name.is_empty())
+}
+
+/// Every editable native preference must have a running consumer. Unported controls
+/// stay visible, but cannot claim a successful save that has no effect.
+pub fn unavailable_reason(setting: &Setting) -> Option<&'static str> {
+    match setting.store {
+        Store::Device(key)
+            if !matches!(
+                key,
+                "zoom"
+                    | "hermes.desktop.chat-text-scale.v1"
+                    | "hermes.desktop.intro-splash.v1"
+                    | "hermes-desktop-mode-v1"
+                    | "hermes-desktop-theme-v2"
+                    | "hermes.desktop.user-bubble-transparency.v1"
+                    | "hermes.desktop.toolView.technical"
+                    | "hermes.desktop.toolView.hideCodeDiffs"
+                    | "hermes.desktop.reasoning.collapsedByDefault"
+            ) =>
+        {
+            Some("Not yet available in the Rust app. This control is disabled; no change will be saved.")
+        }
+        Store::Config("display.language" | "display.resume_last_session") => {
+            Some("This desktop feature is not implemented in the Rust app yet. This control is disabled.")
+        }
+        _ => None,
+    }
+}
+
 const SCALES: &[Opt] = &[
     o("90", "90%"),
     o("100", "100%"),
@@ -583,34 +627,37 @@ pub const SETTINGS: &[Setting] = &[
         Control::Segmented(&[o("light", "Light"), o("dark", "Dark"), o("system", "System")]),
         &["color mode", "skin", "light", "dark"],
     ),
-    widget(
-        "appearance",
-        "theme",
-        "hermes-desktop-theme-v2",
-        "Palette",
-        "",
-        &[
-            "palette",
-            "skin",
-            "omarchy",
-            "nous",
-            "github",
-            "catppuccin",
-            "everforest",
-            "solarized",
-            "midnight",
-            "ember",
-            "mono",
-            "slate",
-            "cyberpunk",
-        ],
-    ),
+    Setting {
+        store: Store::Device("hermes-desktop-theme-v2"),
+        ..widget(
+            "appearance",
+            "theme",
+            "hermes-desktop-theme-v2",
+            "Palette",
+            "",
+            &[
+                "palette",
+                "skin",
+                "omarchy",
+                "nous",
+                "github",
+                "catppuccin",
+                "everforest",
+                "solarized",
+                "midnight",
+                "ember",
+                "mono",
+                "slate",
+                "cyberpunk",
+            ],
+        )
+    },
     dev(
         "appearance",
         "typography",
         "zoom",
         "UI Scale",
-        "Scales text and controls across the whole app. Cmd/Ctrl with +, - and 0 also works.",
+        "Scales text and controls across the whole app.",
         Control::Segmented(SCALES),
         &["zoom", "size"],
     ),
@@ -799,7 +846,7 @@ pub const SETTINGS: &[Setting] = &[
         "chat-display",
         "hermes.desktop.toolView.technical",
         "Tool Call Display",
-        "Product hides raw tool payloads; Technical shows full input/output.",
+        "Product hides raw tool payloads; Technical shows the captured context and output preview.",
         Control::Segmented(&[o("false", "Product"), o("true", "Technical")]),
         &["tool display", "technical"],
     ),
@@ -2357,6 +2404,15 @@ pub fn get<'a>(config: &'a Value, dotted: &str) -> Option<&'a Value> {
     dotted.split('.').try_fold(config, |v, k| v.get(k))
 }
 
+/// Reasoning visibility for local chats: CLI platform override wins over the global
+/// display preference, matching the original desktop's `localShowReasoning` helper.
+pub fn local_show_reasoning(config: &Value) -> bool {
+    let value = get(config, "display.platforms.cli.show_reasoning")
+        .filter(|v| !v.is_null())
+        .or_else(|| get(config, "display.show_reasoning"));
+    !matches!(value, Some(Value::Bool(false))) && !value.is_some_and(|v| v == "false" || v == 0)
+}
+
 /// String form of a config value ("" when missing / null).
 pub fn get_str(config: &Value, dotted: &str) -> String {
     match get(config, dotted) {
@@ -2407,9 +2463,24 @@ pub fn set_in(config: &mut Value, dotted: &str, value: Value) {
 /// using the current value's JSON type as a hint for free text (numbers stay numbers).
 pub fn parse_value(control: &Control, raw: &str, current: Option<&Value>) -> Result<Value, String> {
     let raw_t = raw.trim();
+    if let Control::Segmented(options) | Control::Select(options) = control
+        && !options.is_empty()
+        && !options.iter().any(|option| option.value == raw)
+    {
+        return Err("Choose one of the available options; no change was saved.".into());
+    }
+    if matches!(control, Control::Toggle) && !matches!(raw_t, "true" | "false") {
+        return Err("Expected true or false; no change was saved.".into());
+    }
     match control {
         Control::Toggle => Ok(Value::Bool(raw_t == "true")),
-        Control::Number | Control::Slider { .. } => {
+        Control::Slider { min, max, .. } => raw_t
+            .parse::<f64>()
+            .ok()
+            .filter(|f| f.is_finite())
+            .map(|f| Value::from(f.round().clamp(f64::from(*min), f64::from(*max)) as i64))
+            .ok_or_else(|| format!("“{raw_t}” is not a number")),
+        Control::Number => {
             if raw_t.is_empty() {
                 return Ok(Value::from(0));
             }
@@ -2436,16 +2507,7 @@ pub fn parse_value(control: &Control, raw: &str, current: Option<&Value>) -> Res
             Ok(Value::Bool(raw_t == "true"))
         }
         _ => match current {
-            Some(Value::Number(_)) => raw_t
-                .parse::<f64>()
-                .map(|f| {
-                    if f.fract() == 0.0 {
-                        Value::from(f as i64)
-                    } else {
-                        Value::from(f)
-                    }
-                })
-                .map_err(|_| format!("“{raw_t}” is not a number")),
+            Some(Value::Number(_)) => parse_value(&Control::Number, raw, current),
             Some(Value::Bool(_)) => Ok(Value::Bool(raw_t == "true")),
             _ => Ok(Value::String(raw.to_owned())),
         },
@@ -2582,6 +2644,38 @@ pub fn rows_for(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn slider_values_are_canonical_before_saving() {
+        let slider = Control::Slider {
+            min: 0,
+            max: 100,
+            unit: "%",
+        };
+        for (input, expected) in [("0", 0), ("100", 100), ("-3", 0), ("101", 100), ("49.6", 50)] {
+            assert_eq!(parse_value(&slider, input, None).unwrap(), json!(expected));
+        }
+        for invalid in ["NaN", "inf", "not a number"] {
+            assert!(parse_value(&slider, invalid, None).is_err());
+        }
+    }
+
+    #[test]
+    fn local_reasoning_visibility_matches_desktop_precedence() {
+        assert!(local_show_reasoning(&json!({})));
+        for off in [json!(false), json!("false"), json!(0)] {
+            assert!(!local_show_reasoning(&json!({"display": {"show_reasoning": off}})));
+            assert!(!local_show_reasoning(&json!({"display": {
+                "show_reasoning": true, "platforms": {"cli": {"show_reasoning": off}}
+            }})));
+        }
+        assert!(local_show_reasoning(&json!({"display": {
+            "show_reasoning": false, "platforms": {"cli": {"show_reasoning": true}}
+        }})));
+        assert!(!local_show_reasoning(&json!({"display": {
+            "show_reasoning": false, "platforms": {"cli": {"show_reasoning": null}}
+        }})));
+    }
 
     #[test]
     fn every_setting_lives_on_a_real_page() {
@@ -2725,6 +2819,23 @@ mod tests {
     }
 
     #[test]
+    fn profile_identity_comes_from_backend_paths_not_default_assumptions() {
+        let roster = json!({"profiles": [
+            {"name": "default", "path": "/fixture/root"},
+            {"name": "work", "path": "/fixture/root/profiles/work"}
+        ]});
+        assert_eq!(
+            profile_name_for_home(&roster, std::path::Path::new("/fixture/root/profiles/work")),
+            Some("work")
+        );
+        assert_eq!(
+            profile_name_for_home(&roster, std::path::Path::new("/fixture/root")),
+            Some("default")
+        );
+        assert_eq!(profile_name_for_home(&roster, std::path::Path::new("/unknown")), None);
+    }
+
+    #[test]
     fn rows_resolve_values_and_options() {
         let cfg = json!({
             "display": {"language": "fr"},
@@ -2741,13 +2852,13 @@ mod tests {
         let splash = rows.iter().find(|r| r.id == "hermes.desktop.intro-splash.v1").unwrap();
         assert_eq!(splash.kind, "toggle");
         assert_eq!(splash.value, "true");
-        // The palette row is a page widget with no text value.
+        // The palette widget uses the same device preference as its runtime consumer.
         let pal = rows_for("appearance", "theme", &cfg, &prefs, |_| None)
             .into_iter()
             .find(|r| r.id == "hermes-desktop-theme-v2")
             .unwrap();
         assert_eq!(pal.kind, "widget");
-        assert_eq!(pal.value, "");
+        assert_eq!(pal.value, "nous");
     }
 
     #[test]

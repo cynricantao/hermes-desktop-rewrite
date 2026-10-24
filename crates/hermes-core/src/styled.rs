@@ -54,6 +54,100 @@ pub fn escape_literal(text: &str) -> String {
 
 // ── Prose ───────────────────────────────────────────────────────────────────────
 
+/// A readable prose block. Layout and colours belong to the UI, not this parser.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct ProseBlock {
+    pub text: String,
+    pub heading_level: u8,
+    pub marker: String,
+    /// Source indentation in spaces, retained for nested list items.
+    pub indent: usize,
+}
+
+/// Separate paragraphs, headings and list items before handing them to StyledText.
+/// Slint's inline renderer otherwise loses the space between those blocks. Call this
+/// on prose from `markdown::split`, never on code fences or table source.
+pub fn prose_blocks(text: &str) -> Vec<ProseBlock> {
+    let mut blocks = Vec::new();
+    let mut current = ProseBlock::default();
+    let flush = |current: &mut ProseBlock, blocks: &mut Vec<ProseBlock>| {
+        if !current.text.trim().is_empty() || !current.marker.is_empty() {
+            blocks.push(std::mem::take(current));
+        }
+    };
+    for raw in text.lines() {
+        let line = raw.replace('\t', "    ");
+        let trimmed = line.trim();
+        let indent = line.len() - line.trim_start_matches(' ').len();
+        if trimmed.is_empty() {
+            flush(&mut current, &mut blocks);
+            continue;
+        }
+        if let Some(heading) = atx_heading(&line) {
+            flush(&mut current, &mut blocks);
+            if !heading.is_empty() {
+                blocks.push(ProseBlock {
+                    text: heading,
+                    heading_level: trimmed.chars().take_while(|&c| c == '#').count() as u8,
+                    ..Default::default()
+                });
+            }
+            continue;
+        }
+        if !current.text.is_empty()
+            && current.marker.is_empty()
+            && (trimmed.chars().all(|c| c == '=') || trimmed.chars().all(|c| c == '-'))
+        {
+            current.heading_level = if trimmed.starts_with('=') { 1 } else { 2 };
+            flush(&mut current, &mut blocks);
+            continue;
+        }
+        // A rule is not a bullet or a setext heading when separated by a blank line.
+        if !is_rule_or_underline(&line)
+            && let Some((marker, body)) = prose_list_prefix(trimmed)
+        {
+            flush(&mut current, &mut blocks);
+            current = ProseBlock {
+                text: body.to_owned(),
+                marker: marker.to_owned(),
+                indent,
+                ..Default::default()
+            };
+            // Task boxes are content, but their list prefix lives in a separate gutter.
+            for (prefix, glyph) in [("[ ] ", "☐ "), ("[x] ", "☑ "), ("[X] ", "☑ ")] {
+                if let Some(rest) = current.text.strip_prefix(prefix) {
+                    current.text = format!("{glyph}{rest}");
+                    break;
+                }
+            }
+        } else {
+            if !current.text.is_empty() {
+                current.text.push('\n');
+            }
+            // Retain indented code in ordinary prose; list continuations share the
+            // item's hanging indent rather than introducing another markdown list.
+            current
+                .text
+                .push_str(if current.marker.is_empty() { &line } else { trimmed });
+        }
+    }
+    flush(&mut current, &mut blocks);
+    blocks
+}
+
+fn prose_list_prefix(text: &str) -> Option<(&str, &str)> {
+    let digits = text.bytes().take_while(u8::is_ascii_digit).count();
+    let end = if text.starts_with(['-', '*', '+']) {
+        1
+    } else if digits > 0 && matches!(text.as_bytes().get(digits), Some(b'.' | b')')) {
+        digits + 1
+    } else {
+        return None;
+    };
+    let rest = &text[end..];
+    (rest.is_empty() || rest.starts_with(char::is_whitespace)).then(|| (&text[..end], rest.trim_start()))
+}
+
 fn prose(text: &str) -> String {
     let mut out: Vec<String> = Vec::new();
     // Last non-blank source line was a list item / its indented continuation, so a
@@ -314,6 +408,36 @@ fn table_as_list(t: &Table) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn readable_blocks_keep_paragraphs_lists_and_continuations() {
+        let blocks = prose_blocks(
+            "Intro.\n\n## Steps\n1.\nRecord a video.\n2. Share it.\n  - Ask for **feedback**.\n  - [x] Keep the draft.\n\nDone.",
+        );
+        assert_eq!(blocks.len(), 7);
+        assert_eq!((&blocks[0].text, blocks[0].heading_level), (&"Intro.".to_owned(), 0));
+        assert_eq!((&blocks[1].text, blocks[1].heading_level), (&"Steps".to_owned(), 2));
+        assert_eq!(
+            (&blocks[2].marker, &blocks[2].text),
+            (&"1.".to_owned(), &"Record a video.".to_owned())
+        );
+        assert_eq!(blocks[3].marker, "2.");
+        assert_eq!(blocks[4].indent, 2);
+        assert_eq!(blocks[4].text, "Ask for **feedback**.");
+        assert_eq!(blocks[5].text, "☑ Keep the draft.");
+        assert_eq!(blocks[6].text, "Done.");
+    }
+
+    #[test]
+    fn readable_blocks_preserve_setext_rules_and_literal_numbers() {
+        let blocks = prose_blocks("Title\n=====\n\n---\n\n3.14 is pi.\nA wrapped sentence.\n\n99) Numbered item.");
+        assert_eq!(blocks[0].heading_level, 1);
+        assert_eq!(blocks[1].text, "---");
+        assert!(blocks[1].marker.is_empty());
+        assert_eq!(blocks[2].text, "3.14 is pi.\nA wrapped sentence.");
+        assert_eq!(blocks[3].marker, "99)");
+        assert!(prose_blocks("  \n").is_empty());
+    }
 
     #[test]
     fn headings_become_bold_lines() {

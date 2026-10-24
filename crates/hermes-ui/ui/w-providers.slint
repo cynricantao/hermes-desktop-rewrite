@@ -20,6 +20,7 @@
 import { ScrollView, LineEdit } from "std-widgets.slint";
 import { Theme, Motion, Ease } from "theme.slint";
 import { Icons } from "icons.slint";
+import { TextField } from "kit/kit.slint";
 import { PrimaryButton, GhostButton, Toggle, IconButton, Chip } from "components.slint";
 
 // ── Models ──────────────────────────────────────────────────────────────────────
@@ -482,7 +483,9 @@ component KeyRowItem inherits Rectangle {
             spacing: 8px;
             MonoLabel {
                 text: root.entry.label;
-                width: 236px;
+                min-width: 120px;
+                max-width: 236px;
+                horizontal-stretch: 1;
                 overflow: elide;
             }
             Text {
@@ -529,13 +532,12 @@ component KeyRowItem inherits Rectangle {
             }
             HorizontalLayout {
                 spacing: 8px;
-                input := LineEdit {
+                input := TextField {
                     text <=> root.draft;
-                    placeholder-text: root.entry.is-set ? "Replace value…" : "Paste value…";
-                    font-size: Theme.fs-sm;
-                    input-type: root.entry.is-password ? InputType.password : InputType.text;
+                    placeholder: root.entry.is-set ? "Replace value…" : "Paste value…";
+                    password: root.entry.is-password;
                     horizontal-stretch: 1;
-                    accessible-label: root.entry.label;
+                    label: root.entry.label;
                     accepted(t) => { root.act("providers:env-set:" + root.entry.key + ":" + t); }
                 }
                 GhostButton {
@@ -710,62 +712,28 @@ component ToolsPanel inherits VerticalLayout {
 component PoolEntryRow inherits Rectangle {
     in property <PoolEntry> entry;
     callback act(string);
-    height: 30px;
-    HorizontalLayout {
-        spacing: 10px;
-        Text {
-            text: "#" + root.entry.index;
-            color: Theme.text-4;
-            font-size: Theme.fs-sm;
-            width: 26px;
-            vertical-alignment: center;
+    height: content.preferred-height;
+    content := VerticalLayout {
+        padding: 8px;
+        spacing: 6px;
+        HorizontalLayout {
+            spacing: 8px;
+            Text { text: "#" + root.entry.index; color: Theme.text-4; font-size: Theme.fs-sm; }
+            Text { text: root.entry.label; color: Theme.text; font-size: Theme.fs-sm; horizontal-stretch: 1; overflow: elide; }
+            Chip { text: root.entry.auth-type; interactive: false; outlined: true; }
+            TwoClickButton {
+                text: "Remove";
+                confirm-text: "Remove?";
+                confirmed => { root.act("providers:vault-del:" + root.entry.provider + ":" + root.entry.index); }
+            }
         }
-        Text {
-            text: root.entry.label;
-            color: Theme.text;
-            font-size: Theme.fs-sm;
-            width: 210px;
-            vertical-alignment: center;
-            overflow: elide;
-        }
-        Chip { text: root.entry.auth-type; interactive: false; outlined: true; }
-        Text {
-            text: root.entry.source;
-            color: Theme.text-3;
-            font-size: Theme.fs-xs;
-            font-family: Theme.mono-font;
-            horizontal-stretch: 1;
-            vertical-alignment: center;
-            overflow: elide;
-        }
-        Text {
-            text: root.entry.status != "" ? root.entry.status : "—";
-            color: root.entry.status == "ok" ? Theme.diff-add-fg : Theme.text-3;
-            font-size: Theme.fs-xs;
-            width: 30px;
-            vertical-alignment: center;
-        }
-        Text {
-            text: root.entry.requests + " req";
-            color: Theme.text-3;
-            font-size: Theme.fs-xs;
-            width: 56px;
-            vertical-alignment: center;
-        }
-        Text {
-            text: root.entry.token-preview;
-            color: Theme.text-4;
-            font-size: Theme.fs-xs;
-            font-family: Theme.mono-font;
-            width: 96px;
-            vertical-alignment: center;
-            overflow: elide;
-        }
-        if root.entry.has-refresh: Chip { text: "refresh"; interactive: false; outlined: true; }
-        TwoClickButton {
-            text: "Remove";
-            confirm-text: "Remove?";
-            confirmed => { root.act("providers:vault-del:" + root.entry.provider + ":" + root.entry.index); }
+        Text { text: root.entry.source; color: Theme.text-3; font-size: Theme.fs-xs; font-family: Theme.mono-font; overflow: elide; }
+        HorizontalLayout {
+            spacing: 8px;
+            Text { text: root.entry.status != "" ? root.entry.status : "—"; color: root.entry.status == "ok" ? Theme.diff-add-fg : Theme.text-3; font-size: Theme.fs-xs; }
+            Text { text: root.entry.requests + " req"; color: Theme.text-3; font-size: Theme.fs-xs; }
+            Text { text: root.entry.token-preview; color: Theme.text-4; font-size: Theme.fs-xs; font-family: Theme.mono-font; max-width: 96px; horizontal-stretch: 1; overflow: elide; }
+            if root.entry.has-refresh: Chip { text: "refresh"; interactive: false; outlined: true; }
         }
     }
 }
@@ -890,6 +858,7 @@ component EndpointsPanel inherits VerticalLayout {
         text: "No custom endpoints yet. Add any OpenAI-compatible base URL below.";
         color: Theme.text-4;
         font-size: Theme.fs-sm;
+        wrap: word-wrap;
     }
     for row[i] in ProvidersState.endpoint-rows: EndpointRowItem {
         entry: row;
@@ -906,40 +875,42 @@ component EndpointsPanel inherits VerticalLayout {
         HorizontalLayout {
             spacing: 8px;
             FieldLabel { text: "Name"; width: 74px; }
-            name-in := LineEdit {
+            name-in := TextField {
                 text <=> ProvidersState.form-name;
-                placeholder-text: "e.g. vLLM box";
-                font-size: Theme.fs-sm;
+                placeholder: "e.g. vLLM box";
                 horizontal-stretch: 1;
-                accessible-label: "Endpoint name";
+                label: "Endpoint name";
             }
-            FieldLabel { text: "Base URL"; width: 62px; }
-            base-in := LineEdit {
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            FieldLabel { text: "Base URL"; width: 74px; }
+            base-in := TextField {
                 text <=> ProvidersState.form-base-url;
-                placeholder-text: "https://host/v1";
-                font-size: Theme.fs-sm;
-                horizontal-stretch: 2;
-                accessible-label: "Endpoint base URL";
+                placeholder: "https://host/v1";
+                horizontal-stretch: 1;
+                label: "Endpoint base URL";
             }
         }
         HorizontalLayout {
             spacing: 8px;
             FieldLabel { text: "Model"; width: 74px; }
-            model-in := LineEdit {
+            model-in := TextField {
                 text <=> ProvidersState.form-model;
-                placeholder-text: "default model id";
-                font-size: Theme.fs-sm;
+                placeholder: "default model id";
                 horizontal-stretch: 1;
-                accessible-label: "Endpoint model";
+                label: "Endpoint model";
             }
-            FieldLabel { text: "API key"; width: 62px; }
-            key-in := LineEdit {
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            FieldLabel { text: "API key"; width: 74px; }
+            key-in := TextField {
                 text <=> ProvidersState.form-key;
-                placeholder-text: "optional";
-                input-type: InputType.password;
-                font-size: Theme.fs-sm;
-                horizontal-stretch: 2;
-                accessible-label: "Endpoint API key";
+                placeholder: "optional";
+                password: true;
+                horizontal-stretch: 1;
+                label: "Endpoint API key";
             }
         }
         HorizontalLayout {
@@ -973,31 +944,26 @@ component EndpointsPanel inherits VerticalLayout {
 component LocalModelRowItem inherits Rectangle {
     in property <LocalModelRow> entry;
     callback act(string);
-    height: 30px;
-    HorizontalLayout {
-        spacing: 10px;
-        Text {
-            text: root.entry.id;
-            color: Theme.text;
-            font-size: Theme.fs-sm;
-            font-family: Theme.mono-font;
-            horizontal-stretch: 1;
-            vertical-alignment: center;
-            overflow: elide;
-        }
-        Text {
-            text: root.entry.size;
-            color: Theme.text-3;
-            font-size: Theme.fs-sm;
-            width: 70px;
-            vertical-alignment: center;
-        }
-        if root.entry.active: StatusPill { text: "Default"; good: true; }
-        if root.entry.loaded: StatusPill { text: "Loaded"; good: true; }
+    height: 64px;
+    VerticalLayout {
+        spacing: 4px;
         HorizontalLayout {
-            spacing: 6px;
-            width: 168px;
-            alignment: end;
+            spacing: 10px;
+            Text {
+                text: root.entry.id;
+                color: Theme.text;
+                font-size: Theme.fs-sm;
+                font-family: Theme.mono-font;
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            if root.entry.active: StatusPill { text: "Default"; good: true; }
+            if root.entry.loaded: StatusPill { text: "Loaded"; good: true; }
+        }
+        HorizontalLayout {
+            spacing: 10px;
+            Text { text: root.entry.size; color: Theme.text-3; font-size: Theme.fs-sm; vertical-alignment: center; horizontal-stretch: 1; }
             if !root.entry.active: GhostButton {
                 text: "Activate";
                 clicked => { root.act("providers:lm-activate:" + root.entry.id); }
@@ -1016,7 +982,7 @@ component LocalPanel inherits VerticalLayout {
     spacing: 8px;
 
     Card {
-        HorizontalLayout {
+        VerticalLayout {
             spacing: 10px;
             VerticalLayout {
                 horizontal-stretch: 1;
