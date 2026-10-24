@@ -27,7 +27,10 @@
 //!   survive).
 //!
 //! Action ids (the UI side emits them via `act(...)`):
-//! * `models:pick:<provider>:<model>` — set the default model.
+//! * `models:main-scope:<encoded-profile>:stage-provider|stage-model:<value>` — edit a draft.
+//! * `models:main-scope:<encoded-profile>:apply` — verify and save the staged pair.
+//! * `models:main-scope:<encoded-profile>:default-effort|default-speed:<value>` — profile defaults.
+//! * `models:pick:<provider>:<model>` — legacy picker bridge; stages without applying.
 //! * `models:mfilter:<text>` / `models:pfilter:<text>` — filter the main list / the picker.
 //! * `models:open:<target>` — open the picker on `main`, `aux.<task>`, `moa.ref`, `moa.agg`,
 //!   `fb.<index>` or `fb.new`.
@@ -37,6 +40,7 @@
 //! * `models:moa-enabled:<0|1>`, `models:moa-preset:<name>`, `models:moa-ref-enabled:<i>:<0|1>`,
 //!   `models:moa-ref-remove:<i>`, `models:moa-fanout:<i>`, `models:moa-policy:<i>`.
 
+use hermes_core::model_settings::{MainDefaults, ModelDraft};
 use std::sync::{Mutex, MutexGuard};
 
 use serde_json::{Value, json};
@@ -87,6 +91,8 @@ struct Cache {
     scope: String,
     /// Last `/api/model/options` payload.
     options: Value,
+    main_draft: Option<ModelDraft>,
+    config: Option<Value>,
     /// Last `/api/model/moa` payload (the full object PUT back after an edit).
     moa: Value,
     /// Preset the MoA panel edits.
@@ -349,6 +355,129 @@ fn push_moa(ctx: &Ctx, moa: &Value, preset: &str) {
     });
 }
 
+fn choice(value: &str, label: &str) -> crate::SelectOption {
+    crate::SelectOption {
+        value: value.into(),
+        label: label.into(),
+        ..Default::default()
+    }
+}
+
+fn effort_label(value: &str) -> String {
+    match value {
+        "none" => "Off".into(),
+        "xhigh" => "X-High".into(),
+        value => {
+            let mut chars = value.chars();
+            chars
+                .next()
+                .map(|first| first.to_uppercase().to_string() + chars.as_str())
+                .unwrap_or_default()
+        }
+    }
+}
+
+fn push_main(ctx: &Ctx) {
+    let (options, draft, config, query) = {
+        let guard = cache(&ctx.scope);
+        let state = guard.as_ref().expect("cache");
+        (
+            state.options.clone(),
+            state.main_draft.clone().unwrap_or_default(),
+            state.config.clone(),
+            state.main_query.clone(),
+        )
+    };
+    let scope_token = hermes_core::backend::percent_encode(&ctx.scope);
+    let applied = ModelDraft::applied(&options);
+    let defaults = MainDefaults::read(&options, config.as_ref().unwrap_or(&Value::Null));
+    let ready = config.is_some();
+    let providers: Vec<_> = options["providers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|row| {
+            let value = row["slug"].as_str()?;
+            let label = row["name"].as_str().unwrap_or(value);
+            Some((value.to_owned(), label.to_owned()))
+        })
+        .collect();
+    let label = providers
+        .iter()
+        .find(|(value, _)| value == &draft.provider)
+        .map(|(_, label)| label.clone())
+        .unwrap_or_else(|| draft.provider.clone());
+    let models = hermes_core::model_settings::provider(&options, &draft.provider)
+        .and_then(|row| serde_json::from_value::<hermes_core::protocol::ModelOptionProvider>(row.clone()).ok())
+        .map(|row| row.model_ids())
+        .unwrap_or_default();
+    let needle = query.to_lowercase();
+    let models: Vec<_> = models
+        .into_iter()
+        .filter(|id| needle.is_empty() || id.to_lowercase().contains(&needle))
+        .collect();
+    ctx.ui(move |ui| {
+        let state = ui.global::<ModelsState>();
+        // A same-profile refresh must not overwrite UI edits whose commands are queued.
+        if !state.get_main_draft_initialized() || state.get_main_draft_scope_token().as_str() != scope_token {
+            state.set_main_last_provider(draft.provider.as_str().into());
+            state.set_main_draft_provider(draft.provider.as_str().into());
+            state.set_main_draft_model(draft.model.as_str().into());
+            state.set_main_draft_scope_token(scope_token.as_str().into());
+            state.set_main_draft_initialized(true);
+        }
+        state.set_main_provider(applied.provider.into());
+        state.set_main_model(applied.model.into());
+        let current_draft = state.get_main_draft_provider().as_str() == draft.provider
+            && state.get_main_draft_model().as_str() == draft.model;
+        state.set_main_provider_options(ModelRc::new(VecModel::from(
+            providers
+                .iter()
+                .map(|(value, label)| choice(value, label))
+                .collect::<Vec<_>>(),
+        )));
+        if current_draft {
+            state.set_main_provider_label(label.into());
+            state.set_main_model_options(ModelRc::new(VecModel::from(
+                models.iter().map(|id| choice(id, id)).collect::<Vec<_>>(),
+            )));
+        }
+        state.set_main_scope_token(scope_token.into());
+        state.set_main_ready(true);
+        state.set_main_defaults_ready(ready);
+        state.set_main_reasoning_supported(defaults.reasoning);
+        state.set_main_fast_supported(defaults.fast);
+        state.set_main_ultrafast_supported(defaults.ultrafast);
+        state.set_main_effort_options(ModelRc::new(VecModel::from(
+            hermes_core::model_settings::REASONING_VALUES
+                .iter()
+                .map(|value| choice(value, &effort_label(value)))
+                .collect::<Vec<_>>(),
+        )));
+        let mut speeds = vec![choice("normal", "Standard")];
+        if defaults.fast {
+            speeds.push(choice("fast", "Fast"));
+        }
+        if defaults.ultrafast {
+            speeds.push(choice("ultrafast", "Ultrafast"));
+        }
+        state.set_main_speed_options(ModelRc::new(VecModel::from(speeds)));
+        state.set_main_effort_label(effort_label(&defaults.effort).into());
+        state.set_main_effort(defaults.effort.into());
+        state.set_main_speed_label(
+            match defaults.speed.as_str() {
+                "fast" => "Fast",
+                "ultrafast" => "Ultrafast",
+                _ => "Standard",
+            }
+            .into(),
+        );
+        state.set_main_speed(defaults.speed.into());
+        state.set_busy(false);
+        state.set_error(SharedString::new());
+    });
+}
+
 // ── Load ────────────────────────────────────────────────────────────────────────
 
 /// Load (or reload) one widget's data into `ModelsState`.
@@ -370,29 +499,39 @@ async fn fetch_options(ctx: &Ctx) -> Result<Value, String> {
 }
 
 async fn load_main(ctx: &Ctx) {
-    ctx.ui(|ui| ui.global::<ModelsState>().set_busy(true));
-    let options = match fetch_options(ctx).await {
-        Ok(v) => v,
-        Err(e) => {
-            ctx.ui(|ui| ui.global::<ModelsState>().set_busy(false));
-            return push_error(ctx, format!("Could not load the model list: {e}"));
-        }
-    };
-    let query = cache(&ctx.scope).as_ref().expect("cache").main_query.clone();
-    let groups = build_groups(&options, &query);
-    let count = count_label(&groups, &query, "models");
-    let provider = text(&options, "provider");
-    let model = text(&options, "model");
-    let rows = groups.groups;
+    let scope_token = hermes_core::backend::percent_encode(&ctx.scope);
     ctx.ui(move |ui| {
         let state = ui.global::<ModelsState>();
-        state.set_main_groups(group_model(rows));
-        state.set_main_count(count.into());
-        state.set_main_provider(provider.into());
-        state.set_main_model(model.into());
-        state.set_busy(false);
-        state.set_error(SharedString::new());
+        state.set_busy(true);
+        state.set_main_ready(false);
+        state.set_main_scope_token(scope_token.into());
+        state.set_main_defaults_ready(false);
     });
+    let (options, config) = tokio::join!(fetch_options(ctx), ctx.config());
+    let options = match options {
+        Ok(value) => value,
+        Err(error) => {
+            ctx.ui(|ui| ui.global::<ModelsState>().set_busy(false));
+            return push_error(ctx, format!("Could not load the model list: {error}"));
+        }
+    };
+    let error = config.as_ref().err().cloned();
+    let config = config.ok();
+    {
+        let mut guard = cache(&ctx.scope);
+        let state = guard.as_mut().expect("cache");
+        let applied = ModelDraft::applied(&options);
+        // Only entering a profile initializes its draft. Reloads update Current separately.
+        state.main_draft.get_or_insert(applied);
+        state.config = config;
+    }
+    push_main(ctx);
+    if let Some(error) = error {
+        push_error(
+            ctx,
+            format!("Model loaded, but profile defaults are unavailable: {error}"),
+        );
+    }
 }
 
 async fn load_aux(ctx: &Ctx) {
@@ -535,8 +674,179 @@ async fn assign(ctx: &Ctx, body: &Value, ok: String) -> Outcome {
 }
 
 async fn set_main(ctx: &Ctx, provider: &str, model: &str) -> Outcome {
-    let body = json!({"scope": "main", "provider": provider, "model": model});
-    assign(ctx, &body, format!("Default model set to {provider} · {model}")).await
+    let result = stage_provider(ctx, provider);
+    if matches!(result, Outcome::Error(_)) {
+        return result;
+    }
+    let result = stage_model(ctx, model);
+    push_main(ctx);
+    result
+}
+
+fn push_draft_options(ctx: &Ctx) {
+    let (options, draft, query) = {
+        let guard = cache(&ctx.scope);
+        let state = guard.as_ref().expect("cache");
+        (
+            state.options.clone(),
+            state.main_draft.clone().unwrap_or_default(),
+            state.main_query.clone(),
+        )
+    };
+    let label = hermes_core::model_settings::provider(&options, &draft.provider)
+        .and_then(|row| row["name"].as_str())
+        .unwrap_or(&draft.provider)
+        .to_owned();
+    let models = hermes_core::model_settings::provider(&options, &draft.provider)
+        .and_then(|row| serde_json::from_value::<hermes_core::protocol::ModelOptionProvider>(row.clone()).ok())
+        .map(|row| row.model_ids())
+        .unwrap_or_default();
+    let needle = query.to_lowercase();
+    let models: Vec<_> = models
+        .into_iter()
+        .filter(|id| needle.is_empty() || id.to_lowercase().contains(&needle))
+        .collect();
+    ctx.ui(move |ui| {
+        let state = ui.global::<ModelsState>();
+        if state.get_main_draft_provider().as_str() == draft.provider
+            && state.get_main_draft_model().as_str() == draft.model
+        {
+            state.set_main_provider_label(label.into());
+            state.set_main_model_options(ModelRc::new(VecModel::from(
+                models.iter().map(|id| choice(id, id)).collect::<Vec<_>>(),
+            )));
+        }
+    });
+}
+
+fn stage_provider(ctx: &Ctx, provider: &str) -> Outcome {
+    {
+        let mut guard = cache(&ctx.scope);
+        let state = guard.as_mut().expect("cache");
+        let Some(draft) = &mut state.main_draft else {
+            return Outcome::Error("The model catalog has not loaded.".into());
+        };
+        if let Err(error) = draft.select_provider(&state.options, provider) {
+            return Outcome::Error(error);
+        }
+        state.main_query.clear();
+    }
+    push_draft_options(ctx);
+    Outcome::None
+}
+
+fn stage_model(ctx: &Ctx, model: &str) -> Outcome {
+    {
+        let mut guard = cache(&ctx.scope);
+        let state = guard.as_mut().expect("cache");
+        let Some(draft) = &mut state.main_draft else {
+            return Outcome::Error("The model catalog has not loaded.".into());
+        };
+        draft.model = model.to_owned();
+        state.main_query = model.to_owned();
+    }
+    push_draft_options(ctx);
+    Outcome::None
+}
+
+async fn apply_main(ctx: &Ctx) -> Outcome {
+    let (draft, body) = {
+        let guard = cache(&ctx.scope);
+        let state = guard.as_ref().expect("cache");
+        let Some(draft) = state.main_draft.clone() else {
+            return Outcome::Error("The model catalog has not loaded.".into());
+        };
+        let body = match draft.assignment(&state.options) {
+            Ok(body) => body,
+            Err(error) => return Outcome::Error(error),
+        };
+        (draft, body)
+    };
+    ctx.ui(|ui| ui.global::<ModelsState>().set_busy(true));
+    let result = apply_main_verified(ctx, &draft, &body).await;
+    ctx.ui(|ui| ui.global::<ModelsState>().set_busy(false));
+    match result {
+        Ok(()) => {
+            push_notice(
+                ctx,
+                &format!("Default model set to {} · {}", draft.provider, draft.model),
+            );
+            Outcome::Reload
+        }
+        Err(error) => Outcome::Error(error),
+    }
+}
+
+async fn apply_main_verified(ctx: &Ctx, draft: &ModelDraft, body: &Value) -> Result<(), String> {
+    let result = ctx.post_json(&scoped(ctx, "/api/model/set"), body).await?;
+    if result["confirm_required"].as_bool() == Some(true) || result["ok"].as_bool() == Some(false) {
+        return Err(result["confirm_message"]
+            .as_str()
+            .unwrap_or("The backend refused this model.")
+            .to_owned());
+    }
+    let saved = fetch_options(ctx).await?;
+    if !draft.matches(&saved) {
+        return Err("The saved model did not match this selection. Refresh before retrying.".into());
+    }
+    cache(&ctx.scope).as_mut().expect("cache").main_query.clear();
+    Ok(())
+}
+
+async fn save_default(ctx: &Ctx, key: &str, value: &str) -> Outcome {
+    let parsed = {
+        let guard = cache(&ctx.scope);
+        let state = guard.as_ref().expect("cache");
+        let Some(config) = &state.config else {
+            return Outcome::Error("Profile defaults have not loaded.".into());
+        };
+        match MainDefaults::read(&state.options, config).validate(key, value) {
+            Ok(value) => value,
+            Err(error) => {
+                drop(guard);
+                push_main(ctx);
+                return Outcome::Error(error);
+            }
+        }
+    };
+    ctx.ui(|ui| ui.global::<ModelsState>().set_busy(true));
+    let result = async {
+        ctx.config_set(key, parsed).await?;
+        let config = ctx.config().await?;
+        let options = cache(&ctx.scope).as_ref().expect("cache").options.clone();
+        let saved = MainDefaults::read(&options, &config);
+        let actual = if key == "agent.reasoning_effort" {
+            &saved.effort
+        } else {
+            &saved.speed
+        };
+        if actual != value {
+            return Err("The backend did not save this model default.".to_owned());
+        }
+        cache(&ctx.scope).as_mut().expect("cache").config = Some(config);
+        Ok(())
+    }
+    .await;
+    // Do not depend on the controller's broader config refresh to release this panel.
+    ctx.ui(|ui| ui.global::<ModelsState>().set_busy(false));
+    match result {
+        Ok(()) => {
+            push_main(ctx);
+            push_notice(
+                ctx,
+                if key == "agent.reasoning_effort" {
+                    "Reasoning default saved"
+                } else {
+                    "Speed default saved"
+                },
+            );
+            Outcome::Reload
+        }
+        Err(error) => {
+            load_main(ctx).await;
+            Outcome::Error(format!("Could not save this model default: {error}"))
+        }
+    }
 }
 
 async fn set_aux(ctx: &Ctx, task: &str, provider: &str, model: &str) -> Outcome {
@@ -589,11 +899,32 @@ async fn write_fallbacks(ctx: &Ctx, list: Vec<Value>, ok: &str) -> Outcome {
 
 /// One `models:<verb>[:<arg>]` action from the UI.
 pub(crate) async fn action(rest: &str, ctx: &Ctx) -> Outcome {
+    // Reject events still queued from the previously displayed profile.
+    let rest = if let Some(scoped) = rest.strip_prefix("main-scope:") {
+        let Some((token, action)) = scoped.split_once(':') else {
+            return Outcome::Error("Invalid model action.".into());
+        };
+        if token != hermes_core::backend::percent_encode(&ctx.scope) {
+            return Outcome::Error("The settings profile changed; no change was saved.".into());
+        }
+        action
+    } else {
+        rest
+    };
     let (verb, args) = rest.split_once(':').unwrap_or((rest, ""));
     // Any action clears the previous confirmation line.
     ctx.ui(|ui| ui.global::<ModelsState>().set_notice(SharedString::new()));
     match verb {
-        // models:pick:<provider>:<model> — the default-model list.
+        "stage-provider" => stage_provider(ctx, args),
+        "stage-model" => stage_model(ctx, args),
+        "apply" => apply_main(ctx).await,
+        "reload-main" => {
+            load_main(ctx).await;
+            Outcome::None
+        }
+        "default-effort" => save_default(ctx, "agent.reasoning_effort", args).await,
+        "default-speed" => save_default(ctx, "agent.service_tier", args).await,
+        // Compatibility with an older picker: stage its selection, never bypass Apply.
         "pick" => {
             let (provider, model) = args.split_once(':').unwrap_or((args, ""));
             set_main(ctx, provider, model).await

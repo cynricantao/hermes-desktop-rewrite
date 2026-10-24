@@ -69,6 +69,56 @@ prices, attachment preview limits and native notifications. Disabled controls do
 these features are implemented. Technical still exposes captured context and bounded
 previews rather than full raw inputs and unbounded output. No full page is accepted.
 
+## Main model parity batch (in progress)
+
+This page is being checked against original Hermes commit
+`5894e750c3dba980d43b25aa29e3958149ba2c61`, `model-settings.tsx`.
+Provider/model edits now stage until Apply. The applied model gates profile-default
+reasoning and Standard/Fast/Ultrafast controls; custom endpoint URLs are retained.
+The obsolete ungated Advanced service-tier row is replaced by these model defaults.
+New model actions carry the displayed profile token, and suggestion updates must match
+both provider and text before updating the view. They never write back over typed input.
+
+Four core helper tests and the software-rendered Apply/typing/layout check passed.
+The original missing-Apply check failed before implementation. The 53-page settings
+layout rerun passed after targeting `AccessibleRole::TextInput` instead of the sidebar tab.
+A real typing regression then exposed PopupWindow activation taking the editable combo's
+focus: the draft emptied and later characters were dropped. The shared Combobox restores
+field focus after opening suggestions. Separate-character typing and Down/Return pass.
+
+The isolated real-backend `model_settings` section passed 12 checks with zero failures:
+metadata/default loading, baseline, no autosave while typing, pointer Apply with independent
+readback, reasoning persistence, pending-draft preservation during a save-triggered refresh,
+unsupported-speed rejection, private second-profile setup,
+stale-profile action rejection, isolated profile save, and visible backend-write failure.
+The loopback metadata provider recorded zero inference requests. The latest harness also
+resets its owned fixture and restores its blocked config on unwind.
+
+The independent save-state review was checked against the actual callers. Controller
+commands await each widget operation serially (`controller.rs:871–872`), so overlapping
+controller reloads are not a current path; no speculative load-generation counter was
+added. UI input can still advance while those commands await. A live regression failed
+before the correction: a reasoning save's refresh overwrote the pending model draft.
+Same-profile refreshes now update Current and metadata without writing over the UI draft;
+profile changes initialize a separate draft. The regression passes.
+
+Failed initial model-list loads retain disabled write controls and expose a scoped Retry
+button, verified through a real pointer in the software UI test. A verified default save
+updates its cache and releases busy locally rather than relying on a broader config reload.
+The specific failure of that later broader reload is source-reviewed, not fault-injected.
+Legacy auxiliary/fallback/MoA actions remain for their later scope-hardening batches.
+Required local gates passed on this source: formatting, workspace Clippy with warnings
+denied, and workspace tests (591 passed, 0 failed, 25 ignored). The ignored live tests are
+not counted as executed; the separate private-backend section above was run explicitly.
+Linux gallery rendering/interactions passed; Windows reference comparison is a separate
+CI check. Local release/install delivery is reported with the draft PR, not inferred from
+these tests. Reasoning effort is newly accepted as an individual checklist item; no full
+settings page is accepted.
+
+This is not full-page acceptance. Inline provider credential setup, expensive-model
+confirmation, stale-auxiliary warnings, and exact custom-model store parity remain gaps.
+No real credentials, inference, owner desktop or everyday configuration are used.
+
 ## Wider source-audit findings
 
 The read-only audits flagged specialized gaps in shortcut rebinding, notification delivery,
@@ -92,7 +142,7 @@ not yet met this task's complete appearance-and-behaviour acceptance criteria.
 
 | Page | Full-page acceptance |
 |---|---|
-| Model → Main model | Pending |
+| Model → Main model | Partial; staged Apply and scoped reasoning verified; gaps above |
 | Model → Fallback models | Pending |
 | Model → Auxiliary models | Pending |
 | Model → Mixture of Agents | Pending |
