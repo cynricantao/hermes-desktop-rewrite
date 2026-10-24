@@ -474,15 +474,23 @@ export component Combobox inherits Rectangle {
     in property <string> placeholder;
     in property <string> label;
     in property <string> empty-text: "No suggestions";
+    in property <bool> enabled: true;
+    changed enabled => { if !root.enabled { popup.close(); } }
     callback edited(string);
     callback committed(string);
     height: Theme.control-h;
     min-width: 160px;
     property <int> hl: 0;
+    function show-suggestions() {
+        if !popup.is-open { popup.show(); }
+        // Popup activation takes focus. Suggestions must not interrupt free-text editing.
+        field.focus();
+    }
     FocusScope {
         capture-key-pressed(e) => {
+            if !root.enabled { return reject; }
             if e.text == Key.DownArrow {
-                if !popup.is-open { popup.show(); }
+                if !popup.is-open { root.show-suggestions(); }
                 else if root.options.length > 0 { root.hl = min(root.hl + 1, root.options.length - 1); }
                 return accept;
             }
@@ -493,12 +501,13 @@ export component Combobox inherits Rectangle {
             if e.text == Key.Return && popup.is-open && root.hl >= 0 && root.hl < root.options.length { root.text = root.options[root.hl].value; root.committed(root.text); popup.close(); return accept; }
             return reject;
         }
-        TextField {
+        field := TextField {
             width: root.width;
             text <=> root.text;
             placeholder: root.placeholder;
             label: root.label;
-            edited(t) => { root.hl = 0; root.edited(t); if root.options.length > 0 { popup.show(); } }
+            enabled: root.enabled;
+            edited(t) => { root.hl = 0; root.edited(t); if root.options.length > 0 { root.show-suggestions(); } }
             accepted(t) => { root.committed(t); popup.close(); }
             escape => { popup.close(); }
         }

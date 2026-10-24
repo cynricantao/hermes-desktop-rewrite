@@ -30,8 +30,11 @@ Status is updated in the same commit as the code it describes.
 ### Rewrite progress
 
 Counted from the markers below (re-count with `grep -c '^- \[x\]' docs/PARITY.md` etc.):
-**74 done · 363 partial · 349 not started · 8 unsupported** (of 794).
+**75 done · 362 partial · 349 not started · 8 unsupported** (of 794).
 Performance work is tracked separately in [PERF.md](PERF.md).
+Main model parity work is in progress: staged Apply, scoped defaults and private-backend
+save/failure checks pass. Reasoning effort is newly live-verified; full-page gaps remain;
+see [SETTINGS-PARITY.md](SETTINGS-PARITY.md).
 
 P0 review follow-up (2026-10-21): the gallery now has headless keyboard/pointer
 regressions for radio navigation, empty search results, inert menus, cascading menus,
@@ -691,13 +694,13 @@ owner-display run or full 53-page functional parity is claimed. No markers are p
 ## Settings — Model page
 
 - [x] Default model — config model / REST /api/model/set — src/app/settings/constants.ts
-  ⟶ `model.main` panel: `/api/model/options` grouped by provider with search + current marker, picked via POST /api/model/set — widgets live test: "4 providers · 130 models", a pick moved the backend's current provider and the panel followed (docs/screenshots/rs-widget-model-main.png)
+  ⟶ `model.main` stages a provider and free-form model id until Apply; the current pair remains separate. The isolated `model_settings` section verifies real typing, pointer Apply and independent `/api/model/options` readback, profile isolation and visible failed saves. Full-page gaps remain in SETTINGS-PARITY.md.
 - [~] Main model context override — config model_context_length — src/app/settings/constants.ts
   ⟶ registry row from the settings table; writes go through the same live-verified config path (PUT /api/config, exercised by the settings section) — not individually exercised
-- [~] Reasoning effort — config agent.reasoning_effort — src/app/settings/config-subpages.ts
-  ⟶ registry row from the settings table; writes go through the same live-verified config path (PUT /api/config, exercised by the settings section) — not individually exercised
+- [x] Reasoning effort — config agent.reasoning_effort — src/app/settings/config-subpages.ts
+  ⟶ Main model shows the applied model's capability-gated default. Verified by the isolated real-backend `model_settings` section: normal saves/readbacks, different-profile isolation, queued-draft survival and failed-save recovery; source and rendered checks are in SETTINGS-PARITY.md.
 - [~] Service tier — config agent.service_tier — src/app/settings/constants.ts
-  ⟶ registry row from the settings table; writes go through the same live-verified config path (PUT /api/config, exercised by the settings section) — not individually exercised
+  ⟶ Main model renders Standard/Fast/Ultrafast from the applied model's capabilities. Unit/UI checks cover the controls and unsupported writes fail closed against the private backend. Successful Fast/Ultrafast writes remain unverified live.
 - [x] Fallback models — config fallback_providers — src/app/settings/fallback-models-field.tsx
   ⟶ `fallback_providers` renders as a list editor (add via provider/model pickers, remove, move up/down) writing the config key — widgets live test: editor rows == config `fallback_providers` (docs/screenshots/rs-widget-model-fallbacks.png)
 - [x] Auxiliary (task) models — REST /api/model/auxiliary — src/app/settings/aux-task-rows.tsx
@@ -922,7 +925,7 @@ owner-display run or full 53-page functional parity is claimed. No markers are p
 - [~] API retries — config agent.api_max_retries — src/app/settings/constants.ts
   ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
 - [~] Service tier — config agent.service_tier — src/app/settings/constants.ts
-  ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written; same registry row as Model › Service tier (it lives on Advanced › Agent limits)
+  ⟶ Uses the same capability-gated Main model control noted above. The obsolete ungated Advanced duplicate was removed; successful Fast/Ultrafast writes remain unverified live.
 - [~] Tool-use enforcement — config agent.tool_use_enforcement — src/app/settings/constants.ts
   ⟶ renders on its registry page showing the backend's value (live 2026-10-17, tests/live_backend.rs `settings_pages`); saves through the live-verified config path (PUT /api/config) — not individually written
 - [~] Subagent model/provider/turn limit/concurrency/timeout/reasoning — config delegation.* — src/app/settings/constants.ts

@@ -2,8 +2,8 @@
 // per-task auxiliary models (`model.auxiliary`), Mixture of Agents (`model.moa`) and the
 // `fallback_providers` list editor.
 //
-// The controller (`crates/hermes-ui/src/widgets/models.rs`) owns every value in
-// `ModelsState`; this file only draws them and reports intents as
+// The controller (`crates/hermes-ui/src/widgets/models.rs`) owns loaded/applied state.
+// The view retains typed draft text and reports draft/save intents as
 // `act("<area>:<verb>[:<arg>]")` — settings.slint forwards those to
 // `SettingsState.action`. Rendered full-width inside the settings row for its id.
 
@@ -11,7 +11,7 @@ import { ScrollView } from "std-widgets.slint";
 import { Theme, Motion, Ease } from "theme.slint";
 import { PrimaryButton, GhostButton, Chip, Toggle, Segmented, IconButton, Spinner } from "components.slint";
 import { Icons } from "icons.slint";
-import { TextField } from "kit/kit.slint";
+import { TextField, Select, SelectOption, Combobox } from "kit/kit.slint";
 
 // ── Data the controller pushes ──────────────────────────────────────────────────
 
@@ -60,6 +60,26 @@ export global ModelsState {
     in-out property <string> main-count;
     in-out property <string> main-search;
     in-out property <[ModelGroup]> main-groups: [];
+    in-out property <[SelectOption]> main-provider-options: [];
+    in-out property <[SelectOption]> main-model-options: [];
+    in-out property <string> main-draft-provider;
+    in-out property <string> main-last-provider;
+    in-out property <string> main-draft-model;
+    in-out property <bool> main-draft-initialized: false;
+    in-out property <string> main-draft-scope-token;
+    in-out property <string> main-provider-label;
+    in-out property <bool> main-ready: false;
+    in-out property <string> main-scope-token;
+    in-out property <bool> main-defaults-ready: false;
+    in-out property <bool> main-reasoning-supported: false;
+    in-out property <bool> main-fast-supported: false;
+    in-out property <bool> main-ultrafast-supported: false;
+    in-out property <[SelectOption]> main-effort-options: [];
+    in-out property <[SelectOption]> main-speed-options: [];
+    in-out property <string> main-effort;
+    in-out property <string> main-effort-label;
+    in-out property <string> main-speed;
+    in-out property <string> main-speed-label;
 
     /// The one inline picker any "change" control opens (only one is open at a time).
     in-out property <string> picker-target;
@@ -208,53 +228,128 @@ component Picker inherits VerticalLayout {
 
 /// `model.main` — the default model.
 component MainPanel inherits VerticalLayout {
+    in property <bool> compact: false;
     callback act(string);
-    spacing: 8px;
+    function route(action: string) { root.act("models:main-scope:" + ModelsState.main-scope-token + ":" + action); }
+    property <length> control-w: root.compact ? 200px : 260px;
+    spacing: 12px;
+    Text {
+        text: "Choose a provider and model, then Apply to save this profile's default.";
+        font-size: Theme.fs-xs;
+        color: Theme.text-3;
+        wrap: word-wrap;
+    }
+    if !ModelsState.main-ready && !ModelsState.busy && ModelsState.error != "": GhostButton {
+        text: "Retry model list";
+        clicked => { root.route("reload-main"); }
+    }
     HorizontalLayout {
-        spacing: 10px;
-        Text {
-            text: ModelsState.main-count;
-            font-size: Theme.fs-sm;
-            color: Theme.text-3;
-            vertical-alignment: center;
+        spacing: 12px;
+        Text { text: "Provider"; font-size: Theme.fs-sm; color: Theme.text; vertical-alignment: center; horizontal-stretch: 1; }
+        Select {
+            min-width: root.control-w;
+            max-width: root.control-w;
             horizontal-stretch: 1;
+            options: ModelsState.main-provider-options;
+            value <=> ModelsState.main-draft-provider;
+            display: ModelsState.main-provider-label;
+            enabled: ModelsState.main-ready && !ModelsState.busy;
+            accessible-role: button;
+            accessible-label: "Main model provider";
+            changed(v) => {
+                if v != ModelsState.main-last-provider {
+                    ModelsState.main-draft-model = "";
+                    ModelsState.main-model-options = [];
+                }
+                ModelsState.main-last-provider = v;
+                root.route("stage-provider:" + v);
+            }
         }
-        Spinner {
-            width: 14px;
-            height: 14px;
-            visible: ModelsState.busy;
+    }
+    HorizontalLayout {
+        spacing: 12px;
+        Text { text: "Model"; font-size: Theme.fs-sm; color: Theme.text; vertical-alignment: center; horizontal-stretch: 1; }
+        Rectangle {
+            min-width: root.control-w;
+            max-width: root.control-w;
+            horizontal-stretch: 1;
+            height: Theme.control-h;
+            accessible-role: groupbox;
+            accessible-label: "Main model field";
+            Combobox {
+                width: parent.width;
+                enabled: ModelsState.main-ready && !ModelsState.busy;
+                options: ModelsState.main-model-options;
+                text <=> ModelsState.main-draft-model;
+                placeholder: "Choose or enter a model";
+                label: "Main model";
+                edited(t) => { root.route("stage-model:" + t); }
+                committed(t) => { root.route("stage-model:" + t); }
+            }
+        }
+    }
+    HorizontalLayout {
+        alignment: end;
+        spacing: 8px;
+        Spinner { visible: ModelsState.busy; width: 14px; height: 14px; }
+        PrimaryButton {
+            text: "Apply";
+            enabled: ModelsState.main-ready && !ModelsState.busy
+                && ModelsState.main-draft-provider != "" && ModelsState.main-draft-model != "";
+            clicked => { root.route("apply"); }
         }
     }
     Text {
-        text: ModelsState.main-provider == "" ? "" : ModelsState.main-provider + " · " + ModelsState.main-model;
-        font-size: Theme.fs-sm;
-        color: Theme.accent-text;
+        text: !ModelsState.main-ready || ModelsState.main-provider == "" ? "" : "Current: " + ModelsState.main-provider + " · " + ModelsState.main-model;
+        font-size: Theme.fs-xs;
+        color: Theme.text-3;
         wrap: word-wrap;
     }
-    TextField {
-        placeholder: "Search models";
-        label: "Search models";
-        text <=> ModelsState.main-search;
-        edited(t) => { root.act("models:mfilter:" + t); }
-        accepted(t) => { root.act("models:mfilter:" + t); }
-    }
-    Rectangle {
-        height: 232px;
-        clip: true;
-        border-radius: Theme.r-md;
-        border-width: 1px;
-        border-color: Theme.border;
-        background: Theme.surface;
-        GroupedList {
-            width: parent.width;
-            height: parent.height;
-            accessible-role: list;
-            accessible-label: "Default model list";
-            groups: ModelsState.main-groups;
-            current-provider: ModelsState.main-provider;
-            current-model: ModelsState.main-model;
-            prefix: "models:pick";
-            act(a) => { root.act(a); }
+    if ModelsState.main-defaults-ready && (ModelsState.main-reasoning-supported || ModelsState.main-fast-supported || ModelsState.main-ultrafast-supported): VerticalLayout {
+        spacing: 12px;
+        Text { text: "Defaults for new chats"; font-size: Theme.fs-xs; color: Theme.text-3; }
+        if ModelsState.main-reasoning-supported: HorizontalLayout {
+            spacing: 12px;
+            Text { text: "Reasoning"; font-size: Theme.fs-sm; color: Theme.text; vertical-alignment: center; horizontal-stretch: 1; }
+            Select {
+                min-width: root.control-w; max-width: root.control-w; horizontal-stretch: 1;
+                options: ModelsState.main-effort-options;
+                value <=> ModelsState.main-effort;
+                display: ModelsState.main-effort-label;
+                enabled: !ModelsState.busy;
+                accessible-role: button;
+                accessible-label: "Default reasoning";
+                changed(v) => { root.route("default-effort:" + v); }
+            }
+        }
+        if ModelsState.main-ultrafast-supported: HorizontalLayout {
+            spacing: 12px;
+            Text { text: "Speed"; font-size: Theme.fs-sm; color: Theme.text; vertical-alignment: center; horizontal-stretch: 1; }
+            Select {
+                min-width: root.control-w; max-width: root.control-w; horizontal-stretch: 1;
+                options: ModelsState.main-speed-options;
+                value <=> ModelsState.main-speed;
+                display: ModelsState.main-speed-label;
+                enabled: !ModelsState.busy;
+                accessible-role: button;
+                accessible-label: "Default speed";
+                changed(v) => { root.route("default-speed:" + v); }
+            }
+        }
+        if ModelsState.main-fast-supported && !ModelsState.main-ultrafast-supported: HorizontalLayout {
+            spacing: 12px;
+            Text { text: "Fast"; font-size: Theme.fs-sm; color: Theme.text; vertical-alignment: center; horizontal-stretch: 1; }
+            Toggle {
+                checked: ModelsState.main-speed == "fast";
+                enabled: !ModelsState.busy;
+                accessible-role: checkbox;
+                accessible-label: "Default fast mode";
+                toggled(v) => { root.route("default-speed:" + (v ? "fast" : "normal")); }
+            }
+        }
+        if ModelsState.main-fast-supported || ModelsState.main-ultrafast-supported: Text {
+            text: "Fast and Ultrafast may cost more at your provider.";
+            font-size: Theme.fs-xs; color: Theme.text-3; wrap: word-wrap;
         }
     }
 }
@@ -512,6 +607,7 @@ component FallbackPanel inherits VerticalLayout {
 
 export component ModelsWidget inherits VerticalLayout {
     in property <string> id;
+    in property <bool> compact: false;
     callback act(string);
     horizontal-stretch: 1;
     spacing: 8px;
@@ -538,7 +634,7 @@ export component ModelsWidget inherits VerticalLayout {
         font-size: Theme.fs-xs;
     }
 
-    if id == "model.main": MainPanel { act(a) => { root.act(a); } }
+    if id == "model.main": MainPanel { compact: root.compact; act(a) => { root.act(a); } }
     if id == "model.auxiliary": AuxPanel { act(a) => { root.act(a); } }
     if id == "model.moa": MoaPanel { act(a) => { root.act(a); } }
     if id == "fallback_providers": FallbackPanel { act(a) => { root.act(a); } }

@@ -423,6 +423,7 @@ component SettingRowView inherits Rectangle {
             }
             if root.item.area == "models": ModelsWidget {
                 id: root.item.id;
+                compact: root.compact;
                 act(a) => { SettingsState.action(a); }
             }
             if root.item.area == "providers": ProvidersWidget {

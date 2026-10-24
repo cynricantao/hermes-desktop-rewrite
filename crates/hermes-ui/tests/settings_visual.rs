@@ -6,9 +6,9 @@ use std::time::Duration;
 
 use hermes_core::settings;
 use hermes_ui::{
-    AppWindow, AppearanceState, ArchiveRow, KeyGroup, KeyRow, LocalModelRow, ModelGroup, ModelsState, Motion, NavEntry,
-    PaletteCard, PluginRow, PoolEntry, PoolGroup, ProvidersState, SavedConnRow, SettingRowUI, SettingsState,
-    SystemState, Theme, ThemeMode,
+    AppWindow, AppearanceState, ArchiveRow, KeyGroup, KeyRow, LocalModelRow, ModelsState, Motion, NavEntry,
+    PaletteCard, PluginRow, PoolEntry, PoolGroup, ProvidersState, SavedConnRow, SelectOption, SettingRowUI,
+    SettingsState, SystemState, Theme, ThemeMode,
 };
 use i_slint_backend_testing::{AccessibleRole, ElementHandle};
 use slint::platform::{PointerEventButton, WindowEvent};
@@ -337,55 +337,54 @@ fn settings_general_matches_reference_structure_and_controls() {
         click(&ui, &close);
         assert!(!ui.get_settings_open(), "close button dismisses the modal");
 
-        // Reproduce the supplied model-picker overlap with labelled catalog fixtures.
+        // Main model stages selections and exposes an explicit Apply boundary.
         ui.window().set_size(slint::LogicalSize::new(1280.0, 820.0));
         populate(&ui, "model", "main");
-        let models = vec![
-            "sample/fast".into(),
-            "sample/reasoning-small".into(),
-            "sample/reasoning-large".into(),
-        ];
         let model_state = ui.global::<ModelsState>();
         model_state.set_main_provider("sample".into());
         model_state.set_main_model("sample/fast".into());
-        model_state.set_main_count(format!("1 provider · {} models", models.len()).into());
-        model_state.set_main_groups(ModelRc::new(VecModel::from(vec![ModelGroup {
-            slug: "sample".into(),
-            name: "Sample provider".into(),
-            authenticated: true,
-            models: ModelRc::new(VecModel::from(models)),
+        model_state.set_main_draft_provider("sample".into());
+        model_state.set_main_draft_model("sample/reasoning-small".into());
+        model_state.set_main_provider_label("Sample provider".into());
+        model_state.set_main_ready(true);
+        model_state.set_main_provider_options(ModelRc::new(VecModel::from(vec![SelectOption {
+            value: "sample".into(),
+            label: "Sample provider".into(),
+            ..Default::default()
         }])));
         ui.set_settings_open(true);
         for (width, suffix) in [(1280.0, "wide"), (720.0, "narrow")] {
             ui.window().set_size(slint::LogicalSize::new(width, 820.0));
             frame(&ui, &format!("models-{suffix}-{mode}"));
-            let list = ElementHandle::find_by_accessible_label(&ui, "Default model list")
-                .next()
+            let provider = control(&ui, "Main model provider");
+            let model = ElementHandle::find_by_accessible_label(&ui, "Main model")
+                .find(|e| e.accessible_role() == Some(AccessibleRole::TextInput))
                 .unwrap();
-            let search = ElementHandle::find_by_accessible_label(&ui, "Search models")
-                .find(|e| e.accessible_role() != Some(AccessibleRole::Text))
-                .unwrap();
+            let apply = control(&ui, "Apply");
             let next = ElementHandle::find_by_accessible_label(&ui, "Main model context window (override)")
                 .next()
                 .unwrap();
-            assert!(list.size().height >= 220.0, "model list reserves its own height");
             assert!(
-                list.absolute_position().y >= search.absolute_position().y + search.size().height + 6.0,
-                "catalog cannot cover search"
+                model.absolute_position().y >= provider.absolute_position().y + provider.size().height + 6.0,
+                "provider and model controls do not overlap"
             );
             assert!(
-                next.absolute_position().y >= list.absolute_position().y + list.size().height + 10.0,
-                "next setting stays below model list"
+                apply.absolute_position().y >= model.absolute_position().y + model.size().height + 6.0,
+                "Apply remains below the model input"
+            );
+            assert!(
+                next.absolute_position().y >= apply.absolute_position().y + apply.size().height + 10.0,
+                "next setting stays below the model editor"
             );
         }
         let actions = Rc::new(RefCell::new(Vec::new()));
         let captured = actions.clone();
         ui.global::<SettingsState>()
             .on_action(move |action| captured.borrow_mut().push(action.to_string()));
-        click(&ui, &control(&ui, "Sample provider sample/reasoning-small"));
+        click(&ui, &control(&ui, "Apply"));
         assert_eq!(
             actions.borrow().last().map(String::as_str),
-            Some("models:pick:sample:sample/reasoning-small")
+            Some("models:main-scope::apply")
         );
 
         // All registry pages use the same shell. Verify its geometry with fixture/default

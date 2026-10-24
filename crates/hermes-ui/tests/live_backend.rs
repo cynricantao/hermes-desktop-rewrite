@@ -45,6 +45,8 @@ mod commands;
 mod composer;
 #[path = "live_backend/durable.rs"]
 mod durable;
+#[path = "live_backend/model_settings.rs"]
+mod model_settings;
 #[path = "live_backend/rich_seeded.rs"]
 mod rich_seeded;
 #[path = "live_backend/sidebar.rs"]
@@ -355,6 +357,9 @@ async fn script(ui: slint::Weak<AppWindow>, log: Log) {
     }
     if want("settings") {
         settings_section(&ui, &log).await;
+    }
+    if want("model_settings") {
+        model_settings::section(&ui, &log).await;
     }
     if want("chat_display") {
         chat_display::section(&ui, &log).await;
@@ -2981,62 +2986,40 @@ async fn settings_widgets_section(ui: &AppWindow, log: &Log) {
     // ── models/main: the default-model picker ───────────────────────────────────
     let m = ui.global::<hermes_ui::ModelsState>();
     s.invoke_goto("model".into(), "main".into());
-    let groups = wait_until(20, || m.get_main_groups().row_count() > 0).await;
-    let mut pick: Option<(String, String)> = None;
-    for g in m.get_main_groups().iter() {
-        for model in g.models.iter() {
-            let pair = (g.slug.to_string(), model.to_string());
-            if m.get_main_model() != pair.1 || m.get_main_provider() != pair.0 {
-                pick = Some(pair);
-                break;
-            }
-        }
-        if pick.is_some() {
-            break;
-        }
-    }
+    let loaded = wait_until(20, || {
+        m.get_main_ready() && m.get_main_provider_options().row_count() > 0
+    })
+    .await;
+    let provider = m.get_main_draft_provider().to_string();
+    let pick = m
+        .get_main_model_options()
+        .iter()
+        .find(|option| option.value != m.get_main_model())
+        .map(|option| option.value.to_string());
     record(
         log,
         "widgets: Model › Main lists providers and models",
-        groups && !m.get_main_count().is_empty() && pick.is_some(),
+        loaded && pick.is_some(),
         format!(
-            "groups={}, count={:?}, current={} · {}, wait={:?}",
-            m.get_main_groups().row_count(),
-            m.get_main_count(),
-            m.get_main_provider(),
-            m.get_main_model(),
-            pick
+            "providers={}, models={}",
+            m.get_main_provider_options().row_count(),
+            m.get_main_model_options().row_count()
         ),
     );
-    if let Some((provider, model)) = pick {
-        s.invoke_action(format!("models:pick:{provider}:{model}").into());
-        // The backend canonicalises some ids (e.g. `claude-fable-5.1` -> `claude-fable-5-1`),
-        // so panel and pick are compared with dots and dashes folded together.
-        let fold = |v: &str| v.replace('.', "-");
-        let want = fold(&model);
-        let ui_ok = wait_until(25, || fold(m.get_main_model().as_ref()) == want).await;
-        let mut backend_ok = false;
-        for _ in 0..67 {
-            let current_provider = probe.get("/api/model/options").ok().and_then(|v| {
-                v.get("providers").and_then(|p| p.as_array()).and_then(|list| {
-                    list.iter()
-                        .find(|p| p.get("is_current").and_then(|c| c.as_bool()).unwrap_or(false))
-                        .and_then(|p| p.get("slug").and_then(|s| s.as_str()).map(str::to_owned))
-                })
-            });
-            if current_provider.as_deref() == Some(provider.as_str()) {
-                backend_ok = true;
-                break;
-            }
-            sleep(300).await;
-        }
+    if let Some(model) = pick {
+        s.invoke_action(format!("models:stage-provider:{provider}").into());
+        s.invoke_action(format!("models:stage-model:{model}").into());
+        s.invoke_action("models:apply".into());
+        let ui_ok = wait_until(25, || m.get_main_model().as_str() == model).await;
+        let backend = probe.get("/api/model/options").ok();
+        let backend_ok = backend
+            .as_ref()
+            .is_some_and(|value| value["model"].as_str() == Some(model.as_str()));
         record(
             log,
-            "widgets: Model › Main sets the default model (backed by /api/model/set)",
+            "widgets: Model › Main applies the staged default model",
             ui_ok && backend_ok,
-            format!(
-                "picked {provider} · {model}; UI shows it={ui_ok}; /api/model/options marks that provider current={backend_ok}"
-            ),
+            format!("UI matches selection={ui_ok}; independent backend read matches={backend_ok}"),
         );
     }
 

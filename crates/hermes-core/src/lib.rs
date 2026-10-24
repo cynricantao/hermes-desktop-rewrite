@@ -48,6 +48,7 @@ pub mod input_requests;
 pub mod keybinds;
 pub mod markdown;
 pub mod markdown_code;
+pub mod model_settings;
 pub mod models;
 pub mod notify;
 pub mod prefs;
