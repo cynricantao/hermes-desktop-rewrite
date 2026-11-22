@@ -44,7 +44,9 @@ impl Controller {
             return;
         }
         if !self.attachments.is_empty() || !self.composer.files.is_empty() {
-            self.queue_paused.insert(key);
+            self.queue_paused.insert(key.clone());
+            self.sync_queue(&key);
+            self.persist_durable().await;
             self.banner(
                 "Queue paused to preserve your staged attachment. Send or remove it, then /queue resume.".into(),
                 false,
@@ -53,6 +55,10 @@ impl Controller {
         }
         if let Some(p) = self.queues.pop(&key) {
             self.publish_queue();
+            // Persist the pop before submitting: a restart must not resend a prompt
+            // that may already have run, and the failed-prompt draft covers failures.
+            self.sync_queue(&key);
+            self.persist_durable().await;
             // Queued text is a literal prompt, as in the CLI. Skill dispatches
             // have already been expanded before entering this FIFO.
             self.submit(p.text, p.display).await;
@@ -81,6 +87,8 @@ impl Controller {
         let (verb, rest) = arg.split_once(char::is_whitespace).unwrap_or((arg, ""));
         if arg == "resume" {
             self.queue_paused.remove(&sid);
+            self.sync_queue(&sid);
+            self.persist_durable().await;
             self.drain_queue().await;
         } else if matches!(verb, "" | "list" | "edit" | "rm" | "move" | "clear") {
             match self.queues.manage(&sid, arg) {
@@ -91,6 +99,13 @@ impl Controller {
                 }
             }
             self.publish_queue();
+            if matches!(verb, "edit" | "rm" | "move" | "clear") {
+                if verb == "clear" && rest.is_empty() {
+                    self.clear_durable_pending(&sid);
+                }
+                self.sync_queue(&sid);
+                self.persist_durable().await;
+            }
         } else {
             let text = if verb == "add" { rest.trim() } else { arg.trim() };
             if text.is_empty() {
@@ -106,7 +121,29 @@ impl Controller {
                 );
                 return false;
             }
+            if self.queues.len(&sid) >= hermes_core::durable::MAX_QUEUE_ENTRIES {
+                self.banner(
+                    format!(
+                        "Queue is full ({} pending prompts). Drain or clear it before adding another.",
+                        hermes_core::durable::MAX_QUEUE_ENTRIES
+                    ),
+                    true,
+                );
+                return false;
+            }
+            if text.len() > hermes_core::durable::MAX_PROMPT_BYTES {
+                self.banner(
+                    format!(
+                        "That prompt is too large to queue (limit {} bytes).",
+                        hermes_core::durable::MAX_PROMPT_BYTES
+                    ),
+                    true,
+                );
+                return false;
+            }
             self.enqueue(text.into(), text.into());
+            self.sync_queue(&sid);
+            self.persist_durable().await;
             self.drain_queue().await;
         }
         true
