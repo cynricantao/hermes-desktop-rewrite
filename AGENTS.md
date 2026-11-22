@@ -145,3 +145,38 @@ Use exactly these words when reporting:
 * **tested locally** — the named tests actually ran and passed (say which).
 * **pushed** — on the remote branch / in a draft PR.
 * **merged** — the user merged the PR. Agents never do this.
+
+## 13. Risk-based review and verification
+
+Read [REVIEW.md](REVIEW.md) before reviewing a change and the relevant sections of
+[docs/VERIFICATION.md](docs/VERIFICATION.md) before implementing or testing it. Use the
+[PR template](.github/pull_request_template.md) for evidence and recovery notes. These
+files supplement, not replace, the hard rules and pre-commit checks above.
+
+* State the intended outcome and important failure cases before substantial work. Keep
+  one coherent change per PR; preserve other agents' branches, files and in-progress work.
+* Classify the change by its possible impact, not its author. Low risk: documentation or
+  copy with no routing, permission or runtime change. Medium: ordinary UI or pure core
+  logic with bounded impact. High: session identity/routing, persistent writes, approvals,
+  credential handling, process execution, browser trust boundaries, updater/install code,
+  dependencies, CI or agent/review instructions. If uncertain, use the higher tier.
+* Review every final diff. Use a separate read-only reviewer for high-risk or complex
+  changes, with the intended behaviour and exact base/head. Confirm findings before
+  changing code; an agent verdict never replaces the user's merge decision.
+* Start with the smallest credible behaviour checks. Add tests for agreed requirements
+  or concrete regressions, not to mirror implementation details. Preserve the required
+  pre-commit gates in section 3. Re-run passed checks only when affected code, dependencies,
+  environment or a required gate changes. Benchmark only performance-sensitive changes.
+* Limit implementation recovery to the first attempt plus one focused correction. After
+  another failed implementation check, report the blocker. Diagnose infrastructure
+  failures separately and retry at most once. Later reviews focus on the new diff and
+  affected callers; do not repeat resolved findings or accumulate unrelated cleanup.
+* Mark backend-ready but unwired UI as partial. Documentation-only workflow changes claim
+  no new parity item; state that in the PR rather than changing parity counts.
+* As documented in [UPDATING.md](docs/UPDATING.md), merges to `main` can be installed by the
+  automatic updater. Treat merge approval as approval for that delivery path. State the
+  installed-behaviour impact and recovery route; do not install, merge, deploy or change
+  update/review settings as an implicit part of implementation.
+* Feed confirmed recurring failures into a focused test or short rule in these documents.
+  Record review rounds, requested human actions, escaped bugs and reverts in the PR or
+  incident notes. Judge automation by saved human effort without increased failures.
