@@ -38,8 +38,11 @@ export struct TableRow { cells: [TableCell] }
 
 // A display segment of an assistant reply (rows.rs `segments`).
 export struct Seg {
-    // 0 prose, 1 code, 2 diff, 3 table, 4 prose-like fence (plain wrapped text)
+    // 0 paragraph, 1 code, 2 diff, 3 table, 4 prose fence, 5 heading, 6 list item
     kind: int,
+    heading-level: int,
+    marker: string,
+    indent: int,
     md: styled-text,
     // code / diff / prose-fence source, for copy
     raw: string,
@@ -266,42 +269,43 @@ component CodeBlock inherits Rectangle {
             padding-top: 10px;
             padding-bottom: 10px;
             for l in root.seg.lines: Rectangle {
+                height: max(Theme.chat-code-line-h, code.preferred-height);
                 background: l.kind == 1 ? Theme.diff-add-bg : l.kind == 2 ? Theme.diff-del-bg : l.kind == 3 ? Theme.hover : transparent;
                 HorizontalLayout {
                     padding-left: 12px;
                     padding-right: 12px;
                     spacing: 8px;
                     if root.seg.kind == 2: Text {
-                        width: 28px;
+                        width: 28px * Theme.chat-scale;
                         text: l.old;
                         horizontal-alignment: right;
                         vertical-alignment: center;
                         font-family: Theme.mono-font;
-                        font-size: Theme.fs-xs;
+                        font-size: Theme.fs-chat-code - 2px * Theme.chat-scale;
                         color: Theme.text-4;
                     }
                     if root.seg.kind == 2: Text {
-                        width: 28px;
+                        width: 28px * Theme.chat-scale;
                         text: l.new;
                         horizontal-alignment: right;
                         vertical-alignment: center;
                         font-family: Theme.mono-font;
-                        font-size: Theme.fs-xs;
+                        font-size: Theme.fs-chat-code - 2px * Theme.chat-scale;
                         color: Theme.text-4;
                     }
                     if root.seg.kind == 2: Text {
-                        width: 10px;
+                        width: Theme.fs-chat-code;
                         text: l.kind == 1 ? "+" : l.kind == 2 ? "−" : "";
                         vertical-alignment: center;
                         font-family: Theme.mono-font;
-                        font-size: Theme.fs-sm;
+                        font-size: Theme.fs-chat-code;
                         color: l.kind == 1 ? Theme.diff-add-fg : Theme.diff-del-fg;
                     }
-                    StyledText {
+                    code := StyledText {
                         text: l.md;
                         default-font-family: Theme.mono-font;
-                        default-font-size: Theme.fs-sm;
-                        default-color: l.kind >= 3 ? Theme.text-3 : Theme.text.with-alpha(0.9);
+                        default-font-size: Theme.fs-chat-code;
+                        default-color: l.kind >= 3 ? Theme.text-3 : Theme.text;
                         vertical-alignment: center;
                     }
                 }
@@ -350,7 +354,9 @@ component CodeBlock inherits Rectangle {
 // to fit the column. (The original's draggable column sashes are not built yet.)
 component TableBlock inherits Rectangle {
     in property <Seg> seg;
-    property <float> scale: root.seg.total-w > 0 ? min(1, root.width / root.seg.total-w) : 1;
+    // Grow columns with the text before constraining the table to the viewport.
+    // Otherwise even short words split at 150% while most of the card stays empty.
+    property <float> scale: root.seg.total-w > 0 ? min(Theme.chat-scale, root.width / root.seg.total-w) : 1;
     height: body.preferred-height;
     border-radius: Theme.r-md;
     border-width: 1px;
@@ -368,7 +374,7 @@ component TableBlock inherits Rectangle {
                         x: 10px;
                         width: parent.width - 20px;
                         text: c.md;
-                        default-font-size: Theme.fs-md;
+                        default-font-size: Theme.fs-chat-table;
                         default-font-family: Theme.ui-font;
                         default-color: Theme.text;
                         horizontal-alignment: c.align == 1 ? center : c.align == 2 ? right : left;
@@ -387,7 +393,7 @@ component TableBlock inherits Rectangle {
                         x: 10px;
                         width: parent.width - 20px;
                         text: c.md;
-                        default-font-size: Theme.fs-md;
+                        default-font-size: Theme.fs-chat-table;
                         default-font-family: Theme.ui-font;
                         default-color: Theme.text-2;
                         link-color: Theme.link;
@@ -433,7 +439,9 @@ component MessageRow inherits Rectangle {
             Rectangle {
                 max-width: lay.width * 0.82;
                 border-radius: Theme.r-lg;
-                background: Theme.surface;
+                background: Theme.accent-soft;
+                border-width: 1px;
+                border-color: Theme.accent.with-alpha(0.18);
                 HorizontalLayout {
                     padding: 10px;
                     padding-left: 14px;
@@ -442,7 +450,7 @@ component MessageRow inherits Rectangle {
                         text: root.item.text;
                         wrap: word-wrap;
                         color: Theme.text;
-                        font-size: Theme.fs-body;
+                        font-size: Theme.fs-reply;
                     }
                 }
             }
@@ -454,17 +462,46 @@ component MessageRow inherits Rectangle {
         }
 
         if root.item.kind == 1: VerticalLayout {
-            spacing: 10px;
-            for s in root.item.segs: VerticalLayout {
-                if s.kind == 0: Rectangle {
-                    height: prose.preferred-height;
+            spacing: 0px;
+            for s[segment-index] in root.item.segs: VerticalLayout {
+                // Headings separate sections; adjacent list items stay grouped.
+                padding-top: segment-index == 0 ? 0px
+                    : s.kind == 5 ? Theme.reply-heading-gap
+                    : s.kind == 6 && root.item.segs[segment-index - 1].kind == 6 ? Theme.reply-list-gap
+                    : Theme.reply-block-gap;
+                if s.kind == 0 || s.kind == 4 || s.kind == 5 || s.kind == 6: Rectangle {
+                    property <length> gutter: s.kind == 6 ? max(28px, marker.preferred-width + Theme.space-md) : 0px;
+                    property <length> inset: s.kind == 6 ? s.indent * 6px : 0px;
+                    property <length> text-size: s.kind != 5 ? Theme.fs-reply
+                        : s.heading-level == 1 ? Theme.fs-reply-title
+                        : s.heading-level == 2 ? Theme.fs-reply-heading
+                        : s.heading-level == 3 ? Theme.fs-reply-subheading : Theme.fs-reply;
+                    height: max(prose.preferred-height, self.text-size * Theme.lh-body);
+                    marker := Text {
+                        visible: s.kind == 6;
+                        y: 0;
+                        height: self.preferred-height;
+                        x: parent.inset;
+                        width: max(0px, parent.gutter - Theme.space-md);
+                        text: s.marker;
+                        color: Theme.secondary;
+                        font-size: Theme.fs-reply;
+                        font-weight: 600;
+                        horizontal-alignment: right;
+                        accessible-label: "List marker " + s.marker;
+                    }
                     prose := StyledText {
-                        width: parent.width;
+                        y: 0;
+                        height: self.preferred-height;
+                        x: parent.inset + parent.gutter;
+                        width: max(0px, parent.width - self.x);
                         text: s.md;
-                        default-color: Theme.text;
-                        default-font-size: Theme.fs-body;
+                        default-color: Theme.foreground;
+                        default-font-size: parent.text-size;
                         default-font-family: Theme.ui-font;
-                        link-color: Theme.link;
+                        link-color: Theme.info;
+                        accessible-role: text;
+                        accessible-label: s.raw;
                     }
                 }
                 if s.kind == 1 || s.kind == 2: CodeBlock {
@@ -473,17 +510,6 @@ component MessageRow inherits Rectangle {
                     copy(t) => { root.copy(t); }
                 }
                 if s.kind == 3: TableBlock { seg: s; }
-                if s.kind == 4: Rectangle {
-                    height: fence-prose.preferred-height;
-                    fence-prose := StyledText {
-                        width: parent.width;
-                        text: s.md;
-                        default-color: Theme.text;
-                        default-font-size: Theme.fs-body;
-                        default-font-family: Theme.ui-font;
-                        link-color: Theme.link;
-                    }
-                }
             }
         }
 
@@ -781,7 +807,7 @@ export component Composer inherits Rectangle {
                     text <=> root.text;
                     single-line: false;
                     wrap: word-wrap;
-                    font-size: Theme.fs-body;
+                    font-size: Theme.fs-composer;
                     font-family: Theme.ui-font;
                     color: Theme.text;
                     selection-background-color: Theme.accent-soft;
@@ -792,7 +818,7 @@ export component Composer inherits Rectangle {
             if root.text == "": Text {
                 x: 0; y: 0;
                 text: root.placeholder;
-                font-size: Theme.fs-body;
+                font-size: Theme.fs-composer;
                 color: Theme.text-4;
             }
         }

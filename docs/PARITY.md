@@ -48,8 +48,33 @@ transcript-detail controls and the glass composer. The shell follows the documen
 256 px sidebar, 52 px header and 736 px conversation width. `workspace_visual` exercises
 light/dark, reduced-motion and minimum-window rendering with labelled fixture content;
 private `live_backend` sidebar/composer/rich-seeded checks exercise the existing actions.
-This visual pass adds no backend capability and promotes no checklist markers. Settings,
-secondary screens and the transcript's content renderers retain their existing views.
+This visual pass adds no backend capability and promotes no checklist markers. Settings
+and secondary screens retain their existing views.
+
+Reply presentation follow-up: prose is separated into paragraphs, headings and list items,
+with a larger reading size, hanging list markers and semantic colour accents. Sidebar
+branding uses aligned fixed slots. The styled-parser and row-conversion regressions
+pass, alongside the workspace headless rendering/pointer checks. No new live-backend
+parity claim or marker promotion is made.
+The settings shell retains the reference navigation and registry-driven controls, with
+theme-aware inputs, centred navigation icons and stacked wide controls on narrow pages.
+The model catalog reserves its height, palette cards fit their grid, credential/local-model
+rows use separate lines, and archived/plugin/connection actions occupy real layout slots.
+`settings_visual` renders all 53 registry pages in light/dark at wide/narrow sizes, with
+labelled widget fixtures and checks for switch/search/model/restore/endpoint input intents.
+These are local rendering/UI-intent checks, not backend persistence or provider inference.
+
+Typography refinement: reply heading levels now have distinct reading sizes, adjacent
+list items are grouped more tightly, and user/composer text is larger without enlarging
+sidebar controls. Code, diffs and tables honor Chat Text Size. `typography_visual`
+checks the actual AppWindow hierarchy, 80/100/150% sizing, narrow-window list gutters,
+composer bounds and text contrast across the five palettes. This changes presentation,
+not backend capability; no checklist markers are promoted by the typography pass.
+Tested locally: the typography rendering/contrast checks and existing workspace visual
+checks passed, `hermes-ui` lint passed with warnings denied, and 38 UI unit tests passed.
+The isolated no-inference `rich_seeded` run passed 9 checks, including hydrated code,
+tables/diffs, pointer copy and theme recolouring. Real-desktop rendering and provider
+inference are not claimed by these checks.
 
 
 ## Summary

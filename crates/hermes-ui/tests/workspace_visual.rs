@@ -187,6 +187,52 @@ fn workspace_renders_light_dark_narrow_and_reduced() {
         ])));
         state.set_draft("Check the narrow layout next.".into());
         frame(&ui, &format!("chat-{mode}"));
+        let toggle = ElementHandle::find_by_accessible_label(&ui, "Toggle sidebar (Ctrl+B)")
+            .next()
+            .unwrap();
+        let detail = ElementHandle::find_by_accessible_label(&ui, "Transcript detail")
+            .next()
+            .unwrap();
+        assert!(
+            (toggle.absolute_position().x - 264.0).abs() <= 1.0,
+            "header toggle stays beside the sidebar"
+        );
+        assert!((toggle.absolute_position().y + toggle.size().height / 2.0 - 26.0).abs() <= 1.0);
+        assert!(
+            (detail.absolute_position().x + detail.size().width - 1270.0).abs() <= 1.0,
+            "detail controls stay at the right edge"
+        );
+        let heading = ElementHandle::find_by_accessible_label(&ui, "Workspace review")
+            .next()
+            .unwrap();
+        let paragraph = ElementHandle::find_by_accessible_label(
+            &ui,
+            "The conversation stays centred, with navigation on the left and the message composer below.",
+        )
+        .next()
+        .unwrap();
+        let first_item = ElementHandle::find_by_accessible_label(&ui, "Keep the primary action visible.")
+            .next()
+            .unwrap();
+        assert!(paragraph.absolute_position().y >= heading.absolute_position().y + heading.size().height + 10.0);
+        assert!(first_item.absolute_position().y >= paragraph.absolute_position().y + paragraph.size().height + 10.0);
+        assert!(
+            first_item.absolute_position().x >= paragraph.absolute_position().x + 24.0,
+            "list has a hanging indent"
+        );
+        let mark = ElementHandle::find_by_element_type_name(&ui, "HermesMark")
+            .next()
+            .unwrap();
+        let lettering = ElementHandle::find_by_accessible_label(&ui, "Hermes")
+            .find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Text))
+            .unwrap();
+        assert!(
+            ((mark.absolute_position().y + mark.size().height / 2.0)
+                - (lettering.absolute_position().y + lettering.size().height / 2.0))
+                .abs()
+                <= 1.0,
+            "brand centres align"
+        );
         let transcript = ElementHandle::find_by_element_type_name(&ui, "Transcript")
             .next()
             .unwrap();
@@ -203,6 +249,25 @@ fn workspace_renders_light_dark_narrow_and_reduced() {
         ui.set_sidebar_open(true);
         ui.window().set_size(slint::LogicalSize::new(1280.0, 820.0));
         exercise_actions(&ui);
+
+        let original_rows = state.get_rows();
+        state.set_rows(ModelRc::new(VecModel::from(vec![
+            rows::to_row(0, &Block::Text { role: Role::User, text: "How do I introduce my app to people?".into(), reasoning: String::new(), streaming: false }, &ctx),
+            rows::to_row(1, &Block::Text { role: Role::Assistant, text: "Start with a few people you know. Show them the app and ask them to try it.\n\n## Three simple steps\n\n1. **Record a short video.** Show one useful task from start to finish, so someone can see what the app does.\n2. **Share it with a friend.** Ask them to try the same task and tell you where they get stuck.\n3. **Follow up tomorrow.** Ask whether it helped and improve the one thing that caused trouble.\n\nKeep the first test small. You can plan a wider launch after people find it useful.\n\nSee the [launch checklist](https://example.com/checklist) for a worked example.".into(), reasoning: String::new(), streaming: false }, &ctx),
+        ])));
+        frame(&ui, &format!("reading-{mode}"));
+        let marker = ElementHandle::find_by_accessible_label(&ui, "List marker 1.")
+            .next()
+            .unwrap();
+        let item = ElementHandle::find_by_accessible_label(&ui, "**Record a short video.** Show one useful task from start to finish, so someone can see what the app does.").next().unwrap();
+        assert!(
+            marker.absolute_position().x + marker.size().width + 6.0 <= item.absolute_position().x,
+            "number stays outside the wrapped text"
+        );
+        assert!((marker.absolute_position().y - item.absolute_position().y).abs() <= 1.0);
+        ui.window().set_size(slint::LogicalSize::new(720.0, 620.0));
+        frame(&ui, &format!("reading-narrow-{mode}"));
+        state.set_rows(original_rows);
 
         ui.window().set_size(slint::LogicalSize::new(720.0, 480.0));
         state.set_model_label("A provider/model identifier that is much longer than the available space".into());

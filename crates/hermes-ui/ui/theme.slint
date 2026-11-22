@@ -174,7 +174,18 @@ export global Theme {
     out property <length> fs-h2: 18px;
     out property <length> fs-display: 28px;  // empty-state title
     out property <length> fs-chat: 14px * chat-scale;
+    // Conversation reading scale, independent of compact controls and code.
+    out property <length> fs-reply: 16px * chat-scale;
+    out property <length> fs-reply-title: 24px * chat-scale;
+    out property <length> fs-reply-heading: 20px * chat-scale;
+    out property <length> fs-reply-subheading: 18px * chat-scale;
+    out property <length> fs-composer: 15px * chat-scale;
+    out property <length> fs-chat-table: 14px * chat-scale;
+    out property <length> reply-block-gap: 12px * chat-scale;
+    out property <length> reply-heading-gap: 20px * chat-scale;
+    out property <length> reply-list-gap: 6px * chat-scale;
     out property <length> fs-chat-code: 13px * chat-scale;
+    out property <length> chat-code-line-h: 20px * chat-scale;
     out property <float> lh-body: 1.5;
 
     // ── Radii ───────────────────────────────────────────────────────────────────────

@@ -7,10 +7,11 @@
 // `act("<area>:<verb>[:<arg>]")` — settings.slint forwards those to
 // `SettingsState.action`. Rendered full-width inside the settings row for its id.
 
-import { ScrollView, LineEdit } from "std-widgets.slint";
+import { ScrollView } from "std-widgets.slint";
 import { Theme, Motion, Ease } from "theme.slint";
 import { PrimaryButton, GhostButton, Chip, Toggle, Segmented, IconButton, Spinner } from "components.slint";
 import { Icons } from "icons.slint";
+import { TextField } from "kit/kit.slint";
 
 // ── Data the controller pushes ──────────────────────────────────────────────────
 
@@ -120,15 +121,18 @@ component GroupedList inherits ScrollView {
                 accessible-label: g.name + " " + m;
                 accessible-action-default => { root.act(root.prefix + ":" + g.slug + ":" + m); }
                 HorizontalLayout {
-                    alignment: center;
                     padding-left: 8px;
                     padding-right: 8px;
                     spacing: 8px;
-                    if g.slug == root.current-provider && m == root.current-model: Image {
-                        source: Icons.get("check");
+                    Rectangle {
                         width: 12px;
-                        height: 12px;
-                        colorize: Theme.accent;
+                        if g.slug == root.current-provider && m == root.current-model: Image {
+                            y: (parent.height - self.height) / 2;
+                            source: Icons.get("check");
+                            width: 12px;
+                            height: 12px;
+                            colorize: Theme.accent;
+                        }
                     }
                     Text {
                         text: m;
@@ -182,8 +186,9 @@ component Picker inherits VerticalLayout {
                     clicked => { root.act("models:clear:" + root.target); }
                 }
             }
-            LineEdit {
-                placeholder-text: "Search models";
+            TextField {
+                placeholder: "Search models";
+                label: "Search models";
                 text <=> ModelsState.picker-search;
                 edited(t) => { root.act("models:pfilter:" + t); }
                 accepted(t) => { root.act("models:pfilter:" + t); }
@@ -206,7 +211,6 @@ component MainPanel inherits VerticalLayout {
     callback act(string);
     spacing: 8px;
     HorizontalLayout {
-        alignment: center;
         spacing: 10px;
         Text {
             text: ModelsState.main-count;
@@ -220,25 +224,32 @@ component MainPanel inherits VerticalLayout {
             height: 14px;
             visible: ModelsState.busy;
         }
-        Text {
-            text: ModelsState.main-provider == "" ? "" : ModelsState.main-provider + " · " + ModelsState.main-model;
-            font-size: Theme.fs-sm;
-            color: Theme.text-2;
-            vertical-alignment: center;
-        }
     }
-    LineEdit {
-        placeholder-text: "Search models";
+    Text {
+        text: ModelsState.main-provider == "" ? "" : ModelsState.main-provider + " · " + ModelsState.main-model;
+        font-size: Theme.fs-sm;
+        color: Theme.accent-text;
+        wrap: word-wrap;
+    }
+    TextField {
+        placeholder: "Search models";
+        label: "Search models";
         text <=> ModelsState.main-search;
         edited(t) => { root.act("models:mfilter:" + t); }
         accepted(t) => { root.act("models:mfilter:" + t); }
     }
     Rectangle {
+        height: 232px;
+        clip: true;
         border-radius: Theme.r-md;
         border-width: 1px;
         border-color: Theme.border;
         background: Theme.surface;
         GroupedList {
+            width: parent.width;
+            height: parent.height;
+            accessible-role: list;
+            accessible-label: "Default model list";
             groups: ModelsState.main-groups;
             current-provider: ModelsState.main-provider;
             current-model: ModelsState.main-model;

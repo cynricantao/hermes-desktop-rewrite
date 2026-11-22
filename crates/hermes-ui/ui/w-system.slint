@@ -10,10 +10,11 @@
 // Two-click confirms are drawn from state the module keeps: the first click arms
 // (button relabels to "Confirm …"), the second performs the destructive call.
 
-import { LineEdit, ScrollView } from "std-widgets.slint";
+import { ScrollView } from "std-widgets.slint";
 import { Theme, Motion, Ease } from "theme.slint";
 import { GhostButton, PrimaryButton, Toggle } from "components.slint";
 import { Icons } from "icons.slint";
+import { TextField } from "kit/kit.slint";
 
 // ── Models the controller fills ────────────────────────────────────────────────
 
@@ -188,10 +189,11 @@ component ListRowBox inherits Rectangle {
     in property <string> title;
     in property <string> caption;
     in property <string> meta;
-    height: 46px;
+    height: max(46px, content.preferred-height + 12px);
     border-radius: Theme.r-md;
     background: rta.has-hover ? Theme.hover : transparent;
-    HorizontalLayout {
+    rta := TouchArea { }
+    content := HorizontalLayout {
         padding-left: 10px;
         padding-right: 6px;
         spacing: 10px;
@@ -214,15 +216,18 @@ component ListRowBox inherits Rectangle {
                 overflow: elide;
                 vertical-alignment: center;
             }
+            if root.meta != "": Text {
+                text: root.meta;
+                color: Theme.text-3;
+                font-size: Theme.fs-xs;
+                wrap: word-wrap;
+            }
         }
-        if root.meta != "": Text {
-            text: root.meta;
-            color: Theme.text-3;
-            font-size: Theme.fs-xs;
-            vertical-alignment: center;
+        VerticalLayout {
+            alignment: center;
+            @children
         }
     }
-    rta := TouchArea { }
 }
 
 export component SystemWidget inherits VerticalLayout {
@@ -256,8 +261,7 @@ export component SystemWidget inherits VerticalLayout {
             caption: r.preview;
             meta: r.hint;
             HorizontalLayout {
-                x: parent.width - self.width - 8px;
-                y: (parent.height - self.height) / 2;
+                height: 32px;
                 spacing: 4px;
                 GhostButton {
                     text: "Restore";
@@ -339,8 +343,7 @@ export component SystemWidget inherits VerticalLayout {
                 title: s.label;
                 caption: s.endpoint;
                 HorizontalLayout {
-                    x: parent.width - self.width - 8px;
-                    y: (parent.height - self.height) / 2;
+                    height: 32px;
                     spacing: 4px;
                     GhostButton {
                         text: "Command";
@@ -359,9 +362,9 @@ export component SystemWidget inherits VerticalLayout {
         HorizontalLayout {
             spacing: 8px;
             height: 36px;
-            label := LineEdit {
-                placeholder-text: "Name for this connection";
-                font-size: Theme.fs-sm;
+            label := TextField {
+                placeholder: "Name for this connection";
+                label: "Connection name";
                 horizontal-stretch: 1;
                 height: 32px;
                 // The module (not the UI) owns the label; `act` is the only path back.
@@ -419,7 +422,6 @@ export component SystemWidget inherits VerticalLayout {
             Fact { label: "Estimated cost"; value: SystemState.usage-cost; }
             Fact { label: "Sessions"; value: SystemState.usage-sessions; }
             for m[i] in SystemState.usage-models: ListRowBox {
-                height: 40px;
                 title: m.model;
                 meta: m.tokens + " · " + m.cost + " · " + m.sessions;
             }
@@ -486,8 +488,7 @@ export component SystemWidget inherits VerticalLayout {
             title: p.label + (p.version != "" ? "  " + p.version : "");
             caption: p.description;
             HorizontalLayout {
-                x: parent.width - self.width - 8px;
-                y: (parent.height - self.height) / 2;
+                height: 32px;
                 spacing: 4px;
                 Toggle {
                     checked: !p.hidden;

@@ -2,8 +2,9 @@
 
 Status: **P1 workspace migration**. The main shell, sidebar navigation and composer now
 use the P0 kit, including the Hermes wordmark, a 256 px sidebar, 52 px header and 736 px
-conversation column. Transcript content renderers and secondary screens still use the
-existing views and legacy token aliases in `ui/theme.slint`; this is not full UI parity.
+conversation column. Reply prose now uses separate paragraphs, coloured headings and
+hanging list markers at a 16 px reading size; code, diff, table and secondary views
+retain their existing renderers. This is not full UI parity.
 
 The previous Claude-Desktop-inspired specification (measured CDS tokens, the 60/120/200/
 300 ms ladder) is superseded. It remains readable in git history
@@ -99,8 +100,18 @@ The desktop presets shared with the Electron app (`midnight`, `ember`, `mono`,
 
 Inter (UI) and JetBrains Mono (code/terminal), bundled, OFL. Scale: 11 meta · 12 rows/
 chips · 13 controls · 14 body · 16/18 headings. `Theme.chat-scale` (device-local *Chat
-Text Size*) multiplies `fs-chat` / `fs-chat-code` only — "Sidebars and controls stay the
-same size." *UI Scale* is applied as the window scale factor (P3). *Chat Font* and
+Text Size*) scales conversation, composer and code text only — "Sidebars and controls stay the
+same size." Conversation prose and user messages use `fs-reply` (16 px). Markdown
+heading levels 1/2/3 use 24/20/18 px; deeper headings keep the 16 px reading size with
+bold emphasis. Headings use the primary foreground, links use info blue and list markers
+use bronze. Paragraphs have a 12 px gap, section headings have 20 px above them, and
+adjacent list items have a tighter 6 px gap. These sizes and gaps scale with `chat-scale`.
+The composer uses 15 px, tables 14 px, and code/diffs 13 px with 20 px line boxes;
+all honor Chat Text Size, including diff numbers and signs. Control/sidebar typography
+and the component-gallery type scale are unchanged.
+List markers sit in a separate gutter so wrapped text keeps its hanging indent. The
+inline Slint renderer does not expose line-height; paragraph spacing is explicit.
+*UI Scale* is applied as the window scale factor (P3). *Chat Font* and
 *Terminal Font* set `ui-font` / `mono-font` (blank = bundled font).
 
 ## 4. Components (kit)

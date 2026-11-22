@@ -15,7 +15,7 @@ import { ProjectItem, ProjectState, ProjectsModal } from "projects.slint";
 import { CapAction, CapItem, CapState, CapabilitiesModal } from "capabilities.slint";
 import { InputCard, InputChoice, InputState } from "input-card.slint";
 import { SessionItem, SessionRow } from "session-row.slint";
-import { Wordmark, HermesMark, TextField, Button, ButtonVariant, NavItem as KitNavItem, IconButton as KitIconButton, Segmented as KitSegmented } from "kit/kit.slint";
+import { HermesMark, TextField, Button, ButtonVariant, NavItem as KitNavItem, IconButton as KitIconButton, Segmented as KitSegmented } from "kit/kit.slint";
 
 export { CommandItem, Theme, Motion, ThemeMode, ChatRow, ToolRow, SettingsState, ProjectItem, ProjectState, AppearanceState, ModelsState, ProvidersState, SystemState, CapAction, CapItem, CapState, InputChoice, InputState, ModelItem, EditModelRow, SessionItem }
 
@@ -141,10 +141,23 @@ component Sidebar inherits Rectangle {
         padding-bottom: Theme.space-md;
         spacing: Theme.space-xs;
 
-        HorizontalLayout {
+        // Fixed brand slots keep the mark and lettering on one centre line.
+        Rectangle {
             height: Theme.topbar-h - Theme.space-md;
-            padding-left: Theme.space-md;
-            Wordmark { size: Theme.fs-h3; }
+            HermesMark {
+                x: Theme.space-md;
+                y: (parent.height - self.height) / 2;
+                size: Theme.control-h;
+            }
+            Text {
+                x: Theme.space-md + Theme.control-h + Theme.space-sm;
+                height: parent.height;
+                text: "Hermes";
+                font-size: Theme.fs-h2;
+                font-weight: 650;
+                color: Theme.foreground;
+                vertical-alignment: center;
+            }
         }
 
         TextField {
@@ -396,18 +409,22 @@ export component AppWindow inherits Window {
             width: root.width - root.sb-w;
             height: root.height;
 
-            // Title strip
+            // Fixed-height slots centre controls without changing horizontal anchors.
             HorizontalLayout {
                 y: 0;
+                width: parent.width;
                 height: Theme.topbar-h;
-                padding-left: 8px;
+                padding-left: Theme.space-md;
                 padding-right: 10px;
-                spacing: 6px;
-                KitIconButton {
-                    y: (parent.height - self.height) / 2;
-                    icon: "panel-left";
-                    label: "Toggle sidebar (Ctrl+B)";
-                    clicked => { root.sidebar-open = !root.sidebar-open; }
+                spacing: Theme.space-sm;
+                Rectangle {
+                    width: Theme.control-h;
+                    KitIconButton {
+                        y: (parent.height - self.height) / 2;
+                        icon: "panel-left";
+                        label: "Toggle sidebar (Ctrl+B)";
+                        clicked => { root.sidebar-open = !root.sidebar-open; }
+                    }
                 }
                 Text {
                     text: root.empty ? "New chat" : AppState.session-title;
@@ -417,18 +434,24 @@ export component AppWindow inherits Window {
                     overflow: elide;
                     horizontal-stretch: 1;
                 }
-                if AppState.connection != "open": Chip {
-                    y: (parent.height - self.height) / 2;
-                    interactive: false;
-                    outlined: true;
-                    text: AppState.connection == "error" ? "Offline" : "Connecting";
+                if AppState.connection != "open": Rectangle {
+                    width: status-chip.width;
+                    status-chip := Chip {
+                        y: (parent.height - self.height) / 2;
+                        interactive: false;
+                        outlined: true;
+                        text: AppState.connection == "error" ? "Offline" : "Connecting";
+                    }
                 }
-                if !root.empty: KitSegmented {
-                    y: (parent.height - self.height) / 2;
+                if !root.empty: Rectangle {
                     width: main.width < 600px ? 196px : 228px;
-                    label: "Transcript detail";
-                    options: ["Normal", "Thinking", "Verbose"];
-                    selected <=> AppState.transcript-mode;
+                    KitSegmented {
+                        y: (parent.height - self.height) / 2;
+                        width: parent.width;
+                        label: "Transcript detail";
+                        options: ["Normal", "Thinking", "Verbose"];
+                        selected <=> AppState.transcript-mode;
+                    }
                 }
             }
 
