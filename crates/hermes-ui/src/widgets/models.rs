@@ -40,6 +40,8 @@
 //! * `models:moa-enabled:<0|1>`, `models:moa-preset:<name>`, `models:moa-ref-enabled:<i>:<0|1>`,
 //!   `models:moa-ref-remove:<i>`, `models:moa-fanout:<i>`, `models:moa-policy:<i>`.
 
+mod fallbacks;
+
 use hermes_core::model_settings::{MainDefaults, ModelDraft};
 use std::sync::{Mutex, MutexGuard};
 
@@ -48,6 +50,16 @@ use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::widgets::{Ctx, Outcome};
 use crate::{AuxRow, FbRow, MoaRef, ModelGroup, ModelsState};
+
+pub(crate) fn connect(ui: &crate::AppWindow) {
+    let state = ui.global::<ModelsState>();
+    state.on_pack_fallback(|verb, context, row, value, revision| {
+        hermes_core::fallbacks::encode_action(&verb, &context, &row, &value, revision).into()
+    });
+    state.on_pack_choice(|scope, target, provider, model| {
+        hermes_core::model_settings::encode_picker_choice(&scope, &target, &provider, &model).into()
+    });
+}
 
 /// Widget ids this module draws.
 pub(crate) fn owns(id: &str) -> bool {
@@ -92,6 +104,8 @@ struct Cache {
     /// Last `/api/model/options` payload.
     options: Value,
     main_draft: Option<ModelDraft>,
+    fallbacks: Option<hermes_core::fallbacks::Draft>,
+    fb_revision: i32,
     config: Option<Value>,
     /// Last `/api/model/moa` payload (the full object PUT back after an edit).
     moa: Value,
@@ -302,6 +316,7 @@ fn push_picker(ctx: &Ctx, target: &str, groups: Vec<GroupData>) {
 
 /// Fill `ModelsState` from a MoA payload for the preset being edited.
 fn push_moa(ctx: &Ctx, moa: &Value, preset: &str) {
+    let scope_token = hermes_core::backend::percent_encode(&ctx.scope);
     let names = preset_names(moa);
     let default = default_preset_name(moa);
     let selected = if names.iter().any(|n| n == preset) {
@@ -442,6 +457,7 @@ fn push_main(ctx: &Ctx) {
                 models.iter().map(|id| choice(id, id)).collect::<Vec<_>>(),
             )));
         }
+        state.set_scope_token(scope_token.clone().into());
         state.set_main_scope_token(scope_token.into());
         state.set_main_ready(true);
         state.set_main_defaults_ready(ready);
@@ -486,7 +502,7 @@ pub(crate) async fn load(id: &str, ctx: &Ctx) {
         "model.main" => load_main(ctx).await,
         "model.auxiliary" => load_aux(ctx).await,
         "model.moa" => load_moa(ctx).await,
-        "fallback_providers" => load_fallbacks(ctx).await,
+        "fallback_providers" => fallbacks::load(ctx).await,
         _ => {}
     }
 }
@@ -504,6 +520,7 @@ async fn load_main(ctx: &Ctx) {
         let state = ui.global::<ModelsState>();
         state.set_busy(true);
         state.set_main_ready(false);
+        state.set_scope_token(scope_token.clone().into());
         state.set_main_scope_token(scope_token.into());
         state.set_main_defaults_ready(false);
     });
@@ -535,6 +552,7 @@ async fn load_main(ctx: &Ctx) {
 }
 
 async fn load_aux(ctx: &Ctx) {
+    let scope_token = hermes_core::backend::percent_encode(&ctx.scope);
     let payload = match ctx.get_json(&scoped(ctx, "/api/model/auxiliary")).await {
         Ok(v) => v,
         Err(e) => return push_error(ctx, format!("Could not load the auxiliary models: {e}")),
@@ -586,6 +604,8 @@ async fn load_aux(ctx: &Ctx) {
         .unwrap_or_default();
     ctx.ui(move |ui| {
         let state = ui.global::<ModelsState>();
+        state.set_scope_token(scope_token.into());
+        state.set_picker_target(SharedString::new());
         state.set_aux_rows(ModelRc::new(VecModel::from(rows)));
         state.set_error(SharedString::new());
     });
@@ -619,6 +639,7 @@ async fn load_fallbacks(ctx: &Ctx) {
         .map(|entry| FbRow {
             provider: text(entry, "provider").into(),
             model: text(entry, "model").into(),
+            ..Default::default()
         })
         .collect();
     ctx.ui(move |ui| {
@@ -899,22 +920,57 @@ async fn write_fallbacks(ctx: &Ctx, list: Vec<Value>, ok: &str) -> Outcome {
 
 /// One `models:<verb>[:<arg>]` action from the UI.
 pub(crate) async fn action(rest: &str, ctx: &Ctx) -> Outcome {
-    // Reject events still queued from the previously displayed profile.
-    let rest = if let Some(scoped) = rest.strip_prefix("main-scope:") {
+    let (rest, tagged) = if let Some(scoped) = rest.strip_prefix("scope:") {
         let Some((token, action)) = scoped.split_once(':') else {
             return Outcome::Error("Invalid model action.".into());
         };
         if token != hermes_core::backend::percent_encode(&ctx.scope) {
             return Outcome::Error("The settings profile changed; no change was saved.".into());
         }
-        action
+        let Some(action) = action.strip_prefix("models:") else {
+            return Outcome::Error("Invalid model action.".into());
+        };
+        (action, true)
     } else {
-        rest
+        (rest, false)
+    };
+    let (rest, tagged) = if let Some(scoped) = rest.strip_prefix("main-scope:") {
+        let Some((token, action)) = scoped.split_once(':') else {
+            return Outcome::Error("Invalid model action.".into());
+        };
+        if token != hermes_core::backend::percent_encode(&ctx.scope) {
+            return Outcome::Error("The settings profile changed; no change was saved.".into());
+        }
+        (action, true)
+    } else {
+        (rest, tagged)
     };
     let (verb, args) = rest.split_once(':').unwrap_or((rest, ""));
-    // Any action clears the previous confirmation line.
-    ctx.ui(|ui| ui.global::<ModelsState>().set_notice(SharedString::new()));
+    if !tagged && !matches!(verb, "fallback" | "choose-safe") {
+        return Outcome::Error("The model action has no profile token; reopen Settings.".into());
+    }
+    if !matches!(
+        verb,
+        "stage-model" | "stage-provider" | "pfilter" | "mfilter" | "fallback"
+    ) {
+        ctx.ui(|ui| ui.global::<ModelsState>().set_notice(SharedString::new()));
+    }
     match verb {
+        "fallback" => fallbacks::action(args, ctx).await,
+        "reload-fallbacks" => {
+            fallbacks::load(ctx).await;
+            Outcome::None
+        }
+        "choose-safe" => {
+            let choice = match hermes_core::model_settings::decode_picker_choice(args) {
+                Ok(c) => c,
+                Err(e) => return Outcome::Error(e),
+            };
+            if choice.scope != hermes_core::backend::percent_encode(&ctx.scope) {
+                return Outcome::Error("The settings profile changed; no change was saved.".into());
+            }
+            choose(ctx, &choice.target, &choice.provider, &choice.model).await
+        }
         "stage-provider" => stage_provider(ctx, args),
         "stage-model" => stage_model(ctx, args),
         "apply" => apply_main(ctx).await,
@@ -941,7 +997,7 @@ pub(crate) async fn action(rest: &str, ctx: &Ctx) -> Outcome {
             Some(task) => set_aux(ctx, task, "auto", "").await,
             None => Outcome::Error(format!("Nothing to clear for “{args}”")),
         },
-        "fbup" | "fbdown" | "fbremove" => fallback_edit(ctx, verb, args).await,
+        "fbup" | "fbdown" | "fbremove" => Outcome::Error("Reopen Fallback models to use stable row controls.".into()),
         "moa-enabled" => {
             let on = args == "1";
             moa_edit(
@@ -1166,8 +1222,8 @@ async fn choose(ctx: &Ctx, target: &str, provider: &str, model: &str) -> Outcome
             });
         })
         .await
-    } else if let Some(slot) = target.strip_prefix("fb.") {
-        set_fallback(ctx, slot, provider, model).await
+    } else if target.starts_with("fb.") {
+        Outcome::Error("Reopen Fallback models to use the current editor.".into())
     } else {
         Outcome::Error(format!("Unknown model target “{target}”"))
     };

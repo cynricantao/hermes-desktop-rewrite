@@ -4,6 +4,33 @@ use serde_json::{Value, json};
 
 pub const REASONING_VALUES: &[&str] = crate::projects::REASONING_LEVELS;
 
+/// Picker payloads are JSON, never raw colon-separated provider/model identities.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PickerChoice {
+    pub scope: String,
+    pub target: String,
+    pub provider: String,
+    pub model: String,
+}
+
+pub fn encode_picker_choice(scope: &str, target: &str, provider: &str, model: &str) -> String {
+    let choice = PickerChoice {
+        scope: scope.into(),
+        target: target.into(),
+        provider: provider.into(),
+        model: model.into(),
+    };
+    format!(
+        "models:choose-safe:{}",
+        serde_json::to_string(&choice).expect("string choice serializes")
+    )
+}
+
+pub fn decode_picker_choice(value: &str) -> Result<PickerChoice, String> {
+    serde_json::from_str(value).map_err(|_| "Invalid model choice; no change was saved.".into())
+}
+
 /// Resolve catalog identities without splitting provider ids such as `custom:local`.
 pub fn provider<'a>(options: &'a Value, name: &str) -> Option<&'a Value> {
     let rows = options.get("providers")?.as_array()?;
@@ -142,6 +169,15 @@ mod tests {
             {"slug":"other", "models":["plain"], "capabilities":{"plain":{"reasoning":false,"ultrafast":true}}}
         ]})
     }
+    #[test]
+    fn picker_choices_preserve_qualified_ids_and_scope() {
+        let encoded = encode_picker_choice("work", "aux.vision", "custom:local", "org/model:v2");
+        let choice = decode_picker_choice(encoded.strip_prefix("models:choose-safe:").unwrap()).unwrap();
+        assert_eq!(choice.provider, "custom:local");
+        assert_eq!(choice.model, "org/model:v2");
+        assert_eq!(choice.scope, "work");
+    }
+
     #[test]
     fn switching_provider_stages_without_carrying_the_old_model() {
         let options = catalog();

@@ -41,6 +41,7 @@ pub mod commands;
 pub mod composer;
 pub mod diff;
 pub mod durable;
+pub mod fallbacks;
 pub mod flip;
 pub mod highlight;
 pub mod http;

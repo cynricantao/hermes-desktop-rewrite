@@ -11,7 +11,7 @@ import { ScrollView } from "std-widgets.slint";
 import { Theme, Motion, Ease } from "theme.slint";
 import { PrimaryButton, GhostButton, Chip, Toggle, Segmented, IconButton, Spinner } from "components.slint";
 import { Icons } from "icons.slint";
-import { TextField, Select, SelectOption, Combobox } from "kit/kit.slint";
+import { TextField, Select, SelectOption, Combobox, Button, ButtonVariant, IconButton as KitIconButton } from "kit/kit.slint";
 
 // ── Data the controller pushes ──────────────────────────────────────────────────
 
@@ -45,14 +45,21 @@ export struct MoaRef {
 
 /// One `fallback_providers` entry.
 export struct FbRow {
+    key: string,
     provider: string,
+    provider-label: string,
     model: string,
+    options: [SelectOption],
 }
 
 export global ModelsState {
     in-out property <bool> busy: false;
     in-out property <string> error;
     in-out property <string> notice;
+    in-out property <string> scope-token;
+    // Pure serializers only. Backend requests still go through SettingsState.action.
+    callback pack-fallback(string, string, string, string, int) -> string;
+    callback pack-choice(string, string, string, string) -> string;
 
     // Default model (`model.main`).
     in-out property <string> main-provider;
@@ -105,6 +112,13 @@ export global ModelsState {
 
     // Fallback models.
     in-out property <[FbRow]> fb-rows: [];
+    in-out property <[SelectOption]> fb-providers: [];
+    in-out property <string> fb-context;
+    in-out property <int> fb-revision: 0;
+    in-out property <bool> fb-ready: false;
+    in-out property <bool> fb-saving: false;
+    in-out property <bool> fb-dirty: false;
+    in-out property <bool> fb-save-failed: false;
 }
 
 // ── Shared pieces ───────────────────────────────────────────────────────────────
@@ -115,7 +129,7 @@ component GroupedList inherits ScrollView {
     in property <[ModelGroup]> groups: [];
     in property <string> current-provider;
     in property <string> current-model;
-    in property <string> prefix;
+    in property <string> target;
     callback act(string);
     height: 232px;
     VerticalLayout {
@@ -139,7 +153,7 @@ component GroupedList inherits ScrollView {
                 animate background { duration: Motion.fast; }
                 accessible-role: button;
                 accessible-label: g.name + " " + m;
-                accessible-action-default => { root.act(root.prefix + ":" + g.slug + ":" + m); }
+                accessible-action-default => { root.act(ModelsState.pack-choice(ModelsState.scope-token, root.target, g.slug, m)); }
                 HorizontalLayout {
                     padding-left: 8px;
                     padding-right: 8px;
@@ -165,7 +179,7 @@ component GroupedList inherits ScrollView {
                 }
                 ta := TouchArea {
                     mouse-cursor: pointer;
-                    clicked => { root.act(root.prefix + ":" + g.slug + ":" + m); }
+                    clicked => { root.act(ModelsState.pack-choice(ModelsState.scope-token, root.target, g.slug, m)); }
                 }
             }
         }
@@ -217,7 +231,7 @@ component Picker inherits VerticalLayout {
                 groups: ModelsState.picker-groups;
                 current-provider: root.current-provider;
                 current-model: root.current-model;
-                prefix: "models:choose:" + root.target;
+                target: root.target;
                 act(a) => { root.act(a); }
             }
         }
@@ -230,7 +244,7 @@ component Picker inherits VerticalLayout {
 component MainPanel inherits VerticalLayout {
     in property <bool> compact: false;
     callback act(string);
-    function route(action: string) { root.act("models:main-scope:" + ModelsState.main-scope-token + ":" + action); }
+    function route(action: string) { root.act("models:" + action); }
     property <length> control-w: root.compact ? 200px : 260px;
     spacing: 12px;
     Text {
@@ -534,74 +548,95 @@ component MoaPanel inherits VerticalLayout {
 
 /// `fallback_providers` — the ordered fallback chain.
 component FallbackPanel inherits VerticalLayout {
+    in property <bool> compact: false;
     callback act(string);
-    spacing: 6px;
-    if ModelsState.fb-rows.length == 0: Text {
-        text: "No fallbacks: they are tried in order if the default model fails.";
-        font-size: Theme.fs-sm;
-        color: Theme.text-4;
-        wrap: word-wrap;
+    function edit(verb: string, key: string, value: string) {
+        ModelsState.fb-revision = mod(ModelsState.fb-revision + 1, 1000000000);
+        ModelsState.fb-dirty = true;
+        root.act(ModelsState.pack-fallback(verb, ModelsState.fb-context, key, value, ModelsState.fb-revision));
+    }
+    spacing: 10px;
+    Text {
+        text: "Fallbacks are tried in order if the main model fails. Only rows with both a provider and model are saved.";
+        color: Theme.text-3; font-size: Theme.fs-xs; wrap: word-wrap;
+    }
+    if !ModelsState.fb-ready: GhostButton {
+        text: "Retry fallback models";
+        clicked => { root.act("models:reload-fallbacks"); }
+    }
+    if ModelsState.fb-ready && ModelsState.fb-rows.length == 0: Text {
+        text: "No fallback models configured.";
+        color: Theme.text-4; font-size: Theme.fs-sm;
     }
     for row[i] in ModelsState.fb-rows: VerticalLayout {
-        spacing: 4px;
+        spacing: 6px;
         HorizontalLayout {
-            alignment: center;
             spacing: 8px;
-            Text {
-                text: "\{i + 1}";
-                width: 16px;
-                horizontal-alignment: center;
-                font-size: Theme.fs-xs;
-                color: Theme.text-4;
-                vertical-alignment: center;
+            Text { text: "Fallback " + (i + 1); color: Theme.text-3; font-size: Theme.fs-xs; vertical-alignment: center; horizontal-stretch: 1; }
+            KitIconButton {
+                icon: "arrow-up";
+                label: "Move fallback " + (i + 1) + " up";
+                enabled: ModelsState.fb-ready && i > 0;
+                clicked => { root.edit("up", row.key, ""); }
             }
-            Chip {
-                text: row.provider == "" ? "Choose a model" : row.provider + " · " + row.model;
-                has-chevron: true;
-                clicked => { root.act("models:open:fb." + i); }
+            KitIconButton {
+                icon: "arrow-down";
+                label: "Move fallback " + (i + 1) + " down";
+                enabled: ModelsState.fb-ready && i + 1 < ModelsState.fb-rows.length;
+                clicked => { root.edit("down", row.key, ""); }
             }
-            Rectangle { horizontal-stretch: 1; }
-            IconButton {
-                icon: Icons.get("arrow-up");
-                tooltip: "Move up";
-                visible: i > 0;
-                clicked => { root.act("models:fbup:" + i); }
-            }
-            IconButton {
-                icon: Icons.get("arrow-down");
-                tooltip: "Move down";
-                visible: i + 1 < ModelsState.fb-rows.length;
-                clicked => { root.act("models:fbdown:" + i); }
-            }
-            IconButton {
-                icon: Icons.get("x");
-                tooltip: "Remove";
-                clicked => { root.act("models:fbremove:" + i); }
+            KitIconButton {
+                icon: "x";
+                label: "Remove fallback " + (i + 1);
+                enabled: ModelsState.fb-ready;
+                clicked => { root.edit("remove", row.key, ""); }
             }
         }
-        if ModelsState.picker-target == "fb." + i: Picker {
-            target: "fb." + i;
-            title: "Fallback " + (i + 1);
-            current-provider: row.provider;
-            current-model: row.model;
-            clear-label: "";
-            act(a) => { root.act(a); }
+        Select {
+            horizontal-stretch: 1;
+            options: ModelsState.fb-providers;
+            value <=> row.provider;
+            display: row.provider-label;
+            placeholder: "Provider";
+            enabled: ModelsState.fb-ready;
+            accessible-role: button;
+            accessible-label: "Fallback provider " + (i + 1);
+            changed(v) => {
+                row.model = "";
+                row.options = [];
+                root.edit("provider", row.key, v);
+            }
+        }
+        Combobox {
+            horizontal-stretch: 1;
+            options: row.options;
+            text <=> row.model;
+            placeholder: "Choose or enter a model";
+            label: "Fallback model " + (i + 1);
+            enabled: ModelsState.fb-ready;
+            edited(v) => { root.edit("model", row.key, v); }
+            committed(v) => { root.edit("model", row.key, v); }
+        }
+        if row.provider == "" || row.model == "": Text {
+            text: "Draft row. Choose both a provider and a model to save it.";
+            color: Theme.text-4; font-size: Theme.fs-xs; wrap: word-wrap;
         }
     }
     HorizontalLayout {
-        spacing: 6px;
-        GhostButton {
+        spacing: 8px;
+        Button {
+            variant: ButtonVariant.ghost;
             text: "Add fallback";
-            clicked => { root.act("models:open:fb.new"); }
+            enabled: ModelsState.fb-ready;
+            clicked => { root.edit("add", "", ""); }
         }
-    }
-    if ModelsState.picker-target == "fb.new": Picker {
-        target: "fb.new";
-        title: "Add a fallback model";
-        current-provider: "";
-        current-model: "";
-        clear-label: "";
-        act(a) => { root.act(a); }
+        if ModelsState.fb-save-failed: Button {
+            variant: ButtonVariant.ghost;
+            text: "Retry save";
+            enabled: ModelsState.fb-ready && !ModelsState.fb-saving;
+            clicked => { root.act(ModelsState.pack-fallback("flush", ModelsState.fb-context, "", "", ModelsState.fb-revision)); }
+        }
+        Spinner { visible: ModelsState.fb-saving; width: 14px; height: 14px; }
     }
 }
 
@@ -634,8 +669,8 @@ export component ModelsWidget inherits VerticalLayout {
         font-size: Theme.fs-xs;
     }
 
-    if id == "model.main": MainPanel { compact: root.compact; act(a) => { root.act(a); } }
-    if id == "model.auxiliary": AuxPanel { act(a) => { root.act(a); } }
-    if id == "model.moa": MoaPanel { act(a) => { root.act(a); } }
-    if id == "fallback_providers": FallbackPanel { act(a) => { root.act(a); } }
+    if id == "model.main": MainPanel { compact: root.compact; act(a) => { root.act("models:scope:" + ModelsState.scope-token + ":" + a); } }
+    if id == "model.auxiliary": AuxPanel { act(a) => { root.act("models:scope:" + ModelsState.scope-token + ":" + a); } }
+    if id == "model.moa": MoaPanel { act(a) => { root.act("models:scope:" + ModelsState.scope-token + ":" + a); } }
+    if id == "fallback_providers": FallbackPanel { compact: root.compact; act(a) => { root.act("models:scope:" + ModelsState.scope-token + ":" + a); } }
 }

@@ -373,8 +373,26 @@ pub fn start(ui: &AppWindow, rt: &tokio::runtime::Runtime) {
         }));
     });
     let t = tx.clone();
+    widgets::models::connect(ui);
+    let fallback_timer = slint::Timer::default();
     s.on_action(move |id| {
-        let _ = t.send(Cmd::Settings(SettingsCmd::Action(id.into())));
+        let _ = t.send(Cmd::Settings(SettingsCmd::Action(id.clone().into())));
+        if let Some((prefix, payload)) = id.as_str().split_once("models:fallback:")
+            && let Ok(request) = hermes_core::fallbacks::decode_action(payload)
+            && matches!(
+                request.verb.as_str(),
+                "add" | "provider" | "model" | "remove" | "up" | "down"
+            )
+        {
+            let flush = format!(
+                "{prefix}{}",
+                hermes_core::fallbacks::encode_action("flush", &request.context, "", "", request.revision,)
+            );
+            let sender = t.clone();
+            fallback_timer.start(slint::TimerMode::SingleShot, Duration::from_millis(550), move || {
+                let _ = sender.send(Cmd::Settings(SettingsCmd::Action(flush.clone())));
+            });
+        }
     });
     let t = tx.clone();
     s.on_export_config(move || {

@@ -92,6 +92,7 @@ fn main_model_has_an_explicit_apply_boundary() {
             "fixture-provider",
             "Fixture provider",
         )])));
+        state.set_scope_token("work".into());
         state.set_main_scope_token("work".into());
         state.set_main_ready(true);
         state.set_main_defaults_ready(true);
@@ -163,12 +164,12 @@ fn main_model_has_an_explicit_apply_boundary() {
             actions
                 .borrow()
                 .iter()
-                .all(|action| action != "models:main-scope:work:apply")
+                .all(|action| action != "models:scope:work:models:apply")
         );
         click(&ui, &control(&ui, "Apply"));
         assert_eq!(
             actions.borrow().last().map(String::as_str),
-            Some("models:main-scope:work:apply")
+            Some("models:scope:work:models:apply")
         );
         for width in [1280.0, 720.0] {
             ui.window().set_size(slint::LogicalSize::new(width, 820.0));
@@ -235,7 +236,7 @@ fn main_model_has_an_explicit_apply_boundary() {
         click(&ui, &control(&ui, "Retry model list"));
         assert_eq!(
             actions.borrow().last().map(String::as_str),
-            Some("models:main-scope:work:reload-main")
+            Some("models:scope:work:models:reload-main")
         );
         ui.hide().unwrap();
     }
